@@ -1,0 +1,20 @@
+{
+  "name": "mary-app",
+  "version": "1.0.0",
+  "description": "Mary ERP Application",
+  "main": "src/main.jsx",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "react",
+    "vite",
+    "erp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
