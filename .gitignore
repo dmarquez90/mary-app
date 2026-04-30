@@ -1,1 +1,3 @@
-node_modules/  dist/ 
+mary-app/node_modules/
+mary-app/dist/
+mary-app/.env
