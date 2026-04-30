@@ -1,12 +1,15 @@
+
 import { useState, useMemo } from 'react'
 import { useStore } from '../store'
+import { useT } from '../i18n'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, DangerBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 
 const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unidad:'m²', cantidad:'', costo_mo:'', costo_materiales:'', costo_equipos:'' })
 
 export default function Presupuesto() {
   const { state, dispatch } = useStore()
+  const t = useT()
   const { proyectos, presupuesto } = state
   const [proyId, setProyId] = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer] = useState(false)
@@ -32,7 +35,6 @@ export default function Presupuesto() {
   const openAdd = (tipo) => {
     const f = emptyForm()
     f.tipo = tipo
-    // Pre-select parent from selected row
     if (selected) {
       const sel = items.find(i => i.id === selected)
       if (sel) {
@@ -73,53 +75,51 @@ export default function Presupuesto() {
     <div className="p-6 max-w-full">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">Presupuesto Maestro</h1>
+          <h1 className="text-xl font-semibold text-gray-800">{t('pres_title')}</h1>
           {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
         </div>
         <div className="flex items-center gap-3">
           <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1D9E75]" value={proyId} onChange={e => { setProyId(e.target.value); setSelected(null) }}>
-            <option value="">— Seleccionar proyecto —</option>
+            <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
         </div>
       </div>
 
       {!proyId ? (
-        <EmptyState icon={Icons.budget} title="Selecciona un proyecto" subtitle="Elige un proyecto del selector para ver su presupuesto" />
+        <EmptyState icon={Icons.budget} title={t('pres_no_project')} subtitle={t('pres_empty_sub')} />
       ) : (
         <>
-          {/* Toolbar */}
           <div className="bg-white border border-gray-100 rounded-xl mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0">
             <TBtn onClick={() => openAdd('etapa')} disabled={closed}>
-              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>+ Etapa
+              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>{t('pres_add_stage')}
             </TBtn>
             <TBtn onClick={() => openAdd('sub_etapa')} disabled={closed || stages.length === 0}>
-              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#185FA5'}}/>+ Sub-Etapa
+              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#185FA5'}}/>{t('pres_add_substage')}
             </TBtn>
             <TBtn onClick={() => openAdd('actividad')} disabled={closed || substages.length === 0}>
-              <span className="w-2 h-2 rounded-sm inline-block mr-1 bg-gray-400"/>+ Actividad
+              <span className="w-2 h-2 rounded-sm inline-block mr-1 bg-gray-400"/>{t('pres_add_activity')}
             </TBtn>
             <div className="w-px h-5 bg-gray-200 mx-1" />
-            <TBtn onClick={openEdit} disabled={!selected}>✎ Editar</TBtn>
-            <TBtn danger onClick={() => selected && setConfirmDel(selected)} disabled={!selected}>✕ Eliminar</TBtn>
+            <TBtn onClick={openEdit} disabled={!selected}>✎ {t('btn_edit')}</TBtn>
+            <TBtn danger onClick={() => selected && setConfirmDel(selected)} disabled={!selected}>✕ {t('btn_delete')}</TBtn>
             <div className="ml-auto flex items-center gap-2 text-sm">
-              <span className="text-gray-400 text-xs">Gran Total:</span>
+              <span className="text-gray-400 text-xs">{t('pres_grand_total')}:</span>
               <span className="font-semibold font-mono text-sm" style={{color:'#1D9E75'}}>{fmt(grandTotal, moneda)}</span>
             </div>
           </div>
 
-          {/* Table */}
           {flat.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-xl rounded-t-none py-16">
-              <EmptyState icon={Icons.table} title="No hay presupuesto cargado"
-                subtitle="Agrega la primera Etapa para comenzar" action="Agregar primera Etapa" onAction={() => openAdd('etapa')} />
+              <EmptyState icon={Icons.table} title={t('pres_empty')}
+                subtitle={t('pres_empty_sub')} action={t('pres_add_stage')} onAction={() => openAdd('etapa')} />
             </div>
           ) : (
             <div className="bg-white border border-gray-100 rounded-xl rounded-t-none overflow-x-auto">
               <table className="w-full min-w-[860px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {['ID','Descripción','Unidad','Cantidad','M.O. Unit.','Mat. Unit.','Eq./Trans.','Costo Unit.','Costo Total'].map((h, i) => (
+                    {['ID', t('pres_col_desc'), t('pres_col_unit'), t('pres_col_qty'), t('pres_col_mo'), t('pres_col_mat'), t('pres_col_eq'), t('pres_col_uc'), t('pres_col_total')].map((h, i) => (
                       <th key={h} className={`px-3 py-3 text-xs text-gray-500 whitespace-nowrap ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
                     ))}
                   </tr>
@@ -162,7 +162,7 @@ export default function Presupuesto() {
                     )
                   })}
                   <tr className="bg-gray-50 border-t border-gray-200">
-                    <td colSpan={8} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Presupuesto</td>
+                    <td colSpan={8} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('pres_grand_total')}</td>
                     <td className="px-3 py-3 text-right text-sm font-bold font-mono" style={{color:'#1D9E75'}}>{fmt(grandTotal, moneda)}</td>
                   </tr>
                 </tbody>
@@ -172,29 +172,28 @@ export default function Presupuesto() {
         </>
       )}
 
-      {/* Drawer */}
       <Drawer open={drawer} onClose={() => setDrawer(false)}
-        title={editing ? `Editar ${form.tipo === 'etapa' ? 'Etapa' : form.tipo === 'sub_etapa' ? 'Sub-Etapa' : 'Actividad'}` : `Agregar ${form.tipo === 'etapa' ? 'Etapa' : form.tipo === 'sub_etapa' ? 'Sub-Etapa' : 'Actividad'}`}
+        title={editing ? `${t('btn_edit')} ${form.tipo === 'etapa' ? t('pres_form_stage') : form.tipo === 'sub_etapa' ? t('pres_form_substage') : t('pres_form_activity')}` : `${t('btn_add')} ${form.tipo === 'etapa' ? t('pres_form_stage') : form.tipo === 'sub_etapa' ? t('pres_form_substage') : t('pres_form_activity')}`}
         width={380}>
 
         {form.tipo === 'sub_etapa' && !editing && (
-          <Field label="Etapa padre" required>
+          <Field label={t('pres_form_parent_stage')} required>
             <select className={selectCls} value={form.parent_id} onChange={set('parent_id')}>
-              <option value="">— Seleccionar —</option>
+              <option value="">{t('lbl_select')}</option>
               {stages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
             </select>
           </Field>
         )}
         {form.tipo === 'actividad' && !editing && (
-          <Field label="Sub-Etapa padre" required>
+          <Field label={t('pres_form_parent_sub')} required>
             <select className={selectCls} value={form.parent_id} onChange={set('parent_id')}>
-              <option value="">— Seleccionar —</option>
+              <option value="">{t('lbl_select')}</option>
               {substages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
             </select>
           </Field>
         )}
 
-        <Field label="Descripción" required>
+        <Field label={t('pres_form_desc')} required>
           <input className={inputCls} value={form.descripcion} onChange={set('descripcion')}
             placeholder={form.tipo === 'etapa' ? 'Ej: Obras Preliminares' : form.tipo === 'sub_etapa' ? 'Ej: Movimiento de Tierras' : 'Ej: Excavación manual'} />
         </Field>
@@ -202,32 +201,32 @@ export default function Presupuesto() {
         {form.tipo === 'actividad' && (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Unidad">
+              <Field label={t('pres_form_unit')}>
                 <select className={selectCls} value={form.unidad} onChange={set('unidad')}>
                   {UNIDADES.map(u => <option key={u}>{u}</option>)}
                 </select>
               </Field>
-              <Field label="Cantidad">
+              <Field label={t('pres_form_qty')}>
                 <input type="number" className={inputCls} value={form.cantidad} onChange={set('cantidad')} placeholder="0.00" min="0" step="0.01" />
               </Field>
             </div>
-            <SectionBox title="Costo Unitario — Desglose">
-              <Field label="Mano de Obra (por unidad)">
+            <SectionBox title={t('pres_unit_cost')}>
+              <Field label={t('pres_form_mo')}>
                 <input type="number" className={inputCls} value={form.costo_mo} onChange={set('costo_mo')} placeholder="0.00" min="0" step="0.01" />
               </Field>
-              <Field label="Materiales (por unidad)">
+              <Field label={t('pres_form_mat')}>
                 <input type="number" className={inputCls} value={form.costo_materiales} onChange={set('costo_materiales')} placeholder="0.00" min="0" step="0.01" />
               </Field>
-              <Field label="Equipo y Transporte (por unidad)">
+              <Field label={t('pres_form_eq')}>
                 <input type="number" className={inputCls} value={form.costo_equipos} onChange={set('costo_equipos')} placeholder="0.00" min="0" step="0.01" />
               </Field>
               <div className="border-t border-gray-200 pt-2 mt-1 flex flex-col gap-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Costo Unitario</span>
+                  <span className="text-gray-500">{t('pres_unit_cost')}</span>
                   <span className="font-mono font-medium">{fmt(ucPreview, moneda)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold">
-                  <span className="text-gray-600">Costo Total</span>
+                  <span className="text-gray-600">{t('pres_total_cost')}</span>
                   <span className="font-mono" style={{color:'#1D9E75'}}>{fmt(tcPreview, moneda)}</span>
                 </div>
               </div>
@@ -236,16 +235,16 @@ export default function Presupuesto() {
         )}
 
         <div className="flex gap-2 mt-auto pt-2">
-          <SecondaryBtn onClick={() => setDrawer(false)} className="flex-1">Cancelar</SecondaryBtn>
+          <SecondaryBtn onClick={() => setDrawer(false)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
           <PrimaryBtn
             onClick={save}
             disabled={!form.descripcion || (form.tipo !== 'etapa' && !editing && !form.parent_id)}
             className="flex-1"
-          >{editing ? 'Guardar' : 'Agregar'}</PrimaryBtn>
+          >{editing ? t('btn_save') : t('btn_add')}</PrimaryBtn>
         </div>
       </Drawer>
 
-      <Confirm open={!!confirmDel} message="¿Eliminar este elemento? Se eliminarán también todos sus elementos hijos."
+      <Confirm open={!!confirmDel} message={t('pres_delete_confirm')}
         onConfirm={del} onCancel={() => setConfirmDel(null)} />
     </div>
   )
