@@ -155,8 +155,7 @@ export function StoreProvider({ children }) {
         break
       }
       case 'ADD_ENTRADA': {
-        case 'ADD_ENTRADA': {
-  const payload = { ...action.payload }
+        const payload = { ...action.payload }
   if (!payload.oc_id) delete payload.oc_id
   if (!payload.proyecto_id) delete payload.proyecto_id
   const item = { ...payload, id: uuid(), created_at: today() }
