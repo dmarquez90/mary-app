@@ -155,8 +155,12 @@ export function StoreProvider({ children }) {
         break
       }
       case 'ADD_ENTRADA': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
-        await supabase.from('entradas').insert(item)
+        case 'ADD_ENTRADA': {
+  const payload = { ...action.payload }
+  if (!payload.oc_id) delete payload.oc_id
+  if (!payload.proyecto_id) delete payload.proyecto_id
+  const item = { ...payload, id: uuid(), created_at: today() }
+  await supabase.from('entradas').insert(item)
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) await supabase.from('materiales').update({ stock_actual: (mat.stock_actual||0) + (parseFloat(item.cantidad)||0) }).eq('id', mat.id)
         dispatch({ type: 'ADD_ENTRADA', payload: item })
