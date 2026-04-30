@@ -1,0 +1,1 @@
+notepad src\supabase.js 
