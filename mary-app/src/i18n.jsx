@@ -1,25 +1,32 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-
+ 
 const LS_KEY = 'mary_lang'
-
+ 
 /* ============================================================
    🇪🇸 ESPAÑOL
    ============================================================ */
 const ES = {
-
+ 
   // COMMON
   lbl_select: '— Seleccionar —',
   lbl_status: 'Estado',
   lbl_currency: 'Moneda',
   lbl_client: 'Cliente',
   lbl_notes: 'Notas',
+  lbl_project: 'Proyecto',
+  lbl_date: 'Fecha',
+  lbl_quantity: 'Cantidad',
+  lbl_unit: 'Unidad',
   btn_save: 'Guardar',
   btn_add: 'Agregar',
   btn_edit: 'Editar',
   btn_cancel: 'Cancelar',
   btn_delete: 'Eliminar',
   btn_close: 'Cerrar',
-
+  btn_view: 'Ver',
+  btn_approve: 'Aprobar',
+  btn_reject: 'Rechazar',
+ 
   // DASHBOARD
   dash_title: 'Panel Principal',
   dash_projects: 'Proyectos',
@@ -28,9 +35,12 @@ const ES = {
   dash_outputs: 'Salidas',
   dash_requests: 'Solicitudes',
   dash_purchase_orders: 'Órdenes de Compra',
-
+ 
   // PROYECTOS
+  proy_title: 'Proyectos',
+  proy_sub: '{n} proyectos registrados',
   proy_new: '+ Nuevo Proyecto',
+  proy_detail: 'Ver detalle',
   proy_empty_title: 'No hay proyectos registrados',
   proy_empty_sub: 'Crea tu primer proyecto para comenzar',
   proy_empty_action: 'Crear primer proyecto',
@@ -43,15 +53,21 @@ const ES = {
   proy_form_status: 'Estado',
   proy_form_start: 'Fecha de inicio',
   proy_form_end: 'Fecha fin estimada',
+  proy_form_title_new: 'Nuevo proyecto',
+  proy_form_title_edit: 'Editar proyecto',
   proy_budget_label: 'Presupuesto',
   proy_delete_confirm: '¿Eliminar este proyecto? Se eliminarán también sus fases, presupuesto y lista de materiales.',
+  proy_fases_title: 'Fases del proyecto',
+  proy_fase_add: '+ Fase',
+  proy_fase_name: 'Nombre de la fase',
   proy_fase_placeholder: 'Nombre de la fase',
   proy_fase_save: 'Guardar fase',
   proy_fase_cancel: 'Cancelar',
   proy_detail_edit: 'Editar proyecto',
   proy_detail_back: 'Volver',
-
+ 
   // PRESUPUESTO
+  pres_title: 'Presupuesto',
   pres_no_project: 'Selecciona un proyecto para ver su presupuesto',
   pres_empty_title: 'No hay ítems en el presupuesto',
   pres_empty_sub: 'Agrega etapas, sub-etapas y actividades',
@@ -76,8 +92,11 @@ const ES = {
   pres_unit_total: 'Total unitario',
   pres_total: 'Total',
   pres_delete_confirm: '¿Eliminar este ítem del presupuesto?',
-
+ 
   // INVENTARIO
+  inv_title: 'Inventario',
+  inv_sub: '{n} materiales registrados',
+  inv_critical: '{n} material(es) en nivel crítico',
   inv_tab_catalog: 'Catálogo',
   inv_tab_entries: 'Entradas',
   inv_tab_exits: 'Salidas',
@@ -94,6 +113,8 @@ const ES = {
   inv_col_unit: 'Unidad',
   inv_col_location: 'Ubicación',
   inv_col_stock: 'Stock',
+  inv_col_min: 'Stock mín.',
+  inv_col_status: 'Estado',
   inv_col_date: 'Fecha',
   inv_col_material: 'Material',
   inv_col_qty: 'Cantidad',
@@ -104,8 +125,13 @@ const ES = {
   inv_col_type: 'Tipo',
   inv_critical_badge: 'Crítico',
   inv_ok_badge: 'OK',
+  inv_ok: 'OK',
   inv_entry_label: 'Entrada',
   inv_exit_label: 'Salida',
+  inv_entry: 'Entrada',
+  inv_exit: 'Salida',
+  inv_deactivate: 'Desactivar',
+  inv_stock_warning: 'Stock insuficiente. Disponible: {n}',
   inv_form_code: 'Código',
   inv_form_desc: 'Descripción',
   inv_form_unit: 'Unidad',
@@ -126,12 +152,33 @@ const ES = {
   inv_form_exit_material: 'Material',
   inv_form_exit_qty: 'Cantidad',
   inv_form_exit_date: 'Fecha de salida',
-
+  inv_form_mat_title: 'Agregar material',
+  inv_form_mat_title_edit: 'Editar material',
+  inv_form_entry_title: 'Registrar entrada',
+  inv_form_exit_title: 'Registrar salida',
+  inv_del_entry_title: 'Eliminar entrada',
+  inv_del_exit_title: 'Eliminar salida',
+  inv_del_confirm_msg: 'El stock del material se ajustará automáticamente.',
+  inv_form_entry_title_edit: 'Editar entrada',
+  inv_form_exit_title_edit: 'Editar salida',
+  inv_stock_current: 'Stock actual',
+  inv_del_warning_title: 'Advertencia — Salidas sin respaldo',
+  inv_del_warning_body: 'Al eliminar esta entrada, quedarán {n} salida(s) de {mat} sin respaldo en el inventario.',
+  inv_del_entries_remaining: 'Entradas restantes',
+  inv_del_total_exits: 'Total salidas registradas',
+  inv_del_what_to_do: '¿Qué deseas hacer?',
+  inv_del_entry_and_exits: 'Eliminar entrada + {n} salida(s) afectada(s)',
+  inv_del_entry_only: 'Solo eliminar la entrada (el stock quedará inconsistente)',
+  inv_col_detail: 'Detalle',
+ 
   // BOM
   bom_form_save: 'Guardar material',
   bom_form_save_edit: 'Actualizar material',
-
+ 
   // COMPRAS
+  comp_title: 'Compras / Órdenes de Compra',
+  comp_sub_pending: '{n} solicitudes pendientes',
+  comp_sub_oc: '{n} OC pendientes de aprobación',
   comp_tab_sol: 'Solicitudes',
   comp_tab_oc: 'Órdenes de Compra',
   comp_title_sol: 'Solicitudes de Compra',
@@ -140,6 +187,8 @@ const ES = {
   comp_new_oc: '+ Nueva OC',
   comp_empty_sol: 'No hay solicitudes registradas',
   comp_empty_oc: 'No hay órdenes de compra registradas',
+  comp_empty_oc_sub: 'Genera una OC desde una solicitud aprobada',
+  comp_items_count: '{n} ítem(s)',
   comp_col_project: 'Proyecto',
   comp_col_activity: 'Actividad',
   comp_col_material: 'Material',
@@ -147,24 +196,42 @@ const ES = {
   comp_col_status: 'Estado',
   comp_col_date: 'Fecha',
   comp_col_actions: 'Acciones',
+  comp_col_items: 'Ítems',
   comp_col_oc: 'Código OC',
   comp_col_supplier: 'Proveedor',
   comp_col_total: 'Total',
+  comp_col_approval: 'Aprobación',
+  comp_generate_oc: 'Generar OC',
+  comp_cancel_oc: 'Cancelar',
+  comp_ready_receive: 'Lista para recibir',
   comp_form_project: 'Proyecto',
   comp_form_activity: 'Actividad',
+  comp_form_items: 'Materiales solicitados',
   comp_form_items_label: 'Materiales solicitados',
+  comp_form_add_item: '+ Agregar material',
   comp_form_justification: 'Justificación',
+  comp_form_justification_ph: 'Motivo de la solicitud...',
   comp_form_sol_ref: 'Solicitud de referencia',
   comp_form_supplier: 'Proveedor',
+  comp_form_supplier_ph: 'Nombre del proveedor',
   comp_form_save_sol: 'Guardar solicitud',
   comp_form_save_oc: 'Guardar OC',
+  comp_form_submit: 'Enviar solicitud',
+  comp_form_create_oc: 'Crear OC',
+  comp_form_sol_title: 'Nueva solicitud de compra',
+  comp_form_oc_title: 'Nueva orden de compra',
   comp_det_project: 'Proyecto',
   comp_det_activity: 'Actividad',
   comp_det_status: 'Estado',
   comp_det_supplier: 'Proveedor',
   comp_det_items: 'Ítems',
+  comp_detail_sol: 'Detalle de solicitud',
+  comp_detail_oc: 'Detalle de OC',
+  comp_detail_materials: 'Materiales',
+  comp_detail_items: 'Ítems de la OC',
+  comp_pending_approval: 'Pendiente',
   comp_oc_approved_msg: 'OC aprobada',
-
+ 
   // FINANCIERO
   fin_tab_direct: 'Costos Directos',
   fin_tab_payroll: 'Nómina',
@@ -224,7 +291,39 @@ const ES = {
   fin_form_eq_days: 'Días de uso',
   fin_form_eq_total: 'Costo total',
   fin_form_category: 'Categoría',
-
+ 
+  // CURVA S
+  curva_title: 'Curva S & Reportes',
+  curva_select_project: 'Proyecto',
+  curva_by_month: 'Por mes',
+  curva_by_week: 'Por semana',
+  curva_empty_title: 'Selecciona un proyecto',
+  curva_empty_sub: 'Elige un proyecto para ver su Curva S',
+  curva_no_data: 'Sin datos suficientes',
+  curva_no_data_sub: 'Registra el presupuesto y costos reales para generar la Curva S',
+  curva_kpi_budget: 'Presupuesto Total',
+  curva_kpi_real: 'Costo Real',
+  curva_kpi_deviation: 'Desviación',
+  curva_overcost: 'sobrecosto',
+  curva_saving: 'ahorro',
+  curva_on_budget: 'en presupuesto',
+  curva_kpi_execution: 'Ejecución',
+  curva_kpi_execution_sub: 'del presupuesto utilizado',
+  curva_chart_title: 'Curva S — Costo Acumulado',
+  curva_line_budget: 'Presupuestado',
+  curva_line_real: 'Real Ejecutado',
+  curva_dev_title: 'Desviaciones por Actividad',
+  curva_col_code: 'Código',
+  curva_col_activity: 'Actividad',
+  curva_col_budget: 'Presupuestado',
+  curva_col_real: 'Real',
+  curva_col_dev: 'Desviación $',
+  curva_col_dev_pct: 'Desv. %',
+  curva_col_status: 'Estado',
+  curva_status_ok: 'OK',
+  curva_status_alert: 'Alerta',
+  curva_status_critical: 'Crítico',
+ 
   // CONFIGURACIÓN
   config_title: 'Configuración',
   config_subtitle: 'Preferencias del sistema',
@@ -245,25 +344,32 @@ const ES = {
   config_save: 'Guardar configuración',
   config_saved: '✓ Configuración guardada',
 }
-
+ 
 /* ============================================================
    🇺🇸 ENGLISH
    ============================================================ */
 const EN = {
-
+ 
   // COMMON
   lbl_select: '— Select —',
   lbl_status: 'Status',
   lbl_currency: 'Currency',
   lbl_client: 'Client',
   lbl_notes: 'Notes',
+  lbl_project: 'Project',
+  lbl_date: 'Date',
+  lbl_quantity: 'Quantity',
+  lbl_unit: 'Unit',
   btn_save: 'Save',
   btn_add: 'Add',
   btn_edit: 'Edit',
   btn_cancel: 'Cancel',
   btn_delete: 'Delete',
   btn_close: 'Close',
-
+  btn_view: 'View',
+  btn_approve: 'Approve',
+  btn_reject: 'Reject',
+ 
   // DASHBOARD
   dash_title: 'Main Dashboard',
   dash_projects: 'Projects',
@@ -272,9 +378,12 @@ const EN = {
   dash_outputs: 'Exits',
   dash_requests: 'Requests',
   dash_purchase_orders: 'Purchase Orders',
-
+ 
   // PROJECTS
+  proy_title: 'Projects',
+  proy_sub: '{n} projects registered',
   proy_new: '+ New Project',
+  proy_detail: 'View detail',
   proy_empty_title: 'No projects registered',
   proy_empty_sub: 'Create your first project to get started',
   proy_empty_action: 'Create first project',
@@ -287,15 +396,21 @@ const EN = {
   proy_form_status: 'Status',
   proy_form_start: 'Start date',
   proy_form_end: 'Estimated end date',
+  proy_form_title_new: 'New project',
+  proy_form_title_edit: 'Edit project',
   proy_budget_label: 'Budget',
   proy_delete_confirm: 'Delete this project? Its phases, budget and materials list will also be removed.',
+  proy_fases_title: 'Project phases',
+  proy_fase_add: '+ Phase',
+  proy_fase_name: 'Phase name',
   proy_fase_placeholder: 'Phase name',
   proy_fase_save: 'Save phase',
   proy_fase_cancel: 'Cancel',
   proy_detail_edit: 'Edit project',
   proy_detail_back: 'Back',
-
+ 
   // BUDGET
+  pres_title: 'Budget',
   pres_no_project: 'Select a project to view its budget',
   pres_empty_title: 'No budget items',
   pres_empty_sub: 'Add stages, sub-stages and activities',
@@ -320,8 +435,11 @@ const EN = {
   pres_unit_total: 'Unit total',
   pres_total: 'Total',
   pres_delete_confirm: 'Delete this budget item?',
-
+ 
   // INVENTORY
+  inv_title: 'Inventory',
+  inv_sub: '{n} materials registered',
+  inv_critical: '{n} material(s) at critical level',
   inv_tab_catalog: 'Catalog',
   inv_tab_entries: 'Entries',
   inv_tab_exits: 'Exits',
@@ -338,6 +456,8 @@ const EN = {
   inv_col_unit: 'Unit',
   inv_col_location: 'Location',
   inv_col_stock: 'Stock',
+  inv_col_min: 'Min. stock',
+  inv_col_status: 'Status',
   inv_col_date: 'Date',
   inv_col_material: 'Material',
   inv_col_qty: 'Quantity',
@@ -348,8 +468,13 @@ const EN = {
   inv_col_type: 'Type',
   inv_critical_badge: 'Critical',
   inv_ok_badge: 'OK',
+  inv_ok: 'OK',
   inv_entry_label: 'Entry',
   inv_exit_label: 'Exit',
+  inv_entry: 'Entry',
+  inv_exit: 'Exit',
+  inv_deactivate: 'Deactivate',
+  inv_stock_warning: 'Insufficient stock. Available: {n}',
   inv_form_code: 'Code',
   inv_form_desc: 'Description',
   inv_form_unit: 'Unit',
@@ -370,12 +495,33 @@ const EN = {
   inv_form_exit_material: 'Material',
   inv_form_exit_qty: 'Quantity',
   inv_form_exit_date: 'Exit date',
-
+  inv_form_mat_title: 'Add material',
+  inv_form_mat_title_edit: 'Edit material',
+  inv_form_entry_title: 'Register entry',
+  inv_form_exit_title: 'Register exit',
+  inv_del_entry_title: 'Delete entry',
+  inv_del_exit_title: 'Delete exit',
+  inv_del_confirm_msg: 'The material stock will be adjusted automatically.',
+  inv_form_entry_title_edit: 'Edit entry',
+  inv_form_exit_title_edit: 'Edit exit',
+  inv_stock_current: 'Current stock',
+  inv_del_warning_title: 'Warning — Unsupported exits',
+  inv_del_warning_body: 'Deleting this entry will leave {n} exit(s) of {mat} without inventory support.',
+  inv_del_entries_remaining: 'Remaining entries',
+  inv_del_total_exits: 'Total registered exits',
+  inv_del_what_to_do: 'What would you like to do?',
+  inv_del_entry_and_exits: 'Delete entry + {n} affected exit(s)',
+  inv_del_entry_only: 'Delete entry only (stock will be inconsistent)',
+  inv_col_detail: 'Detail',
+ 
   // BOM
   bom_form_save: 'Save material',
   bom_form_save_edit: 'Update material',
-
+ 
   // PURCHASES
+  comp_title: 'Purchases / Purchase Orders',
+  comp_sub_pending: '{n} pending requests',
+  comp_sub_oc: '{n} POs pending approval',
   comp_tab_sol: 'Requests',
   comp_tab_oc: 'Purchase Orders',
   comp_title_sol: 'Purchase Requests',
@@ -384,6 +530,8 @@ const EN = {
   comp_new_oc: '+ New PO',
   comp_empty_sol: 'No requests registered',
   comp_empty_oc: 'No purchase orders registered',
+  comp_empty_oc_sub: 'Generate a PO from an approved request',
+  comp_items_count: '{n} item(s)',
   comp_col_project: 'Project',
   comp_col_activity: 'Activity',
   comp_col_material: 'Material',
@@ -391,24 +539,42 @@ const EN = {
   comp_col_status: 'Status',
   comp_col_date: 'Date',
   comp_col_actions: 'Actions',
+  comp_col_items: 'Items',
   comp_col_oc: 'PO Code',
   comp_col_supplier: 'Supplier',
   comp_col_total: 'Total',
+  comp_col_approval: 'Approval',
+  comp_generate_oc: 'Generate PO',
+  comp_cancel_oc: 'Cancel',
+  comp_ready_receive: 'Ready to receive',
   comp_form_project: 'Project',
   comp_form_activity: 'Activity',
+  comp_form_items: 'Requested materials',
   comp_form_items_label: 'Requested materials',
+  comp_form_add_item: '+ Add material',
   comp_form_justification: 'Justification',
+  comp_form_justification_ph: 'Reason for the request...',
   comp_form_sol_ref: 'Reference request',
   comp_form_supplier: 'Supplier',
+  comp_form_supplier_ph: 'Supplier name',
   comp_form_save_sol: 'Save request',
   comp_form_save_oc: 'Save PO',
+  comp_form_submit: 'Submit request',
+  comp_form_create_oc: 'Create PO',
+  comp_form_sol_title: 'New purchase request',
+  comp_form_oc_title: 'New purchase order',
   comp_det_project: 'Project',
   comp_det_activity: 'Activity',
   comp_det_status: 'Status',
   comp_det_supplier: 'Supplier',
   comp_det_items: 'Items',
+  comp_detail_sol: 'Request detail',
+  comp_detail_oc: 'PO detail',
+  comp_detail_materials: 'Materials',
+  comp_detail_items: 'PO items',
+  comp_pending_approval: 'Pending',
   comp_oc_approved_msg: 'PO approved',
-
+ 
   // FINANCIAL
   fin_tab_direct: 'Direct Costs',
   fin_tab_payroll: 'Payroll',
@@ -468,7 +634,39 @@ const EN = {
   fin_form_eq_days: 'Days of use',
   fin_form_eq_total: 'Total cost',
   fin_form_category: 'Category',
-
+ 
+  // S CURVE
+  curva_title: 'S Curve & Reports',
+  curva_select_project: 'Project',
+  curva_by_month: 'By month',
+  curva_by_week: 'By week',
+  curva_empty_title: 'Select a project',
+  curva_empty_sub: 'Choose a project to view its S Curve',
+  curva_no_data: 'Insufficient data',
+  curva_no_data_sub: 'Register the budget and real costs to generate the S Curve',
+  curva_kpi_budget: 'Total Budget',
+  curva_kpi_real: 'Real Cost',
+  curva_kpi_deviation: 'Deviation',
+  curva_overcost: 'over budget',
+  curva_saving: 'saving',
+  curva_on_budget: 'on budget',
+  curva_kpi_execution: 'Execution',
+  curva_kpi_execution_sub: 'of budget used',
+  curva_chart_title: 'S Curve — Cumulative Cost',
+  curva_line_budget: 'Budgeted',
+  curva_line_real: 'Real Executed',
+  curva_dev_title: 'Deviations by Activity',
+  curva_col_code: 'Code',
+  curva_col_activity: 'Activity',
+  curva_col_budget: 'Budgeted',
+  curva_col_real: 'Real',
+  curva_col_dev: 'Deviation $',
+  curva_col_dev_pct: 'Dev. %',
+  curva_col_status: 'Status',
+  curva_status_ok: 'OK',
+  curva_status_alert: 'Alert',
+  curva_status_critical: 'Critical',
+ 
   // SETTINGS
   config_title: 'Settings',
   config_subtitle: 'System preferences',
@@ -489,26 +687,26 @@ const EN = {
   config_save: 'Save settings',
   config_saved: '✓ Settings saved',
 }
-
+ 
 /* ============================================================
    CONTEXTO DE IDIOMA
    ============================================================ */
-const LangContext = createContext()
-
+export const LangContext = createContext()
+ 
 export function LangProvider({ children }) {
   const [lang, setLang] = useState('ES')
-
+ 
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY)
     if (saved) setLang(saved)
   }, [])
-
+ 
   const toggleLang = () => {
     const newLang = lang === 'ES' ? 'EN' : 'ES'
     setLang(newLang)
     localStorage.setItem(LS_KEY, newLang)
   }
-
+ 
   const t = (key, vars = {}) => {
     const dict = lang === 'ES' ? ES : EN
     let text = dict[key] || key
@@ -517,17 +715,15 @@ export function LangProvider({ children }) {
     })
     return text
   }
-
+ 
   return (
     <LangContext.Provider value={{ lang, toggleLang, t }}>
       {children}
     </LangContext.Provider>
   )
 }
-
-export const useLang = () => useContext(LangContext)
-export const useT = () => useContext(LangContext).t
-
-// Alias para compatibilidad con imports existentes
+ 
+export const useLang    = () => useContext(LangContext)
+export const useT       = () => useContext(LangContext).t
 export const LanguageProvider = LangProvider
-export const useLanguage = useLang
+export const useLanguage      = useLang

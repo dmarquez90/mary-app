@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import { useStore } from '../store'
-import { useT } from '../i18n'
+import { LangContext } from '../i18n'
 import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls } from '../components'
 
@@ -9,18 +9,18 @@ const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', p
 
 export default function Proyectos({ onNavigate }) {
   const { state, dispatch } = useStore()
-  const t = useT()
+  const { t } = useContext(LangContext)
   const { proyectos, presupuesto, fases } = state
-  const [drawer, setDrawer] = useState(false)
-  const [form, setForm] = useState(empty())
-  const [editing, setEditing] = useState(null)
+  const [drawer, setDrawer]       = useState(false)
+  const [form, setForm]           = useState(empty())
+  const [editing, setEditing]     = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
-  const [detail, setDetail] = useState(null)
-  const [faseForm, setFaseForm] = useState({ nombre:'', fecha_inicio:'', fecha_fin:'', estado:'pendiente' })
-  const [addFase, setAddFase] = useState(false)
+  const [detail, setDetail]       = useState(null)
+  const [faseForm, setFaseForm]   = useState({ nombre:'', fecha_inicio:'', fecha_fin:'', estado:'pendiente' })
+  const [addFase, setAddFase]     = useState(false)
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
-  const openAdd = () => { setForm(empty()); setEditing(null); setDrawer(true) }
+  const openAdd  = () => { setForm(empty()); setEditing(null); setDrawer(true) }
   const openEdit = (p) => { setForm({ ...p }); setEditing(p.id); setDrawer(true) }
 
   const save = () => {
@@ -46,9 +46,9 @@ export default function Proyectos({ onNavigate }) {
     setAddFase(false)
   }
 
-  const proyecto = proyectos.find(p => p.id === detail)
+  const proyecto  = proyectos.find(p => p.id === detail)
   const proyFases = fases.filter(f => f.proyecto_id === detail)
-  const budget = detail ? calcGrandTotal(presupuesto.filter(b => b.proyecto_id === detail)) : 0
+  const budget    = detail ? calcGrandTotal(presupuesto.filter(b => b.proyecto_id === detail)) : 0
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -66,7 +66,7 @@ export default function Proyectos({ onNavigate }) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {proyectos.map(p => {
-            const b = calcGrandTotal(presupuesto.filter(x => x.proyecto_id === p.id))
+            const b      = calcGrandTotal(presupuesto.filter(x => x.proyecto_id === p.id))
             const closed = p.estado === 'completado' || p.estado === 'cancelado'
             return (
               <div key={p.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
@@ -105,19 +105,21 @@ export default function Proyectos({ onNavigate }) {
                 <p className="text-xs text-gray-400">{proyecto.project_code}</p>
               </div>
               <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
               </button>
             </div>
             <div className="p-6 flex flex-col gap-5">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  [t('lbl_status'), <Badge estado={proyecto.estado} />],
-                  [t('lbl_currency'), proyecto.moneda],
-                  [t('lbl_client'), proyecto.cliente_externo || '—'],
-                  [t('proy_form_city'), proyecto.ciudad || '—'],
-                  [t('proy_form_start'), proyecto.fecha_inicio],
-                  [t('proy_form_end'), proyecto.fecha_fin_estimada || '—'],
-                  [t('proy_budget_label'), new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
+                  [t('lbl_status'),         <Badge estado={proyecto.estado} />],
+                  [t('lbl_currency'),       proyecto.moneda],
+                  [t('lbl_client'),         proyecto.cliente_externo || '—'],
+                  [t('proy_form_city'),     proyecto.ciudad || '—'],
+                  [t('proy_form_start'),    proyecto.fecha_inicio],
+                  [t('proy_form_end'),      proyecto.fecha_fin_estimada || '—'],
+                  [t('proy_budget_label'),  new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
                 ].map(([k,v]) => (
                   <div key={k}>
                     <p className="text-xs text-gray-400">{k}</p>
@@ -135,10 +137,13 @@ export default function Proyectos({ onNavigate }) {
                 </div>
                 {addFase && (
                   <div className="bg-gray-50 rounded-lg p-3 mb-3 flex flex-col gap-2">
-                    <input className={inputCls} placeholder={t('proy_fase_name') + ' *'} value={faseForm.nombre} onChange={e => setFaseForm(f => ({...f, nombre:e.target.value}))} />
+                    <input className={inputCls} placeholder={t('proy_fase_name') + ' *'} value={faseForm.nombre}
+                      onChange={e => setFaseForm(f => ({...f, nombre:e.target.value}))} />
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="date" className={inputCls} value={faseForm.fecha_inicio} onChange={e => setFaseForm(f => ({...f, fecha_inicio:e.target.value}))} />
-                      <input type="date" className={inputCls} value={faseForm.fecha_fin} onChange={e => setFaseForm(f => ({...f, fecha_fin:e.target.value}))} />
+                      <input type="date" className={inputCls} value={faseForm.fecha_inicio}
+                        onChange={e => setFaseForm(f => ({...f, fecha_inicio:e.target.value}))} />
+                      <input type="date" className={inputCls} value={faseForm.fecha_fin}
+                        onChange={e => setFaseForm(f => ({...f, fecha_fin:e.target.value}))} />
                     </div>
                     <div className="flex gap-2">
                       <PrimaryBtn onClick={addFaseHandler} disabled={!faseForm.nombre}>{t('proy_fase_save')}</PrimaryBtn>
@@ -162,7 +167,8 @@ export default function Proyectos({ onNavigate }) {
                             onChange={e => dispatch({ type:'UPD_FASE', payload:{ id:f.id, estado:e.target.value } })}>
                             {['pendiente','activa','completada'].map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
-                          <button onClick={() => dispatch({ type:'DEL_FASE', payload:f.id })} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                          <button onClick={() => dispatch({ type:'DEL_FASE', payload:f.id })}
+                            className="text-gray-300 hover:text-red-400 text-xs">✕</button>
                         </div>
                       </div>
                     ))}
@@ -179,7 +185,8 @@ export default function Proyectos({ onNavigate }) {
         </div>
       )}
 
-      <Drawer open={drawer} onClose={() => setDrawer(false)} title={editing ? t('proy_form_title_edit') : t('proy_form_title_new')} width={420}>
+      <Drawer open={drawer} onClose={() => setDrawer(false)}
+        title={editing ? t('proy_form_title_edit') : t('proy_form_title_new')} width={420}>
         <Field label={t('proy_form_name')} required>
           <input className={inputCls} value={form.nombre} onChange={set('nombre')} placeholder="Ej: Residencial Las Palmas" />
         </Field>
