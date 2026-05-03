@@ -35,6 +35,7 @@ const ES = {
   dash_outputs: 'Salidas',
   dash_requests: 'Solicitudes',
   dash_purchase_orders: 'Órdenes de Compra',
+  dash_inv_value: 'Valor del Inventario',
 
   // PROYECTOS
   proy_title: 'Proyectos',
@@ -92,6 +93,16 @@ const ES = {
   pres_unit_total: 'Total unitario',
   pres_total: 'Total',
   pres_delete_confirm: '¿Eliminar este ítem del presupuesto?',
+  pres_add_stage: '+ Etapa',
+  pres_add_substage: '+ Sub-etapa',
+  pres_add_activity: '+ Actividad',
+  pres_col_uc: 'C.U.',
+  pres_grand_total: 'Gran Total',
+  pres_empty: 'No hay ítems en el presupuesto',
+  pres_form_stage: 'Etapa',
+  pres_form_substage: 'Sub-etapa',
+  pres_form_activity: 'Actividad',
+  pres_total_cost: 'Costo total',
 
   // INVENTARIO
   inv_title: 'Inventario',
@@ -315,6 +326,13 @@ const ES = {
   fin_form_eq_days: 'Días de uso',
   fin_form_eq_total: 'Costo total',
   fin_form_category: 'Categoría',
+  fin_materials_sub: 'Costo de materiales usados',
+  fin_payroll_sub: 'Nómina pagada',
+  fin_subcontracts_sub: 'Subcontratos pagados',
+  fin_petty: 'Caja chica',
+  fin_eq_rental: 'Alquiler',
+  fin_eq_owned: 'Propio',
+  lbl_total: 'Total',
 
   // CURVA S
   curva_title: 'Curva S & Reportes',
@@ -402,6 +420,7 @@ const EN = {
   dash_outputs: 'Exits',
   dash_requests: 'Requests',
   dash_purchase_orders: 'Purchase Orders',
+  dash_inv_value: 'Inventory Value',
 
   // PROJECTS
   proy_title: 'Projects',
@@ -459,7 +478,16 @@ const EN = {
   pres_unit_total: 'Unit total',
   pres_total: 'Total',
   pres_delete_confirm: 'Delete this budget item?',
-
+pres_add_stage: '+ Etapa',
+  pres_add_substage: '+ Sub-etapa',
+  pres_add_activity: '+ Actividad',
+  pres_col_uc: 'C.U.',
+  pres_grand_total: 'Gran Total',
+  pres_empty: 'No hay ítems en el presupuesto',
+  pres_form_stage: 'Etapa',
+  pres_form_substage: 'Sub-etapa',
+  pres_form_activity: 'Actividad',
+  pres_total_cost: 'Costo total',
   // INVENTORY
   inv_title: 'Inventory',
   inv_sub: '{n} materials registered',
@@ -682,6 +710,13 @@ const EN = {
   fin_form_eq_days: 'Days of use',
   fin_form_eq_total: 'Total cost',
   fin_form_category: 'Category',
+  fin_materials_sub: 'Cost of materials used',
+  fin_payroll_sub: 'Payroll paid',
+  fin_subcontracts_sub: 'Subcontracts paid',
+  fin_petty: 'Petty cash',
+  fin_eq_rental: 'Rental',
+  fin_eq_owned: 'Owned',
+  lbl_total: 'Total',
 
   // S CURVE
   curva_title: 'S Curve & Reports',

@@ -1,7 +1,6 @@
-
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
-import { useT } from '../i18n'
+import { LangContext } from '../i18n'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 
@@ -9,21 +8,21 @@ const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unida
 
 export default function Presupuesto() {
   const { state, dispatch } = useStore()
-  const t = useT()
+  const { t } = useContext(LangContext)
   const { proyectos, presupuesto } = state
-  const [proyId, setProyId] = useState(proyectos[0]?.id || '')
-  const [drawer, setDrawer] = useState(false)
-  const [form, setForm] = useState(emptyForm())
-  const [editing, setEditing] = useState(null)
-  const [selected, setSelected] = useState(null)
+  const [proyId, setProyId]       = useState(proyectos[0]?.id || '')
+  const [drawer, setDrawer]       = useState(false)
+  const [form, setForm]           = useState(emptyForm())
+  const [editing, setEditing]     = useState(null)
+  const [selected, setSelected]   = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  const proy = proyectos.find(p => p.id === proyId)
+  const proy  = proyectos.find(p => p.id === proyId)
   const items = useMemo(() => presupuesto.filter(b => b.proyecto_id === proyId), [presupuesto, proyId])
-  const flat = useMemo(() => flatBudgetItems(items), [items])
+  const flat  = useMemo(() => flatBudgetItems(items), [items])
   const closed = proy?.estado === 'completado' || proy?.estado === 'cancelado'
 
-  const stages = items.filter(i => i.tipo === 'etapa')
+  const stages   = items.filter(i => i.tipo === 'etapa')
   const substages = items.filter(i => i.tipo === 'sub_etapa')
   const grandTotal = calcGrandTotal(items)
 
@@ -49,7 +48,16 @@ export default function Presupuesto() {
     if (!selected) return
     const item = items.find(i => i.id === selected)
     if (!item) return
-    setForm({ tipo: item.tipo, parent_id: item.parent_id || '', descripcion: item.descripcion, unidad: item.unidad || 'm²', cantidad: item.cantidad || '', costo_mo: item.costo_mo || '', costo_materiales: item.costo_materiales || '', costo_equipos: item.costo_equipos || '' })
+    setForm({
+      tipo: item.tipo,
+      parent_id: item.parent_id || '',
+      descripcion: item.descripcion,
+      unidad: item.unidad || 'm²',
+      cantidad: item.cantidad || '',
+      costo_mo: item.costo_mo || '',
+      costo_materiales: item.costo_materiales || '',
+      costo_equipos: item.costo_equipos || ''
+    })
     setEditing(selected); setDrawer(true)
   }
 
@@ -57,9 +65,27 @@ export default function Presupuesto() {
     if (!form.descripcion) return
     if (form.tipo !== 'etapa' && !form.parent_id) return
     if (editing) {
-      dispatch({ type: 'UPD_BUDGET', payload: { id: editing, descripcion: form.descripcion, unidad: form.unidad, cantidad: parseFloat(form.cantidad)||0, costo_mo: parseFloat(form.costo_mo)||0, costo_materiales: parseFloat(form.costo_materiales)||0, costo_equipos: parseFloat(form.costo_equipos)||0 } })
+      dispatch({ type: 'UPD_BUDGET', payload: {
+        id: editing,
+        descripcion: form.descripcion,
+        unidad: form.unidad,
+        cantidad: parseFloat(form.cantidad)||0,
+        costo_mo: parseFloat(form.costo_mo)||0,
+        costo_materiales: parseFloat(form.costo_materiales)||0,
+        costo_equipos: parseFloat(form.costo_equipos)||0
+      }})
     } else {
-      dispatch({ type: 'ADD_BUDGET', payload: { proyectoId: proyId, tipo: form.tipo, parent_id: form.parent_id || null, descripcion: form.descripcion, unidad: form.unidad, cantidad: parseFloat(form.cantidad)||0, costo_mo: parseFloat(form.costo_mo)||0, costo_materiales: parseFloat(form.costo_materiales)||0, costo_equipos: parseFloat(form.costo_equipos)||0 } })
+      dispatch({ type: 'ADD_BUDGET', payload: {
+        proyectoId: proyId,
+        tipo: form.tipo,
+        parent_id: form.parent_id || null,
+        descripcion: form.descripcion,
+        unidad: form.unidad,
+        cantidad: parseFloat(form.cantidad)||0,
+        costo_mo: parseFloat(form.costo_mo)||0,
+        costo_materiales: parseFloat(form.costo_materiales)||0,
+        costo_equipos: parseFloat(form.costo_equipos)||0
+      }})
     }
     setDrawer(false); setSelected(null)
   }
@@ -71,6 +97,12 @@ export default function Presupuesto() {
 
   const moneda = proy?.moneda || 'USD'
 
+  const tipoLabel = (tipo) => {
+    if (tipo === 'etapa')     return t('pres_form_stage')
+    if (tipo === 'sub_etapa') return t('pres_form_substage')
+    return t('pres_form_activity')
+  }
+
   return (
     <div className="p-6 max-w-full">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
@@ -79,7 +111,9 @@ export default function Presupuesto() {
           {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
         </div>
         <div className="flex items-center gap-3">
-          <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1D9E75]" value={proyId} onChange={e => { setProyId(e.target.value); setSelected(null) }}>
+          <select
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1D9E75]"
+            value={proyId} onChange={e => { setProyId(e.target.value); setSelected(null) }}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
@@ -92,13 +126,16 @@ export default function Presupuesto() {
         <>
           <div className="bg-white border border-gray-100 rounded-xl mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0">
             <TBtn onClick={() => openAdd('etapa')} disabled={closed}>
-              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>{t('pres_add_stage')}
+              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>
+              {t('pres_add_stage')}
             </TBtn>
             <TBtn onClick={() => openAdd('sub_etapa')} disabled={closed || stages.length === 0}>
-              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#185FA5'}}/>{t('pres_add_substage')}
+              <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#185FA5'}}/>
+              {t('pres_add_substage')}
             </TBtn>
             <TBtn onClick={() => openAdd('actividad')} disabled={closed || substages.length === 0}>
-              <span className="w-2 h-2 rounded-sm inline-block mr-1 bg-gray-400"/>{t('pres_add_activity')}
+              <span className="w-2 h-2 rounded-sm inline-block mr-1 bg-gray-400"/>
+              {t('pres_add_activity')}
             </TBtn>
             <div className="w-px h-5 bg-gray-200 mx-1" />
             <TBtn onClick={openEdit} disabled={!selected}>✎ {t('btn_edit')}</TBtn>
@@ -120,22 +157,23 @@ export default function Presupuesto() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {['ID', t('pres_col_desc'), t('pres_col_unit'), t('pres_col_qty'), t('pres_col_mo'), t('pres_col_mat'), t('pres_col_eq'), t('pres_col_uc'), t('pres_col_total')].map((h, i) => (
-                      <th key={h} className={`px-3 py-3 text-xs text-gray-500 whitespace-nowrap ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
+                      <th key={i} className={`px-3 py-3 text-xs text-gray-500 whitespace-nowrap ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {flat.map(item => {
-                    const isEt = item.tipo === 'etapa', isSs = item.tipo === 'sub_etapa', isAc = item.tipo === 'actividad'
-                    const uc = isAc ? (item.costo_mo||0)+(item.costo_materiales||0)+(item.costo_equipos||0) : 0
-                    const tc = isAc ? (item.cantidad||0)*uc : calcSubtotal(items, item.id, item.tipo)
-                    const sel = item.id === selected
+                    const isEt = item.tipo === 'etapa'
+                    const isSs = item.tipo === 'sub_etapa'
+                    const isAc = item.tipo === 'actividad'
+                    const uc   = isAc ? (item.costo_mo||0)+(item.costo_materiales||0)+(item.costo_equipos||0) : 0
+                    const tc   = isAc ? (item.cantidad||0)*uc : calcSubtotal(items, item.id, item.tipo)
+                    const sel  = item.id === selected
                     return (
                       <tr key={item.id}
                         className={`border-b border-gray-50 cursor-pointer transition-colors
                           ${sel ? 'bg-blue-50' : isEt ? 'bg-gray-50/70 hover:bg-gray-100/50' : 'hover:bg-gray-50/50'}`}
-                        onClick={() => setSelected(sel ? null : item.id)}
-                      >
+                        onClick={() => setSelected(sel ? null : item.id)}>
                         <td className="px-3 py-2.5">
                           <span className={`inline-block px-2 py-0.5 rounded text-xs font-mono font-medium
                             ${isEt ? 'bg-green-100 text-green-700' : isSs ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
@@ -162,8 +200,12 @@ export default function Presupuesto() {
                     )
                   })}
                   <tr className="bg-gray-50 border-t border-gray-200">
-                    <td colSpan={8} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('pres_grand_total')}</td>
-                    <td className="px-3 py-3 text-right text-sm font-bold font-mono" style={{color:'#1D9E75'}}>{fmt(grandTotal, moneda)}</td>
+                    <td colSpan={8} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {t('pres_grand_total')}
+                    </td>
+                    <td className="px-3 py-3 text-right text-sm font-bold font-mono" style={{color:'#1D9E75'}}>
+                      {fmt(grandTotal, moneda)}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -173,7 +215,7 @@ export default function Presupuesto() {
       )}
 
       <Drawer open={drawer} onClose={() => setDrawer(false)}
-        title={editing ? `${t('btn_edit')} ${form.tipo === 'etapa' ? t('pres_form_stage') : form.tipo === 'sub_etapa' ? t('pres_form_substage') : t('pres_form_activity')}` : `${t('btn_add')} ${form.tipo === 'etapa' ? t('pres_form_stage') : form.tipo === 'sub_etapa' ? t('pres_form_substage') : t('pres_form_activity')}`}
+        title={`${editing ? t('btn_edit') : t('btn_add')} ${tipoLabel(form.tipo)}`}
         width={380}>
 
         {form.tipo === 'sub_etapa' && !editing && (
@@ -195,7 +237,11 @@ export default function Presupuesto() {
 
         <Field label={t('pres_form_desc')} required>
           <input className={inputCls} value={form.descripcion} onChange={set('descripcion')}
-            placeholder={form.tipo === 'etapa' ? 'Ej: Obras Preliminares' : form.tipo === 'sub_etapa' ? 'Ej: Movimiento de Tierras' : 'Ej: Excavación manual'} />
+            placeholder={
+              form.tipo === 'etapa' ? 'Ej: Obras Preliminares' :
+              form.tipo === 'sub_etapa' ? 'Ej: Movimiento de Tierras' :
+              'Ej: Excavación manual'
+            } />
         </Field>
 
         {form.tipo === 'actividad' && (
@@ -239,13 +285,15 @@ export default function Presupuesto() {
           <PrimaryBtn
             onClick={save}
             disabled={!form.descripcion || (form.tipo !== 'etapa' && !editing && !form.parent_id)}
-            className="flex-1"
-          >{editing ? t('btn_save') : t('btn_add')}</PrimaryBtn>
+            className="flex-1">
+            {editing ? t('btn_save') : t('btn_add')}
+          </PrimaryBtn>
         </div>
       </Drawer>
 
       <Confirm open={!!confirmDel} message={t('pres_delete_confirm')}
-        onConfirm={del} onCancel={() => setConfirmDel(null)} />
+        onConfirm={del} onCancel={() => setConfirmDel(null)}
+        confirmLabel={t('btn_delete')} cancelLabel={t('btn_cancel')} />
     </div>
   )
 }
