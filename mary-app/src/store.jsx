@@ -56,9 +56,16 @@ function reducer(state, action) {
       return { ...state, solicitudes: [...state.solicitudes, action.payload.solicitud], solicitud_items: [...state.solicitud_items, ...action.payload.items] }
     case 'UPD_SOLICITUD_ESTADO':
       return { ...state, solicitudes: state.solicitudes.map(s => s.id === action.payload.id ? { ...s, estado: action.payload.estado } : s) }
+    case 'DEL_SOLICITUD':
+      return {
+        ...state,
+        solicitudes: state.solicitudes.filter(s => s.id !== action.payload),
+        solicitud_items: state.solicitud_items.filter(i => i.solicitud_id !== action.payload)
+      }
 
     case 'ADD_OC':        return { ...state, ordenes_compra: [...state.ordenes_compra, action.payload] }
     case 'UPD_OC_ESTADO': return { ...state, ordenes_compra: state.ordenes_compra.map(oc => oc.id === action.payload.id ? { ...oc, estado: action.payload.estado } : oc) }
+    case 'DEL_OC':        return { ...state, ordenes_compra: state.ordenes_compra.filter(oc => oc.id !== action.payload) }
 
     case 'ADD_COSTO_DIRECTO':   return { ...state, costos_directos: [...state.costos_directos, action.payload] }
     case 'ADD_NOMINA':          return { ...state, nominas: [...state.nominas, action.payload] }
@@ -286,6 +293,12 @@ export function StoreProvider({ children }) {
         dispatch(action)
         break
       }
+      case 'DEL_SOLICITUD': {
+        await supabase.from('solicitud_items').delete().eq('solicitud_id', action.payload)
+        await supabase.from('solicitudes').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
 
       case 'ADD_OC': {
         const oc_number = genOCCode(state.ordenes_compra)
@@ -297,6 +310,11 @@ export function StoreProvider({ children }) {
       }
       case 'UPD_OC_ESTADO': {
         await supabase.from('ordenes_compra').update({ estado: action.payload.estado }).eq('id', action.payload.id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_OC': {
+        await supabase.from('ordenes_compra').delete().eq('id', action.payload)
         dispatch(action)
         break
       }

@@ -283,6 +283,9 @@ const ES = {
   comp_print_sol_title: 'Solicitud de Compra',
   comp_print_oc_title: 'Orden de Compra',
   comp_print_btn: 'Imprimir',
+  comp_del_sol_title: '¿Eliminar esta solicitud?',
+  comp_del_oc_title: '¿Eliminar esta orden de compra?',
+  comp_del_confirm_msg: 'Esta acción no se puede deshacer.',
 
   // FINANCIERO
   fin_tab_direct: 'Costos Directos',
@@ -684,6 +687,9 @@ comp_requester_info: 'Requester information',
   comp_print_sol_title: 'Purchase Request',
   comp_print_oc_title: 'Purchase Order',
   comp_print_btn: 'Print',
+  comp_del_sol_title: 'Delete this request?',
+  comp_del_oc_title: 'Delete this purchase order?',
+  comp_del_confirm_msg: 'This action cannot be undone.',
   // FINANCIAL
   fin_tab_direct: 'Direct Costs',
   fin_tab_payroll: 'Payroll',

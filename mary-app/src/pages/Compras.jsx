@@ -1,10 +1,9 @@
-import { useState, useContext, useRef } from 'react'
+import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { today, fmt } from '../utils'
+import { today } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 
-// ── PRINT STYLES ──────────────────────────────────────────
 const printStyles = `
   @media print {
     body * { visibility: hidden; }
@@ -24,11 +23,11 @@ export default function Compras() {
   const [form, setForm]     = useState({})
   const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und' }])
   const [detail, setDetail] = useState(null)
-  const [printDoc, setPrintDoc] = useState(null) // { type:'sol'|'oc', data }
+  const [printDoc, setPrintDoc] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   const TABS = [t('comp_tab_sol'), t('comp_tab_oc')]
-
   const actividades = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
   const activos     = materiales.filter(m => m.activo !== false)
 
@@ -67,6 +66,17 @@ export default function Compras() {
     setDrawer(null)
   }
 
+  const confirmDelete = () => {
+    if (!confirmDel) return
+    if (confirmDel.type === 'sol') {
+      dispatch({ type:'DEL_SOLICITUD', payload: confirmDel.id })
+    } else {
+      dispatch({ type:'DEL_OC', payload: confirmDel.id })
+    }
+    setConfirmDel(null)
+    setDrawer(null)
+  }
+
   const detSol     = solicitudes.find(s => s.id === detail)
   const detItems   = solicitud_items.filter(i => i.solicitud_id === detail)
   const detOC      = ordenes_compra.find(oc => oc.id === detail)
@@ -79,10 +89,7 @@ export default function Compras() {
   const pendSol = solicitudes.filter(s => s.estado === 'pendiente').length
   const pendOC  = ordenes_compra.filter(oc => oc.estado === 'pendiente_aprobacion').length
 
-  // ── PRINT ──
-  const handlePrint = () => {
-    window.print()
-  }
+  const handlePrint = () => window.print()
 
   const openPrintSol = (sol) => {
     const items = solicitud_items.filter(i => i.solicitud_id === sol.id)
@@ -100,11 +107,28 @@ export default function Compras() {
     <div className="p-6 max-w-6xl mx-auto">
       <style>{printStyles}</style>
 
-      {/* ── PRINT PREVIEW MODAL ── */}
+      {/* CONFIRM DELETE */}
+      {confirmDel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <p className="text-sm font-semibold text-gray-800 mb-1">
+              {confirmDel.type === 'sol' ? t('comp_del_sol_title') : t('comp_del_oc_title')}
+            </p>
+            <p className="text-sm text-gray-500 mb-5">{t('comp_del_confirm_msg')}</p>
+            <div className="flex justify-end gap-2">
+              <SecondaryBtn onClick={() => setConfirmDel(null)}>{t('btn_cancel')}</SecondaryBtn>
+              <button onClick={confirmDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
+                {t('btn_delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRINT PREVIEW */}
       {printDoc && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            {/* Toolbar */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
               <p className="font-semibold text-gray-800 text-sm">
                 {printDoc.type === 'sol' ? t('comp_print_sol_title') : t('comp_print_oc_title')}
@@ -114,8 +138,6 @@ export default function Compras() {
                 <SecondaryBtn onClick={() => setPrintDoc(null)}>{t('btn_close')}</SecondaryBtn>
               </div>
             </div>
-
-            {/* Print Area */}
             <div id="print-area" className="p-8">
               {printDoc.type === 'sol' && <PrintSolicitud doc={printDoc} materiales={materiales} t={t} />}
               {printDoc.type === 'oc'  && <PrintOC doc={printDoc} materiales={materiales} t={t} />}
@@ -201,6 +223,7 @@ export default function Compras() {
                               setDrawer('oc')
                             }}>{t('comp_generate_oc')}</TBtn>
                           )}
+                          <TBtn danger onClick={() => setConfirmDel({ type:'sol', id:sol.id })}>{t('btn_delete')}</TBtn>
                         </div>
                       </td>
                     </tr>
@@ -245,6 +268,7 @@ export default function Compras() {
                           {oc.estado === 'aprobada' && (
                             <span className="text-xs text-green-600 font-medium px-2">{t('comp_ready_receive')}</span>
                           )}
+                          <TBtn danger onClick={() => setConfirmDel({ type:'oc', id:oc.id })}>{t('btn_delete')}</TBtn>
                         </div>
                       </td>
                     </tr>
@@ -273,7 +297,6 @@ export default function Compras() {
           </select>
         </Field>
 
-        {/* DATOS DEL SOLICITANTE */}
         <div className="border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('comp_requester_info')}</p>
           <Field label={t('comp_requester_name')}>
@@ -289,7 +312,6 @@ export default function Compras() {
           </div>
         </div>
 
-        {/* MATERIALES */}
         <div className="border-t border-gray-100 pt-3">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-gray-500">{t('comp_form_items')} *</label>
@@ -324,7 +346,15 @@ export default function Compras() {
       {/* DRAWER OC */}
       <Drawer open={drawer==='oc'} onClose={() => setDrawer(null)} title={t('comp_form_oc_title')} width={480}>
         <Field label={t('comp_form_sol_ref')} required>
-          <select className={selectCls} value={form.solicitud_id||''} onChange={set('solicitud_id')}>
+          <select className={selectCls} value={form.solicitud_id||''} onChange={e => {
+            const sol = solicitudes.find(s => s.id === e.target.value)
+            setForm(f => ({
+              ...f,
+              solicitud_id:       e.target.value,
+              solicitante_nombre: sol?.nombre_solicitante || '',
+              solicitante_cargo:  sol?.cargo_solicitante  || '',
+            }))
+          }}>
             <option value="">{t('lbl_select')}</option>
             {solicitudes.filter(s=>s.estado==='aprobada').map(s=>{
               const p = proyectos.find(x=>x.id===s.proyecto_id)
@@ -336,42 +366,27 @@ export default function Compras() {
           <input className={inputCls} value={form.proveedor||''} onChange={set('proveedor')} placeholder={t('comp_form_supplier_ph')} />
         </Field>
 
-        {/* ELABORÓ */}
         <div className="border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('comp_prepared_by')}</p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('comp_name')}>
-              <input className={inputCls} value={form.elaboro_nombre||''} onChange={set('elaboro_nombre')} placeholder={t('comp_name')} />
-            </Field>
-            <Field label={t('comp_position')}>
-              <input className={inputCls} value={form.elaboro_cargo||''} onChange={set('elaboro_cargo')} placeholder={t('comp_position')} />
-            </Field>
+            <Field label={t('comp_name')}><input className={inputCls} value={form.elaboro_nombre||''} onChange={set('elaboro_nombre')} placeholder={t('comp_name')} /></Field>
+            <Field label={t('comp_position')}><input className={inputCls} value={form.elaboro_cargo||''} onChange={set('elaboro_cargo')} placeholder={t('comp_position')} /></Field>
           </div>
         </div>
 
-        {/* SOLICITANTE */}
         <div className="border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('comp_requested_by')}</p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('comp_name')}>
-              <input className={inputCls} value={form.solicitante_nombre||''} onChange={set('solicitante_nombre')} placeholder={t('comp_name')} />
-            </Field>
-            <Field label={t('comp_position')}>
-              <input className={inputCls} value={form.solicitante_cargo||''} onChange={set('solicitante_cargo')} placeholder={t('comp_position')} />
-            </Field>
+            <Field label={t('comp_name')}><input className={inputCls} value={form.solicitante_nombre||''} onChange={set('solicitante_nombre')} placeholder={t('comp_name')} /></Field>
+            <Field label={t('comp_position')}><input className={inputCls} value={form.solicitante_cargo||''} onChange={set('solicitante_cargo')} placeholder={t('comp_position')} /></Field>
           </div>
         </div>
 
-        {/* APROBADOR */}
         <div className="border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('comp_approved_by')}</p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('comp_name')}>
-              <input className={inputCls} value={form.aprobador_nombre||''} onChange={set('aprobador_nombre')} placeholder={t('comp_name')} />
-            </Field>
-            <Field label={t('comp_position')}>
-              <input className={inputCls} value={form.aprobador_cargo||''} onChange={set('aprobador_cargo')} placeholder={t('comp_position')} />
-            </Field>
+            <Field label={t('comp_name')}><input className={inputCls} value={form.aprobador_nombre||''} onChange={set('aprobador_nombre')} placeholder={t('comp_name')} /></Field>
+            <Field label={t('comp_position')}><input className={inputCls} value={form.aprobador_cargo||''} onChange={set('aprobador_cargo')} placeholder={t('comp_position')} /></Field>
           </div>
         </div>
 
@@ -410,7 +425,12 @@ export default function Compras() {
               )
             })}
           </div>
-          <PrimaryBtn onClick={() => openPrintSol(detSol)} className="w-full">🖨 {t('comp_print_btn')}</PrimaryBtn>
+          <div className="flex gap-2">
+            <PrimaryBtn onClick={() => openPrintSol(detSol)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
+            <button onClick={() => { setConfirmDel({ type:'sol', id:detSol.id }) }} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">
+              {t('btn_delete')}
+            </button>
+          </div>
         </>}
       </Drawer>
 
@@ -422,8 +442,8 @@ export default function Compras() {
             <div><p className="text-xs text-gray-400">{t('lbl_status')}</p><Badge estado={detOC.estado} /></div>
             <div><p className="text-xs text-gray-400">{t('comp_col_supplier')}</p><p className="text-sm">{detOC.proveedor}</p></div>
             <div><p className="text-xs text-gray-400">{t('comp_col_approval')}</p><p className="text-sm">{detOC.fecha_aprobacion || t('comp_pending_approval')}</p></div>
-            {detOC.elaboro_nombre     && <div><p className="text-xs text-gray-400">{t('comp_prepared_by')}</p><p className="text-sm">{detOC.elaboro_nombre}</p></div>}
-            {detOC.aprobador_nombre   && <div><p className="text-xs text-gray-400">{t('comp_approved_by')}</p><p className="text-sm">{detOC.aprobador_nombre}</p></div>}
+            {detOC.elaboro_nombre   && <div><p className="text-xs text-gray-400">{t('comp_prepared_by')}</p><p className="text-sm">{detOC.elaboro_nombre}</p></div>}
+            {detOC.aprobador_nombre && <div><p className="text-xs text-gray-400">{t('comp_approved_by')}</p><p className="text-sm">{detOC.aprobador_nombre}</p></div>}
           </div>
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2">{t('comp_detail_items')}</p>
@@ -437,10 +457,16 @@ export default function Compras() {
               )
             })}
           </div>
+          {detOC.notas && <div><p className="text-xs text-gray-400">{t('lbl_notes')}</p><p className="text-sm text-gray-700">{detOC.notas}</p></div>}
           {detOC.estado === 'aprobada' && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">{t('comp_oc_approved_msg')}</div>
           )}
-          <PrimaryBtn onClick={() => openPrintOC(detOC)} className="w-full">🖨 {t('comp_print_btn')}</PrimaryBtn>
+          <div className="flex gap-2">
+            <PrimaryBtn onClick={() => openPrintOC(detOC)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
+            <button onClick={() => setConfirmDel({ type:'oc', id:detOC.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">
+              {t('btn_delete')}
+            </button>
+          </div>
         </>}
       </Drawer>
     </div>
@@ -452,7 +478,6 @@ function PrintSolicitud({ doc, materiales, t }) {
   const { sol, items, proy } = doc
   return (
     <div style={{ fontFamily:'Arial, sans-serif', fontSize:'12px', color:'#111' }}>
-      {/* Header */}
       <div style={{ borderBottom:'2px solid #1D9E75', paddingBottom:'12px', marginBottom:'16px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
@@ -466,7 +491,6 @@ function PrintSolicitud({ doc, materiales, t }) {
         </div>
       </div>
 
-      {/* Info grid */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px', background:'#f9f9f9', padding:'12px', borderRadius:'6px' }}>
         <div><span style={{ color:'#666', fontSize:'11px' }}>{t('lbl_project')}:</span><p style={{ margin:'2px 0 0', fontWeight:'600' }}>{proy?.project_code} — {proy?.nombre}</p></div>
         <div><span style={{ color:'#666', fontSize:'11px' }}>{t('lbl_status')}:</span><p style={{ margin:'2px 0 0', fontWeight:'600', color:'#1D9E75' }}>{sol.estado?.toUpperCase()}</p></div>
@@ -475,7 +499,6 @@ function PrintSolicitud({ doc, materiales, t }) {
         {sol.departamento       && <div><span style={{ color:'#666', fontSize:'11px' }}>{t('comp_requester_dept')}:</span><p style={{ margin:'2px 0 0', fontWeight:'600' }}>{sol.departamento}</p></div>}
       </div>
 
-      {/* Justificación */}
       {sol.justificacion && (
         <div style={{ marginBottom:'16px' }}>
           <p style={{ color:'#666', fontSize:'11px', marginBottom:'4px' }}>{t('comp_form_justification')}:</p>
@@ -483,7 +506,6 @@ function PrintSolicitud({ doc, materiales, t }) {
         </div>
       )}
 
-      {/* Tabla de materiales */}
       <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:'24px' }}>
         <thead>
           <tr style={{ background:'#1D9E75', color:'white' }}>
@@ -510,7 +532,6 @@ function PrintSolicitud({ doc, materiales, t }) {
         </tbody>
       </table>
 
-      {/* Firmas */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'40px', marginTop:'32px' }}>
         <div style={{ textAlign:'center' }}>
           <div style={{ borderTop:'1px solid #111', paddingTop:'8px' }}>
@@ -534,7 +555,6 @@ function PrintOC({ doc, materiales, t }) {
   const { oc, items, proy } = doc
   return (
     <div style={{ fontFamily:'Arial, sans-serif', fontSize:'12px', color:'#111' }}>
-      {/* Header */}
       <div style={{ borderBottom:'2px solid #1D9E75', paddingBottom:'12px', marginBottom:'16px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
@@ -549,7 +569,6 @@ function PrintOC({ doc, materiales, t }) {
         </div>
       </div>
 
-      {/* Info */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px', background:'#f9f9f9', padding:'12px', borderRadius:'6px' }}>
         <div><span style={{ color:'#666', fontSize:'11px' }}>{t('lbl_project')}:</span><p style={{ margin:'2px 0 0', fontWeight:'600' }}>{proy?.project_code} — {proy?.nombre}</p></div>
         <div><span style={{ color:'#666', fontSize:'11px' }}>{t('comp_col_supplier')}:</span><p style={{ margin:'2px 0 0', fontWeight:'600' }}>{oc.proveedor}</p></div>
@@ -557,7 +576,6 @@ function PrintOC({ doc, materiales, t }) {
         {oc.fecha_aprobacion && <div><span style={{ color:'#666', fontSize:'11px' }}>{t('comp_col_approval')}:</span><p style={{ margin:'2px 0 0', fontWeight:'600' }}>{oc.fecha_aprobacion}</p></div>}
       </div>
 
-      {/* Tabla */}
       <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:'24px' }}>
         <thead>
           <tr style={{ background:'#1D9E75', color:'white' }}>
@@ -584,7 +602,6 @@ function PrintOC({ doc, materiales, t }) {
         </tbody>
       </table>
 
-      {/* Notas */}
       {oc.notas && (
         <div style={{ marginBottom:'24px' }}>
           <p style={{ color:'#666', fontSize:'11px', marginBottom:'4px' }}>{t('lbl_notes')}:</p>
@@ -592,12 +609,11 @@ function PrintOC({ doc, materiales, t }) {
         </div>
       )}
 
-      {/* Firmas */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'24px', marginTop:'32px' }}>
         {[
-          { label: t('comp_prepared_by'), nombre: oc.elaboro_nombre,     cargo: oc.elaboro_cargo },
+          { label: t('comp_prepared_by'),  nombre: oc.elaboro_nombre,     cargo: oc.elaboro_cargo },
           { label: t('comp_requested_by'), nombre: oc.solicitante_nombre, cargo: oc.solicitante_cargo },
-          { label: t('comp_approved_by'), nombre: oc.aprobador_nombre,   cargo: oc.aprobador_cargo },
+          { label: t('comp_approved_by'),  nombre: oc.aprobador_nombre,   cargo: oc.aprobador_cargo },
         ].map((f, i) => (
           <div key={i} style={{ textAlign:'center' }}>
             <div style={{ borderTop:'1px solid #111', paddingTop:'8px' }}>
