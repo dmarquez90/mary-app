@@ -2,12 +2,13 @@ import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { today, fmt, fmtNum } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, StatCard, Icons, inputCls, selectCls } from '../components'
 
 export default function Financiero() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
-  const { proyectos, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, materiales } = state
+  const { proyectos, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas } = state
+
   const [tab, setTab]       = useState(0)
   const [proyId, setProyId] = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer] = useState(false)
@@ -45,12 +46,12 @@ export default function Financiero() {
   const totalReal = totalMat + totalDir + totalNom + totalSub + totalEq + totalInd
 
   const openDrawer = () => {
-    const base = { proyecto_id: proyId, fecha: today() }
-    if (tab === 0) setForm({ ...base, tipo:'factura_obra', descripcion:'', monto:'', numero_documento:'', actividad_id:'' })
+    const base = { proyecto_id: proyId }
+    if (tab === 0) setForm({ ...base, tipo:'factura_obra', descripcion:'', monto:'', numero_documento:'', actividad_id:'', fecha: today() })
     if (tab === 1) setForm({ ...base, trabajador:'', cargo:'', periodo_inicio:today(), periodo_fin:today(), salario_base:'', deducciones:'0' })
     if (tab === 2) setForm({ ...base, subcontratista:'', descripcion_trabajo:'', monto_contrato:'', avance_porcentaje:'0', monto_pagado:'0', actividad_id:'' })
-    if (tab === 3) setForm({ ...base, descripcion:'', tipo:'alquiler', tarifa_diaria:'', dias_uso:'', costo_total:'', actividad_id:'' })
-    if (tab === 4) setForm({ ...base, categoria:'', descripcion:'', monto:'' })
+    if (tab === 3) setForm({ ...base, descripcion:'', tipo:'alquiler', tarifa_diaria:'', dias_uso:'', costo_total:'' })
+    if (tab === 4) setForm({ ...base, categoria:'', descripcion:'', monto:'', fecha: today() })
     setDrawer(true)
   }
 
@@ -64,6 +65,13 @@ export default function Financiero() {
   }
 
   const tabEmpty = [directs, noms, subs, eqs, inds][tab]
+
+  // Calcular costo total de equipo automáticamente
+  const calcCostoTotal = (tarifa, dias) => {
+    const t = parseFloat(tarifa)||0
+    const d = parseFloat(dias)||0
+    return t > 0 && d > 0 ? t * d : ''
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -88,10 +96,10 @@ export default function Financiero() {
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <StatCard label={t('fin_total_real')}    value={fmt(totalReal, moneda)} color="#1D9E75" />
-            <StatCard label={t('fin_materials')}     value={fmt(totalMat, moneda)}  sub={t('fin_materials_sub')} />
-            <StatCard label={t('fin_payroll')}       value={fmt(totalNom, moneda)}  sub={t('fin_payroll_sub')} />
-            <StatCard label={t('fin_subcontracts')}  value={fmt(totalSub, moneda)}  sub={t('fin_subcontracts_sub')} />
+            <StatCard label={t('fin_total_real')}   value={fmt(totalReal, moneda)} color="#1D9E75" />
+            <StatCard label={t('fin_materials')}    value={fmt(totalMat, moneda)}  sub={t('fin_materials_sub')} />
+            <StatCard label={t('fin_payroll')}      value={fmt(totalNom, moneda)}  sub={t('fin_payroll_sub')} />
+            <StatCard label={t('fin_subcontracts')} value={fmt(totalSub, moneda)}  sub={t('fin_subcontracts_sub')} />
           </div>
 
           <div className="flex border-b border-gray-200 mb-5">
@@ -113,7 +121,6 @@ export default function Financiero() {
           ) : (
             <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
 
-              {/* COSTOS DIRECTOS */}
               {tab === 0 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
@@ -126,7 +133,7 @@ export default function Financiero() {
                       const act = presupuesto.find(b=>b.id===c.actividad_id)
                       return (
                         <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-3 text-xs text-gray-500">{c.fecha}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500">{c.fecha || c.created_at}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tipo==='caja_chica'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>
                               {c.tipo==='caja_chica' ? t('fin_petty') : t('fin_invoice')}
@@ -148,7 +155,6 @@ export default function Financiero() {
                 </table>
               )}
 
-              {/* NÓMINA */}
               {tab === 1 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
@@ -178,7 +184,6 @@ export default function Financiero() {
                 </table>
               )}
 
-              {/* SUBCONTRATOS */}
               {tab === 2 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
@@ -210,7 +215,6 @@ export default function Financiero() {
                 </table>
               )}
 
-              {/* EQUIPOS */}
               {tab === 3 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
@@ -240,7 +244,6 @@ export default function Financiero() {
                 </table>
               )}
 
-              {/* COSTOS INDIRECTOS */}
               {tab === 4 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
@@ -251,7 +254,7 @@ export default function Financiero() {
                   <tbody>
                     {inds.map(c => (
                       <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-4 py-3 text-xs text-gray-500">{c.fecha}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{c.fecha || c.created_at}</td>
                         <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{c.categoria}</span></td>
                         <td className="px-4 py-3 text-sm text-gray-800">{c.descripcion||'—'}</td>
                         <td className="px-4 py-3 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(c.monto,moneda)}</td>
@@ -271,6 +274,7 @@ export default function Financiero() {
 
       {/* DRAWER */}
       <Drawer open={drawer} onClose={() => setDrawer(false)} title={`+ ${TABS[tab]}`} width={400}>
+
         {tab === 0 && <>
           <Field label={t('fin_form_type')}>
             <select className={selectCls} value={form.tipo||'factura_obra'} onChange={set('tipo')}>
@@ -367,17 +371,37 @@ export default function Financiero() {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('fin_form_eq_rate')}>
-              <input type="number" className={inputCls} value={form.tarifa_diaria||''} onChange={set('tarifa_diaria')} placeholder="0.00" min="0" step="0.01"/>
+              <input type="number" className={inputCls}
+                value={form.tarifa_diaria||''}
+                onChange={e => {
+                  const tarifa = e.target.value
+                  const total = calcCostoTotal(tarifa, form.dias_uso)
+                  setForm(f => ({ ...f, tarifa_diaria: tarifa, costo_total: total }))
+                }}
+                placeholder="0.00" min="0" step="0.01"/>
             </Field>
             <Field label={t('fin_form_eq_days')}>
-              <input type="number" className={inputCls} value={form.dias_uso||''} onChange={set('dias_uso')} placeholder="0" min="0"/>
+              <input type="number" className={inputCls}
+                value={form.dias_uso||''}
+                onChange={e => {
+                  const dias = e.target.value
+                  const total = calcCostoTotal(form.tarifa_diaria, dias)
+                  setForm(f => ({ ...f, dias_uso: dias, costo_total: total }))
+                }}
+                placeholder="0" min="0"/>
             </Field>
           </div>
           <Field label={t('fin_form_eq_total')} required>
             <input type="number" className={inputCls}
-              value={form.costo_total||((parseFloat(form.tarifa_diaria)||0)*(parseFloat(form.dias_uso)||0)||'')}
-              onChange={set('costo_total')} placeholder="0.00" min="0" step="0.01"/>
+              value={form.costo_total||''}
+              onChange={set('costo_total')}
+              placeholder="0.00" min="0" step="0.01"/>
           </Field>
+          {form.tarifa_diaria && form.dias_uso && (
+            <p className="text-xs text-gray-400">
+              {form.tarifa_diaria} × {form.dias_uso} días = <span className="font-medium text-gray-600">{fmt(calcCostoTotal(form.tarifa_diaria, form.dias_uso), moneda)}</span>
+            </p>
+          )}
         </>}
 
         {tab === 4 && <>

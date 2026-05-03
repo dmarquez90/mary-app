@@ -320,19 +320,22 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_COSTO_DIRECTO': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const { fecha, ...rest } = action.payload
+        const item = { ...rest, id: uuid(), created_at: today() }
         await supabase.from('costos_directos').insert(item)
         dispatch({ type: 'ADD_COSTO_DIRECTO', payload: item })
         break
       }
       case 'ADD_NOMINA': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const { fecha, ...rest } = action.payload
+        const item = { ...rest, id: uuid(), created_at: today() }
         await supabase.from('nominas').insert(item)
         dispatch({ type: 'ADD_NOMINA', payload: item })
         break
       }
       case 'ADD_SUBCONTRATO': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const { fecha, ...rest } = action.payload
+        const item = { ...rest, id: uuid(), created_at: today() }
         await supabase.from('subcontratos').insert(item)
         dispatch({ type: 'ADD_SUBCONTRATO', payload: item })
         break
@@ -343,13 +346,15 @@ export function StoreProvider({ children }) {
         break
       }
       case 'ADD_EQUIPO': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const { fecha, monto, ...rest } = action.payload
+        const item = { ...rest, id: uuid(), created_at: today() }
         await supabase.from('equipos').insert(item)
         dispatch({ type: 'ADD_EQUIPO', payload: item })
         break
       }
       case 'ADD_COSTO_INDIRECTO': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const { fecha, ...rest } = action.payload
+        const item = { ...rest, id: uuid(), created_at: today() }
         await supabase.from('costos_indirectos').insert(item)
         dispatch({ type: 'ADD_COSTO_INDIRECTO', payload: item })
         break
