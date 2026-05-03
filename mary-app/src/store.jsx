@@ -7,7 +7,9 @@ const INIT = {
   materiales: [], entradas: [], salidas: [],
   solicitudes: [], solicitud_items: [], ordenes_compra: [],
   costos_directos: [], nominas: [], subcontratos: [],
-  equipos: [], costos_indirectos: [], loaded: false
+  equipos: [], costos_indirectos: [],
+  materiales_presupuestados: [],
+  loaded: false
 }
 
 function reducer(state, action) {
@@ -33,30 +35,40 @@ function reducer(state, action) {
 
     case 'ADD_ENTRADA': return { ...state, entradas: [...state.entradas, action.payload] }
     case 'UPD_ENTRADA': return { ...state, entradas: state.entradas.map(e => e.id === action.payload.id ? { ...e, ...action.payload } : e) }
-    case 'DEL_ENTRADA': return { ...state, entradas: state.entradas.filter(e => e.id !== action.payload.id),
-                                            materiales: state.materiales.map(m => m.id === action.payload.materialId
-                                              ? { ...m, stock_actual: Math.max(0, (m.stock_actual||0) - action.payload.cantidad) } : m) }
+    case 'DEL_ENTRADA': return {
+      ...state,
+      entradas: state.entradas.filter(e => e.id !== action.payload.id),
+      materiales: state.materiales.map(m => m.id === action.payload.materialId
+        ? { ...m, stock_actual: Math.max(0, (m.stock_actual||0) - action.payload.cantidad) } : m)
+    }
 
     case 'ADD_SALIDA': return { ...state, salidas: [...state.salidas, action.payload] }
     case 'UPD_SALIDA': return { ...state, salidas: state.salidas.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
-    case 'DEL_SALIDA': return { ...state, salidas: state.salidas.filter(s => s.id !== action.payload.id),
-                                           materiales: state.materiales.map(m => m.id === action.payload.materialId
-                                             ? { ...m, stock_actual: (m.stock_actual||0) + action.payload.cantidad } : m) }
+    case 'DEL_SALIDA': return {
+      ...state,
+      salidas: state.salidas.filter(s => s.id !== action.payload.id),
+      materiales: state.materiales.map(m => m.id === action.payload.materialId
+        ? { ...m, stock_actual: (m.stock_actual||0) + action.payload.cantidad } : m)
+    }
 
     case 'ADD_SOLICITUD':
       return { ...state, solicitudes: [...state.solicitudes, action.payload.solicitud], solicitud_items: [...state.solicitud_items, ...action.payload.items] }
     case 'UPD_SOLICITUD_ESTADO':
       return { ...state, solicitudes: state.solicitudes.map(s => s.id === action.payload.id ? { ...s, estado: action.payload.estado } : s) }
 
-    case 'ADD_OC':      return { ...state, ordenes_compra: [...state.ordenes_compra, action.payload] }
+    case 'ADD_OC':        return { ...state, ordenes_compra: [...state.ordenes_compra, action.payload] }
     case 'UPD_OC_ESTADO': return { ...state, ordenes_compra: state.ordenes_compra.map(oc => oc.id === action.payload.id ? { ...oc, estado: action.payload.estado } : oc) }
 
-    case 'ADD_COSTO_DIRECTO':  return { ...state, costos_directos: [...state.costos_directos, action.payload] }
-    case 'ADD_NOMINA':         return { ...state, nominas: [...state.nominas, action.payload] }
-    case 'ADD_SUBCONTRATO':    return { ...state, subcontratos: [...state.subcontratos, action.payload] }
-    case 'UPD_SUBCONTRATO':    return { ...state, subcontratos: state.subcontratos.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
-    case 'ADD_EQUIPO':         return { ...state, equipos: [...state.equipos, action.payload] }
+    case 'ADD_COSTO_DIRECTO':   return { ...state, costos_directos: [...state.costos_directos, action.payload] }
+    case 'ADD_NOMINA':          return { ...state, nominas: [...state.nominas, action.payload] }
+    case 'ADD_SUBCONTRATO':     return { ...state, subcontratos: [...state.subcontratos, action.payload] }
+    case 'UPD_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
+    case 'ADD_EQUIPO':          return { ...state, equipos: [...state.equipos, action.payload] }
     case 'ADD_COSTO_INDIRECTO': return { ...state, costos_indirectos: [...state.costos_indirectos, action.payload] }
+
+    case 'ADD_MAT_PRES': return { ...state, materiales_presupuestados: [...state.materiales_presupuestados, action.payload] }
+    case 'UPD_MAT_PRES': return { ...state, materiales_presupuestados: state.materiales_presupuestados.map(m => m.id === action.payload.id ? { ...m, ...action.payload } : m) }
+    case 'DEL_MAT_PRES': return { ...state, materiales_presupuestados: state.materiales_presupuestados.filter(m => m.id !== action.payload) }
 
     default: return state
   }
@@ -70,7 +82,12 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     async function loadAll() {
-      const tables = ['proyectos','fases','presupuesto','materiales','entradas','salidas','solicitudes','solicitud_items','ordenes_compra','costos_directos','nominas','subcontratos','equipos','costos_indirectos']
+      const tables = [
+        'proyectos','fases','presupuesto','materiales','entradas','salidas',
+        'solicitudes','solicitud_items','ordenes_compra','costos_directos',
+        'nominas','subcontratos','equipos','costos_indirectos',
+        'materiales_presupuestados'
+      ]
       const results = await Promise.all(tables.map(t => supabase.from(t).select('*')))
       const payload = {}
       tables.forEach((t, i) => { payload[t] = results[i].data || [] })
@@ -138,6 +155,11 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_MATERIAL': {
+        const existe = state.materiales.find(m => m.codigo === action.payload.codigo)
+        if (existe) {
+          alert('Error: El código de material ya existe.')
+          return
+        }
         const item = { ...action.payload, id: uuid(), stock_actual: parseFloat(action.payload.stock_actual)||0, created_at: today() }
         await supabase.from('materiales').insert(item)
         dispatch({ type: 'ADD_MATERIAL', payload: item })
@@ -162,7 +184,11 @@ export function StoreProvider({ children }) {
         const item = { ...payload, id: uuid(), created_at: today() }
         await supabase.from('entradas').insert(item)
         const mat = state.materiales.find(m => m.id === item.material_id)
-        if (mat) await supabase.from('materiales').update({ stock_actual: (mat.stock_actual||0) + (parseFloat(item.cantidad)||0) }).eq('id', mat.id)
+        if (mat) {
+          const nuevoStock = (parseFloat(mat.stock_actual)||0) + (parseFloat(item.cantidad)||0)
+          await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
+          dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+        }
         dispatch({ type: 'ADD_ENTRADA', payload: item })
         break
       }
@@ -175,9 +201,11 @@ export function StoreProvider({ children }) {
       case 'DEL_ENTRADA': {
         await supabase.from('entradas').delete().eq('id', action.payload.id)
         const mat = state.materiales.find(m => m.id === action.payload.materialId)
-        if (mat) await supabase.from('materiales').update({
-          stock_actual: Math.max(0, (mat.stock_actual||0) - action.payload.cantidad)
-        }).eq('id', mat.id)
+        if (mat) {
+          const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) - action.payload.cantidad)
+          await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
+          dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+        }
         dispatch(action)
         break
       }
@@ -189,7 +217,11 @@ export function StoreProvider({ children }) {
         const item = { ...payload, id: uuid(), created_at: today() }
         await supabase.from('salidas').insert(item)
         const mat = state.materiales.find(m => m.id === item.material_id)
-        if (mat) await supabase.from('materiales').update({ stock_actual: Math.max(0, (mat.stock_actual||0) - (parseFloat(item.cantidad)||0)) }).eq('id', mat.id)
+        if (mat) {
+          const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) - (parseFloat(item.cantidad)||0))
+          await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
+          dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+        }
         dispatch({ type: 'ADD_SALIDA', payload: item })
         break
       }
@@ -202,9 +234,11 @@ export function StoreProvider({ children }) {
       case 'DEL_SALIDA': {
         await supabase.from('salidas').delete().eq('id', action.payload.id)
         const mat = state.materiales.find(m => m.id === action.payload.materialId)
-        if (mat) await supabase.from('materiales').update({
-          stock_actual: (mat.stock_actual||0) + action.payload.cantidad
-        }).eq('id', mat.id)
+        if (mat) {
+          const nuevoStock = (parseFloat(mat.stock_actual)||0) + action.payload.cantidad
+          await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
+          dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+        }
         dispatch(action)
         break
       }
@@ -270,6 +304,24 @@ export function StoreProvider({ children }) {
         const item = { ...action.payload, id: uuid(), created_at: today() }
         await supabase.from('costos_indirectos').insert(item)
         dispatch({ type: 'ADD_COSTO_INDIRECTO', payload: item })
+        break
+      }
+
+      case 'ADD_MAT_PRES': {
+        const item = { ...action.payload, id: uuid(), created_at: today() }
+        await supabase.from('materiales_presupuestados').insert(item)
+        dispatch({ type: 'ADD_MAT_PRES', payload: item })
+        break
+      }
+      case 'UPD_MAT_PRES': {
+        const { id, ...fields } = action.payload
+        await supabase.from('materiales_presupuestados').update(fields).eq('id', id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_MAT_PRES': {
+        await supabase.from('materiales_presupuestados').delete().eq('id', action.payload)
+        dispatch(action)
         break
       }
 

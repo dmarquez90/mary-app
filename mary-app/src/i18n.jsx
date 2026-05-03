@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react'
- 
+
 const LS_KEY = 'mary_lang'
- 
+
 /* ============================================================
    🇪🇸 ESPAÑOL
    ============================================================ */
 const ES = {
- 
+
   // COMMON
   lbl_select: '— Seleccionar —',
   lbl_status: 'Estado',
@@ -26,7 +26,7 @@ const ES = {
   btn_view: 'Ver',
   btn_approve: 'Aprobar',
   btn_reject: 'Rechazar',
- 
+
   // DASHBOARD
   dash_title: 'Panel Principal',
   dash_projects: 'Proyectos',
@@ -35,7 +35,7 @@ const ES = {
   dash_outputs: 'Salidas',
   dash_requests: 'Solicitudes',
   dash_purchase_orders: 'Órdenes de Compra',
- 
+
   // PROYECTOS
   proy_title: 'Proyectos',
   proy_sub: '{n} proyectos registrados',
@@ -65,7 +65,7 @@ const ES = {
   proy_fase_cancel: 'Cancelar',
   proy_detail_edit: 'Editar proyecto',
   proy_detail_back: 'Volver',
- 
+
   // PRESUPUESTO
   pres_title: 'Presupuesto',
   pres_no_project: 'Selecciona un proyecto para ver su presupuesto',
@@ -92,7 +92,7 @@ const ES = {
   pres_unit_total: 'Total unitario',
   pres_total: 'Total',
   pres_delete_confirm: '¿Eliminar este ítem del presupuesto?',
- 
+
   // INVENTARIO
   inv_title: 'Inventario',
   inv_sub: '{n} materiales registrados',
@@ -123,6 +123,7 @@ const ES = {
   inv_col_price: 'Precio',
   inv_col_activity: 'Actividad',
   inv_col_type: 'Tipo',
+  inv_col_detail: 'Detalle',
   inv_critical_badge: 'Crítico',
   inv_ok_badge: 'OK',
   inv_ok: 'OK',
@@ -132,6 +133,7 @@ const ES = {
   inv_exit: 'Salida',
   inv_deactivate: 'Desactivar',
   inv_stock_warning: 'Stock insuficiente. Disponible: {n}',
+  inv_stock_current: 'Stock actual',
   inv_form_code: 'Código',
   inv_form_desc: 'Descripción',
   inv_form_unit: 'Unidad',
@@ -155,13 +157,12 @@ const ES = {
   inv_form_mat_title: 'Agregar material',
   inv_form_mat_title_edit: 'Editar material',
   inv_form_entry_title: 'Registrar entrada',
+  inv_form_entry_title_edit: 'Editar entrada',
   inv_form_exit_title: 'Registrar salida',
+  inv_form_exit_title_edit: 'Editar salida',
   inv_del_entry_title: 'Eliminar entrada',
   inv_del_exit_title: 'Eliminar salida',
   inv_del_confirm_msg: 'El stock del material se ajustará automáticamente.',
-  inv_form_entry_title_edit: 'Editar entrada',
-  inv_form_exit_title_edit: 'Editar salida',
-  inv_stock_current: 'Stock actual',
   inv_del_warning_title: 'Advertencia — Salidas sin respaldo',
   inv_del_warning_body: 'Al eliminar esta entrada, quedarán {n} salida(s) de {mat} sin respaldo en el inventario.',
   inv_del_entries_remaining: 'Entradas restantes',
@@ -169,12 +170,35 @@ const ES = {
   inv_del_what_to_do: '¿Qué deseas hacer?',
   inv_del_entry_and_exits: 'Eliminar entrada + {n} salida(s) afectada(s)',
   inv_del_entry_only: 'Solo eliminar la entrada (el stock quedará inconsistente)',
-  inv_col_detail: 'Detalle',
- 
+
   // BOM
   bom_form_save: 'Guardar material',
   bom_form_save_edit: 'Actualizar material',
- 
+
+  // MATERIALES PRESUPUESTADOS
+  mp_title: 'Materiales Presupuestados',
+  mp_add: '+ Agregar material',
+  mp_no_project: 'Selecciona un proyecto para ver sus materiales presupuestados',
+  mp_empty: 'No hay materiales presupuestados registrados',
+  mp_no_results: 'No se encontraron materiales con ese criterio',
+  mp_search_placeholder: 'Buscar por código o nombre...',
+  mp_kpi_materials: 'Materiales',
+  mp_kpi_budget_value: 'Valor presupuestado',
+  mp_kpi_activities: 'Actividades',
+  mp_col_budgeted: 'Presupuestado',
+  mp_col_consumed: 'Consumido',
+  mp_col_remaining: 'Restante',
+  mp_col_activity: 'Actividad',
+  mp_col_status: 'Estado',
+  mp_status_ok: '✓ OK',
+  mp_status_alert: '⚠ Alerta',
+  mp_status_depleted: '⚠ Agotado',
+  mp_form_new: 'Agregar material presupuestado',
+  mp_form_edit: 'Editar material presupuestado',
+  mp_form_material: 'Material',
+  mp_form_activity: 'Actividad',
+  mp_form_qty: 'Cantidad presupuestada',
+
   // COMPRAS
   comp_title: 'Compras / Órdenes de Compra',
   comp_sub_pending: '{n} solicitudes pendientes',
@@ -231,7 +255,7 @@ const ES = {
   comp_detail_items: 'Ítems de la OC',
   comp_pending_approval: 'Pendiente',
   comp_oc_approved_msg: 'OC aprobada',
- 
+
   // FINANCIERO
   fin_tab_direct: 'Costos Directos',
   fin_tab_payroll: 'Nómina',
@@ -291,7 +315,7 @@ const ES = {
   fin_form_eq_days: 'Días de uso',
   fin_form_eq_total: 'Costo total',
   fin_form_category: 'Categoría',
- 
+
   // CURVA S
   curva_title: 'Curva S & Reportes',
   curva_select_project: 'Proyecto',
@@ -323,7 +347,7 @@ const ES = {
   curva_status_ok: 'OK',
   curva_status_alert: 'Alerta',
   curva_status_critical: 'Crítico',
- 
+
   // CONFIGURACIÓN
   config_title: 'Configuración',
   config_subtitle: 'Preferencias del sistema',
@@ -344,12 +368,12 @@ const ES = {
   config_save: 'Guardar configuración',
   config_saved: '✓ Configuración guardada',
 }
- 
+
 /* ============================================================
    🇺🇸 ENGLISH
    ============================================================ */
 const EN = {
- 
+
   // COMMON
   lbl_select: '— Select —',
   lbl_status: 'Status',
@@ -369,7 +393,7 @@ const EN = {
   btn_view: 'View',
   btn_approve: 'Approve',
   btn_reject: 'Reject',
- 
+
   // DASHBOARD
   dash_title: 'Main Dashboard',
   dash_projects: 'Projects',
@@ -378,7 +402,7 @@ const EN = {
   dash_outputs: 'Exits',
   dash_requests: 'Requests',
   dash_purchase_orders: 'Purchase Orders',
- 
+
   // PROJECTS
   proy_title: 'Projects',
   proy_sub: '{n} projects registered',
@@ -408,7 +432,7 @@ const EN = {
   proy_fase_cancel: 'Cancel',
   proy_detail_edit: 'Edit project',
   proy_detail_back: 'Back',
- 
+
   // BUDGET
   pres_title: 'Budget',
   pres_no_project: 'Select a project to view its budget',
@@ -435,7 +459,7 @@ const EN = {
   pres_unit_total: 'Unit total',
   pres_total: 'Total',
   pres_delete_confirm: 'Delete this budget item?',
- 
+
   // INVENTORY
   inv_title: 'Inventory',
   inv_sub: '{n} materials registered',
@@ -466,6 +490,7 @@ const EN = {
   inv_col_price: 'Price',
   inv_col_activity: 'Activity',
   inv_col_type: 'Type',
+  inv_col_detail: 'Detail',
   inv_critical_badge: 'Critical',
   inv_ok_badge: 'OK',
   inv_ok: 'OK',
@@ -475,6 +500,7 @@ const EN = {
   inv_exit: 'Exit',
   inv_deactivate: 'Deactivate',
   inv_stock_warning: 'Insufficient stock. Available: {n}',
+  inv_stock_current: 'Current stock',
   inv_form_code: 'Code',
   inv_form_desc: 'Description',
   inv_form_unit: 'Unit',
@@ -498,13 +524,12 @@ const EN = {
   inv_form_mat_title: 'Add material',
   inv_form_mat_title_edit: 'Edit material',
   inv_form_entry_title: 'Register entry',
+  inv_form_entry_title_edit: 'Edit entry',
   inv_form_exit_title: 'Register exit',
+  inv_form_exit_title_edit: 'Edit exit',
   inv_del_entry_title: 'Delete entry',
   inv_del_exit_title: 'Delete exit',
   inv_del_confirm_msg: 'The material stock will be adjusted automatically.',
-  inv_form_entry_title_edit: 'Edit entry',
-  inv_form_exit_title_edit: 'Edit exit',
-  inv_stock_current: 'Current stock',
   inv_del_warning_title: 'Warning — Unsupported exits',
   inv_del_warning_body: 'Deleting this entry will leave {n} exit(s) of {mat} without inventory support.',
   inv_del_entries_remaining: 'Remaining entries',
@@ -512,12 +537,35 @@ const EN = {
   inv_del_what_to_do: 'What would you like to do?',
   inv_del_entry_and_exits: 'Delete entry + {n} affected exit(s)',
   inv_del_entry_only: 'Delete entry only (stock will be inconsistent)',
-  inv_col_detail: 'Detail',
- 
+
   // BOM
   bom_form_save: 'Save material',
   bom_form_save_edit: 'Update material',
- 
+
+  // BUDGETED MATERIALS
+  mp_title: 'Budgeted Materials',
+  mp_add: '+ Add material',
+  mp_no_project: 'Select a project to view its budgeted materials',
+  mp_empty: 'No budgeted materials registered',
+  mp_no_results: 'No materials found with that criteria',
+  mp_search_placeholder: 'Search by code or name...',
+  mp_kpi_materials: 'Materials',
+  mp_kpi_budget_value: 'Budgeted value',
+  mp_kpi_activities: 'Activities',
+  mp_col_budgeted: 'Budgeted',
+  mp_col_consumed: 'Consumed',
+  mp_col_remaining: 'Remaining',
+  mp_col_activity: 'Activity',
+  mp_col_status: 'Status',
+  mp_status_ok: '✓ OK',
+  mp_status_alert: '⚠ Alert',
+  mp_status_depleted: '⚠ Depleted',
+  mp_form_new: 'Add budgeted material',
+  mp_form_edit: 'Edit budgeted material',
+  mp_form_material: 'Material',
+  mp_form_activity: 'Activity',
+  mp_form_qty: 'Budgeted quantity',
+
   // PURCHASES
   comp_title: 'Purchases / Purchase Orders',
   comp_sub_pending: '{n} pending requests',
@@ -574,7 +622,7 @@ const EN = {
   comp_detail_items: 'PO items',
   comp_pending_approval: 'Pending',
   comp_oc_approved_msg: 'PO approved',
- 
+
   // FINANCIAL
   fin_tab_direct: 'Direct Costs',
   fin_tab_payroll: 'Payroll',
@@ -634,7 +682,7 @@ const EN = {
   fin_form_eq_days: 'Days of use',
   fin_form_eq_total: 'Total cost',
   fin_form_category: 'Category',
- 
+
   // S CURVE
   curva_title: 'S Curve & Reports',
   curva_select_project: 'Project',
@@ -666,7 +714,7 @@ const EN = {
   curva_status_ok: 'OK',
   curva_status_alert: 'Alert',
   curva_status_critical: 'Critical',
- 
+
   // SETTINGS
   config_title: 'Settings',
   config_subtitle: 'System preferences',
@@ -687,26 +735,26 @@ const EN = {
   config_save: 'Save settings',
   config_saved: '✓ Settings saved',
 }
- 
+
 /* ============================================================
    CONTEXTO DE IDIOMA
    ============================================================ */
 export const LangContext = createContext()
- 
+
 export function LangProvider({ children }) {
   const [lang, setLang] = useState('ES')
- 
+
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY)
     if (saved) setLang(saved)
   }, [])
- 
+
   const toggleLang = () => {
     const newLang = lang === 'ES' ? 'EN' : 'ES'
     setLang(newLang)
     localStorage.setItem(LS_KEY, newLang)
   }
- 
+
   const t = (key, vars = {}) => {
     const dict = lang === 'ES' ? ES : EN
     let text = dict[key] || key
@@ -715,15 +763,15 @@ export function LangProvider({ children }) {
     })
     return text
   }
- 
+
   return (
     <LangContext.Provider value={{ lang, toggleLang, t }}>
       {children}
     </LangContext.Provider>
   )
 }
- 
-export const useLang    = () => useContext(LangContext)
-export const useT       = () => useContext(LangContext).t
+
+export const useLang        = () => useContext(LangContext)
+export const useT           = () => useContext(LangContext).t
 export const LanguageProvider = LangProvider
 export const useLanguage      = useLang
