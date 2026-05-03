@@ -181,6 +181,10 @@ const ES = {
   inv_del_what_to_do: '¿Qué deseas hacer?',
   inv_del_entry_and_exits: 'Eliminar entrada + {n} salida(s) afectada(s)',
   inv_del_entry_only: 'Solo eliminar la entrada (el stock quedará inconsistente)',
+  inv_del_mat_blocked_title: 'No se puede eliminar',
+  inv_del_mat_blocked: 'El material tiene {n} {u} en stock. Primero registra las salidas correspondientes.',
+  inv_del_mat_title: 'Eliminar material',
+  inv_del_mat_msg: '¿Eliminar "{mat}" del catálogo? Los registros de entradas y salidas se mantendrán como historial.',
 
   // BOM
   bom_form_save: 'Guardar material',
@@ -565,6 +569,10 @@ pres_add_stage: '+ Etapa',
   inv_del_what_to_do: 'What would you like to do?',
   inv_del_entry_and_exits: 'Delete entry + {n} affected exit(s)',
   inv_del_entry_only: 'Delete entry only (stock will be inconsistent)',
+ inv_del_mat_blocked_title: 'Cannot delete',
+  inv_del_mat_blocked: 'The material has {n} {u} in stock. First register the corresponding exits.',
+  inv_del_mat_title: 'Delete material',
+  inv_del_mat_msg: 'Delete "{mat}" from the catalog? Entry and exit records will be kept as history.',
 
   // BOM
   bom_form_save: 'Save material',

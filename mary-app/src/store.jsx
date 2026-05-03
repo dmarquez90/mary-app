@@ -32,6 +32,7 @@ function reducer(state, action) {
     case 'ADD_MATERIAL':    return { ...state, materiales: [...state.materiales, action.payload] }
     case 'UPD_MATERIAL':    return { ...state, materiales: state.materiales.map(m => m.id === action.payload.id ? { ...m, ...action.payload } : m) }
     case 'TOGGLE_MATERIAL': return { ...state, materiales: state.materiales.map(m => m.id === action.payload ? { ...m, activo: !m.activo } : m) }
+    case 'DEL_MATERIAL':    return { ...state, materiales: state.materiales.filter(m => m.id !== action.payload) }
 
     case 'ADD_ENTRADA': return { ...state, entradas: [...state.entradas, action.payload] }
     case 'UPD_ENTRADA': return { ...state, entradas: state.entradas.map(e => e.id === action.payload.id ? { ...e, ...action.payload } : e) }
@@ -155,7 +156,7 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_MATERIAL': {
-        const existe = state.materiales.find(m => m.codigo === action.payload.codigo)
+        const existe = state.materiales.find(m => m.codigo === action.payload.codigo && m.activo !== false)
         if (existe) {
           alert('Error: El código de material ya existe.')
           return
@@ -173,6 +174,11 @@ export function StoreProvider({ children }) {
       case 'TOGGLE_MATERIAL': {
         const m = state.materiales.find(m => m.id === action.payload)
         if (m) await supabase.from('materiales').update({ activo: !m.activo }).eq('id', m.id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_MATERIAL': {
+        await supabase.from('materiales').delete().eq('id', action.payload)
         dispatch(action)
         break
       }
@@ -194,7 +200,19 @@ export function StoreProvider({ children }) {
       }
       case 'UPD_ENTRADA': {
         const { id, ...fields } = action.payload
+        const entradaAnterior = state.entradas.find(e => e.id === id)
+        const cantAnterior = parseFloat(entradaAnterior?.cantidad || 0)
+        const cantNueva    = parseFloat(fields.cantidad || 0)
+        const diferencia   = cantNueva - cantAnterior
         await supabase.from('entradas').update(fields).eq('id', id)
+        if (diferencia !== 0) {
+          const mat = state.materiales.find(m => m.id === (fields.material_id || entradaAnterior?.material_id))
+          if (mat) {
+            const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) + diferencia)
+            await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
+            dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+          }
+        }
         dispatch(action)
         break
       }
@@ -227,7 +245,19 @@ export function StoreProvider({ children }) {
       }
       case 'UPD_SALIDA': {
         const { id, ...fields } = action.payload
+        const salidaAnterior = state.salidas.find(s => s.id === id)
+        const cantAnterior = parseFloat(salidaAnterior?.cantidad || 0)
+        const cantNueva    = parseFloat(fields.cantidad || 0)
+        const diferencia   = cantNueva - cantAnterior
         await supabase.from('salidas').update(fields).eq('id', id)
+        if (diferencia !== 0) {
+          const mat = state.materiales.find(m => m.id === (fields.material_id || salidaAnterior?.material_id))
+          if (mat) {
+            const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) - diferencia)
+            await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
+            dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+          }
+        }
         dispatch(action)
         break
       }

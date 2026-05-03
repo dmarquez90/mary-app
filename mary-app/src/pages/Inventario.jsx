@@ -20,6 +20,7 @@ export default function Inventario() {
   const [editIn, setEditIn]   = useState(null)
   const [editOut, setEditOut] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
+  const [blockMsg, setBlockMsg]     = useState(null) // mensaje de bloqueo
 
   const TABS = [t('inv_tab_catalog'), t('inv_tab_entries'), t('inv_tab_exits'), t('inv_tab_movements')]
   const set  = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -35,6 +36,7 @@ export default function Inventario() {
 
   const actividades = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
 
+  // ── CATÁLOGO ──
   const saveMat = () => {
     if (!form.codigo || !form.descripcion) return
     if (editMat) {
@@ -45,6 +47,16 @@ export default function Inventario() {
     setDrawer(null)
   }
 
+  const requestDeleteMat = (m) => {
+    const stock = parseFloat(m.stock_actual||0)
+    if (stock > 0) {
+      setBlockMsg(t('inv_del_mat_blocked', { n: fmtNum(stock), u: m.unidad }))
+      return
+    }
+    setConfirmDel({ type:'material', id:m.id, nombre:m.descripcion })
+  }
+
+  // ── ENTRADAS ──
   const saveIn = () => {
     if (!form.material_id || !form.cantidad || !form.fecha_recepcion) return
     if (editIn) {
@@ -58,8 +70,6 @@ export default function Inventario() {
   const requestDeleteIn = (e) => {
     const mat = materiales.find(m => m.id === e.material_id)
     const cantEntrada = parseFloat(e.cantidad||0)
-    const stockActual = parseFloat(mat?.stock_actual||0)
-    const stockResultante = stockActual - cantEntrada
     const salidasDelMaterial = salidas.filter(s => s.material_id === e.material_id)
     const totalSalidas = salidasDelMaterial.reduce((sum, s) => sum + parseFloat(s.cantidad||0), 0)
     const entradasRestantes = entradas.filter(en => en.material_id === e.material_id && en.id !== e.id)
@@ -71,7 +81,6 @@ export default function Inventario() {
       id: e.id,
       materialId: e.material_id,
       cantidad: cantEntrada,
-      stockResultante,
       hayConflicto,
       salidasAfectadas: hayConflicto ? salidasDelMaterial : [],
       totalSalidas,
@@ -81,6 +90,7 @@ export default function Inventario() {
     })
   }
 
+  // ── SALIDAS ──
   const saveOut = () => {
     if (!form.material_id || !form.cantidad || !form.proyecto_id) return
     if (stockAlerta) return
@@ -103,9 +113,12 @@ export default function Inventario() {
     })
   }
 
+  // ── EJECUTAR ELIMINACIONES ──
   const confirmDeleteSolo = () => {
     if (!confirmDel) return
-    if (confirmDel.type === 'entrada') {
+    if (confirmDel.type === 'material') {
+      dispatch({ type:'DEL_MATERIAL', payload: confirmDel.id })
+    } else if (confirmDel.type === 'entrada') {
       dispatch({ type:'DEL_ENTRADA', payload:{ id:confirmDel.id, materialId:confirmDel.materialId, cantidad:confirmDel.cantidad } })
     } else {
       dispatch({ type:'DEL_SALIDA', payload:{ id:confirmDel.id, materialId:confirmDel.materialId, cantidad:confirmDel.cantidad } })
@@ -129,11 +142,43 @@ export default function Inventario() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+
+      {/* MENSAJE DE BLOQUEO */}
+      {blockMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-red-600 text-sm">✕</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800 mb-1">{t('inv_del_mat_blocked_title')}</p>
+                <p className="text-sm text-gray-500">{blockMsg}</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <PrimaryBtn onClick={() => setBlockMsg(null)}>{t('btn_close')}</PrimaryBtn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CONFIRM DIALOG */}
       {confirmDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-            {confirmDel.hayConflicto ? (
+            {confirmDel.type === 'material' ? (
+              <>
+                <p className="text-sm font-semibold text-gray-800 mb-1">{t('inv_del_mat_title')}</p>
+                <p className="text-sm text-gray-500 mb-5">{t('inv_del_mat_msg', { mat: confirmDel.nombre })}</p>
+                <div className="flex justify-end gap-2">
+                  <SecondaryBtn onClick={() => setConfirmDel(null)}>{t('btn_cancel')}</SecondaryBtn>
+                  <button onClick={confirmDeleteSolo} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
+                    {t('btn_delete')}
+                  </button>
+                </div>
+              </>
+            ) : confirmDel.hayConflicto ? (
               <>
                 <div className="flex items-start gap-3 mb-4">
                   <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -152,14 +197,10 @@ export default function Inventario() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button
-                    onClick={confirmDeleteConSalidas}
-                    className="w-full px-4 py-2.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors text-left">
+                  <button onClick={confirmDeleteConSalidas} className="w-full px-4 py-2.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors text-left">
                     {t('inv_del_entry_and_exits', { n: confirmDel.salidasAfectadas.length })}
                   </button>
-                  <button
-                    onClick={confirmDeleteSolo}
-                    className="w-full px-4 py-2.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors text-left">
+                  <button onClick={confirmDeleteSolo} className="w-full px-4 py-2.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors text-left">
                     {t('inv_del_entry_only')}
                   </button>
                   <SecondaryBtn onClick={() => setConfirmDel(null)} className="w-full">{t('btn_cancel')}</SecondaryBtn>
@@ -242,7 +283,7 @@ export default function Inventario() {
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <TBtn onClick={() => { setForm({...m}); setEditMat(m.id); setDrawer('mat') }}>{t('btn_edit')}</TBtn>
-                          <TBtn danger onClick={() => dispatch({ type:'TOGGLE_MATERIAL', payload:m.id })}>{t('inv_deactivate')}</TBtn>
+                          <TBtn danger onClick={() => requestDeleteMat(m)}>{t('btn_delete')}</TBtn>
                         </div>
                       </td>
                     </tr>
