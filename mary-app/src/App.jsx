@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './auth'
 import { Icons } from './components'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
+import Configuracion from './pages/Configuracion'
 import Dashboard from './pages/Dashboard'
 import Proyectos from './pages/Proyectos'
 import Presupuesto from './pages/Presupuesto'
@@ -31,21 +32,22 @@ const NAV = [
 ]
 
 const PAGES = {
-  dashboard:   Dashboard,
-  proyectos:   Proyectos,
-  presupuesto: Presupuesto,
-  inventario:  Inventario,
-  mat_pres:    MatPresupuestados,
-  compras:     Compras,
-  financiero:  Financiero,
-  curvas:      CurvaS,
+  dashboard:      Dashboard,
+  proyectos:      Proyectos,
+  presupuesto:    Presupuesto,
+  inventario:     Inventario,
+  mat_pres:       MatPresupuestados,
+  compras:        Compras,
+  financiero:     Financiero,
+  curvas:         CurvaS,
+  configuracion:  Configuracion,
 }
 
 function Layout() {
   const [page, setPage]         = useState('dashboard')
   const [sideOpen, setSideOpen] = useState(true)
   const { lang, toggleLang }    = useLanguage()
-  const { perfil, logout, isSuperAdmin } = useAuth()
+  const { perfil, logout, isSuperAdmin, isClientAdmin } = useAuth()
   const Page = PAGES[page] || Dashboard
   const isEs = lang === 'ES'
   const currentNav = NAV.find(n => n.id === page)
@@ -97,6 +99,23 @@ function Layout() {
           })}
         </nav>
 
+        {/* Botón Configuración — client_admin y super_admin */}
+        {isClientAdmin && (
+          <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
+            <button onClick={() => setPage('configuracion')}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors relative"
+              style={{ background: page === 'configuracion' ? BRAND_LIGHT : 'transparent', color: page === 'configuracion' ? '#fff' : '#93B8D8' }}
+              onMouseEnter={e => { if (page !== 'configuracion') e.currentTarget.style.background = `${BRAND}80` }}
+              onMouseLeave={e => { if (page !== 'configuracion') e.currentTarget.style.background = 'transparent' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+              {sideOpen && <span className="text-sm font-medium">{isEs ? 'Configuración' : 'Settings'}</span>}
+            </button>
+          </div>
+        )}
+
         {/* Botón Admin — solo Super Admin */}
         {isSuperAdmin && (
           <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
@@ -109,7 +128,7 @@ function Layout() {
                 <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
-              {sideOpen && <span className="text-sm font-medium">Admin Panel</span>}
+              {sideOpen && <span className="text-sm font-medium">{isEs ? 'Panel Admin' : 'Admin Panel'}</span>}
             </a>
           </div>
         )}
