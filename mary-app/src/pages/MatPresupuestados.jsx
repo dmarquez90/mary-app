@@ -22,18 +22,15 @@ export default function MatPresupuestados() {
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
 
-  // Etapas y actividades del proyecto seleccionado
   const etapas      = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'etapa')
   const subetapas   = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'sub_etapa')
   const actividades = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
 
-  // Materiales presupuestados del proyecto actual
   const matsPres = useMemo(() =>
     materiales_presupuestados.filter(mp => mp.proyecto_id === proyId),
     [materiales_presupuestados, proyId]
   )
 
-  // Filtro de búsqueda
   const matsFiltrados = useMemo(() => {
     if (!search) return matsPres
     const q = search.toLowerCase()
@@ -43,14 +40,17 @@ export default function MatPresupuestados() {
     })
   }, [matsPres, search, materiales])
 
-  // Calcular consumo real por material (FIFO simplificado — total salidas)
-  const consumoReal = (materialId) => {
+  // Consumo real filtrado por material Y actividad
+  const consumoReal = (materialId, actividadId) => {
     return salidas
-      .filter(s => s.material_id === materialId && s.proyecto_id === proyId)
+      .filter(s =>
+        s.material_id === materialId &&
+        s.proyecto_id === proyId &&
+        s.actividad_id === actividadId
+      )
       .reduce((sum, s) => sum + parseFloat(s.cantidad||0), 0)
   }
 
-  // Calcular precio promedio ponderado de entradas para valorización
   const precioPromedio = (materialId) => {
     const ents = entradas.filter(e => e.material_id === materialId)
     const totalCant = ents.reduce((s, e) => s + parseFloat(e.cantidad||0), 0)
@@ -58,7 +58,6 @@ export default function MatPresupuestados() {
     return totalCant > 0 ? totalVal / totalCant : 0
   }
 
-  // Total presupuestado en $ (cantidad × precio promedio)
   const totalPresupuestado = useMemo(() =>
     matsPres.reduce((sum, mp) => {
       const precio = precioPromedio(mp.material_id)
@@ -91,7 +90,6 @@ export default function MatPresupuestados() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* HEADER */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">{t('mp_title')}</h1>
@@ -112,7 +110,6 @@ export default function MatPresupuestados() {
         <EmptyState icon={Icons.budget} title={t('mp_no_project')} />
       ) : (
         <>
-          {/* KPIs */}
           <div className="grid grid-cols-3 gap-4 mb-5">
             <div className="bg-white rounded-xl border border-gray-100 p-4">
               <p className="text-xs text-gray-400 mb-1">{t('mp_kpi_materials')}</p>
@@ -128,7 +125,6 @@ export default function MatPresupuestados() {
             </div>
           </div>
 
-          {/* BARRA DE BÚSQUEDA */}
           {matsPres.length > 0 && (
             <div className="mb-4">
               <input
@@ -157,13 +153,13 @@ export default function MatPresupuestados() {
                 </tr></thead>
                 <tbody>
                   {matsFiltrados.map(mp => {
-                    const mat      = materiales.find(m => m.id === mp.material_id)
-                    const act      = presupuesto.find(b => b.id === mp.actividad_id)
-                    const consumido = consumoReal(mp.material_id)
-                    const presup   = parseFloat(mp.cantidad_presupuestada||0)
-                    const restante = presup - consumido
-                    const pct      = presup > 0 ? (consumido / presup) * 100 : 0
-                    const status   = pct >= 100 ? 'agotado' : pct >= 80 ? 'alerta' : 'ok'
+                    const mat       = materiales.find(m => m.id === mp.material_id)
+                    const act       = presupuesto.find(b => b.id === mp.actividad_id)
+                    const consumido = consumoReal(mp.material_id, mp.actividad_id)
+                    const presup    = parseFloat(mp.cantidad_presupuestada||0)
+                    const restante  = presup - consumido
+                    const pct       = presup > 0 ? (consumido / presup) * 100 : 0
+                    const status    = pct >= 100 ? 'agotado' : pct >= 80 ? 'alerta' : 'ok'
 
                     return (
                       <tr key={mp.id} className="border-b border-gray-50 hover:bg-gray-50/50">
@@ -181,8 +177,8 @@ export default function MatPresupuestados() {
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-1">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit
-                              ${status === 'ok' ? 'bg-green-100 text-green-700' : status === 'alerta' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
-                              {status === 'ok' ? t('mp_status_ok') : status === 'alerta' ? t('mp_status_alert') : t('mp_status_depleted')}
+                              ${status==='ok' ? 'bg-green-100 text-green-700' : status==='alerta' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                              {status==='ok' ? t('mp_status_ok') : status==='alerta' ? t('mp_status_alert') : t('mp_status_depleted')}
                             </span>
                             <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                               <div className="h-full rounded-full transition-all"
@@ -206,7 +202,6 @@ export default function MatPresupuestados() {
         </>
       )}
 
-      {/* DRAWER */}
       <Drawer open={drawer} onClose={() => { setDrawer(false); setEditing(null) }}
         title={editing ? t('mp_form_edit') : t('mp_form_new')} width={420}>
 
@@ -237,9 +232,7 @@ export default function MatPresupuestados() {
         <Field label={t('mp_form_activity')}>
           <select className={selectCls} value={form.actividad_id||''} onChange={set('actividad_id')}>
             <option value="">{t('lbl_select')}</option>
-            {actividades
-              .filter(a => !form.proyecto_id || a.proyecto_id === form.proyecto_id)
-              .map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
+            {actividades.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
           </select>
         </Field>
 
