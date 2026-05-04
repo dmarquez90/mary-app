@@ -5,7 +5,7 @@ import { uuid, genProjectCode, genOCCode, genBudgetCode, today } from './utils'
 const INIT = {
   proyectos: [], fases: [], presupuesto: [],
   materiales: [], entradas: [], salidas: [],
-  solicitudes: [], solicitud_items: [], ordenes_compra: [],
+  solicitudes: [], solicitud_items: [], ordenes_compra: [], ordenes_compra_items: [],
   costos_directos: [], nominas: [], subcontratos: [],
   equipos: [], costos_indirectos: [],
   materiales_presupuestados: [],
@@ -63,9 +63,20 @@ function reducer(state, action) {
         solicitud_items: state.solicitud_items.filter(i => i.solicitud_id !== action.payload)
       }
 
-    case 'ADD_OC':        return { ...state, ordenes_compra: [...state.ordenes_compra, action.payload] }
-    case 'UPD_OC_ESTADO': return { ...state, ordenes_compra: state.ordenes_compra.map(oc => oc.id === action.payload.id ? { ...oc, estado: action.payload.estado } : oc) }
-    case 'DEL_OC':        return { ...state, ordenes_compra: state.ordenes_compra.filter(oc => oc.id !== action.payload) }
+    case 'ADD_OC':
+      return {
+        ...state,
+        ordenes_compra: [...state.ordenes_compra, action.payload.oc],
+        ordenes_compra_items: [...state.ordenes_compra_items, ...action.payload.items]
+      }
+    case 'UPD_OC_ESTADO':
+      return { ...state, ordenes_compra: state.ordenes_compra.map(oc => oc.id === action.payload.id ? { ...oc, estado: action.payload.estado } : oc) }
+    case 'DEL_OC':
+      return {
+        ...state,
+        ordenes_compra: state.ordenes_compra.filter(oc => oc.id !== action.payload),
+        ordenes_compra_items: state.ordenes_compra_items.filter(i => i.oc_id !== action.payload)
+      }
 
     case 'ADD_COSTO_DIRECTO':   return { ...state, costos_directos: [...state.costos_directos, action.payload] }
     case 'ADD_NOMINA':          return { ...state, nominas: [...state.nominas, action.payload] }
@@ -92,8 +103,8 @@ export function StoreProvider({ children }) {
     async function loadAll() {
       const tables = [
         'proyectos','fases','presupuesto','materiales','entradas','salidas',
-        'solicitudes','solicitud_items','ordenes_compra','costos_directos',
-        'nominas','subcontratos','equipos','costos_indirectos',
+        'solicitudes','solicitud_items','ordenes_compra','ordenes_compra_items',
+        'costos_directos','nominas','subcontratos','equipos','costos_indirectos',
         'materiales_presupuestados'
       ]
       const results = await Promise.all(tables.map(t => supabase.from(t).select('*')))
@@ -301,11 +312,50 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_OC': {
-        const oc_number = genOCCode(state.ordenes_compra)
-        const item = { ...action.payload, id: uuid(), oc_number, estado: 'pendiente_aprobacion', created_at: today() }
-        await supabase.from('ordenes_compra').insert(item)
-        await supabase.from('solicitudes').update({ estado: 'oc_generada' }).eq('id', item.solicitud_id)
-        dispatch({ type: 'ADD_OC', payload: item })
+        const oc_number  = genOCCode(state.ordenes_compra)
+        const monto_total = (action.payload.items||[]).reduce((s, it) =>
+          s + (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
+
+        const oc = {
+          id:                 uuid(),
+          oc_number,
+          estado:             'pendiente_aprobacion',
+          created_at:         today(),
+          fecha_elaboracion:  today(),
+          solicitud_id:       action.payload.solicitud_id,
+          proyecto_id:        action.payload.proyecto_id,
+          proveedor:          action.payload.proveedor,
+          elaboro_nombre:     action.payload.elaboro_nombre || '',
+          elaboro_cargo:      action.payload.elaboro_cargo  || '',
+          solicitante_nombre: action.payload.solicitante_nombre || '',
+          solicitante_cargo:  action.payload.solicitante_cargo  || '',
+          aprobador_nombre:   action.payload.aprobador_nombre   || '',
+          aprobador_cargo:    action.payload.aprobador_cargo    || '',
+          notas:              action.payload.notas || '',
+          monto_total,
+        }
+
+        const ocItems = (action.payload.items||[]).map(it => ({
+          id:               uuid(),
+          oc_id:            oc.id,
+          solicitud_item_id: it.solicitud_item_id || null,
+          material_id:      it.material_id,
+          descripcion:      it.descripcion || '',
+          cantidad:         parseFloat(it.cantidad||0),
+          unidad:           it.unidad || 'und',
+          precio_unitario:  parseFloat(it.precio_unitario||0),
+        }))
+
+        await supabase.from('ordenes_compra').insert(oc)
+        if (ocItems.length) await supabase.from('ordenes_compra_items').insert(ocItems)
+
+        // Marcar solicitud como oc_generada
+        if (oc.solicitud_id) {
+          await supabase.from('solicitudes').update({ estado: 'oc_generada' }).eq('id', oc.solicitud_id)
+          dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: { id: oc.solicitud_id, estado: 'oc_generada' } })
+        }
+
+        dispatch({ type: 'ADD_OC', payload: { oc, items: ocItems } })
         break
       }
       case 'UPD_OC_ESTADO': {
@@ -314,6 +364,7 @@ export function StoreProvider({ children }) {
         break
       }
       case 'DEL_OC': {
+        await supabase.from('ordenes_compra_items').delete().eq('oc_id', action.payload)
         await supabase.from('ordenes_compra').delete().eq('id', action.payload)
         dispatch(action)
         break
