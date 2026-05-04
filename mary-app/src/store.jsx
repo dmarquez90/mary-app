@@ -96,31 +96,43 @@ function reducer(state, action) {
 const Ctx = createContext(null)
 export const useStore = () => useContext(Ctx)
 
-export function StoreProvider({ children }) {
+export function StoreProvider({ children, tenantId }) {
   const [state, dispatch] = useReducer(reducer, INIT)
 
   useEffect(() => {
+    if (!tenantId) return
     async function loadAll() {
-      const tables = [
+      // Tablas que se filtran por tenant_id
+      const tablasTenant = [
         'proyectos','fases','presupuesto','materiales','entradas','salidas',
-        'solicitudes','solicitud_items','ordenes_compra','ordenes_compra_items',
-        'costos_directos','nominas','subcontratos','equipos','costos_indirectos',
-        'materiales_presupuestados'
+        'solicitudes','ordenes_compra','costos_directos','nominas',
+        'subcontratos','equipos','costos_indirectos','materiales_presupuestados'
       ]
-      const results = await Promise.all(tables.map(t => supabase.from(t).select('*')))
+      // Tablas que se cargan sin filtro de tenant (usan FK de otras tablas)
+      const tablasSinFiltro = [
+        'solicitud_items','ordenes_compra_items'
+      ]
+
+      const [tenantResults, sinFiltroResults] = await Promise.all([
+        Promise.all(tablasTenant.map(t => supabase.from(t).select('*').eq('tenant_id', tenantId))),
+        Promise.all(tablasSinFiltro.map(t => supabase.from(t).select('*'))),
+      ])
+
       const payload = {}
-      tables.forEach((t, i) => { payload[t] = results[i].data || [] })
+      tablasTenant.forEach((t, i) => { payload[t] = tenantResults[i].data || [] })
+      tablasSinFiltro.forEach((t, i) => { payload[t] = sinFiltroResults[i].data || [] })
+
       dispatch({ type: 'LOAD_ALL', payload })
     }
     loadAll()
-  }, [])
+  }, [tenantId])
 
   async function dbDispatch(action) {
     switch (action.type) {
 
       case 'ADD_PROYECTO': {
         const code = genProjectCode(state.proyectos)
-        const item = { ...action.payload, id: uuid(), project_code: code, created_at: today() }
+        const item = { ...action.payload, id: uuid(), project_code: code, created_at: today(), tenant_id: tenantId }
         await supabase.from('proyectos').insert(item)
         dispatch({ type: 'ADD_PROYECTO', payload: item })
         break
@@ -137,7 +149,7 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_FASE': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('fases').insert(item)
         dispatch({ type: 'ADD_FASE', payload: item })
         break
@@ -157,7 +169,7 @@ export function StoreProvider({ children }) {
         const { proyectoId, ...rest } = action.payload
         const byProject = state.presupuesto.filter(b => b.proyecto_id === proyectoId)
         const code = genBudgetCode(byProject, rest.tipo, rest.parent_id)
-        const item = { ...rest, id: uuid(), proyecto_id: proyectoId, code, created_at: today() }
+        const item = { ...rest, id: uuid(), proyecto_id: proyectoId, code, created_at: today(), tenant_id: tenantId }
         await supabase.from('presupuesto').insert(item)
         dispatch({ type: 'ADD_BUDGET', payload: item })
         break
@@ -179,7 +191,7 @@ export function StoreProvider({ children }) {
           alert('Error: El código de material ya existe.')
           return
         }
-        const item = { ...action.payload, id: uuid(), stock_actual: parseFloat(action.payload.stock_actual)||0, created_at: today() }
+        const item = { ...action.payload, id: uuid(), stock_actual: parseFloat(action.payload.stock_actual)||0, created_at: today(), tenant_id: tenantId }
         await supabase.from('materiales').insert(item)
         dispatch({ type: 'ADD_MATERIAL', payload: item })
         break
@@ -205,7 +217,7 @@ export function StoreProvider({ children }) {
         const payload = { ...action.payload }
         if (!payload.oc_id) delete payload.oc_id
         if (!payload.proyecto_id) delete payload.proyecto_id
-        const item = { ...payload, id: uuid(), created_at: today() }
+        const item = { ...payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('entradas').insert(item)
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) {
@@ -250,7 +262,7 @@ export function StoreProvider({ children }) {
         const payload = { ...action.payload }
         if (!payload.proyecto_id) delete payload.proyecto_id
         if (!payload.actividad_id) delete payload.actividad_id
-        const item = { ...payload, id: uuid(), created_at: today() }
+        const item = { ...payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('salidas').insert(item)
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) {
@@ -292,7 +304,7 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_SOLICITUD': {
-        const sol   = { ...action.payload.solicitud, id: uuid(), estado: 'pendiente', created_at: today() }
+        const sol   = { ...action.payload.solicitud, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
         const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), solicitud_id: sol.id }))
         await supabase.from('solicitudes').insert(sol)
         if (items.length) await supabase.from('solicitud_items').insert(items)
@@ -312,7 +324,7 @@ export function StoreProvider({ children }) {
       }
 
       case 'ADD_OC': {
-        const oc_number  = genOCCode(state.ordenes_compra)
+        const oc_number   = genOCCode(state.ordenes_compra)
         const monto_total = (action.payload.items||[]).reduce((s, it) =>
           s + (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
 
@@ -333,23 +345,23 @@ export function StoreProvider({ children }) {
           aprobador_cargo:    action.payload.aprobador_cargo    || '',
           notas:              action.payload.notas || '',
           monto_total,
+          tenant_id:          tenantId,
         }
 
         const ocItems = (action.payload.items||[]).map(it => ({
-          id:               uuid(),
-          oc_id:            oc.id,
+          id:                uuid(),
+          oc_id:             oc.id,
           solicitud_item_id: it.solicitud_item_id || null,
-          material_id:      it.material_id,
-          descripcion:      it.descripcion || '',
-          cantidad:         parseFloat(it.cantidad||0),
-          unidad:           it.unidad || 'und',
-          precio_unitario:  parseFloat(it.precio_unitario||0),
+          material_id:       it.material_id,
+          descripcion:       it.descripcion || '',
+          cantidad:          parseFloat(it.cantidad||0),
+          unidad:            it.unidad || 'und',
+          precio_unitario:   parseFloat(it.precio_unitario||0),
         }))
 
         await supabase.from('ordenes_compra').insert(oc)
         if (ocItems.length) await supabase.from('ordenes_compra_items').insert(ocItems)
 
-        // Marcar solicitud como oc_generada
         if (oc.solicitud_id) {
           await supabase.from('solicitudes').update({ estado: 'oc_generada' }).eq('id', oc.solicitud_id)
           dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: { id: oc.solicitud_id, estado: 'oc_generada' } })
@@ -372,21 +384,21 @@ export function StoreProvider({ children }) {
 
       case 'ADD_COSTO_DIRECTO': {
         const { fecha, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today() }
+        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('costos_directos').insert(item)
         dispatch({ type: 'ADD_COSTO_DIRECTO', payload: item })
         break
       }
       case 'ADD_NOMINA': {
         const { fecha, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today() }
+        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('nominas').insert(item)
         dispatch({ type: 'ADD_NOMINA', payload: item })
         break
       }
       case 'ADD_SUBCONTRATO': {
         const { fecha, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today() }
+        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('subcontratos').insert(item)
         dispatch({ type: 'ADD_SUBCONTRATO', payload: item })
         break
@@ -398,21 +410,21 @@ export function StoreProvider({ children }) {
       }
       case 'ADD_EQUIPO': {
         const { fecha, monto, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today() }
+        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('equipos').insert(item)
         dispatch({ type: 'ADD_EQUIPO', payload: item })
         break
       }
       case 'ADD_COSTO_INDIRECTO': {
         const { fecha, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today() }
+        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('costos_indirectos').insert(item)
         dispatch({ type: 'ADD_COSTO_INDIRECTO', payload: item })
         break
       }
 
       case 'ADD_MAT_PRES': {
-        const item = { ...action.payload, id: uuid(), created_at: today() }
+        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('materiales_presupuestados').insert(item)
         dispatch({ type: 'ADD_MAT_PRES', payload: item })
         break

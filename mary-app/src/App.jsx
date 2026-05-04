@@ -4,6 +4,7 @@ import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { Icons } from './components'
 import Login from './pages/Login'
+import Admin from './pages/Admin'
 import Dashboard from './pages/Dashboard'
 import Proyectos from './pages/Proyectos'
 import Presupuesto from './pages/Presupuesto'
@@ -44,7 +45,7 @@ function Layout() {
   const [page, setPage]         = useState('dashboard')
   const [sideOpen, setSideOpen] = useState(true)
   const { lang, toggleLang }    = useLanguage()
-  const { perfil, logout }      = useAuth()
+  const { perfil, logout, isSuperAdmin } = useAuth()
   const Page = PAGES[page] || Dashboard
   const isEs = lang === 'ES'
   const currentNav = NAV.find(n => n.id === page)
@@ -96,6 +97,24 @@ function Layout() {
           })}
         </nav>
 
+        {/* Botón Admin — solo Super Admin */}
+        {isSuperAdmin && (
+          <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
+            <a href="/admin"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors"
+              style={{ color: '#F59E0B' }}
+              onMouseEnter={e => e.currentTarget.style.background = `${BRAND}80`}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+              {sideOpen && <span className="text-sm font-medium">Admin Panel</span>}
+            </a>
+          </div>
+        )}
+
+        {/* Language toggle */}
         <div className="px-2 pb-2 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
           <button onClick={toggleLang}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors"
@@ -177,7 +196,7 @@ function Layout() {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth()
+  const { user, perfil, loading } = useAuth()
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4F8' }}>
@@ -190,8 +209,12 @@ function AppContent() {
 
   if (!user) return <Login />
 
+  // Routing simple por hash/path
+  const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin'
+  if (isAdminRoute && perfil?.rol === 'super_admin') return <Admin />
+
   return (
-    <StoreProvider>
+    <StoreProvider tenantId={perfil?.tenant_id}>
       <LangProvider>
         <Layout />
       </LangProvider>
