@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
+import { usePermissions } from '../usePermissions'
 import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls } from '../components'
 
@@ -10,16 +11,22 @@ const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', p
 export default function Proyectos({ onNavigate }) {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
+  const { can } = usePermissions()
   const { proyectos, presupuesto, fases } = state
-  const [drawer, setDrawer]       = useState(false)
-  const [form, setForm]           = useState(empty())
-  const [editing, setEditing]     = useState(null)
-  const [confirmDel, setConfirmDel] = useState(null)
-  const [detail, setDetail]       = useState(null)
-  const [faseForm, setFaseForm]   = useState({ nombre:'', fecha_inicio:'', fecha_fin:'', estado:'pendiente' })
-  const [addFase, setAddFase]     = useState(false)
 
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  const [drawer, setDrawer]         = useState(false)
+  const [form, setForm]             = useState(empty())
+  const [editing, setEditing]       = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null)
+  const [detail, setDetail]         = useState(null)
+  const [faseForm, setFaseForm]     = useState({ nombre:'', fecha_inicio:'', fecha_fin:'', estado:'pendiente' })
+  const [addFase, setAddFase]       = useState(false)
+
+  const puedeCrear   = can('proyectos_crear')
+  const puedeEditar  = can('proyectos_editar')
+  const puedeEliminar = can('proyectos_eliminar')
+
+  const set      = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
   const openAdd  = () => { setForm(empty()); setEditing(null); setDrawer(true) }
   const openEdit = (p) => { setForm({ ...p }); setEditing(p.id); setDrawer(true) }
 
@@ -57,12 +64,14 @@ export default function Proyectos({ onNavigate }) {
           <h1 className="text-xl font-semibold text-gray-800">{t('proy_title')}</h1>
           <p className="text-sm text-gray-400 mt-0.5">{t('proy_sub', { n: proyectos.length })}</p>
         </div>
-        <PrimaryBtn onClick={openAdd}>{t('proy_new')}</PrimaryBtn>
+        {puedeCrear && <PrimaryBtn onClick={openAdd}>{t('proy_new')}</PrimaryBtn>}
       </div>
 
       {proyectos.length === 0 ? (
         <EmptyState icon={Icons.projects} title={t('proy_empty_title')}
-          subtitle={t('proy_empty_sub')} action={t('proy_empty_action')} onAction={openAdd} />
+          subtitle={t('proy_empty_sub')}
+          action={puedeCrear ? t('proy_empty_action') : null}
+          onAction={puedeCrear ? openAdd : null} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {proyectos.map(p => {
@@ -86,9 +95,9 @@ export default function Proyectos({ onNavigate }) {
                   <span className="font-mono">{new Intl.NumberFormat('es',{style:'currency',currency:p.moneda,minimumFractionDigits:2}).format(b)}</span>
                 </div>
                 <div className="flex gap-2 pt-3 border-t border-gray-50">
-                  <button onClick={() => setDetail(p.id)} className="flex-1 text-xs text-[#1D9E75] font-medium hover:underline text-left">{t('proy_detail')} →</button>
-                  {!closed && <TBtn onClick={() => openEdit(p)}>{t('btn_edit')}</TBtn>}
-                  <TBtn danger onClick={() => setConfirmDel(p.id)}>{t('btn_delete')}</TBtn>
+                  <button onClick={() => setDetail(p.id)} className="flex-1 text-xs font-medium hover:underline text-left" style={{color:'#1B3A6B'}}>{t('proy_detail')} →</button>
+                  {!closed && puedeEditar && <TBtn onClick={() => openEdit(p)}>{t('btn_edit')}</TBtn>}
+                  {puedeEliminar && <TBtn danger onClick={() => setConfirmDel(p.id)}>{t('btn_delete')}</TBtn>}
                 </div>
               </div>
             )
@@ -113,13 +122,13 @@ export default function Proyectos({ onNavigate }) {
             <div className="p-6 flex flex-col gap-5">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  [t('lbl_status'),         <Badge estado={proyecto.estado} />],
-                  [t('lbl_currency'),       proyecto.moneda],
-                  [t('lbl_client'),         proyecto.cliente_externo || '—'],
-                  [t('proy_form_city'),     proyecto.ciudad || '—'],
-                  [t('proy_form_start'),    proyecto.fecha_inicio],
-                  [t('proy_form_end'),      proyecto.fecha_fin_estimada || '—'],
-                  [t('proy_budget_label'),  new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
+                  [t('lbl_status'),        <Badge estado={proyecto.estado} />],
+                  [t('lbl_currency'),      proyecto.moneda],
+                  [t('lbl_client'),        proyecto.cliente_externo || '—'],
+                  [t('proy_form_city'),    proyecto.ciudad || '—'],
+                  [t('proy_form_start'),   proyecto.fecha_inicio],
+                  [t('proy_form_end'),     proyecto.fecha_fin_estimada || '—'],
+                  [t('proy_budget_label'), new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
                 ].map(([k,v]) => (
                   <div key={k}>
                     <p className="text-xs text-gray-400">{k}</p>
@@ -131,7 +140,7 @@ export default function Proyectos({ onNavigate }) {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-gray-700">{t('proy_fases_title')}</p>
-                  {proyecto.estado !== 'completado' && proyecto.estado !== 'cancelado' && (
+                  {puedeEditar && proyecto.estado !== 'completado' && proyecto.estado !== 'cancelado' && (
                     <TBtn onClick={() => setAddFase(!addFase)}>{t('proy_fase_add')}</TBtn>
                   )}
                 </div>
@@ -162,13 +171,19 @@ export default function Proyectos({ onNavigate }) {
                           <p className="text-xs text-gray-400">{f.fecha_inicio} → {f.fecha_fin || '?'}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <select className="text-xs border-0 bg-transparent text-gray-500 cursor-pointer"
-                            value={f.estado}
-                            onChange={e => dispatch({ type:'UPD_FASE', payload:{ id:f.id, estado:e.target.value } })}>
-                            {['pendiente','activa','completada'].map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                          <button onClick={() => dispatch({ type:'DEL_FASE', payload:f.id })}
-                            className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                          {puedeEditar ? (
+                            <select className="text-xs border-0 bg-transparent text-gray-500 cursor-pointer"
+                              value={f.estado}
+                              onChange={e => dispatch({ type:'UPD_FASE', payload:{ id:f.id, estado:e.target.value } })}>
+                              {['pendiente','activa','completada'].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-500">{f.estado}</span>
+                          )}
+                          {puedeEliminar && (
+                            <button onClick={() => dispatch({ type:'DEL_FASE', payload:f.id })}
+                              className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                          )}
                         </div>
                       </div>
                     ))}

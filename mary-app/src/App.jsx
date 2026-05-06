@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { StoreProvider } from './store'
 import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
+import { usePermissions, NAV_PERMISOS } from './usePermissions'
 import { Icons } from './components'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
@@ -32,24 +33,30 @@ const NAV = [
 ]
 
 const PAGES = {
-  dashboard:      Dashboard,
-  proyectos:      Proyectos,
-  presupuesto:    Presupuesto,
-  inventario:     Inventario,
-  mat_pres:       MatPresupuestados,
-  compras:        Compras,
-  financiero:     Financiero,
-  curvas:         CurvaS,
-  configuracion:  Configuracion,
+  dashboard:     Dashboard,
+  proyectos:     Proyectos,
+  presupuesto:   Presupuesto,
+  inventario:    Inventario,
+  mat_pres:      MatPresupuestados,
+  compras:       Compras,
+  financiero:    Financiero,
+  curvas:        CurvaS,
+  configuracion: Configuracion,
 }
 
 function Layout() {
-  const [page, setPage]         = useState('dashboard')
-  const [sideOpen, setSideOpen] = useState(true)
-  const { lang, toggleLang }    = useLanguage()
   const { perfil, logout, isSuperAdmin, isClientAdmin } = useAuth()
-  const Page = PAGES[page] || Dashboard
+  const { navVisible } = usePermissions()
+  const { lang, toggleLang } = useLanguage()
+
+  const navFiltrado = NAV.filter(item => navVisible(item.id))
+  const defaultPage = navFiltrado[0]?.id || 'dashboard'
+
+  const [page, setPage]         = useState(defaultPage)
+  const [sideOpen, setSideOpen] = useState(true)
   const isEs = lang === 'ES'
+
+  const Page = PAGES[page] || Dashboard
   const currentNav = NAV.find(n => n.id === page)
 
   const iniciales = perfil?.nombre
@@ -82,7 +89,7 @@ function Layout() {
         )}
 
         <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">
-          {NAV.map(item => {
+          {navFiltrado.map(item => {
             const active = page === item.id
             return (
               <button key={item.id} onClick={() => setPage(item.id)}
@@ -99,7 +106,7 @@ function Layout() {
           })}
         </nav>
 
-        {/* Botón Configuración — client_admin y super_admin */}
+        {/* Configuración — client_admin y super_admin */}
         {isClientAdmin && (
           <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
             <button onClick={() => setPage('configuracion')}
@@ -116,7 +123,7 @@ function Layout() {
           </div>
         )}
 
-        {/* Botón Admin — solo Super Admin */}
+        {/* Admin Panel — solo Super Admin */}
         {isSuperAdmin && (
           <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
             <a href="/admin"
@@ -181,9 +188,7 @@ function Layout() {
                 {new Date().toLocaleDateString(isEs ? 'es' : 'en', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
               </span>
             </div>
-
             <div className="w-px h-8 bg-gray-200" />
-
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow"
                 style={{ background: `linear-gradient(135deg, ${BRAND_LIGHT}, ${BRAND_DARK})` }}>
@@ -228,8 +233,7 @@ function AppContent() {
 
   if (!user) return <Login />
 
-  // Routing simple por hash/path
-  const isAdminRoute = window.location.pathname === '/admin' || window.location.hash === '#/admin'
+  const isAdminRoute = window.location.pathname === '/admin'
   if (isAdminRoute && perfil?.rol === 'super_admin') return <Admin />
 
   return (
