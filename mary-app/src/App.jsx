@@ -15,7 +15,9 @@ import MatPresupuestados from './pages/MatPresupuestados'
 import Compras from './pages/Compras'
 import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
+import Reportes from './pages/Reportes'
 import maryLogo from './assets/mary-logo.png'
+
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
@@ -30,6 +32,7 @@ const NAV = [
   { id: 'compras',     labelEs: 'Compras / OC',        labelEn: 'Purchases',          icon: 'purchases' },
   { id: 'financiero',  labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',      labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
+  { id: 'reportes', labelEs: 'Reportes', labelEn: 'Reports', icon: 'curvas' },
 ]
 
 const PAGES = {
@@ -42,6 +45,7 @@ const PAGES = {
   financiero:    Financiero,
   curvas:        CurvaS,
   configuracion: Configuracion,
+  reportes: Reportes,
 }
 
 function Layout() {
