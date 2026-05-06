@@ -955,7 +955,6 @@ export function LangProvider({ children }) {
     </LangContext.Provider>
   )
 }
-
 export const useLang        = () => useContext(LangContext)
 export const useT           = () => useContext(LangContext).t
 export const LanguageProvider = LangProvider

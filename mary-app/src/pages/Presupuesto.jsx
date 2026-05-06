@@ -231,7 +231,11 @@ export default function Presupuesto() {
               <div className="grid grid-cols-2 gap-3">
                 <Field label={t('pres_form_unit')}>
                   <select className={selectCls} value={form.unidad} onChange={set('unidad')}>
-                    {UNIDADES.map(u => <option key={u}>{u}</option>)}
+                    {UNIDADES.map(u => (
+  <option key={u} value={u}>
+    {u === 'LF' ? (isEs ? 'LF — Pie lineal' : 'LF — Lineal Foot') : u}
+  </option>
+))}
                   </select>
                 </Field>
                 <Field label={t('pres_form_qty')}>
