@@ -9,7 +9,7 @@ const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unida
 
 export default function Presupuesto() {
   const { state, dispatch } = useStore()
-  const { t } = useContext(LangContext)
+  const { t, lang } = useContext(LangContext) // Extraemos lang para el idioma
   const { can } = usePermissions()
   const { proyectos, presupuesto } = state
 
@@ -20,6 +20,7 @@ export default function Presupuesto() {
   const [selected, setSelected]     = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
+  const isEs = lang === 'ES' // Variable para verificar si el idioma es español
   const puedeEditar = can('presupuesto_editar')
 
   const proy   = proyectos.find(p => p.id === proyId)
@@ -232,10 +233,12 @@ export default function Presupuesto() {
                 <Field label={t('pres_form_unit')}>
                   <select className={selectCls} value={form.unidad} onChange={set('unidad')}>
                     {UNIDADES.map(u => (
-  <option key={u} value={u}>
-    {u === 'LF' ? (isEs ? 'LF — Pie lineal' : 'LF — Lineal Foot') : u}
-  </option>
-))}
+                      <option key={u} value={u}>
+                        {u === 'LF' 
+                          ? (isEs ? 'LF — Pie lineal' : 'LF — Linear Foot') 
+                          : u}
+                      </option>
+                    ))}
                   </select>
                 </Field>
                 <Field label={t('pres_form_qty')}>

@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../auth'
 
-// Color de la marca para el botón principal
-const BRAND_BLUE = '#0061E0' 
-
 export default function Login() {
   const { login } = useAuth()
   const [email, setEmail]       = useState('')
@@ -26,76 +23,63 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" 
-         style={{ background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)' }}>
+         style={{ background: '#0f172a' }}> {/* Fondo azul muy oscuro */}
       
-      <div className="w-full max-w-md">
-        {/* Nuevo Logo Estilizado (Inspirado en la referencia) */}
+      <div className="w-full max-w-sm">
+        {/* Logo MARY Estilizado */}
         <div className="text-center mb-10">
           <div className="flex justify-center mb-4">
-            <svg width="80" height="80" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#38bdf8" />
-                  <stop offset="100%" stopColor="#1d4ed8" />
-                </linearGradient>
-              </defs>
-              {/* Círculo de fondo sutil */}
-              <circle cx="50" cy="50" r="48" fill="white" fillOpacity="0.05" />
-              {/* Símbolo de la M estilizada */}
-              <path 
-                d="M25 70V30L50 55L75 30V70" 
-                stroke="url(#logo-gradient)" 
-                strokeWidth="12" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              />
-            </svg>
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-900/20 rotate-3">
+               <span className="text-white text-3xl font-black -rotate-3">M</span>
+            </div>
           </div>
-          <h1 className="text-white text-4xl font-extrabold tracking-tighter">
-            MARY<span className="text-blue-400">.</span>
-          </h1>
-          <p className="text-gray-400 text-sm mt-2 font-medium tracking-widest uppercase">
-            Management And Resources Yield
+          <h1 className="text-white text-4xl font-black tracking-tighter">MARY<span className="text-blue-500">.</span></h1>
+          <p className="text-slate-500 text-[10px] uppercase tracking-[0.3em] mt-1 font-bold">
+            Management & Resources Yield
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          {/* Campo Email */}
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+        <form onSubmit={handleLogin} className="space-y-4">
+          {/* Email */}
+          <div className="flex flex-col gap-1">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              </span>
+              <input
+                type="email"
+                placeholder="usuario@empresa.com"
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-12 pr-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
             </div>
-            <input
-              type="email"
-              placeholder="Usuario o Email"
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
           </div>
 
-          {/* Campo Contraseña */}
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+          {/* Password */}
+          <div className="flex flex-col gap-1">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-12 pr-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
             </div>
-            <input
-              type="password"
-              placeholder="Contraseña"
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
           </div>
 
           {error && (
-            <div className="text-red-400 text-xs text-center bg-red-400/10 py-3 rounded-lg border border-red-400/20">
+            <div className="text-red-400 text-xs text-center font-medium bg-red-400/10 py-2 rounded-lg border border-red-400/20">
               {error}
             </div>
           )}
@@ -103,24 +87,25 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-xl text-white font-bold text-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-blue-900/20"
-            style={{ background: `linear-gradient(135deg, ${BRAND_BLUE} 0%, #004bb0 100%)` }}
+            className="w-full py-4 rounded-xl text-white font-bold text-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
           >
-            {loading ? 'Procesando...' : 'Entrar al Sistema'}
+            {loading ? 'Cargando...' : 'Entrar al Sistema'}
           </button>
         </form>
 
-        <div className="flex justify-between items-center mt-6 px-2">
-          <label className="flex items-center text-xs text-gray-400 cursor-pointer">
-            <input type="checkbox" className="mr-2 accent-blue-500" /> Recordarme
-          </label>
-          <a href="#" className="text-blue-400 text-xs hover:text-blue-300 transition-colors">
+        {/* Link corregido (usando <a> en lugar de <Link>) */}
+        <div className="text-center mt-8">
+          <a 
+            href="#" 
+            className="text-blue-400 text-sm font-medium hover:text-white transition-colors"
+          >
             ¿Olvidaste tu contraseña?
           </a>
         </div>
 
-        <footer className="text-center mt-16">
-          <p className="text-[10px] text-gray-600 uppercase tracking-[0.2em]">
+        <footer className="mt-16 text-center border-t border-slate-800 pt-8">
+          <p className="text-[10px] text-slate-600 uppercase tracking-widest font-bold">
             Marquez Project Solutions LLC · 2026
           </p>
         </footer>

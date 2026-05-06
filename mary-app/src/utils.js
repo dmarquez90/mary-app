@@ -103,4 +103,4 @@ export const ESTADO_LABELS = {
 }
 
 export const MONEDAS = ['USD','NIO','COP','GTQ','PEN','MXN']
-export const UNIDADES = ['m²','m³','m','ml','kg','ton','und','gl','hr','día','semana','mes','lote','viaje','%','lb','pie²']
+export const UNIDADES = ['m²','m³','m','ml','kg','ton','und','gl','hr','día','semana','mes','lote','viaje','%','lb','pie²','LF']
