@@ -4,7 +4,7 @@ import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
 import { Icons } from './components'
-import Login from './pages/Login'
+import AuthRouter from './pages/AuthRouter'
 import Admin from './pages/Admin'
 import Configuracion from './pages/Configuracion'
 import Dashboard from './pages/Dashboard'
@@ -32,7 +32,7 @@ const NAV = [
   { id: 'compras',     labelEs: 'Compras / OC',        labelEn: 'Purchases',          icon: 'purchases' },
   { id: 'financiero',  labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',      labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
-  { id: 'reportes', labelEs: 'Reportes', labelEn: 'Reports', icon: 'curvas' },
+  { id: 'reportes',    labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
 ]
 
 const PAGES = {
@@ -45,7 +45,7 @@ const PAGES = {
   financiero:    Financiero,
   curvas:        CurvaS,
   configuracion: Configuracion,
-  reportes: Reportes,
+  reportes:      Reportes,
 }
 
 function Layout() {
@@ -235,7 +235,7 @@ function AppContent() {
     </div>
   )
 
-  if (!user) return <Login />
+  if (!user) return <AuthRouter />
 
   const isAdminRoute = window.location.pathname === '/admin'
   if (isAdminRoute && perfil?.rol === 'super_admin') return <Admin />

@@ -460,6 +460,87 @@ role_lectura: 'Solo Lectura',
 role_client_admin: 'Administrador',
 role_super_admin: 'Super Admin',
 
+// ============================================================
+// INSTRUCCIONES DE INTEGRACIÓN
+// Copia las claves de cada bloque dentro del objeto ES {} y EN {}
+// correspondiente en tu archivo i18n.jsx
+// ============================================================
+
+// ─── AGREGAR AL OBJETO ES {} ────────────────────────────────
+
+  // AUTH — FORGOT PASSWORD
+  auth_forgot_title: '¿Olvidaste tu contraseña?',
+  auth_forgot_subtitle: 'Ingresa tu correo y te enviaremos un código de verificación.',
+  auth_forgot_email_ph: 'usuario@empresa.com',
+  auth_forgot_btn_send: 'Enviar código',
+  auth_forgot_back: '← Volver al inicio de sesión',
+  auth_forgot_success_title: 'Revisa tu correo',
+  auth_forgot_success_body: 'Enviamos un código de 6 dígitos a {email}. Puede tardar unos minutos.',
+  auth_forgot_btn_enter_code: 'Ingresar código',
+
+  // AUTH — VERIFY OTP
+  auth_otp_title: 'Ingresa el código',
+  auth_otp_subtitle: 'Enviamos un código de 6 dígitos a {email}',
+  auth_otp_resend: 'Reenviar código',
+  auth_otp_countdown: 'Reenviar en {n}s',
+  auth_otp_btn_verify: 'Verificar código',
+  auth_otp_error_incomplete: 'Ingresa los 6 dígitos del código.',
+  auth_otp_error_invalid: 'Código incorrecto o expirado. Intenta de nuevo.',
+
+  // AUTH — RESET PASSWORD
+  auth_reset_title: 'Nueva contraseña',
+  auth_reset_subtitle: 'Crea una contraseña segura para tu cuenta.',
+  auth_reset_new_pw: 'Nueva contraseña',
+  auth_reset_confirm_pw: 'Confirmar contraseña',
+  auth_reset_btn_save: 'Guardar contraseña',
+  auth_reset_mismatch: 'Las contraseñas no coinciden.',
+  auth_reset_weak: 'La contraseña debe tener al menos 8 caracteres.',
+  auth_reset_error: 'Ocurrió un error. Intenta de nuevo.',
+  auth_reset_strength_weak: 'Débil',
+  auth_reset_strength_fair: 'Regular',
+  auth_reset_strength_good: 'Buena',
+  auth_reset_strength_strong: 'Fuerte',
+  auth_reset_success_title: '¡Contraseña actualizada!',
+  auth_reset_success_body: 'Tu contraseña fue cambiada exitosamente. Ya puedes iniciar sesión.',
+  auth_reset_btn_login: 'Iniciar sesión',
+
+
+  // AUTH — FORGOT PASSWORD
+  auth_forgot_title: 'Forgot your password?',
+  auth_forgot_subtitle: 'Enter your email and we will send you a verification code.',
+  auth_forgot_email_ph: 'user@company.com',
+  auth_forgot_btn_send: 'Send code',
+  auth_forgot_back: '← Back to login',
+  auth_forgot_success_title: 'Check your email',
+  auth_forgot_success_body: 'We sent a 6-digit code to {email}. It may take a few minutes.',
+  auth_forgot_btn_enter_code: 'Enter code',
+
+  // AUTH — VERIFY OTP
+  auth_otp_title: 'Enter the code',
+  auth_otp_subtitle: 'We sent a 6-digit code to {email}',
+  auth_otp_resend: 'Resend code',
+  auth_otp_countdown: 'Resend in {n}s',
+  auth_otp_btn_verify: 'Verify code',
+  auth_otp_error_incomplete: 'Please enter all 6 digits.',
+  auth_otp_error_invalid: 'Incorrect or expired code. Please try again.',
+
+  // AUTH — RESET PASSWORD
+  auth_reset_title: 'New password',
+  auth_reset_subtitle: 'Create a strong password for your account.',
+  auth_reset_new_pw: 'New password',
+  auth_reset_confirm_pw: 'Confirm password',
+  auth_reset_btn_save: 'Save password',
+  auth_reset_mismatch: 'Passwords do not match.',
+  auth_reset_weak: 'Password must be at least 8 characters.',
+  auth_reset_error: 'An error occurred. Please try again.',
+  auth_reset_strength_weak: 'Weak',
+  auth_reset_strength_fair: 'Fair',
+  auth_reset_strength_good: 'Good',
+  auth_reset_strength_strong: 'Strong',
+  auth_reset_success_title: 'Password updated!',
+  auth_reset_success_body: 'Your password was changed successfully. You can now log in.',
+  auth_reset_btn_login: 'Log in',
+
 }
 
 /* ============================================================
@@ -919,6 +1000,80 @@ role_lectura: 'Read Only',
 role_client_admin: 'Administrator',
 role_super_admin: 'Super Admin',
 
+// AUTH — FORGOT PASSWORD
+  auth_forgot_title: '¿Olvidaste tu contraseña?',
+  auth_forgot_subtitle: 'Ingresa tu correo y te enviaremos un código de verificación.',
+  auth_forgot_email_ph: 'usuario@empresa.com',
+  auth_forgot_btn_send: 'Enviar código',
+  auth_forgot_back: '← Volver al inicio de sesión',
+  auth_forgot_success_title: 'Revisa tu correo',
+  auth_forgot_success_body: 'Enviamos un código de 6 dígitos a {email}. Puede tardar unos minutos.',
+  auth_forgot_btn_enter_code: 'Ingresar código',
+ 
+  // AUTH — VERIFY OTP
+  auth_otp_title: 'Ingresa el código',
+  auth_otp_subtitle: 'Enviamos un código de 6 dígitos a {email}',
+  auth_otp_resend: 'Reenviar código',
+  auth_otp_countdown: 'Reenviar en {n}s',
+  auth_otp_btn_verify: 'Verificar código',
+  auth_otp_error_incomplete: 'Ingresa los 6 dígitos del código.',
+  auth_otp_error_invalid: 'Código incorrecto o expirado. Intenta de nuevo.',
+ 
+  // AUTH — RESET PASSWORD
+  auth_reset_title: 'Nueva contraseña',
+  auth_reset_subtitle: 'Crea una contraseña segura para tu cuenta.',
+  auth_reset_new_pw: 'Nueva contraseña',
+  auth_reset_confirm_pw: 'Confirmar contraseña',
+  auth_reset_btn_save: 'Guardar contraseña',
+  auth_reset_mismatch: 'Las contraseñas no coinciden.',
+  auth_reset_weak: 'La contraseña debe tener al menos 8 caracteres.',
+  auth_reset_error: 'Ocurrió un error. Intenta de nuevo.',
+  auth_reset_strength_weak: 'Débil',
+  auth_reset_strength_fair: 'Regular',
+  auth_reset_strength_good: 'Buena',
+  auth_reset_strength_strong: 'Fuerte',
+  auth_reset_success_title: '¡Contraseña actualizada!',
+  auth_reset_success_body: 'Tu contraseña fue cambiada exitosamente. Ya puedes iniciar sesión.',
+  auth_reset_btn_login: 'Iniciar sesión',
+ 
+ 
+// ─── AGREGAR AL OBJETO EN {} ────────────────────────────────
+ 
+  // AUTH — FORGOT PASSWORD
+  auth_forgot_title: 'Forgot your password?',
+  auth_forgot_subtitle: 'Enter your email and we will send you a verification code.',
+  auth_forgot_email_ph: 'user@company.com',
+  auth_forgot_btn_send: 'Send code',
+  auth_forgot_back: '← Back to login',
+  auth_forgot_success_title: 'Check your email',
+  auth_forgot_success_body: 'We sent a 6-digit code to {email}. It may take a few minutes.',
+  auth_forgot_btn_enter_code: 'Enter code',
+ 
+  // AUTH — VERIFY OTP
+  auth_otp_title: 'Enter the code',
+  auth_otp_subtitle: 'We sent a 6-digit code to {email}',
+  auth_otp_resend: 'Resend code',
+  auth_otp_countdown: 'Resend in {n}s',
+  auth_otp_btn_verify: 'Verify code',
+  auth_otp_error_incomplete: 'Please enter all 6 digits.',
+  auth_otp_error_invalid: 'Incorrect or expired code. Please try again.',
+ 
+  // AUTH — RESET PASSWORD
+  auth_reset_title: 'New password',
+  auth_reset_subtitle: 'Create a strong password for your account.',
+  auth_reset_new_pw: 'New password',
+  auth_reset_confirm_pw: 'Confirm password',
+  auth_reset_btn_save: 'Save password',
+  auth_reset_mismatch: 'Passwords do not match.',
+  auth_reset_weak: 'Password must be at least 8 characters.',
+  auth_reset_error: 'An error occurred. Please try again.',
+  auth_reset_strength_weak: 'Weak',
+  auth_reset_strength_fair: 'Fair',
+  auth_reset_strength_good: 'Good',
+  auth_reset_strength_strong: 'Strong',
+  auth_reset_success_title: 'Password updated!',
+  auth_reset_success_body: 'Your password was changed successfully. You can now log in.',
+  auth_reset_btn_login: 'Log in',
 }
 
 /* ============================================================
