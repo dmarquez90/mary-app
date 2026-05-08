@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, StatCard, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
 
 export default function Financiero() {
   const { state, dispatch } = useStore()
@@ -15,8 +15,10 @@ export default function Financiero() {
   const [proyId, setProyId] = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer] = useState(false)
   const [form, setForm]     = useState({})
+  const [editId, setEditId] = useState(null)   // null = crear, string = editar
 
-  const puedeEditar = can('financiero_editar')  // residente, contador, client_admin
+  const isEs = useContext(LangContext).lang === 'ES'
+  const puedeEditar = can('financiero_editar')
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -45,6 +47,7 @@ export default function Financiero() {
   const totalReal = totalMat + totalDir + totalNom + totalSub + totalEq + totalInd
 
   const openDrawer = () => {
+    setEditId(null)
     const base = { proyecto_id: proyId }
     if (tab===0) setForm({...base, tipo:'factura_obra', descripcion:'', monto:'', numero_documento:'', actividad_id:'', fecha:today()})
     if (tab===1) setForm({...base, trabajador:'', cargo:'', periodo_inicio:today(), periodo_fin:today(), salario_base:'', deducciones:'0'})
@@ -54,13 +57,33 @@ export default function Financiero() {
     setDrawer(true)
   }
 
+  const openEdit = (item) => {
+    setEditId(item.id)
+    setForm({ ...item })
+    setDrawer(true)
+  }
+
+  const TYPES    = ['ADD_COSTO_DIRECTO','ADD_NOMINA','ADD_SUBCONTRATO','ADD_EQUIPO','ADD_COSTO_INDIRECTO']
+  const UPD_TYPES = ['UPD_COSTO_DIRECTO','UPD_NOMINA','UPD_SUBCONTRATO','UPD_EQUIPO','UPD_COSTO_INDIRECTO']
+  const DEL_TYPES = ['DEL_COSTO_DIRECTO','DEL_NOMINA','DEL_SUBCONTRATO','DEL_EQUIPO','DEL_COSTO_INDIRECTO']
+
+  const del = (id) => {
+    if (!window.confirm(isEs ? '¿Eliminar este registro? Esta acción no se puede deshacer.' : 'Delete this record? This action cannot be undone.')) return
+    dispatch({ type: DEL_TYPES[tab], payload: id })
+  }
+
   const save = () => {
-    if (tab===0) { if (!form.descripcion||!form.monto) return; dispatch({ type:'ADD_COSTO_DIRECTO', payload:form }) }
-    if (tab===1) { if (!form.trabajador||!form.salario_base) return; dispatch({ type:'ADD_NOMINA', payload:form }) }
-    if (tab===2) { if (!form.subcontratista||!form.monto_contrato) return; dispatch({ type:'ADD_SUBCONTRATO', payload:form }) }
-    if (tab===3) { if (!form.descripcion||!form.costo_total) return; dispatch({ type:'ADD_EQUIPO', payload:form }) }
-    if (tab===4) { if (!form.categoria||!form.monto) return; dispatch({ type:'ADD_COSTO_INDIRECTO', payload:form }) }
+    if (editId) {
+      dispatch({ type: UPD_TYPES[tab], payload: { ...form, id: editId } })
+    } else {
+      if (tab===0) { if (!form.descripcion||!form.monto) return; dispatch({ type:'ADD_COSTO_DIRECTO', payload:form }) }
+      if (tab===1) { if (!form.trabajador||!form.salario_base) return; dispatch({ type:'ADD_NOMINA', payload:form }) }
+      if (tab===2) { if (!form.subcontratista||!form.monto_contrato) return; dispatch({ type:'ADD_SUBCONTRATO', payload:form }) }
+      if (tab===3) { if (!form.descripcion||!form.costo_total) return; dispatch({ type:'ADD_EQUIPO', payload:form }) }
+      if (tab===4) { if (!form.categoria||!form.monto) return; dispatch({ type:'ADD_COSTO_INDIRECTO', payload:form }) }
+    }
     setDrawer(false)
+    setEditId(null)
   }
 
   const tabEmpty = [directs, noms, subs, eqs, inds][tab]
@@ -122,7 +145,7 @@ export default function Financiero() {
               {tab===0 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_date'),t('fin_col_type'),t('fin_col_desc'),t('fin_col_amount'),t('fin_col_doc'),t('fin_col_activity')].map((h,i) => (
+                    {[t('fin_col_date'),t('fin_col_type'),t('fin_col_desc'),t('fin_col_amount'),t('fin_col_doc'),t('fin_col_activity'), puedeEditar ? '' : null].filter(h=>h!==null).map((h,i) => (
                       <th key={i} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
                     ))}
                   </tr></thead>
@@ -141,13 +164,21 @@ export default function Financiero() {
                           <td className="px-4 py-3 text-sm font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(c.monto, moneda)}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{c.numero_documento||'—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{act?`${act.code} ${act.descripcion}`:'—'}</td>
+                          {puedeEditar && (
+                            <td className="px-4 py-3">
+                              <div className="flex gap-1">
+                                <TBtn onClick={() => openEdit(c)}>{isEs ? 'Modificar' : 'Edit'}</TBtn>
+                                <TBtn danger onClick={() => del(c.id)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       )
                     })}
                     <tr className="bg-gray-50">
                       <td colSpan={3} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
                       <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalDir,moneda)}</td>
-                      <td colSpan={2}/>
+                      <td colSpan={puedeEditar ? 3 : 2}/>
                     </tr>
                   </tbody>
                 </table>
@@ -156,7 +187,7 @@ export default function Financiero() {
               {tab===1 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_worker'),t('fin_col_position'),t('fin_col_period'),t('fin_col_base'),t('fin_col_deductions'),t('fin_col_net')].map((h,i) => (
+                    {[t('fin_col_worker'),t('fin_col_position'),t('fin_col_period'),t('fin_col_base'),t('fin_col_deductions'),t('fin_col_net'), puedeEditar ? '' : null].filter(h=>h!==null).map((h,i) => (
                       <th key={i} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
                     ))}
                   </tr></thead>
@@ -171,12 +202,21 @@ export default function Financiero() {
                           <td className="px-4 py-3 text-sm font-mono text-gray-700">{fmt(n.salario_base,moneda)}</td>
                           <td className="px-4 py-3 text-sm font-mono text-red-500">-{fmt(n.deducciones,moneda)}</td>
                           <td className="px-4 py-3 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(neto,moneda)}</td>
+                          {puedeEditar && (
+                            <td className="px-4 py-3">
+                              <div className="flex gap-1">
+                                <TBtn onClick={() => openEdit(n)}>{isEs ? 'Modificar' : 'Edit'}</TBtn>
+                                <TBtn danger onClick={() => del(n.id)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       )
                     })}
                     <tr className="bg-gray-50">
                       <td colSpan={5} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('fin_col_net')}</td>
                       <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalNom,moneda)}</td>
+                      {puedeEditar && <td/>}
                     </tr>
                   </tbody>
                 </table>
@@ -185,7 +225,7 @@ export default function Financiero() {
               {tab===2 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_subcontractor'),t('fin_col_work'),t('fin_col_contract'),t('fin_col_progress'),t('fin_col_paid'),t('lbl_status')].map((h,i) => (
+                    {[t('fin_col_subcontractor'),t('fin_col_work'),t('fin_col_contract'),t('fin_col_progress'),t('fin_col_paid'),t('lbl_status'), puedeEditar ? '' : null].filter(h=>h!==null).map((h,i) => (
                       <th key={i} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
                     ))}
                   </tr></thead>
@@ -200,12 +240,20 @@ export default function Financiero() {
                         <td className="px-4 py-3">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sc.estado==='activo'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-600'}`}>{sc.estado}</span>
                         </td>
+                        {puedeEditar && (
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1">
+                              <TBtn onClick={() => openEdit(sc)}>{isEs ? 'Modificar' : 'Edit'}</TBtn>
+                              <TBtn danger onClick={() => del(sc.id)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr className="bg-gray-50">
                       <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('fin_col_paid')}</td>
                       <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalSub,moneda)}</td>
-                      <td/>
+                      <td colSpan={puedeEditar ? 2 : 1}/>
                     </tr>
                   </tbody>
                 </table>
@@ -214,7 +262,7 @@ export default function Financiero() {
               {tab===3 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_equipment'),t('fin_col_type'),t('fin_col_rate'),t('fin_col_days'),t('fin_col_total')].map((h,i) => (
+                    {[t('fin_col_equipment'),t('fin_col_type'),t('fin_col_rate'),t('fin_col_days'),t('fin_col_total'), puedeEditar ? '' : null].filter(h=>h!==null).map((h,i) => (
                       <th key={i} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
                     ))}
                   </tr></thead>
@@ -228,11 +276,20 @@ export default function Financiero() {
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{e.tarifa_diaria?fmt(e.tarifa_diaria,moneda):'—'}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{e.dias_uso||'—'}</td>
                         <td className="px-4 py-3 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(e.costo_total,moneda)}</td>
+                        {puedeEditar && (
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1">
+                              <TBtn onClick={() => openEdit(e)}>{isEs ? 'Modificar' : 'Edit'}</TBtn>
+                              <TBtn danger onClick={() => del(e.id)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr className="bg-gray-50">
                       <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
                       <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalEq,moneda)}</td>
+                      {puedeEditar && <td/>}
                     </tr>
                   </tbody>
                 </table>
@@ -241,7 +298,7 @@ export default function Financiero() {
               {tab===4 && (
                 <table className="w-full">
                   <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_date'),t('fin_col_category'),t('fin_col_desc'),t('fin_col_amount')].map((h,i) => (
+                    {[t('fin_col_date'),t('fin_col_category'),t('fin_col_desc'),t('fin_col_amount'), puedeEditar ? '' : null].filter(h=>h!==null).map((h,i) => (
                       <th key={i} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
                     ))}
                   </tr></thead>
@@ -252,11 +309,20 @@ export default function Financiero() {
                         <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{c.categoria}</span></td>
                         <td className="px-4 py-3 text-sm text-gray-800">{c.descripcion||'—'}</td>
                         <td className="px-4 py-3 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(c.monto,moneda)}</td>
+                        {puedeEditar && (
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1">
+                              <TBtn onClick={() => openEdit(c)}>{isEs ? 'Modificar' : 'Edit'}</TBtn>
+                              <TBtn danger onClick={() => del(c.id)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr className="bg-gray-50">
                       <td colSpan={3} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
                       <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalInd,moneda)}</td>
+                      {puedeEditar && <td/>}
                     </tr>
                   </tbody>
                 </table>
@@ -267,7 +333,9 @@ export default function Financiero() {
       )}
 
       {puedeEditar && (
-        <Drawer open={drawer} onClose={() => setDrawer(false)} title={`+ ${TABS[tab]}`} width={400}>
+        <Drawer open={drawer} onClose={() => { setDrawer(false); setEditId(null) }}
+          title={editId ? (isEs ? `Modificar — ${TABS[tab]}` : `Edit — ${TABS[tab]}`) : `+ ${TABS[tab]}`}
+          width={400}>
           {tab===0 && <>
             <Field label={t('fin_form_type')}>
               <select className={selectCls} value={form.tipo||'factura_obra'} onChange={set('tipo')}>

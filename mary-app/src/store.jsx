@@ -87,11 +87,24 @@ function reducer(state, action) {
       }
 
     case 'ADD_COSTO_DIRECTO':   return { ...state, costos_directos: [...state.costos_directos, action.payload] }
+    case 'UPD_COSTO_DIRECTO':   return { ...state, costos_directos: state.costos_directos.map(c => c.id === action.payload.id ? { ...c, ...action.payload } : c) }
+    case 'DEL_COSTO_DIRECTO':   return { ...state, costos_directos: state.costos_directos.filter(c => c.id !== action.payload) }
+
     case 'ADD_NOMINA':          return { ...state, nominas: [...state.nominas, action.payload] }
+    case 'UPD_NOMINA':          return { ...state, nominas: state.nominas.map(n => n.id === action.payload.id ? { ...n, ...action.payload } : n) }
+    case 'DEL_NOMINA':          return { ...state, nominas: state.nominas.filter(n => n.id !== action.payload) }
+
     case 'ADD_SUBCONTRATO':     return { ...state, subcontratos: [...state.subcontratos, action.payload] }
     case 'UPD_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
+    case 'DEL_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.filter(s => s.id !== action.payload) }
+
     case 'ADD_EQUIPO':          return { ...state, equipos: [...state.equipos, action.payload] }
+    case 'UPD_EQUIPO':          return { ...state, equipos: state.equipos.map(e => e.id === action.payload.id ? { ...e, ...action.payload } : e) }
+    case 'DEL_EQUIPO':          return { ...state, equipos: state.equipos.filter(e => e.id !== action.payload) }
+
     case 'ADD_COSTO_INDIRECTO': return { ...state, costos_indirectos: [...state.costos_indirectos, action.payload] }
+    case 'UPD_COSTO_INDIRECTO': return { ...state, costos_indirectos: state.costos_indirectos.map(c => c.id === action.payload.id ? { ...c, ...action.payload } : c) }
+    case 'DEL_COSTO_INDIRECTO': return { ...state, costos_indirectos: state.costos_indirectos.filter(c => c.id !== action.payload) }
 
     case 'ADD_MAT_PRES': return { ...state, materiales_presupuestados: [...state.materiales_presupuestados, action.payload] }
     case 'UPD_MAT_PRES': return { ...state, materiales_presupuestados: state.materiales_presupuestados.map(m => m.id === action.payload.id ? { ...m, ...action.payload } : m) }
@@ -397,6 +410,18 @@ export function StoreProvider({ children, tenantId }) {
         dispatch({ type: 'ADD_COSTO_DIRECTO', payload: item })
         break
       }
+      case 'UPD_COSTO_DIRECTO': {
+        const { id, ...fields } = action.payload
+        await supabase.from('costos_directos').update(fields).eq('id', id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_COSTO_DIRECTO': {
+        await supabase.from('costos_directos').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
       case 'ADD_NOMINA': {
         const { fecha, ...rest } = action.payload
         const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
@@ -404,6 +429,18 @@ export function StoreProvider({ children, tenantId }) {
         dispatch({ type: 'ADD_NOMINA', payload: item })
         break
       }
+      case 'UPD_NOMINA': {
+        const { id, ...fields } = action.payload
+        await supabase.from('nominas').update(fields).eq('id', id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_NOMINA': {
+        await supabase.from('nominas').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
       case 'ADD_SUBCONTRATO': {
         const { fecha, ...rest } = action.payload
         const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
@@ -416,6 +453,12 @@ export function StoreProvider({ children, tenantId }) {
         dispatch(action)
         break
       }
+      case 'DEL_SUBCONTRATO': {
+        await supabase.from('subcontratos').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
       case 'ADD_EQUIPO': {
         const { fecha, monto, ...rest } = action.payload
         const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
@@ -423,11 +466,34 @@ export function StoreProvider({ children, tenantId }) {
         dispatch({ type: 'ADD_EQUIPO', payload: item })
         break
       }
+      case 'UPD_EQUIPO': {
+        const { id, ...fields } = action.payload
+        await supabase.from('equipos').update(fields).eq('id', id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_EQUIPO': {
+        await supabase.from('equipos').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
       case 'ADD_COSTO_INDIRECTO': {
         const { fecha, ...rest } = action.payload
         const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
         await supabase.from('costos_indirectos').insert(item)
         dispatch({ type: 'ADD_COSTO_INDIRECTO', payload: item })
+        break
+      }
+      case 'UPD_COSTO_INDIRECTO': {
+        const { id, ...fields } = action.payload
+        await supabase.from('costos_indirectos').update(fields).eq('id', id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_COSTO_INDIRECTO': {
+        await supabase.from('costos_indirectos').delete().eq('id', action.payload)
+        dispatch(action)
         break
       }
 
