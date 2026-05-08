@@ -40,7 +40,11 @@ function reducer(state, action) {
       ...state,
       entradas: state.entradas.filter(e => e.id !== action.payload.id),
       materiales: state.materiales.map(m => m.id === action.payload.materialId
-        ? { ...m, stock_actual: Math.max(0, (m.stock_actual||0) - action.payload.cantidad) } : m)
+        ? { ...m, stock_actual: Math.max(0, parseFloat(m.stock_actual||0) - parseFloat(action.payload.cantidad||0)) } : m)
+    }
+    case 'DEL_ENTRADA_LOCAL': return {
+      ...state,
+      entradas: state.entradas.filter(e => e.id !== action.payload)
     }
 
     case 'ADD_SALIDA': return { ...state, salidas: [...state.salidas, action.payload] }
@@ -49,7 +53,11 @@ function reducer(state, action) {
       ...state,
       salidas: state.salidas.filter(s => s.id !== action.payload.id),
       materiales: state.materiales.map(m => m.id === action.payload.materialId
-        ? { ...m, stock_actual: (m.stock_actual||0) + action.payload.cantidad } : m)
+        ? { ...m, stock_actual: parseFloat(m.stock_actual||0) + parseFloat(action.payload.cantidad||0) } : m)
+    }
+    case 'DEL_SALIDA_LOCAL': return {
+      ...state,
+      salidas: state.salidas.filter(s => s.id !== action.payload)
     }
 
     case 'ADD_SOLICITUD':
@@ -249,12 +257,12 @@ export function StoreProvider({ children, tenantId }) {
       case 'DEL_ENTRADA': {
         await supabase.from('entradas').delete().eq('id', action.payload.id)
         const mat = state.materiales.find(m => m.id === action.payload.materialId)
+        const nuevoStock = Math.max(0, parseFloat(mat?.stock_actual||0) - parseFloat(action.payload.cantidad||0))
         if (mat) {
-          const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) - action.payload.cantidad)
           await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
           dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
         }
-        dispatch(action)
+        dispatch({ type: 'DEL_ENTRADA_LOCAL', payload: action.payload.id })
         break
       }
 
@@ -294,12 +302,12 @@ export function StoreProvider({ children, tenantId }) {
       case 'DEL_SALIDA': {
         await supabase.from('salidas').delete().eq('id', action.payload.id)
         const mat = state.materiales.find(m => m.id === action.payload.materialId)
+        const nuevoStock = parseFloat(mat?.stock_actual||0) + parseFloat(action.payload.cantidad||0)
         if (mat) {
-          const nuevoStock = (parseFloat(mat.stock_actual)||0) + action.payload.cantidad
           await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id)
           dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
         }
-        dispatch(action)
+        dispatch({ type: 'DEL_SALIDA_LOCAL', payload: action.payload.id })
         break
       }
 

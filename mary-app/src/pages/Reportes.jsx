@@ -851,7 +851,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
               <thead><tr style={thS}>{['Código','Actividad','Presupuestado','Real','Desviación $','Desv. %','Estado'].map((h,i)=><th key={i} className={thC+(i>1?' text-right':'')}>{h}</th>)}</tr></thead>
               <tbody>
                 {actividades.map((a,i)=>{
-                  const status=Math.abs(a.devPct)<5?'ok':Math.abs(a.devPct)<15?'alerta':'critico'
+                  const status=a.dev<=0?'ok':a.devPct<15?'alerta':'critico'
                   return(<tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
                     <td className={tdC+' font-mono text-xs'}>{a.code}</td>
                     <td className={tdC+' max-w-[160px] truncate'}>{a.descripcion}</td>

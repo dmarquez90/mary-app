@@ -6,28 +6,44 @@ import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, input
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 
-const emptyMat = () => ({ codigo:'', descripcion:'', unidad:'und', stock_actual:'0', stock_minimo:'0', ubicacion_bodega:'' })
+const emptyMat = () => ({ codigo:'', descripcion:'', categoria:'', unidad:'und', stock_actual:'0', stock_minimo:'0', ubicacion_bodega:'' })
 const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today() })
 const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today() })
+
+const CATEGORIAS = [
+  { key:'concreto',     es:'Concreto',     en:'Concrete',   color:'#6B7280' },
+  { key:'acero',        es:'Acero',        en:'Steel',      color:'#374151' },
+  { key:'madera',       es:'Madera',       en:'Wood',       color:'#92400E' },
+  { key:'electrico',    es:'Eléctrico',    en:'Electrical', color:'#D97706' },
+  { key:'plomeria',     es:'Plomería',     en:'Plumbing',   color:'#2563EB' },
+  { key:'acabados',     es:'Acabados',     en:'Finishes',   color:'#7C3AED' },
+  { key:'herramientas', es:'Herramientas', en:'Tools',      color:'#DC2626' },
+  { key:'equipos',      es:'Equipos',      en:'Equipment',  color:'#059669' },
+  { key:'otros',        es:'Otros',        en:'Other',      color:'#9CA3AF' },
+]
 
 export default function Inventario() {
   const { state, dispatch } = useStore()
   const t = useT()
   const { can } = usePermissions()
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const { materiales, entradas, salidas, proyectos, presupuesto, ordenes_compra } = state
-  const [tab, setTab]     = useState(0)
-  const [drawer, setDrawer] = useState(null)
-  const [form, setForm]   = useState({})
-  const [editMat, setEditMat] = useState(null)
 
-  const puedeEditar  = can('inventario_editar')  // solo bodeguero y client_admin
+  const [tab, setTab]             = useState(0)
+  const [drawer, setDrawer]       = useState(null)
+  const [form, setForm]           = useState({})
+  const [editMat, setEditMat]     = useState(null)
+  const [catFilter, setCatFilter] = useState('')
 
+  const puedeEditar  = can('inventario_editar')
   const TABS = [t('inv_tab_catalog'), t('inv_tab_entries'), t('inv_tab_exits'), t('inv_tab_movements')]
   const set  = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const activos     = materiales.filter(m => m.activo !== false)
-  const criticos    = activos.filter(m => parseFloat(m.stock_actual||0) <= parseFloat(m.stock_minimo||0))
-  const ocAprobadas = ordenes_compra.filter(oc => oc.estado === 'aprobada' || oc.estado === 'recibida_parcial')
+  const activos          = materiales.filter(m => m.activo !== false)
+  const activosFiltrados = catFilter ? activos.filter(m => m.categoria === catFilter) : activos
+  const criticos         = activos.filter(m => parseFloat(m.stock_actual||0) <= parseFloat(m.stock_minimo||0))
+  const ocAprobadas      = ordenes_compra.filter(oc => oc.estado === 'aprobada' || oc.estado === 'recibida_parcial')
 
   const selectedMat = materiales.find(m => m.id === form.material_id)
   const stockDisp   = selectedMat ? parseFloat(selectedMat.stock_actual||0) : 0
@@ -35,12 +51,52 @@ export default function Inventario() {
   const stockAlerta = drawer === 'out' && qtyOut > stockDisp
   const actividades = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
 
+  // ── Guardar material ───────────────────────────────────────────────────────
   const saveMat = () => {
     if (!form.codigo || !form.descripcion) return
     if (editMat) dispatch({ type:'UPD_MATERIAL', payload:{ ...form, id:editMat } })
     else         dispatch({ type:'ADD_MATERIAL', payload:form })
     setDrawer(null)
   }
+
+  // ── Eliminar material — bloqueado si tiene movimientos ────────────────────
+  const delMat = (m) => {
+    const tieneMovs = entradas.some(e => e.material_id === m.id) || salidas.some(s => s.material_id === m.id)
+    if (tieneMovs) {
+      alert(isEs
+        ? `No se puede eliminar "${m.descripcion}" porque tiene movimientos registrados.\nUsa "Desactivar" en su lugar.`
+        : `Cannot delete "${m.descripcion}" because it has recorded movements.\nUse "Deactivate" instead.`)
+      return
+    }
+    if (!window.confirm(isEs
+      ? `¿Eliminar el material "${m.descripcion}"?\nEsta acción no se puede deshacer.`
+      : `Delete material "${m.descripcion}"?\nThis action cannot be undone.`)) return
+    dispatch({ type:'DEL_MATERIAL', payload: m.id })
+  }
+
+  // ── Eliminar entrada → descuenta stock ────────────────────────────────────
+  const delEntrada = (e) => {
+    const mat = materiales.find(m => m.id === e.material_id)
+    if (!window.confirm(isEs
+      ? `¿Eliminar esta entrada?\nSe descontarán ${fmtNum(e.cantidad)} ${mat?.unidad || ''} del stock de "${mat?.descripcion || ''}".`
+      : `Delete this entry?\n${fmtNum(e.cantidad)} ${mat?.unidad || ''} will be deducted from "${mat?.descripcion || ''}" stock.`)) return
+    dispatch({ type:'DEL_ENTRADA', payload:{ id: e.id, materialId: e.material_id, cantidad: parseFloat(e.cantidad||0) } })
+  }
+
+  // ── Eliminar salida → devuelve stock ──────────────────────────────────────
+  const delSalida = (s) => {
+    const mat = materiales.find(m => m.id === s.material_id)
+    if (!window.confirm(isEs
+      ? `¿Eliminar esta salida?\nSe devolverán ${fmtNum(s.cantidad)} ${mat?.unidad || ''} al stock de "${mat?.descripcion || ''}".`
+      : `Delete this exit?\n${fmtNum(s.cantidad)} ${mat?.unidad || ''} will be returned to "${mat?.descripcion || ''}" stock.`)) return
+    dispatch({ type:'DEL_SALIDA', payload:{ id: s.id, materialId: s.material_id, cantidad: parseFloat(s.cantidad||0) } })
+  }
+
+  // ── Movimientos combinados ─────────────────────────────────────────────────
+  const allMovs = [
+    ...entradas.map(e => ({ ...e, mov:'entrada', fecha: e.fecha_recepcion })),
+    ...salidas.map(s => ({ ...s, mov:'salida',   fecha: s.fecha_salida })),
+  ].sort((a,b) => new Date(b.fecha) - new Date(a.fecha))
 
   const saveIn = () => {
     if (!form.material_id || !form.cantidad || !form.fecha_recepcion) return
@@ -54,11 +110,6 @@ export default function Inventario() {
     dispatch({ type:'ADD_SALIDA', payload:form })
     setDrawer(null)
   }
-
-  const allMovs = [
-    ...entradas.map(e => ({ ...e, mov:'entrada', fecha: e.fecha_recepcion })),
-    ...salidas.map(s => ({ ...s, mov:'salida',   fecha: s.fecha_salida })),
-  ].sort((a,b) => new Date(b.fecha) - new Date(a.fecha))
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -79,6 +130,7 @@ export default function Inventario() {
         )}
       </div>
 
+      {/* TABS */}
       <div className="flex border-b border-gray-200 mb-5">
         {TABS.map((label, i) => (
           <button key={i} onClick={() => setTab(i)}
@@ -89,56 +141,97 @@ export default function Inventario() {
         ))}
       </div>
 
-      {/* CATÁLOGO */}
+      {/* ── CATÁLOGO ─────────────────────────────────────────────────────────── */}
       {tab === 0 && (
         activos.length === 0 ? (
           <EmptyState icon={Icons.inventory} title={t('inv_empty_catalog')}
             action={puedeEditar ? t('inv_add_material') : null}
             onAction={puedeEditar ? () => { setForm(emptyMat()); setEditMat(null); setDrawer('mat') } : null} />
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-            <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
-                {[t('inv_col_code'),t('inv_col_desc'),t('inv_col_unit'),t('inv_col_stock'),t('inv_col_min'),t('inv_col_location'),t('inv_col_status'), puedeEditar ? '' : null].filter(h=>h!==null).map((h,i) => (
-                  <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {activos.map(m => {
-                  const crit = parseFloat(m.stock_actual||0) <= parseFloat(m.stock_minimo||0)
-                  return (
-                    <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-4 py-3 text-xs font-mono text-gray-500">{m.codigo}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800">{m.descripcion}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{m.unidad}</td>
-                      <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: crit ? '#ef4444' : '#1D9E75' }}>
-                        {fmtNum(m.stock_actual)} {crit && <span className="text-xs">⚠</span>}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(m.stock_minimo)}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{m.ubicacion_bodega || '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-                          {crit ? t('inv_critical_badge') : t('inv_ok')}
-                        </span>
-                      </td>
-                      {puedeEditar && (
+          <div>
+            {/* Filtros por categoría */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={() => setCatFilter('')}
+                className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                style={!catFilter
+                  ? { background:'#1B3A6B', color:'#fff', borderColor:'#1B3A6B' }
+                  : { background:'#fff', color:'#6B7280', borderColor:'#D1D5DB' }}>
+                {isEs ? 'Todos' : 'All'}
+              </button>
+              {CATEGORIAS.filter(c => activos.some(m => m.categoria === c.key)).map(c => (
+                <button key={c.key}
+                  onClick={() => setCatFilter(catFilter === c.key ? '' : c.key)}
+                  className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                  style={catFilter === c.key
+                    ? { background: c.color, color:'#fff', borderColor: c.color }
+                    : { background:'#fff', color: c.color, borderColor: c.color }}>
+                  {isEs ? c.es : c.en}
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+              <table className="w-full">
+                <thead><tr className="bg-gray-50 border-b border-gray-100">
+                  {[
+                    t('inv_col_code'),
+                    t('inv_col_desc'),
+                    isEs ? 'Categoría' : 'Category',
+                    t('inv_col_unit'),
+                    t('inv_col_stock'),
+                    t('inv_col_min'),
+                    t('inv_col_location'),
+                    t('inv_col_status'),
+                    puedeEditar ? '' : null
+                  ].filter(h => h !== null).map((h,i) => (
+                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {activosFiltrados.map(m => {
+                    const crit = parseFloat(m.stock_actual||0) <= parseFloat(m.stock_minimo||0)
+                    const cat  = CATEGORIAS.find(c => c.key === m.categoria)
+                    return (
+                      <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <td className="px-4 py-3 text-xs font-mono text-gray-500">{m.codigo}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{m.descripcion}</td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-1">
-                            <TBtn onClick={() => { setForm({...m}); setEditMat(m.id); setDrawer('mat') }}>{t('btn_edit')}</TBtn>
-                            <TBtn danger onClick={() => dispatch({ type:'TOGGLE_MATERIAL', payload:m.id })}>{t('inv_deactivate')}</TBtn>
-                          </div>
+                          {cat
+                            ? <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: cat.color }}>{isEs ? cat.es : cat.en}</span>
+                            : <span className="text-xs text-gray-300">—</span>}
                         </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        <td className="px-4 py-3 text-xs text-gray-500">{m.unidad}</td>
+                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: crit ? '#ef4444' : '#1D9E75' }}>
+                          {fmtNum(m.stock_actual)} {crit && <span className="text-xs">⚠</span>}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(m.stock_minimo)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{m.ubicacion_bodega || '—'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                            {crit ? t('inv_critical_badge') : t('inv_ok')}
+                          </span>
+                        </td>
+                        {puedeEditar && (
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1">
+                              <TBtn onClick={() => { setForm({...m}); setEditMat(m.id); setDrawer('mat') }}>{t('btn_edit')}</TBtn>
+                              <TBtn danger onClick={() => dispatch({ type:'TOGGLE_MATERIAL', payload:m.id })}>{t('inv_deactivate')}</TBtn>
+                              <TBtn danger onClick={() => delMat(m)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       )}
 
-      {/* ENTRADAS */}
+      {/* ── ENTRADAS ─────────────────────────────────────────────────────────── */}
       {tab === 1 && (
         entradas.length === 0 ? (
           <EmptyState icon={Icons.inventory} title={t('inv_empty_entries')}
@@ -148,7 +241,16 @@ export default function Inventario() {
           <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
             <table className="w-full">
               <thead><tr className="bg-gray-50 border-b border-gray-100">
-                {[t('inv_col_date'),t('inv_col_material'),t('inv_col_qty'),t('inv_col_price'),t('inv_col_invoice'),t('inv_col_supplier'),t('inv_col_project')].map(h => (
+                {[
+                  t('inv_col_date'),
+                  t('inv_col_material'),
+                  t('inv_col_qty'),
+                  t('inv_col_price'),
+                  t('inv_col_invoice'),
+                  t('inv_col_supplier'),
+                  t('inv_col_project'),
+                  puedeEditar ? '' : null
+                ].filter(h => h !== null).map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr></thead>
@@ -165,6 +267,13 @@ export default function Inventario() {
                       <td className="px-4 py-3 text-xs text-gray-500">{e.numero_factura || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{e.proveedor || '—'}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{proy?.project_code || '—'}</td>
+                      {puedeEditar && (
+                        <td className="px-4 py-3">
+                          <TBtn danger onClick={() => delEntrada(e)}>
+                            {isEs ? 'Eliminar' : 'Delete'}
+                          </TBtn>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -174,7 +283,7 @@ export default function Inventario() {
         )
       )}
 
-      {/* SALIDAS */}
+      {/* ── SALIDAS ──────────────────────────────────────────────────────────── */}
       {tab === 2 && (
         salidas.length === 0 ? (
           <EmptyState icon={Icons.inventory} title={t('inv_empty_exits')}
@@ -184,7 +293,14 @@ export default function Inventario() {
           <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
             <table className="w-full">
               <thead><tr className="bg-gray-50 border-b border-gray-100">
-                {[t('inv_col_date'),t('inv_col_material'),t('inv_col_qty'),t('inv_col_project'),t('inv_col_activity')].map(h => (
+                {[
+                  t('inv_col_date'),
+                  t('inv_col_material'),
+                  t('inv_col_qty'),
+                  t('inv_col_project'),
+                  t('inv_col_activity'),
+                  puedeEditar ? '' : null
+                ].filter(h => h !== null).map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
                 ))}
               </tr></thead>
@@ -200,6 +316,13 @@ export default function Inventario() {
                       <td className="px-4 py-3 text-sm font-mono text-red-500">-{fmtNum(s.cantidad)} {mat?.unidad}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{proy?.project_code || '—'}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
+                      {puedeEditar && (
+                        <td className="px-4 py-3">
+                          <TBtn danger onClick={() => delSalida(s)}>
+                            {isEs ? 'Eliminar' : 'Delete'}
+                          </TBtn>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -209,7 +332,7 @@ export default function Inventario() {
         )
       )}
 
-      {/* MOVIMIENTOS */}
+      {/* ── MOVIMIENTOS ──────────────────────────────────────────────────────── */}
       {tab === 3 && (
         allMovs.length === 0 ? (
           <EmptyState icon={Icons.inventory} title={t('inv_empty_movements')} />
@@ -248,11 +371,19 @@ export default function Inventario() {
         )
       )}
 
-      {/* DRAWERS — solo si puede editar */}
+      {/* ── DRAWERS ───────────────────────────────────────────────────────────── */}
       {puedeEditar && <>
         <Drawer open={drawer==='mat'} onClose={() => setDrawer(null)} title={editMat ? t('inv_form_mat_title_edit') : t('inv_form_mat_title')} width={380}>
           <Field label={t('inv_form_code')} required><input className={inputCls} value={form.codigo||''} onChange={set('codigo')} placeholder="MAT-001" /></Field>
           <Field label={t('inv_form_desc')} required><input className={inputCls} value={form.descripcion||''} onChange={set('descripcion')} placeholder="Ej: Cemento Portland" /></Field>
+          <Field label={isEs ? 'Categoría' : 'Category'}>
+            <select className={selectCls} value={form.categoria||''} onChange={set('categoria')}>
+              <option value="">{t('lbl_select')}</option>
+              {CATEGORIAS.map(c => (
+                <option key={c.key} value={c.key}>{isEs ? c.es : c.en}</option>
+              ))}
+            </select>
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('inv_form_unit')}><input className={inputCls} value={form.unidad||''} onChange={set('unidad')} placeholder="und" /></Field>
             <Field label={t('inv_form_location')}><input className={inputCls} value={form.ubicacion_bodega||''} onChange={set('ubicacion_bodega')} placeholder="Estante A-1" /></Field>
