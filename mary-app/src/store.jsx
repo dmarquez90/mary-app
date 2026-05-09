@@ -360,17 +360,22 @@ export function StoreProvider({ children, tenantId }) {
       }
 
       // ── SOLICITUDES DE ELIMINACIÓN ─────────────────────────────────────────
-      case 'ADD_SOL_ELIM': {
-        const item = {
-          ...action.payload,
-          id:         uuid(),
-          estado:     'pendiente',
-          created_at: today(),
-          tenant_id:  tenantId,
-        }
-        await supabase.from('solicitudes_eliminacion').insert(item)
-        dispatch({ type: 'ADD_SOL_ELIM', payload: item })
-        break
+      case 'APROBAR_SOL_ELIM': {
+  const sol = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
+  if (!sol) break
+
+  // Ejecutar la eliminación real
+  if (sol.tipo === 'entrada') {
+    await dbDispatch({ type: 'DEL_ENTRADA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+  } else if (sol.tipo === 'salida') {
+    await dbDispatch({ type: 'DEL_SALIDA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+  }
+
+  const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
+  await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
+  dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
+  break
+}
       }
       case 'APROBAR_SOL_ELIM': {
         const sol = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
