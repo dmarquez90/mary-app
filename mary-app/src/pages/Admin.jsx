@@ -403,11 +403,12 @@ export default function Admin() {
       <div className="max-w-7xl mx-auto px-8 py-8">
 
         {/* KPIs */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-4 gap-4 mb-8">
           {[
             { label: T.companiesReg, value: tenants.length,  sub: `${tenants.filter(t=>t.activo).length} ${T.active}` },
             { label: T.totalUsers,   value: usuarios.length, sub: `${usuarios.filter(u=>u.activo).length} ${T.activeU}` },
             { label: T.entPlans,     value: tenants.filter(t=>t.plan==='enterprise'&&t.activo).length, sub: T.active },
+            { label: isEs ? 'Trials activos' : 'Active trials', value: tenants.filter(t=>t.es_trial&&t.activo&&t.trial_fin&&new Date(t.trial_fin)>new Date()).length, sub: isEs ? '60 días gratis' : '60 days free' },
           ].map((k,i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-100 p-5">
               <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -450,11 +451,26 @@ export default function Admin() {
                     const nUsuarios = usuarios.filter(u => u.tenant_id === t.id).length
                     return (
                       <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-800">{t.nombre_empresa}</td>
                         <td className="px-4 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PLAN_COLORS[t.plan]}`}>
-                            {T[`plan_${t.plan}`]}
-                          </span>
+                          <p className="text-sm font-medium text-gray-800">{t.nombre_empresa}</p>
+                          {(t.telefono || t.pais) && (
+                            <p className="text-xs text-gray-400 mt-0.5">{[t.pais, t.telefono].filter(Boolean).join(' · ')}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit ${PLAN_COLORS[t.plan]}`}>
+                              {T[`plan_${t.plan}`]}
+                            </span>
+                            {t.es_trial && (() => {
+                              const dias = t.trial_fin ? Math.max(0, Math.ceil((new Date(t.trial_fin) - new Date()) / 86400000)) : 0
+                              return (
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit ${dias > 0 ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-red-600'}`}>
+                                  {dias > 0 ? `Trial · ${dias}d` : isEs ? 'Trial expirado' : 'Trial expired'}
+                                </span>
+                              )
+                            })()}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">{nUsuarios} / {t.max_usuarios}</td>
                         <td className="px-4 py-3 text-xs text-gray-500">{t.max_proyectos}</td>
