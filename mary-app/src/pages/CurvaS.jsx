@@ -271,7 +271,7 @@ export default function CurvaS() {
                 </tr></thead>
                 <tbody>
                   {actDeviations.map((a,i) => {
-                    const status = Math.abs(a.devPct) < 5 ? 'ok' : Math.abs(a.devPct) < 15 ? 'alerta' : 'critico'
+                    const status = a.dev <= 0 ? 'ok' : a.presupuestado > 0 && a.dev/a.presupuestado < 0.15 ? 'alerta' : 'critico'
                     return (
                       <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
                         <td className="px-4 py-3 text-xs font-mono text-gray-500">{a.code}</td>
@@ -279,10 +279,10 @@ export default function CurvaS() {
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(a.presupuestado, moneda)}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(a.real, moneda)}</td>
                         <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: a.dev>0?'#ef4444':a.dev<0?'#1D9E75':'#6b7280' }}>
-                          {a.dev>=0?'+':''}{fmt(a.dev, moneda)}
+                          {a.dev>0?'+':''}{fmt(a.dev, moneda)}
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono" style={{ color: a.dev>0?'#ef4444':'#1D9E75' }}>
-                          {a.dev>=0?'+':''}{a.devPct.toFixed(1)}%
+                        <td className="px-4 py-3 text-sm font-mono" style={{ color: a.dev>0?'#ef4444':a.dev<0?'#1D9E75':'#6b7280' }}>
+                          {a.dev>0?'+':''}{a.devPct.toFixed(1)}%
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium
