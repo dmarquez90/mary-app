@@ -134,7 +134,7 @@ MARY está diseñada exclusivamente para gestión empresarial legítima. Usted a
 
 4. PLANES, PRECIOS Y PERÍODO DE PRUEBA
 
-MARY ofrece un período de prueba gratuito de 60 días con el plan Pro sin necesidad de tarjeta de crédito. Al vencimiento del período de prueba, el servicio requiere una suscripción mensual activa para continuar operando. Los precios y límites de cada plan están publicados en www.appmary.com y pueden actualizarse con previo aviso.
+MARY ofrece un período de prueba gratuito de 60 días con el plan Pro sin necesidad de tarjeta de crédito. Al vencimiento del período de prueba, el servicio requiere una suscripción mensual activa para continuar operando. Los precios y límites de cada plan están publicados en www.marquezprojectsolutions.com y pueden actualizarse con previo aviso.
 
 5. SUSPENSIÓN Y CANCELACIÓN DE CUENTAS
 
@@ -157,7 +157,7 @@ Marquez Project Solutions LLC se reserva el derecho de modificar estos Términos
 Estos Términos de Servicio se rigen por las leyes del estado de California, Estados Unidos. Cualquier disputa será resuelta en los tribunales competentes del estado de California.
 
 Para consultas: deybi@marquezprojectsolutions.com
-Sitio web: www.appmary.com
+Sitio web: www.marquezprojectsolutions.com
 `
 
   const TOS_EN = `
@@ -187,7 +187,7 @@ MARY is designed exclusively for legitimate business management. You agree NOT t
 
 4. PLANS, PRICING AND TRIAL PERIOD
 
-MARY offers a free 60-day trial with the Pro plan without requiring a credit card. Upon expiration of the trial period, the service requires an active monthly subscription to continue operating. Prices and limits for each plan are published at www.appmary.com and may be updated with prior notice.
+MARY offers a free 60-day trial with the Pro plan without requiring a credit card. Upon expiration of the trial period, the service requires an active monthly subscription to continue operating. Prices and limits for each plan are published at www.marquezprojectsolutions.com and may be updated with prior notice.
 
 5. ACCOUNT SUSPENSION AND CANCELLATION
 
@@ -210,7 +210,7 @@ Marquez Project Solutions LLC reserves the right to modify these Terms of Servic
 These Terms of Service are governed by the laws of the state of California, United States. Any dispute shall be resolved in the competent courts of the state of California.
 
 For inquiries: deybi@marquezprojectsolutions.com
-Website: www.appmary.com
+Website: www.marquezprojectsolutions.com
 `
 
   const PP_ES = `
@@ -281,7 +281,7 @@ Podemos actualizar esta Política de Privacidad periódicamente. Le notificaremo
 Para preguntas sobre esta Política de Privacidad:
 Marquez Project Solutions LLC
 deybi@marquezprojectsolutions.com
-www.appmary.com
+www.marquezprojectsolutions.com
 California, Estados Unidos
 `
 
@@ -353,7 +353,7 @@ We may update this Privacy Policy periodically. We will notify you by email of s
 For questions about this Privacy Policy:
 Marquez Project Solutions LLC
 deybi@marquezprojectsolutions.com
-www.appmary.com
+www.marquezprojectsolutions.com
 California, United States
 `
 
