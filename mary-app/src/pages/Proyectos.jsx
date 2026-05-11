@@ -10,9 +10,14 @@ const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', p
 
 export default function Proyectos({ onNavigate }) {
   const { state, dispatch } = useStore()
-  const { t } = useContext(LangContext)
-  const { can } = usePermissions()
-  const { proyectos, presupuesto, fases } = state
+  const { t }               = useContext(LangContext)
+  const { lang }            = useContext(LangContext)
+  const { can }             = usePermissions()
+  const isEs                = lang === 'ES'
+
+  const { proyectos, presupuesto, fases, entradas, salidas, solicitudes,
+    ordenes_compra, materiales_presupuestados, costos_directos,
+    nominas, subcontratos, equipos, costos_indirectos } = state
 
   const [drawer, setDrawer]         = useState(false)
   const [form, setForm]             = useState(empty())
@@ -21,9 +26,10 @@ export default function Proyectos({ onNavigate }) {
   const [detail, setDetail]         = useState(null)
   const [faseForm, setFaseForm]     = useState({ nombre:'', fecha_inicio:'', fecha_fin:'', estado:'pendiente' })
   const [addFase, setAddFase]       = useState(false)
+  const [delError, setDelError]     = useState(null)
 
-  const puedeCrear   = can('proyectos_crear')
-  const puedeEditar  = can('proyectos_editar')
+  const puedeCrear    = can('proyectos_crear')
+  const puedeEditar   = can('proyectos_editar')
   const puedeEliminar = can('proyectos_eliminar')
 
   const set      = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -41,9 +47,67 @@ export default function Proyectos({ onNavigate }) {
   }
 
   const del = () => {
-    dispatch({ type: 'DEL_PROYECTO', payload: confirmDel })
+    const id = confirmDel
+
+    // Verificar datos relacionados
+    const checks = {
+      pres:    presupuesto.some(b => b.proyecto_id === id),
+      ent:     entradas.some(e => e.proyecto_id === id),
+      sal:     salidas.some(s => s.proyecto_id === id),
+      sol:     solicitudes.some(s => s.proyecto_id === id),
+      oc:      ordenes_compra.some(oc => oc.proyecto_id === id),
+      matPres: (materiales_presupuestados || []).some(m => m.proyecto_id === id),
+      dir:     costos_directos.some(c => c.proyecto_id === id),
+      nom:     nominas.some(n => n.proyecto_id === id),
+      sub:     subcontratos.some(s => s.proyecto_id === id),
+      eq:      equipos.some(e => e.proyecto_id === id),
+      ind:     costos_indirectos.some(c => c.proyecto_id === id),
+    }
+
+    const tieneDatos = Object.values(checks).some(Boolean)
+
+    if (tieneDatos) {
+      setConfirmDel(null)
+
+      const labelsEs = {
+        pres:    'Presupuesto',
+        ent:     'Entradas de materiales',
+        sal:     'Salidas de materiales',
+        sol:     'Solicitudes de compra',
+        oc:      'Órdenes de compra',
+        matPres: 'Materiales presupuestados',
+        dir:     'Costos directos',
+        nom:     'Nómina / Planilla',
+        sub:     'Subcontratos',
+        eq:      'Equipos',
+        ind:     'Costos indirectos',
+      }
+      const labelsEn = {
+        pres:    'Budget',
+        ent:     'Material entries',
+        sal:     'Material exits',
+        sol:     'Purchase requests',
+        oc:      'Purchase orders',
+        matPres: 'Budgeted materials',
+        dir:     'Direct costs',
+        nom:     'Payroll',
+        sub:     'Subcontracts',
+        eq:      'Equipment',
+        ind:     'Indirect costs',
+      }
+
+      const labels = isEs ? labelsEs : labelsEn
+      const items  = Object.entries(checks)
+        .filter(([, v]) => v)
+        .map(([k]) => labels[k])
+
+      setDelError({ items })
+      return
+    }
+
+    dispatch({ type: 'DEL_PROYECTO', payload: id })
     setConfirmDel(null)
-    if (detail === confirmDel) setDetail(null)
+    if (detail === id) setDetail(null)
   }
 
   const addFaseHandler = () => {
@@ -59,6 +123,46 @@ export default function Proyectos({ onNavigate }) {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+
+      {/* MODAL ERROR ELIMINACIÓN */}
+      {delError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 text-lg flex-shrink-0">🚫</div>
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">
+                  {isEs ? 'No se puede eliminar este proyecto' : 'This project cannot be deleted'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {isEs ? 'Tiene información registrada en los siguientes módulos:' : 'It has registered data in the following modules:'}
+                </p>
+              </div>
+            </div>
+
+            <ul className="bg-red-50 rounded-lg p-3 mb-4 flex flex-col gap-1">
+              {delError.items.map((item, i) => (
+                <li key={i} className="text-sm text-red-700 flex items-center gap-2">
+                  <span className="text-red-400">•</span> {item}
+                </li>
+              ))}
+            </ul>
+
+            <p className="text-xs text-gray-500 mb-4">
+              {isEs
+                ? 'Elimina primero esos registros o cambia el estado del proyecto a "Cancelado" para archivarlo.'
+                : 'Delete those records first or change the project status to "Cancelled" to archive it.'}
+            </p>
+
+            <button onClick={() => setDelError(null)}
+              className="w-full py-2.5 text-sm font-semibold text-white rounded-lg"
+              style={{ background: '#1B3A6B' }}>
+              {isEs ? 'Entendido' : 'Got it'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">{t('proy_title')}</h1>
@@ -105,6 +209,7 @@ export default function Proyectos({ onNavigate }) {
         </div>
       )}
 
+      {/* PANEL DETALLE */}
       {detail && proyecto && (
         <div className="fixed inset-0 z-30 bg-black/20 flex justify-end" onClick={() => setDetail(null)}>
           <div className="w-full max-w-lg bg-white shadow-xl overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -200,6 +305,7 @@ export default function Proyectos({ onNavigate }) {
         </div>
       )}
 
+      {/* DRAWER FORMULARIO */}
       <Drawer open={drawer} onClose={() => setDrawer(false)}
         title={editing ? t('proy_form_title_edit') : t('proy_form_title_new')} width={420}>
         <Field label={t('proy_form_name')} required>
@@ -248,8 +354,12 @@ export default function Proyectos({ onNavigate }) {
         </div>
       </Drawer>
 
-      <Confirm open={!!confirmDel} message={t('proy_delete_confirm')}
-        onConfirm={del} onCancel={() => setConfirmDel(null)} />
+      <Confirm open={!!confirmDel}
+        message={isEs
+          ? '¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer.'
+          : 'Are you sure you want to delete this project? This action cannot be undone.'}
+        onConfirm={del}
+        onCancel={() => setConfirmDel(null)} />
     </div>
   )
 }
