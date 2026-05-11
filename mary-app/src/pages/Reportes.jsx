@@ -647,7 +647,8 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────
 export default function Reportes() {
   const { state } = useStore()
-  const { t } = useContext(LangContext)
+  const { t, lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const {
     proyectos, presupuesto, materiales, entradas, salidas,
     costos_directos, nominas, subcontratos, equipos, costos_indirectos
@@ -697,12 +698,12 @@ export default function Reportes() {
 
     return {
       resumen:[
-        {categoria:'Materiales',real:totalMat},
-        {categoria:'Costos Directos',real:totalDir},
-        {categoria:'Nómina / Planilla',real:totalNom},
-        {categoria:'Subcontratos',real:totalSub},
-        {categoria:'Equipos',real:totalEq},
-        {categoria:'Costos Indirectos',real:totalInd},
+        {categoria: t('rep_cat_materiales'),   real:totalMat},
+        {categoria: t('rep_cat_imprevistos'),   real:totalDir},
+        {categoria: t('rep_cat_nomina'),        real:totalNom},
+        {categoria: t('rep_cat_subcontratos'),  real:totalSub},
+        {categoria: t('rep_cat_equipos'),       real:totalEq},
+        {categoria: t('rep_cat_admin'),         real:totalInd},
       ],
       actividades, totalReal, dirs, noms, subs, eqs, inds
     }
@@ -807,6 +808,8 @@ export default function Reportes() {
 
 // ── VISTAS EN APP ─────────────────────────────────────────
 function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const { resumen, actividades, totalReal } = data
   const desviacion = totalReal - budget
   const thS = { background: BRAND }
@@ -816,10 +819,10 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          {label:'Presupuesto total',   val:fmt(budget,moneda),    color:BRAND},
-          {label:'Costo real ejecutado',val:fmt(totalReal,moneda), color:'#1D9E75'},
-          {label:'Desviación',          val:`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`, color:desviacion>0?'#ef4444':'#1D9E75'},
-          {label:'% Ejecución',         val:budget>0?`${((totalReal/budget)*100).toFixed(1)}%`:'0%', color:BRAND},
+          {label:isEs?'Presupuesto total':'Total budget',   val:fmt(budget,moneda),    color:BRAND},
+          {label:isEs?'Costo real ejecutado':'Real cost executed',val:fmt(totalReal,moneda), color:'#1D9E75'},
+          {label:isEs?'Desviación':'Deviation',          val:`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`, color:desviacion>0?'#ef4444':'#1D9E75'},
+          {label:isEs?'% Ejecución':'% Execution',         val:budget>0?`${((totalReal/budget)*100).toFixed(1)}%`:'0%', color:BRAND},
         ].map((k,i)=>(
           <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
             <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -828,9 +831,9 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
         ))}
       </div>
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">Resumen por categoría</p></div>
+        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Resumen por categoría':'Summary by category'}</p></div>
         <table className="w-full">
-          <thead><tr style={thS}><th className={thC}>Categoría</th><th className={thC+' text-right'}>Costo real</th><th className={thC+' text-right'}>% del total</th></tr></thead>
+          <thead><tr style={thS}><th className={thC}>{isEs?'Categoría':'Category'}</th><th className={thC+' text-right'}>{isEs?'Costo real':'Real cost'}</th><th className={thC+' text-right'}>{isEs?'% del total':'% of total'}</th></tr></thead>
           <tbody>
             {resumen.map((r,i)=>(
               <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
@@ -851,7 +854,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
               <thead><tr style={thS}>{['Código','Actividad','Presupuestado','Real','Desviación $','Desv. %','Estado'].map((h,i)=><th key={i} className={thC+(i>1?' text-right':'')}>{h}</th>)}</tr></thead>
               <tbody>
                 {actividades.map((a,i)=>{
-                  const status=a.dev<=0?'ok':a.devPct<15?'alerta':'critico'
+                  const status=Math.abs(a.devPct)<5?'ok':Math.abs(a.devPct)<15?'alerta':'critico'
                   return(<tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
                     <td className={tdC+' font-mono text-xs'}>{a.code}</td>
                     <td className={tdC+' max-w-[160px] truncate'}>{a.descripcion}</td>
@@ -872,6 +875,8 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
 }
 
 function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fmtNum }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const [subTab,setSubTab]=useState(0)
   const thS={background:BRAND}
   const thC='px-4 py-2.5 text-left text-xs font-semibold text-white'
@@ -902,6 +907,8 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
 }
 
 function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, budget, moneda, fmt, fmtNum }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const proyId=proy?.id
   const thS={background:BRAND}
   const thC='px-4 py-2.5 text-left text-xs font-semibold text-white'
@@ -922,37 +929,37 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
   return(
     <div className="flex flex-col gap-5">
       <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <p className="text-sm font-semibold text-gray-700 mb-3">Información del proyecto</p>
+        <p className="text-sm font-semibold text-gray-700 mb-3">{isEs?'Información del proyecto':'Project information'}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          {[['Código',proy?.project_code],['Cliente',proy?.cliente_externo||'—'],['Estado',proy?.estado],['Moneda',moneda],['Inicio',proy?.fecha_inicio||'—'],['Fin est.',proy?.fecha_fin_estimada||'—'],['Ciudad',proy?.ciudad||'—'],['País',proy?.pais||'—']].map(([k,v],i)=>(
+          {[[isEs?'Código':'Code',proy?.project_code],[isEs?'Cliente':'Client',proy?.cliente_externo||'—'],[isEs?'Estado':'Status',proy?.estado],[isEs?'Moneda':'Currency',moneda],[isEs?'Inicio':'Start',proy?.fecha_inicio||'—'],[isEs?'Fin est.':'Est. end',proy?.fecha_fin_estimada||'—'],[isEs?'Ciudad':'City',proy?.ciudad||'—'],[isEs?'País':'Country',proy?.pais||'—']].map(([k,v],i)=>(
             <div key={i}><p className="text-xs text-gray-400">{k}</p><p className="font-medium text-gray-700">{v}</p></div>
           ))}
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[{label:'Presupuesto total',val:fmt(budget,moneda),color:BRAND},{label:'Costo real total',val:fmt(totalReal,moneda),color:'#1D9E75'},{label:'Desviación',val:`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`,color:desviacion>0?'#ef4444':'#1D9E75'},{label:'% Ejecución',val:budget>0?`${((totalReal/budget)*100).toFixed(1)}%`:'0%',color:BRAND}].map((k,i)=>(
+        {[{label:isEs?'Presupuesto total':'Total budget',val:fmt(budget,moneda),color:BRAND},{label:isEs?'Costo real total':'Total real cost',val:fmt(totalReal,moneda),color:'#1D9E75'},{label:isEs?'Desviación':'Deviation',val:`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`,color:desviacion>0?'#ef4444':'#1D9E75'},{label:isEs?'% Ejecución':'% Execution',val:budget>0?`${((totalReal/budget)*100).toFixed(1)}%`:'0%',color:BRAND}].map((k,i)=>(
           <div key={i} className="bg-white rounded-xl border border-gray-100 p-4"><p className="text-xs text-gray-400 mb-1">{k.label}</p><p className="text-lg font-bold" style={{color:k.color}}>{k.val}</p></div>
         ))}
       </div>
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">Resumen de costos</p></div>
+        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Resumen de costos':'Cost summary'}</p></div>
         <table className="w-full">
-          <thead><tr style={thS}><th className={thC}>Categoría</th><th className={thC+' text-right'}>Monto</th><th className={thC+' text-right'}>% del total</th></tr></thead>
+          <thead><tr style={thS}><th className={thC}>{isEs?'Categoría':'Category'}</th><th className={thC+' text-right'}>{isEs?'Monto':'Amount'}</th><th className={thC+' text-right'}>{isEs?'% del total':'% of total'}</th></tr></thead>
           <tbody>
-            {[['Materiales',totalMat],['Costos directos',totalDir],['Nómina / Planilla',totalNom],['Subcontratos',totalSub],['Equipos',totalEq],['Costos indirectos',totalInd]].map(([cat,val],i)=>(
+            {[[isEs?'Materiales':'Materials',totalMat],[isEs?'Imprevistos':'Contingencies',totalDir],[isEs?'Nómina / Planilla':'Payroll',totalNom],[isEs?'Subcontratos':'Subcontracts',totalSub],[isEs?'Equipos':'Equipment',totalEq],[isEs?'Administración':'Administration',totalInd]].map(([cat,val],i)=>(
               <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{cat}</td><td className={tdC+' text-right font-mono'}>{fmt(val,moneda)}</td><td className={tdC+' text-right'}>{totalReal>0?`${((val/totalReal)*100).toFixed(1)}%`:'—'}</td></tr>
             ))}
-            <tr style={{background:'#EEF2F7'}}><td className={tdC+' font-bold'}>TOTAL REAL</td><td className={tdC+' text-right font-mono font-bold'}>{fmt(totalReal,moneda)}</td><td className={tdC+' text-right font-bold'}>100%</td></tr>
+            <tr style={{background:'#EEF2F7'}}><td className={tdC+' font-bold'}>{isEs?'TOTAL REAL':'TOTAL REAL'}</td><td className={tdC+' text-right font-mono font-bold'}>{fmt(totalReal,moneda)}</td><td className={tdC+' text-right font-bold'}>100%</td></tr>
           </tbody>
         </table>
       </div>
       {noms.length>0&&<div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b flex justify-between" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">Nómina / Planilla</p><span className="text-sm font-mono font-semibold" style={{color:BRAND}}>{fmt(totalNom,moneda)}</span></div>
-        <div className="overflow-x-auto"><table className="w-full"><thead><tr style={thS}>{['Trabajador','Cargo','Período','Base','Deducciones','Neto'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead><tbody>{noms.map((n,i)=>{const neto=(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0);return(<tr key={n.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{n.trabajador}</td><td className={tdC}>{n.cargo||'—'}</td><td className={tdC+' text-xs'}>{n.periodo_inicio} → {n.periodo_fin}</td><td className={tdC+' font-mono'}>{fmt(n.salario_base,moneda)}</td><td className={tdC+' font-mono text-red-500'}>-{fmt(n.deducciones,moneda)}</td><td className={tdC+' font-mono font-semibold'} style={{color:'#1D9E75'}}>{fmt(neto,moneda)}</td></tr>)})}</tbody></table></div>
+        <div className="px-5 py-3 border-b flex justify-between" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Nómina / Planilla':'Payroll'}</p><span className="text-sm font-mono font-semibold" style={{color:BRAND}}>{fmt(totalNom,moneda)}</span></div>
+        <div className="overflow-x-auto"><table className="w-full"><thead><tr style={thS}>{[isEs?'Trabajador':'Worker',isEs?'Cargo':'Position',isEs?'Período':'Period',isEs?'Base':'Base',isEs?'Deducciones':'Deductions',isEs?'Neto':'Net'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead><tbody>{noms.map((n,i)=>{const neto=(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0);return(<tr key={n.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{n.trabajador}</td><td className={tdC}>{n.cargo||'—'}</td><td className={tdC+' text-xs'}>{n.periodo_inicio} → {n.periodo_fin}</td><td className={tdC+' font-mono'}>{fmt(n.salario_base,moneda)}</td><td className={tdC+' font-mono text-red-500'}>-{fmt(n.deducciones,moneda)}</td><td className={tdC+' font-mono font-semibold'} style={{color:'#1D9E75'}}>{fmt(neto,moneda)}</td></tr>)})}</tbody></table></div>
       </div>}
       {subs.length>0&&<div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b flex justify-between" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">Subcontratos</p><span className="text-sm font-mono font-semibold" style={{color:BRAND}}>{fmt(totalSub,moneda)}</span></div>
-        <div className="overflow-x-auto"><table className="w-full"><thead><tr style={thS}>{['Subcontratista','Descripción','Contrato','% Avance','Pagado'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead><tbody>{subs.map((s,i)=>(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{s.subcontratista}</td><td className={tdC+' text-xs max-w-[160px] truncate'}>{s.descripcion_trabajo||'—'}</td><td className={tdC+' font-mono'}>{fmt(s.monto_contrato,moneda)}</td><td className={tdC}>{fmtNum(s.avance_porcentaje)}%</td><td className={tdC+' font-mono font-semibold'} style={{color:'#1D9E75'}}>{fmt(s.monto_pagado,moneda)}</td></tr>))}</tbody></table></div>
+        <div className="px-5 py-3 border-b flex justify-between" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Subcontratos':'Subcontracts'}</p><span className="text-sm font-mono font-semibold" style={{color:BRAND}}>{fmt(totalSub,moneda)}</span></div>
+        <div className="overflow-x-auto"><table className="w-full"><thead><tr style={thS}>{[isEs?'Subcontratista':'Subcontractor',isEs?'Descripción':'Description',isEs?'Contrato':'Contract',isEs?'% Avance':'% Progress',isEs?'Pagado':'Paid'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead><tbody>{subs.map((s,i)=>(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{s.subcontratista}</td><td className={tdC+' text-xs max-w-[160px] truncate'}>{s.descripcion_trabajo||'—'}</td><td className={tdC+' font-mono'}>{fmt(s.monto_contrato,moneda)}</td><td className={tdC}>{fmtNum(s.avance_porcentaje)}%</td><td className={tdC+' font-mono font-semibold'} style={{color:'#1D9E75'}}>{fmt(s.monto_pagado,moneda)}</td></tr>))}</tbody></table></div>
       </div>}
     </div>
   )

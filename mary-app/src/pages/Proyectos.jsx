@@ -67,8 +67,6 @@ export default function Proyectos({ onNavigate }) {
     const tieneDatos = Object.values(checks).some(Boolean)
 
     if (tieneDatos) {
-      setConfirmDel(null)
-
       const labelsEs = {
         pres:    'Presupuesto',
         ent:     'Entradas de materiales',
@@ -101,7 +99,8 @@ export default function Proyectos({ onNavigate }) {
         .filter(([, v]) => v)
         .map(([k]) => labels[k])
 
-      setDelError({ items })
+      setConfirmDel(null)
+      setDelError({ items, proyId: id })
       return
     }
 
@@ -154,11 +153,21 @@ export default function Proyectos({ onNavigate }) {
                 : 'Delete those records first or change the project status to "Cancelled" to archive it.'}
             </p>
 
-            <button onClick={() => setDelError(null)}
-              className="w-full py-2.5 text-sm font-semibold text-white rounded-lg"
-              style={{ background: '#1B3A6B' }}>
-              {isEs ? 'Entendido' : 'Got it'}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setDelError(null)}
+                className="flex-1 py-2.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+                {isEs ? 'Cerrar' : 'Close'}
+              </button>
+              <button onClick={() => {
+                const proy = proyectos.find(p => p.id === delError.proyId)
+                if (proy) { setForm({ ...proy, estado: 'cancelado' }); setEditing(proy.id); setDrawer(true) }
+                setDelError(null)
+              }}
+                className="flex-1 py-2.5 text-sm font-semibold text-white rounded-lg"
+                style={{ background: '#1B3A6B' }}>
+                {isEs ? 'Cambiar a Cancelado' : 'Set as Cancelled'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -185,7 +194,7 @@ export default function Proyectos({ onNavigate }) {
               <div key={p.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <span className="text-xs font-mono text-gray-400">{p.project_code}</span>
-                  <Badge estado={p.estado} />
+                  <Badge estado={p.estado} label={t(`estado_${p.estado}`)} />
                 </div>
                 <h3 className="font-semibold text-gray-800 text-sm mb-1">{p.nombre}</h3>
                 {p.cliente_externo && <p className="text-xs text-gray-500 mb-3">{p.cliente_externo}</p>}
@@ -200,7 +209,7 @@ export default function Proyectos({ onNavigate }) {
                 </div>
                 <div className="flex gap-2 pt-3 border-t border-gray-50">
                   <button onClick={() => setDetail(p.id)} className="flex-1 text-xs font-medium hover:underline text-left" style={{color:'#1B3A6B'}}>{t('proy_detail')} →</button>
-                  {!closed && puedeEditar && <TBtn onClick={() => openEdit(p)}>{t('btn_edit')}</TBtn>}
+                  {puedeEditar && <TBtn onClick={() => openEdit(p)}>{t('btn_edit')}</TBtn>}
                   {puedeEliminar && <TBtn danger onClick={() => setConfirmDel(p.id)}>{t('btn_delete')}</TBtn>}
                 </div>
               </div>
@@ -227,7 +236,7 @@ export default function Proyectos({ onNavigate }) {
             <div className="p-6 flex flex-col gap-5">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  [t('lbl_status'),        <Badge estado={proyecto.estado} />],
+                  [t('lbl_status'),        <Badge estado={proyecto.estado} label={t(`estado_${proyecto.estado}`)} />],
                   [t('lbl_currency'),      proyecto.moneda],
                   [t('lbl_client'),        proyecto.cliente_externo || '—'],
                   [t('proy_form_city'),    proyecto.ciudad || '—'],
@@ -334,7 +343,7 @@ export default function Proyectos({ onNavigate }) {
           </Field>
           <Field label={t('proy_form_status')}>
             <select className={selectCls} value={form.estado} onChange={set('estado')}>
-              {ESTADOS_PROYECTO.map(s => <option key={s} value={s}>{ESTADO_LABELS[s]}</option>)}
+              {ESTADOS_PROYECTO.map(s => <option key={s} value={s}>{t(`estado_${s}`)}</option>)}
             </select>
           </Field>
         </div>
