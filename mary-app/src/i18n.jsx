@@ -3,11 +3,9 @@ import { createContext, useContext, useState, useEffect } from 'react'
 const LS_KEY = 'mary_lang'
 
 /* ============================================================
-   🇪🇸 ESPAÑOL
+   ESPAÑOL
    ============================================================ */
 const ES = {
-
-  // COMMON
   lbl_select: '— Seleccionar —',
   lbl_status: 'Estado',
   lbl_currency: 'Moneda',
@@ -17,6 +15,7 @@ const ES = {
   lbl_date: 'Fecha',
   lbl_quantity: 'Cantidad',
   lbl_unit: 'Unidad',
+  lbl_total: 'Total',
   btn_save: 'Guardar',
   btn_add: 'Agregar',
   btn_edit: 'Editar',
@@ -57,7 +56,7 @@ const ES = {
   proy_form_title_new: 'Nuevo proyecto',
   proy_form_title_edit: 'Editar proyecto',
   proy_budget_label: 'Presupuesto',
-  proy_delete_confirm: '¿Eliminar este proyecto? Se eliminarán también sus fases, presupuesto y lista de materiales.',
+  proy_delete_confirm: '¿Eliminar este proyecto?',
   proy_fases_title: 'Fases del proyecto',
   proy_fase_add: '+ Fase',
   proy_fase_name: 'Nombre de la fase',
@@ -66,6 +65,13 @@ const ES = {
   proy_fase_cancel: 'Cancelar',
   proy_detail_edit: 'Editar proyecto',
   proy_detail_back: 'Volver',
+
+  // ESTADOS DE PROYECTO
+  estado_planificacion: 'Planificación',
+  estado_en_ejecucion:  'En Ejecución',
+  estado_pausado:       'Pausado',
+  estado_completado:    'Completado',
+  estado_cancelado:     'Cancelado',
 
   // PRESUPUESTO
   pres_title: 'Presupuesto',
@@ -81,6 +87,9 @@ const ES = {
   pres_col_mat: 'Mat.',
   pres_col_eq: 'Equip.',
   pres_col_total: 'Total',
+  pres_col_uc: 'C.U.',
+  pres_grand_total: 'Gran Total',
+  pres_empty: 'No hay ítems en el presupuesto',
   pres_form_parent_stage: 'Etapa padre',
   pres_form_parent_sub: 'Sub-etapa padre',
   pres_form_desc: 'Descripción',
@@ -92,17 +101,14 @@ const ES = {
   pres_form_eq: 'Equipos',
   pres_unit_total: 'Total unitario',
   pres_total: 'Total',
+  pres_total_cost: 'Costo total',
   pres_delete_confirm: '¿Eliminar este ítem del presupuesto?',
   pres_add_stage: '+ Etapa',
   pres_add_substage: '+ Sub-etapa',
   pres_add_activity: '+ Actividad',
-  pres_col_uc: 'C.U.',
-  pres_grand_total: 'Gran Total',
-  pres_empty: 'No hay ítems en el presupuesto',
   pres_form_stage: 'Etapa',
   pres_form_substage: 'Sub-etapa',
   pres_form_activity: 'Actividad',
-  pres_total_cost: 'Costo total',
 
   // INVENTARIO
   inv_title: 'Inventario',
@@ -135,6 +141,7 @@ const ES = {
   inv_col_activity: 'Actividad',
   inv_col_type: 'Tipo',
   inv_col_detail: 'Detalle',
+  inv_col_invoice: 'Factura',
   inv_critical_badge: 'Crítico',
   inv_ok_badge: 'OK',
   inv_ok: 'OK',
@@ -175,16 +182,16 @@ const ES = {
   inv_del_exit_title: 'Eliminar salida',
   inv_del_confirm_msg: 'El stock del material se ajustará automáticamente.',
   inv_del_warning_title: 'Advertencia — Salidas sin respaldo',
-  inv_del_warning_body: 'Al eliminar esta entrada, quedarán {n} salida(s) de {mat} sin respaldo en el inventario.',
+  inv_del_warning_body: 'Al eliminar esta entrada, quedarán {n} salida(s) de {mat} sin respaldo.',
   inv_del_entries_remaining: 'Entradas restantes',
   inv_del_total_exits: 'Total salidas registradas',
   inv_del_what_to_do: '¿Qué deseas hacer?',
   inv_del_entry_and_exits: 'Eliminar entrada + {n} salida(s) afectada(s)',
-  inv_del_entry_only: 'Solo eliminar la entrada (el stock quedará inconsistente)',
+  inv_del_entry_only: 'Solo eliminar la entrada',
   inv_del_mat_blocked_title: 'No se puede eliminar',
-  inv_del_mat_blocked: 'El material tiene {n} {u} en stock. Primero registra las salidas correspondientes.',
+  inv_del_mat_blocked: 'El material tiene {n} {u} en stock.',
   inv_del_mat_title: 'Eliminar material',
-  inv_del_mat_msg: '¿Eliminar "{mat}" del catálogo? Los registros de entradas y salidas se mantendrán como historial.',
+  inv_del_mat_msg: '¿Eliminar "{mat}" del catálogo?',
 
   // BOM
   bom_form_save: 'Guardar material',
@@ -286,14 +293,6 @@ const ES = {
   comp_del_sol_title: '¿Eliminar esta solicitud?',
   comp_del_oc_title: '¿Eliminar esta orden de compra?',
   comp_del_confirm_msg: 'Esta acción no se puede deshacer.',
-comp_sol_folio: 'Folio',
-  comp_sol_req_date: 'Fecha requerida',
-  comp_sol_priority: 'Prioridad',
-  comp_sol_priority_normal: 'Normal',
-  comp_sol_priority_alta: 'Alta',
-  comp_sol_priority_urgente: 'Urgente',
-  comp_sol_email: 'Email',
-  comp_sol_general_remarks: 'Observaciones generales / Instrucciones especiales',
   comp_sol_folio: 'Folio',
   comp_sol_req_date: 'Fecha requerida',
   comp_sol_priority: 'Prioridad',
@@ -303,6 +302,7 @@ comp_sol_folio: 'Folio',
   comp_sol_email: 'Email',
   comp_sol_general_remarks: 'Observaciones generales / Instrucciones especiales',
   comp_sol_general_remarks_ph: 'Instrucciones de entrega, condiciones especiales...',
+
   // FINANCIERO
   fin_tab_direct: 'Costos Directos',
   fin_tab_payroll: 'Nómina',
@@ -315,12 +315,12 @@ comp_sol_folio: 'Folio',
   fin_materials: 'Materiales',
   fin_payroll: 'Nómina',
   fin_subcontracts: 'Subcontratos',
-  fin_empty:              'No hay registros en este módulo',
-  fin_empty_payroll:      'No hay registros de nómina',
+  fin_empty: 'No hay registros en este módulo',
+  fin_empty_payroll: 'No hay registros de nómina',
   fin_empty_subcontracts: 'No hay subcontratos registrados',
-  fin_empty_equipment:    'No hay equipos registrados',
-  fin_empty_indirect:     'No hay registros de administración',
-  fin_empty_direct:       'No hay imprevistos registrados',
+  fin_empty_equipment: 'No hay equipos registrados',
+  fin_empty_indirect: 'No hay registros de administración',
+  fin_empty_direct: 'No hay imprevistos registrados',
   fin_col_date: 'Fecha',
   fin_col_type: 'Tipo',
   fin_col_desc: 'Descripción',
@@ -373,16 +373,8 @@ comp_sol_folio: 'Folio',
   fin_petty: 'Caja chica',
   fin_eq_rental: 'Alquiler',
   fin_eq_owned: 'Propio',
-  lbl_total: 'Total',
 
-  // ESTADOS DE PROYECTO
-  estado_planificacion: 'Planificación',
-  estado_en_ejecucion:  'En Ejecución',
-  estado_pausado:       'Pausado',
-  estado_completado:    'Completado',
-  estado_cancelado:     'Cancelado',
-
-  // REPORTES — categorías corregidas
+  // REPORTES — categorías
   rep_cat_materiales:   'Materiales',
   rep_cat_imprevistos:  'Imprevistos',
   rep_cat_nomina:       'Nómina / Planilla',
@@ -390,6 +382,8 @@ comp_sol_folio: 'Folio',
   rep_cat_equipos:      'Equipos',
   rep_cat_admin:        'Administración',
 
+  // CURVA S
+  curva_title: 'Curva S',
   curva_select_project: 'Proyecto',
   curva_by_month: 'Por mes',
   curva_by_week: 'Por semana',
@@ -440,7 +434,7 @@ comp_sol_folio: 'Folio',
   config_save: 'Guardar configuración',
   config_saved: '✓ Configuración guardada',
 
-// GESTIÓN DE USUARIOS
+  // GESTIÓN DE USUARIOS
   cfg_users_title: 'Gestión de Usuarios',
   cfg_users_sub: 'Usuarios de la empresa',
   cfg_users_new: '+ Nuevo usuario',
@@ -455,7 +449,7 @@ comp_sol_folio: 'Folio',
   cfg_users_deactivate: 'Desactivar',
   cfg_users_activate: 'Activar',
   cfg_users_your_account: 'Tu cuenta',
-  cfg_users_limit_reached: 'Has alcanzado el límite de usuarios de tu plan. Contacta a MPS para ampliar tu suscripción.',
+  cfg_users_limit_reached: 'Has alcanzado el límite de usuarios de tu plan.',
   cfg_users_plan: 'Plan activo',
   cfg_users_limit: 'Usuarios',
   cfg_users_max_projects: 'Proyectos máx.',
@@ -465,38 +459,30 @@ comp_sol_folio: 'Folio',
   cfg_users_form_email: 'Email',
   cfg_users_form_email_locked: 'El email no se puede modificar.',
   cfg_users_form_password: 'Contraseña temporal',
-  cfg_users_form_password_hint: 'Si dejas vacío se envía email de activación al usuario.',
+  cfg_users_form_password_hint: 'Si dejas vacío se envía email de activación.',
   cfg_users_form_role: 'Rol',
   cfg_users_success_created: 'Usuario {nombre} creado exitosamente.',
   cfg_users_success_updated: 'Usuario actualizado correctamente.',
+
+  // ROLES
   role_coordinador: 'Coordinador',
-role_gerente: 'Gerente de Proyecto',
-role_residente: 'Residente de Obra',
-role_bodeguero: 'Bodeguero',
-role_contador: 'Contador',
-role_lectura: 'Solo Lectura',
-role_client_admin: 'Administrador',
-role_super_admin: 'Super Admin',
+  role_gerente: 'Gerente de Proyecto',
+  role_residente: 'Residente de Obra',
+  role_bodeguero: 'Bodeguero',
+  role_contador: 'Contador',
+  role_lectura: 'Solo Lectura',
+  role_client_admin: 'Administrador',
+  role_super_admin: 'Super Admin',
 
-// ============================================================
-// INSTRUCCIONES DE INTEGRACIÓN
-// Copia las claves de cada bloque dentro del objeto ES {} y EN {}
-// correspondiente en tu archivo i18n.jsx
-// ============================================================
-
-// ─── AGREGAR AL OBJETO ES {} ────────────────────────────────
-
-  // AUTH — FORGOT PASSWORD
+  // AUTH
   auth_forgot_title: '¿Olvidaste tu contraseña?',
   auth_forgot_subtitle: 'Ingresa tu correo y te enviaremos un código de verificación.',
   auth_forgot_email_ph: 'usuario@empresa.com',
   auth_forgot_btn_send: 'Enviar código',
   auth_forgot_back: '← Volver al inicio de sesión',
   auth_forgot_success_title: 'Revisa tu correo',
-  auth_forgot_success_body: 'Enviamos un código de 6 dígitos a {email}. Puede tardar unos minutos.',
+  auth_forgot_success_body: 'Enviamos un código de 6 dígitos a {email}.',
   auth_forgot_btn_enter_code: 'Ingresar código',
-
-  // AUTH — VERIFY OTP
   auth_otp_title: 'Ingresa el código',
   auth_otp_subtitle: 'Enviamos un código de 6 dígitos a {email}',
   auth_otp_resend: 'Reenviar código',
@@ -504,8 +490,6 @@ role_super_admin: 'Super Admin',
   auth_otp_btn_verify: 'Verificar código',
   auth_otp_error_incomplete: 'Ingresa los 6 dígitos del código.',
   auth_otp_error_invalid: 'Código incorrecto o expirado. Intenta de nuevo.',
-
-  // AUTH — RESET PASSWORD
   auth_reset_title: 'Nueva contraseña',
   auth_reset_subtitle: 'Crea una contraseña segura para tu cuenta.',
   auth_reset_new_pw: 'Nueva contraseña',
@@ -521,52 +505,12 @@ role_super_admin: 'Super Admin',
   auth_reset_success_title: '¡Contraseña actualizada!',
   auth_reset_success_body: 'Tu contraseña fue cambiada exitosamente. Ya puedes iniciar sesión.',
   auth_reset_btn_login: 'Iniciar sesión',
-
-
-  // AUTH — FORGOT PASSWORD
-  auth_forgot_title: 'Forgot your password?',
-  auth_forgot_subtitle: 'Enter your email and we will send you a verification code.',
-  auth_forgot_email_ph: 'user@company.com',
-  auth_forgot_btn_send: 'Send code',
-  auth_forgot_back: '← Back to login',
-  auth_forgot_success_title: 'Check your email',
-  auth_forgot_success_body: 'We sent a 6-digit code to {email}. It may take a few minutes.',
-  auth_forgot_btn_enter_code: 'Enter code',
-
-  // AUTH — VERIFY OTP
-  auth_otp_title: 'Enter the code',
-  auth_otp_subtitle: 'We sent a 6-digit code to {email}',
-  auth_otp_resend: 'Resend code',
-  auth_otp_countdown: 'Resend in {n}s',
-  auth_otp_btn_verify: 'Verify code',
-  auth_otp_error_incomplete: 'Please enter all 6 digits.',
-  auth_otp_error_invalid: 'Incorrect or expired code. Please try again.',
-
-  // AUTH — RESET PASSWORD
-  auth_reset_title: 'New password',
-  auth_reset_subtitle: 'Create a strong password for your account.',
-  auth_reset_new_pw: 'New password',
-  auth_reset_confirm_pw: 'Confirm password',
-  auth_reset_btn_save: 'Save password',
-  auth_reset_mismatch: 'Passwords do not match.',
-  auth_reset_weak: 'Password must be at least 8 characters.',
-  auth_reset_error: 'An error occurred. Please try again.',
-  auth_reset_strength_weak: 'Weak',
-  auth_reset_strength_fair: 'Fair',
-  auth_reset_strength_good: 'Good',
-  auth_reset_strength_strong: 'Strong',
-  auth_reset_success_title: 'Password updated!',
-  auth_reset_success_body: 'Your password was changed successfully. You can now log in.',
-  auth_reset_btn_login: 'Log in',
-
 }
 
 /* ============================================================
-   🇺🇸 ENGLISH
+   ENGLISH
    ============================================================ */
 const EN = {
-
-  // COMMON
   lbl_select: '— Select —',
   lbl_status: 'Status',
   lbl_currency: 'Currency',
@@ -576,6 +520,7 @@ const EN = {
   lbl_date: 'Date',
   lbl_quantity: 'Quantity',
   lbl_unit: 'Unit',
+  lbl_total: 'Total',
   btn_save: 'Save',
   btn_add: 'Add',
   btn_edit: 'Edit',
@@ -616,7 +561,7 @@ const EN = {
   proy_form_title_new: 'New project',
   proy_form_title_edit: 'Edit project',
   proy_budget_label: 'Budget',
-  proy_delete_confirm: 'Delete this project? Its phases, budget and materials list will also be removed.',
+  proy_delete_confirm: 'Delete this project?',
   proy_fases_title: 'Project phases',
   proy_fase_add: '+ Phase',
   proy_fase_name: 'Phase name',
@@ -625,6 +570,13 @@ const EN = {
   proy_fase_cancel: 'Cancel',
   proy_detail_edit: 'Edit project',
   proy_detail_back: 'Back',
+
+  // PROJECT STATUSES
+  estado_planificacion: 'Planning',
+  estado_en_ejecucion:  'In Progress',
+  estado_pausado:       'On Hold',
+  estado_completado:    'Completed',
+  estado_cancelado:     'Cancelled',
 
   // BUDGET
   pres_title: 'Budget',
@@ -640,6 +592,9 @@ const EN = {
   pres_col_mat: 'Mat.',
   pres_col_eq: 'Equip.',
   pres_col_total: 'Total',
+  pres_col_uc: 'U.C.',
+  pres_grand_total: 'Grand Total',
+  pres_empty: 'No budget items',
   pres_form_parent_stage: 'Parent stage',
   pres_form_parent_sub: 'Parent sub-stage',
   pres_form_desc: 'Description',
@@ -651,17 +606,15 @@ const EN = {
   pres_form_eq: 'Equipment',
   pres_unit_total: 'Unit total',
   pres_total: 'Total',
+  pres_total_cost: 'Total cost',
   pres_delete_confirm: 'Delete this budget item?',
-pres_add_stage: '+ Etapa',
-  pres_add_substage: '+ Sub-etapa',
-  pres_add_activity: '+ Actividad',
-  pres_col_uc: 'C.U.',
-  pres_grand_total: 'Gran Total',
-  pres_empty: 'No hay ítems en el presupuesto',
-  pres_form_stage: 'Etapa',
-  pres_form_substage: 'Sub-etapa',
-  pres_form_activity: 'Actividad',
-  pres_total_cost: 'Costo total',
+  pres_add_stage: '+ Stage',
+  pres_add_substage: '+ Sub-stage',
+  pres_add_activity: '+ Activity',
+  pres_form_stage: 'Stage',
+  pres_form_substage: 'Sub-stage',
+  pres_form_activity: 'Activity',
+
   // INVENTORY
   inv_title: 'Inventory',
   inv_sub: '{n} materials registered',
@@ -693,6 +646,7 @@ pres_add_stage: '+ Etapa',
   inv_col_activity: 'Activity',
   inv_col_type: 'Type',
   inv_col_detail: 'Detail',
+  inv_col_invoice: 'Invoice',
   inv_critical_badge: 'Critical',
   inv_ok_badge: 'OK',
   inv_ok: 'OK',
@@ -731,18 +685,18 @@ pres_add_stage: '+ Etapa',
   inv_form_exit_title_edit: 'Edit exit',
   inv_del_entry_title: 'Delete entry',
   inv_del_exit_title: 'Delete exit',
-  inv_del_confirm_msg: 'The material stock will be adjusted automatically.',
+  inv_del_confirm_msg: 'Stock will be adjusted automatically.',
   inv_del_warning_title: 'Warning — Unsupported exits',
-  inv_del_warning_body: 'Deleting this entry will leave {n} exit(s) of {mat} without inventory support.',
+  inv_del_warning_body: 'Deleting this entry will leave {n} exit(s) of {mat} without support.',
   inv_del_entries_remaining: 'Remaining entries',
   inv_del_total_exits: 'Total registered exits',
   inv_del_what_to_do: 'What would you like to do?',
   inv_del_entry_and_exits: 'Delete entry + {n} affected exit(s)',
-  inv_del_entry_only: 'Delete entry only (stock will be inconsistent)',
- inv_del_mat_blocked_title: 'Cannot delete',
-  inv_del_mat_blocked: 'The material has {n} {u} in stock. First register the corresponding exits.',
+  inv_del_entry_only: 'Delete entry only',
+  inv_del_mat_blocked_title: 'Cannot delete',
+  inv_del_mat_blocked: 'The material has {n} {u} in stock.',
   inv_del_mat_title: 'Delete material',
-  inv_del_mat_msg: 'Delete "{mat}" from the catalog? Entry and exit records will be kept as history.',
+  inv_del_mat_msg: 'Delete "{mat}" from the catalog?',
 
   // BOM
   bom_form_save: 'Save material',
@@ -828,7 +782,7 @@ pres_add_stage: '+ Etapa',
   comp_detail_items: 'PO items',
   comp_pending_approval: 'Pending',
   comp_oc_approved_msg: 'PO approved',
-comp_requester_info: 'Requester information',
+  comp_requester_info: 'Requester information',
   comp_requester_name: 'Requester name',
   comp_requester_position: 'Position',
   comp_requester_dept: 'Department',
@@ -852,15 +806,8 @@ comp_requester_info: 'Requester information',
   comp_sol_priority_urgente: 'Urgent',
   comp_sol_email: 'Email',
   comp_sol_general_remarks: 'General remarks / Special instructions',
-  comp_sol_folio: 'Folio',
-  comp_sol_req_date: 'Required date',
-  comp_sol_priority: 'Priority',
-  comp_sol_priority_normal: 'Normal',
-  comp_sol_priority_alta: 'High',
-  comp_sol_priority_urgente: 'Urgent',
-  comp_sol_email: 'Email',
-  comp_sol_general_remarks: 'General remarks / Special instructions',
   comp_sol_general_remarks_ph: 'Delivery instructions, special conditions...',
+
   // FINANCIAL
   fin_tab_direct: 'Direct Costs',
   fin_tab_payroll: 'Payroll',
@@ -873,12 +820,12 @@ comp_requester_info: 'Requester information',
   fin_materials: 'Materials',
   fin_payroll: 'Payroll',
   fin_subcontracts: 'Subcontracts',
-  fin_empty:              'No records in this module',
-  fin_empty_payroll:      'No payroll records',
+  fin_empty: 'No records in this module',
+  fin_empty_payroll: 'No payroll records',
   fin_empty_subcontracts: 'No subcontracts registered',
-  fin_empty_equipment:    'No equipment registered',
-  fin_empty_indirect:     'No administration records',
-  fin_empty_direct:       'No contingencies registered',
+  fin_empty_equipment: 'No equipment registered',
+  fin_empty_indirect: 'No administration records',
+  fin_empty_direct: 'No contingencies registered',
   fin_col_date: 'Date',
   fin_col_type: 'Type',
   fin_col_desc: 'Description',
@@ -931,16 +878,8 @@ comp_requester_info: 'Requester information',
   fin_petty: 'Petty cash',
   fin_eq_rental: 'Rental',
   fin_eq_owned: 'Owned',
-  lbl_total: 'Total',
 
-  // PROJECT STATUSES
-  estado_planificacion: 'Planning',
-  estado_en_ejecucion:  'In Progress',
-  estado_pausado:       'On Hold',
-  estado_completado:    'Completed',
-  estado_cancelado:     'Cancelled',
-
-  // REPORTS — corrected categories
+  // REPORTS — categories
   rep_cat_materiales:   'Materials',
   rep_cat_imprevistos:  'Contingencies',
   rep_cat_nomina:       'Payroll',
@@ -948,6 +887,8 @@ comp_requester_info: 'Requester information',
   rep_cat_equipos:      'Equipment',
   rep_cat_admin:        'Administration',
 
+  // S CURVE
+  curva_title: 'S Curve',
   curva_select_project: 'Project',
   curva_by_month: 'By month',
   curva_by_week: 'By week',
@@ -998,7 +939,7 @@ comp_requester_info: 'Requester information',
   config_save: 'Save settings',
   config_saved: '✓ Settings saved',
 
-// USER MANAGEMENT
+  // USER MANAGEMENT
   cfg_users_title: 'User Management',
   cfg_users_sub: 'Company users',
   cfg_users_new: '+ New user',
@@ -1013,7 +954,7 @@ comp_requester_info: 'Requester information',
   cfg_users_deactivate: 'Deactivate',
   cfg_users_activate: 'Activate',
   cfg_users_your_account: 'Your account',
-  cfg_users_limit_reached: 'You have reached your plan user limit. Contact MPS to upgrade your subscription.',
+  cfg_users_limit_reached: 'You have reached your plan user limit.',
   cfg_users_plan: 'Active plan',
   cfg_users_limit: 'Users',
   cfg_users_max_projects: 'Max projects',
@@ -1023,69 +964,30 @@ comp_requester_info: 'Requester information',
   cfg_users_form_email: 'Email',
   cfg_users_form_email_locked: 'Email cannot be modified.',
   cfg_users_form_password: 'Temporary password',
-  cfg_users_form_password_hint: 'Leave empty to send an activation email to the user.',
+  cfg_users_form_password_hint: 'Leave empty to send an activation email.',
   cfg_users_form_role: 'Role',
   cfg_users_success_created: 'User {nombre} created successfully.',
   cfg_users_success_updated: 'User updated successfully.',
-  role_coordinador: 'Project Coordinator',
-role_gerente: 'Project Manager',
-role_residente: 'Site Supervisor',
-role_bodeguero: 'Warehouse Manager',
-role_contador: 'Accountant',
-role_lectura: 'Read Only',
-role_client_admin: 'Administrator',
-role_super_admin: 'Super Admin',
 
-// AUTH — FORGOT PASSWORD
-  auth_forgot_title: '¿Olvidaste tu contraseña?',
-  auth_forgot_subtitle: 'Ingresa tu correo y te enviaremos un código de verificación.',
-  auth_forgot_email_ph: 'usuario@empresa.com',
-  auth_forgot_btn_send: 'Enviar código',
-  auth_forgot_back: '← Volver al inicio de sesión',
-  auth_forgot_success_title: 'Revisa tu correo',
-  auth_forgot_success_body: 'Enviamos un código de 6 dígitos a {email}. Puede tardar unos minutos.',
-  auth_forgot_btn_enter_code: 'Ingresar código',
- 
-  // AUTH — VERIFY OTP
-  auth_otp_title: 'Ingresa el código',
-  auth_otp_subtitle: 'Enviamos un código de 6 dígitos a {email}',
-  auth_otp_resend: 'Reenviar código',
-  auth_otp_countdown: 'Reenviar en {n}s',
-  auth_otp_btn_verify: 'Verificar código',
-  auth_otp_error_incomplete: 'Ingresa los 6 dígitos del código.',
-  auth_otp_error_invalid: 'Código incorrecto o expirado. Intenta de nuevo.',
- 
-  // AUTH — RESET PASSWORD
-  auth_reset_title: 'Nueva contraseña',
-  auth_reset_subtitle: 'Crea una contraseña segura para tu cuenta.',
-  auth_reset_new_pw: 'Nueva contraseña',
-  auth_reset_confirm_pw: 'Confirmar contraseña',
-  auth_reset_btn_save: 'Guardar contraseña',
-  auth_reset_mismatch: 'Las contraseñas no coinciden.',
-  auth_reset_weak: 'La contraseña debe tener al menos 8 caracteres.',
-  auth_reset_error: 'Ocurrió un error. Intenta de nuevo.',
-  auth_reset_strength_weak: 'Débil',
-  auth_reset_strength_fair: 'Regular',
-  auth_reset_strength_good: 'Buena',
-  auth_reset_strength_strong: 'Fuerte',
-  auth_reset_success_title: '¡Contraseña actualizada!',
-  auth_reset_success_body: 'Tu contraseña fue cambiada exitosamente. Ya puedes iniciar sesión.',
-  auth_reset_btn_login: 'Iniciar sesión',
- 
- 
-// ─── AGREGAR AL OBJETO EN {} ────────────────────────────────
- 
-  // AUTH — FORGOT PASSWORD
+  // ROLES
+  role_coordinador: 'Project Coordinator',
+  role_gerente: 'Project Manager',
+  role_residente: 'Site Supervisor',
+  role_bodeguero: 'Warehouse Manager',
+  role_contador: 'Accountant',
+  role_lectura: 'Read Only',
+  role_client_admin: 'Administrator',
+  role_super_admin: 'Super Admin',
+
+  // AUTH
   auth_forgot_title: 'Forgot your password?',
   auth_forgot_subtitle: 'Enter your email and we will send you a verification code.',
   auth_forgot_email_ph: 'user@company.com',
   auth_forgot_btn_send: 'Send code',
   auth_forgot_back: '← Back to login',
   auth_forgot_success_title: 'Check your email',
-  auth_forgot_success_body: 'We sent a 6-digit code to {email}. It may take a few minutes.',
+  auth_forgot_success_body: 'We sent a 6-digit code to {email}.',
   auth_forgot_btn_enter_code: 'Enter code',
- 
-  // AUTH — VERIFY OTP
   auth_otp_title: 'Enter the code',
   auth_otp_subtitle: 'We sent a 6-digit code to {email}',
   auth_otp_resend: 'Resend code',
@@ -1093,8 +995,6 @@ role_super_admin: 'Super Admin',
   auth_otp_btn_verify: 'Verify code',
   auth_otp_error_incomplete: 'Please enter all 6 digits.',
   auth_otp_error_invalid: 'Incorrect or expired code. Please try again.',
- 
-  // AUTH — RESET PASSWORD
   auth_reset_title: 'New password',
   auth_reset_subtitle: 'Create a strong password for your account.',
   auth_reset_new_pw: 'New password',
@@ -1146,7 +1046,8 @@ export function LangProvider({ children }) {
     </LangContext.Provider>
   )
 }
-export const useLang        = () => useContext(LangContext)
-export const useT           = () => useContext(LangContext).t
+
+export const useLang          = () => useContext(LangContext)
+export const useT             = () => useContext(LangContext).t
 export const LanguageProvider = LangProvider
 export const useLanguage      = useLang

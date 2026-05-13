@@ -6,7 +6,25 @@ import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls } from '../components'
 
 const ESTADOS_PROYECTO = ['planificacion','en_ejecucion','pausado','completado','cancelado']
-const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', pais:'', moneda:'USD', fecha_inicio:today(), fecha_fin_estimada:'', estado:'planificacion' })
+
+const PAISES_AMERICA = [
+  'Argentina','Belice','Bolivia','Brasil','Canadá','Chile','Colombia','Costa Rica',
+  'Cuba','Ecuador','El Salvador','Estados Unidos','Guatemala','Guyana','Haití',
+  'Honduras','Jamaica','México','Nicaragua','Panamá','Paraguay','Perú',
+  'República Dominicana','Trinidad y Tobago','Uruguay','Venezuela'
+]
+
+const ESTADOS_USA = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada',
+  'New Hampshire','New Jersey','New Mexico','New York','North Carolina',
+  'North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island',
+  'South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
+  'Virginia','Washington','West Virginia','Wisconsin','Wyoming'
+]
+const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', pais:'', estado_usa:'', moneda:'USD', fecha_inicio:today(), fecha_fin_estimada:'', estado:'planificacion' })
 
 export default function Proyectos({ onNavigate }) {
   const { state, dispatch } = useStore()
@@ -194,12 +212,12 @@ export default function Proyectos({ onNavigate }) {
               <div key={p.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <span className="text-xs font-mono text-gray-400">{p.project_code}</span>
-                  <Badge estado={p.estado} label={t(`estado_${p.estado}`)} />
+                  <Badge estado={p.estado} />
                 </div>
                 <h3 className="font-semibold text-gray-800 text-sm mb-1">{p.nombre}</h3>
                 {p.cliente_externo && <p className="text-xs text-gray-500 mb-3">{p.cliente_externo}</p>}
                 <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
-                  <span>{p.ciudad}{p.ciudad && p.pais ? ', ' : ''}{p.pais}</span>
+                  <span>{p.ciudad}{p.ciudad && (p.estado_usa||p.pais) ? ', ' : ''}{p.estado_usa || p.pais}</span>
                   {(p.ciudad || p.pais) && <span>·</span>}
                   <span>{p.moneda}</span>
                 </div>
@@ -236,12 +254,14 @@ export default function Proyectos({ onNavigate }) {
             <div className="p-6 flex flex-col gap-5">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  [t('lbl_status'),        <Badge estado={proyecto.estado} label={t(`estado_${proyecto.estado}`)} />],
+                  [t('lbl_status'),        <Badge estado={proyecto.estado} />],
                   [t('lbl_currency'),      proyecto.moneda],
                   [t('lbl_client'),        proyecto.cliente_externo || '—'],
                   [t('proy_form_city'),    proyecto.ciudad || '—'],
                   [t('proy_form_start'),   proyecto.fecha_inicio],
                   [t('proy_form_end'),     proyecto.fecha_fin_estimada || '—'],
+                  [isEs ? 'País' : 'Country', proyecto.pais || '—'],
+                  ...(proyecto.estado_usa ? [[isEs ? 'Estado (EE.UU.)' : 'State (USA)', proyecto.estado_usa]] : []),
                   [t('proy_budget_label'), new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
                 ].map(([k,v]) => (
                   <div key={k}>
@@ -328,9 +348,23 @@ export default function Proyectos({ onNavigate }) {
             <input className={inputCls} value={form.ciudad} onChange={set('ciudad')} placeholder="Sacramento" />
           </Field>
           <Field label={t('proy_form_country')}>
-            <input className={inputCls} value={form.pais} onChange={set('pais')} placeholder="EE.UU." />
+            <select className={selectCls} value={form.pais} onChange={e => {
+              const val = e.target.value
+              setForm(f => ({ ...f, pais: val, estado_usa: '' }))
+            }}>
+              <option value="">— {t('lbl_select')} —</option>
+              {PAISES_AMERICA.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
           </Field>
         </div>
+        {form.pais === 'Estados Unidos' && (
+          <Field label={isEs ? 'Estado (EE.UU.)' : 'State (USA)'}>
+            <select className={selectCls} value={form.estado_usa||''} onChange={set('estado_usa')}>
+              <option value="">— {t('lbl_select')} —</option>
+              {ESTADOS_USA.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label={t('proy_form_address')}>
           <input className={inputCls} value={form.direccion} onChange={set('direccion')} placeholder={t('proy_form_address')} />
         </Field>

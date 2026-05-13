@@ -707,7 +707,7 @@ export default function Reportes() {
       ],
       actividades, totalReal, dirs, noms, subs, eqs, inds
     }
-  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos])
+  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -907,7 +907,7 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
 }
 
 function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, budget, moneda, fmt, fmtNum }) {
-  const { lang } = useContext(LangContext)
+  const { lang, t } = useContext(LangContext)
   const isEs = lang === 'ES'
   const proyId=proy?.id
   const thS={background:BRAND}
@@ -931,7 +931,7 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <p className="text-sm font-semibold text-gray-700 mb-3">{isEs?'Información del proyecto':'Project information'}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          {[[isEs?'Código':'Code',proy?.project_code],[isEs?'Cliente':'Client',proy?.cliente_externo||'—'],[isEs?'Estado':'Status',proy?.estado],[isEs?'Moneda':'Currency',moneda],[isEs?'Inicio':'Start',proy?.fecha_inicio||'—'],[isEs?'Fin est.':'Est. end',proy?.fecha_fin_estimada||'—'],[isEs?'Ciudad':'City',proy?.ciudad||'—'],[isEs?'País':'Country',proy?.pais||'—']].map(([k,v],i)=>(
+          {[[isEs?'Código':'Code',proy?.project_code],[isEs?'Cliente':'Client',proy?.cliente_externo||'—'],[isEs?'Estado':'Status',t(`estado_${proy?.estado}`)],[isEs?'Moneda':'Currency',moneda],[isEs?'Inicio':'Start',proy?.fecha_inicio||'—'],[isEs?'Fin est.':'Est. end',proy?.fecha_fin_estimada||'—'],[isEs?'Ciudad':'City',proy?.ciudad||'—'],[isEs?'País':'Country',proy?.pais||'—']].map(([k,v],i)=>(
             <div key={i}><p className="text-xs text-gray-400">{k}</p><p className="font-medium text-gray-700">{v}</p></div>
           ))}
         </div>
