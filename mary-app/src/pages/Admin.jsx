@@ -228,6 +228,8 @@ export default function Admin() {
 )
 const result = await res.json()
 if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
+        showSuccess(isEs ? `Usuario ${form.nombre} creado.` : `User ${form.nombre} created.`)
+      }
       await loadAll(); setDrawer(null)
     } catch (e) { setError(e.message) }
     setSaving(false)
@@ -562,4 +564,5 @@ if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
     </div>
   )
 }
+
 
