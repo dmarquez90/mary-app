@@ -1,6 +1,7 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
 import { supabase } from './supabase'
 import { uuid, genProjectCode, genOCCode, genBudgetCode, today } from './utils'
+import { tStatic } from './i18n'
 
 const INIT = {
   proyectos: [], fases: [], presupuesto: [],
@@ -211,7 +212,7 @@ export function StoreProvider({ children, tenantId }) {
       case 'ADD_MATERIAL': {
         const existe = state.materiales.find(m => m.codigo === action.payload.codigo && m.activo !== false)
         if (existe) {
-          alert('Error: El código de material ya existe.')
+          alert(tStatic('store_material_code_exists'))
           return
         }
         const stockInicial = parseFloat(action.payload.stock_actual) || 0
