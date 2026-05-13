@@ -927,7 +927,7 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <p className="text-sm font-semibold text-gray-700 mb-3">{t('rep_project_info')}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          {[[t('rep_proj_code'),proy?.project_code],[t('rep_proj_client'),proy?.cliente_externo||'—'],[t('rep_proj_status'),proy?.estado],[t('rep_proj_currency'),moneda],[t('rep_proj_start'),proy?.fecha_inicio||'—'],[t('rep_proj_end_est'),proy?.fecha_fin_estimada||'—'],[t('rep_proj_city'),proy?.ciudad||'—'],[t('rep_proj_country'),proy?.pais||'—']].map(([k,v],i)=>(
+          {[[t('rep_proj_code'),proy?.project_code],[t('rep_proj_client'),proy?.cliente_externo||'—'],[t('rep_proj_status'),proy?.estado?t(`estado_${proy.estado}`):'—'],[t('rep_proj_currency'),moneda],[t('rep_proj_start'),proy?.fecha_inicio||'—'],[t('rep_proj_end_est'),proy?.fecha_fin_estimada||'—'],[t('rep_proj_city'),proy?.ciudad||'—'],[t('rep_proj_country'),proy?.pais||'—']].map(([k,v],i)=>(
             <div key={i}><p className="text-xs text-gray-400">{k}</p><p className="font-medium text-gray-700">{v}</p></div>
           ))}
         </div>
