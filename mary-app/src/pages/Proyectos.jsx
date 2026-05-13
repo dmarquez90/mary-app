@@ -9,7 +9,7 @@ const ESTADOS_PROYECTO = ['planificacion','en_ejecucion','pausado','completado',
 
 const PAISES_AMERICA = [
   'Argentina','Belice','Bolivia','Brasil','Canadá','Chile','Colombia','Costa Rica',
-  'Cuba','Ecuador','El Salvador','Estados Unidos','Guatemala','Guyana','Haití',
+  'Cuba','Ecuador','El Salvador','United States','Guatemala','Guyana','Haití',
   'Honduras','Jamaica','México','Nicaragua','Panamá','Paraguay','Perú',
   'República Dominicana','Trinidad y Tobago','Uruguay','Venezuela'
 ]
@@ -357,7 +357,7 @@ export default function Proyectos({ onNavigate }) {
             </select>
           </Field>
         </div>
-        {form.pais === 'Estados Unidos' && (
+        {form.pais === 'United States' && (
           <Field label={isEs ? 'Estado (EE.UU.)' : 'State (USA)'}>
             <select className={selectCls} value={form.estado_usa||''} onChange={set('estado_usa')}>
               <option value="">— {t('lbl_select')} —</option>
