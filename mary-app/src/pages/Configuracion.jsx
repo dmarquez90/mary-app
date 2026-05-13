@@ -1,6 +1,5 @@
 import { useState, useEffect, useContext } from 'react'
 import { supabase } from '../supabase'
-import { supabaseAdmin } from '../supabaseAdmin'
 import { useAuth } from '../auth'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
@@ -70,17 +69,20 @@ export default function Configuracion() {
         await supabase.from('usuarios').update({ nombre:form.nombre, rol:form.rol, activo:form.activo }).eq('id', form.id)
         showSuccess(t('cfg_users_success_updated'))
       } else {
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: form.email,
-          password: form.password?.length >= 6 ? form.password : Math.random().toString(36).slice(-10)+'A1!',
-          email_confirm: true,
-        })
-        if (authError) throw authError
-        await supabase.from('usuarios').insert({
-          id: authData.user.id, tenant_id: perfil.tenant_id,
-          nombre: form.nombre, email: form.email, rol: form.rol,
-          activo: true, creado_por: perfil.id,
-        })
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ email: form.email, password: form.password, nombre: form.nombre, rol: form.rol, tenant_id: perfil.tenant_id })
+          }
+        )
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
         showSuccess(t('cfg_users_success_created', { nombre: form.nombre }))
       }
       await loadData(); setDrawer(null)

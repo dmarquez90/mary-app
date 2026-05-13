@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
-import { supabaseAdmin } from '../supabaseAdmin'
 import { useAuth } from '../auth'
 import maryLogo from '../assets/mary-logo.png'
 
@@ -209,21 +208,26 @@ export default function Admin() {
         }).eq('id', form.id)
         showSuccess(isEs ? 'Usuario actualizado.' : 'User updated.')
       } else {
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email:         form.email,
-          password:      form.password && form.password.length >= 6
-                           ? form.password
-                           : Math.random().toString(36).slice(-10) + 'A1!',
-          email_confirm: true,
-        })
-        if (authError) throw authError
-        await supabase.from('usuarios').insert({
-          id: authData.user.id, tenant_id: form.tenant_id,
-          nombre: form.nombre, email: form.email, rol: form.rol,
-          activo: true, creado_por: perfil?.id,
-        })
-        showSuccess(isEs ? `Usuario ${form.nombre} creado.` : `User ${form.nombre} created.`)
-      }
+        const res = await fetch(
+  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      email: form.email,
+      password: form.password && form.password.length >= 6 ? form.password : Math.random().toString(36).slice(-10) + 'A1!',
+      nombre: form.nombre,
+      rol: form.rol,
+      tenant_id: form.tenant_id
+    })
+  }
+)
+const result = await res.json()
+if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
       await loadAll(); setDrawer(null)
     } catch (e) { setError(e.message) }
     setSaving(false)
@@ -558,3 +562,4 @@ export default function Admin() {
     </div>
   )
 }
+

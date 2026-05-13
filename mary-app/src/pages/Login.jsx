@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
-import { supabaseAdmin } from '../supabaseAdmin'
 
 const PAISES = [
   'Estados Unidos','México','Guatemala','El Salvador','Honduras','Nicaragua',
@@ -485,55 +484,21 @@ export default function Login({ onNavigate }) {
     }
     setRegLoading(true)
     try {
-      const { data: empresaExistente } = await supabase
-        .from('tenants').select('id').ilike('nombre_empresa', reg.empresa).maybeSingle()
-      if (empresaExistente) { setRegError(t.err_company_taken); setRegLoading(false); return }
-
-      const ahora    = new Date()
-      const trialFin = new Date(ahora)
-      trialFin.setDate(trialFin.getDate() + 60)
-
-      const { data: tenant, error: tenantError } = await supabase
-        .from('tenants').insert({
-          nombre_empresa: reg.empresa,
-          plan:           'pro',
-          max_usuarios:   15,
-          max_proyectos:  10,
-          activo:         true,
-          es_trial:       true,
-          trial_inicio:   ahora.toISOString(),
-          trial_fin:      trialFin.toISOString(),
-          telefono:       reg.telefono,
-          pais:           reg.pais,
-          fecha_creacion: ahora.toISOString(),
-        }).select().single()
-
-      if (tenantError) throw tenantError
-
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email:         reg.email,
-        password:      reg.password,
-        email_confirm: true,
-      })
-
-      if (authError) {
-        await supabase.from('tenants').delete().eq('id', tenant.id)
-        if (authError.message?.includes('already registered') || authError.message?.includes('already exists')) {
-          setRegError(t.err_email_taken)
-        } else { throw authError }
-        setRegLoading(false); return
+      // Crear tenant y usuario via Edge Function segura
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-trial`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais })
+        }
+      )
+      const result = await res.json()
+      if (!res.ok) {
+        if (result.error === 'company_taken') { setRegError(t.err_company_taken); setRegLoading(false); return }
+        if (result.error === 'email_taken') { setRegError(t.err_email_taken); setRegLoading(false); return }
+        throw new Error(result.error || 'Error al crear la cuenta.')
       }
-
-      await supabase.from('usuarios').insert({
-        id:                    authData.user.id,
-        tenant_id:             tenant.id,
-        nombre:                reg.nombre,
-        email:                 reg.email,
-        rol:                   'client_admin',
-        activo:                true,
-        terminos_aceptados:    true,
-        fecha_terminos:        ahora.toISOString(),
-      })
 
       setRegSuccess(true)
       setReg({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
