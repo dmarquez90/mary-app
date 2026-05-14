@@ -192,6 +192,7 @@ export default function Compras() {
   const saveSol = () => {
     if (!form.proyecto_id) return
     const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre || i.mat_pres_id) && i.cantidad)
+    if (!validItems.length) return
     dispatch({ type: 'ADD_SOLICITUD', payload: {
       solicitud: {
         proyecto_id:             form.proyecto_id,
@@ -206,10 +207,18 @@ export default function Compras() {
         prioridad:               form.prioridad || 'normal',
         observaciones_generales: form.observaciones_generales || '',
       },
-      items: validItems
+      items: validItems.map(it => ({
+        material_id:   it.material_id || null,
+        descripcion:   it.descripcion_libre || (activos.find(m=>m.id===it.material_id)?.descripcion) || '',
+        cantidad:      parseFloat(it.cantidad || 0),
+        unidad:        it.unidad || 'und',
+        actividad_id:  it.actividad_id || null,
+        es_adicional:  it.es_adicional || false,
+        observaciones: it.observaciones || '',
+      }))
     }})
     setDrawer(null)
-    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'' }])
   }
 
   const [ocItems, setOcItems] = useState([])
@@ -260,7 +269,7 @@ export default function Compras() {
   const detOC      = ordenes_compra.find(oc => oc.id === detail)
   const detOCItems = detOC ? solicitud_items.filter(i => i.solicitud_id === detOC.solicitud_id) : []
 
-  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'' }])
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
@@ -531,19 +540,37 @@ export default function Compras() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
                   {solItems.length > 1 && (
-                    <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕ Remove</button>
+                    <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
                   )}
                 </div>
+
+                {/* Buscar en catálogo O escribir libremente */}
                 <MaterialSearchInput
                   materiales={activos}
                   value={it.material_id}
                   onChange={v => {
                     const mat = activos.find(m => m.id === v)
                     setSolItem(idx, 'material_id', v)
-                    if (mat) setSolItem(idx, 'unidad', mat.unidad || 'und')
+                    if (mat) {
+                      setSolItem(idx, 'unidad', mat.unidad || 'und')
+                      setSolItem(idx, 'descripcion_libre', mat.descripcion)
+                    } else {
+                      setSolItem(idx, 'descripcion_libre', '')
+                    }
                   }}
                   placeholder={t('inv_form_material') + '...'}
                 />
+
+                {/* Campo libre — siempre visible si no hay material del catálogo */}
+                {!it.material_id && (
+                  <input className={inputCls}
+                    placeholder={t('btn_cancel') === 'Cancel'
+                      ? 'Or write description freely (e.g.: Pencil, Cleaning service...)'
+                      : 'O escribe libremente (ej: Lápiz, Servicio de limpieza...)'}
+                    value={it.descripcion_libre||''}
+                    onChange={e => setSolItem(idx, 'descripcion_libre', e.target.value)} />
+                )}
+
                 <div className="flex gap-2">
                   <input type="number"
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B]"
@@ -556,14 +583,26 @@ export default function Compras() {
                     placeholder={t('lbl_unit')}
                     value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
                 </div>
+
                 {form.proyecto_id && (
                   <select className={selectCls} value={it.actividad_id||''} onChange={e=>setSolItem(idx,'actividad_id',e.target.value)}>
                     <option value="">— {t('comp_form_activity')} ({t('btn_cancel') === 'Cancel' ? 'optional' : 'opcional'}) —</option>
                     {todasActsDelProy.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
                   </select>
                 )}
+
+                {/* Marcar como adicional si no viene del presupuesto */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" className="w-3.5 h-3.5 accent-[#1B3A6B]"
+                    checked={it.es_adicional||false}
+                    onChange={e=>setSolItem(idx,'es_adicional',e.target.checked)}/>
+                  <span className="text-xs text-gray-500">
+                    {t('btn_cancel') === 'Cancel' ? 'Additional (not in budget)' : 'Adicional (no estaba en presupuesto)'}
+                  </span>
+                </label>
+
                 <input className={inputCls}
-                  placeholder={t('lbl_notes') + (t('btn_cancel') === 'Cancel' ? ' / Remarks (optional)' : ' / Observaciones (opcional)')}
+                  placeholder={t('lbl_notes') + (t('btn_cancel') === 'Cancel' ? ' (optional)' : ' (opcional)')}
                   value={it.observaciones||''} onChange={e=>setSolItem(idx,'observaciones',e.target.value)}/>
               </div>
             ))}
@@ -754,7 +793,10 @@ export default function Compras() {
               return (
                 <div key={it.id} className="py-2 border-b border-gray-50">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-700">{m?.codigo} — {m?.descripcion || '—'}</span>
+                    <span className="text-gray-700 flex items-center gap-1.5">
+                      {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
+                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{t('btn_cancel')==='Cancel'?'Additional':'Adicional'}</span>}
+                    </span>
                     <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
                   </div>
                   {act && <p className="text-xs text-gray-400 mt-0.5">{act.code} — {act.descripcion}</p>}
@@ -923,7 +965,7 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
               <tr key={it.id} style={{ background: idx%2===0 ? '#fff' : '#F8FAFC' }}>
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
                 <td style={{ ...cell, fontFamily:'monospace' }}>{m?.codigo || '—'}</td>
-                <td style={cell}>{m?.descripcion || '—'}</td>
+                <td style={cell}>{m?.descripcion || it.descripcion || '—'}{it.es_adicional ? ' *' : ''}</td>
                 <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
                 <td style={{ ...cell, textAlign:'center', fontWeight:'bold' }}>{it.cantidad}</td>
                 <td style={{ ...cell, fontSize:'10px' }}>{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
