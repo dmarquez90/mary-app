@@ -190,8 +190,8 @@ export default function Compras() {
   }
 
   const saveSol = () => {
-    if (!form.proyecto_id || solItems.every(i => !i.material_id)) return
-    const validItems = solItems.filter(i => i.material_id && i.cantidad)
+    if (!form.proyecto_id) return
+    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre || i.mat_pres_id) && i.cantidad)
     dispatch({ type: 'ADD_SOLICITUD', payload: {
       solicitud: {
         proyecto_id:             form.proyecto_id,
@@ -576,7 +576,7 @@ export default function Compras() {
 
         <div className="flex gap-2 mt-auto pt-2">
           <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>!i.material_id||!i.cantidad)} className="flex-1">
+          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>(!i.material_id&&!i.descripcion_libre&&!i.mat_pres_id)||!i.cantidad)} className="flex-1">
             {t('comp_form_submit')}
           </PrimaryBtn>
         </div>
@@ -1167,3 +1167,4 @@ function PrintOC({ doc, materiales, presupuesto, t }) {
     </div>
   )
 }
+
