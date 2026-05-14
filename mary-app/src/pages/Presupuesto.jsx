@@ -5,11 +5,12 @@ import { usePermissions } from '../usePermissions'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
+
 const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unidad:'m²', cantidad:'', costo_mo:'', costo_materiales:'', costo_equipos:'' })
 
 export default function Presupuesto() {
   const { state, dispatch } = useStore()
-  const { t, lang } = useContext(LangContext) // Extraemos lang para el idioma
+  const { t, lang } = useContext(LangContext)
   const { can } = usePermissions()
   const { proyectos, presupuesto } = state
 
@@ -20,7 +21,7 @@ export default function Presupuesto() {
   const [selected, setSelected]     = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  const isEs = lang === 'ES' // Variable para verificar si el idioma es español
+  const isEs = lang === 'ES'
   const puedeEditar = can('presupuesto_editar')
 
   const proy   = proyectos.find(p => p.id === proyId)
@@ -44,7 +45,7 @@ export default function Presupuesto() {
       const sel = items.find(i => i.id === selected)
       if (sel) {
         if (tipo === 'sub_etapa') f.parent_id = sel.tipo==='etapa' ? sel.id : sel.tipo==='sub_etapa' ? sel.parent_id : items.find(i=>i.id===sel.parent_id)?.parent_id || ''
-        if (tipo === 'actividad') f.parent_id = sel.tipo==='sub_etapa' ? sel.id : sel.tipo==='actividad' ? sel.parent_id : ''
+        if (tipo === 'actividad') f.parent_id = sel.tipo==='sub_etapa' ? sel.id : sel.tipo==='actividad' ? sel.parent_id : sel.tipo==='etapa' ? sel.id : ''
       }
     }
     setForm(f); setEditing(null); setDrawer(true)
@@ -65,6 +66,7 @@ export default function Presupuesto() {
 
   const save = () => {
     if (!form.descripcion) return
+    // Actividad y sub-etapa requieren parent; etapa no
     if (form.tipo !== 'etapa' && !form.parent_id) return
     if (editing) {
       dispatch({ type:'UPD_BUDGET', payload: {
@@ -124,7 +126,8 @@ export default function Presupuesto() {
                 <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#185FA5'}}/>
                 {t('pres_add_substage')}
               </TBtn>
-              <TBtn onClick={() => openAdd('actividad')} disabled={substages.length===0}>
+              {/* ← CAMBIO: actividad habilitada apenas haya una etapa */}
+              <TBtn onClick={() => openAdd('actividad')} disabled={stages.length===0}>
                 <span className="w-2 h-2 rounded-sm inline-block mr-1 bg-gray-400"/>
                 {t('pres_add_activity')}
               </TBtn>
@@ -137,9 +140,12 @@ export default function Presupuesto() {
               <span className="font-semibold font-mono text-sm" style={{color:'#1D9E75'}}>{fmt(grandTotal, moneda)}</span>
             </div>
           </div>
-{puedeEditar && !closed && (
-  <ImportarPresupuesto proyId={proyId} moneda={moneda} onDone={() => setSelected(null)} />
-)}
+
+          {/* ← IMPORTAR DESDE EXCEL */}
+          {puedeEditar && !closed && (
+            <ImportarPresupuesto proyId={proyId} moneda={moneda} onDone={() => setSelected(null)} />
+          )}
+
           {flat.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-xl rounded-t-none py-16">
               <EmptyState icon={Icons.table} title={t('pres_empty')} subtitle={t('pres_empty_sub')}
@@ -217,11 +223,19 @@ export default function Presupuesto() {
               </select>
             </Field>
           )}
+          {/* ← CAMBIO: actividad puede tener como parent una sub-etapa O una etapa directamente */}
           {form.tipo==='actividad' && !editing && (
             <Field label={t('pres_form_parent_sub')} required>
               <select className={selectCls} value={form.parent_id} onChange={set('parent_id')}>
                 <option value="">{t('lbl_select')}</option>
-                {substages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
+                {substages.length > 0 && (
+                  <optgroup label="Sub-etapas">
+                    {substages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
+                  </optgroup>
+                )}
+                <optgroup label="Etapas (sin sub-etapa)">
+                  {stages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
+                </optgroup>
               </select>
             </Field>
           )}
@@ -236,8 +250,8 @@ export default function Presupuesto() {
                   <select className={selectCls} value={form.unidad} onChange={set('unidad')}>
                     {UNIDADES.map(u => (
                       <option key={u} value={u}>
-                        {u === 'LF' 
-                          ? (isEs ? 'LF — Pie lineal' : 'LF — Linear Foot') 
+                        {u === 'LF'
+                          ? (isEs ? 'LF — Pie lineal' : 'LF — Linear Foot')
                           : u}
                       </option>
                     ))}
