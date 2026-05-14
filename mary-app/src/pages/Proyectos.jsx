@@ -2,7 +2,7 @@ import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal } from '../utils'
+import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal, PAIS_MONEDA } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls } from '../components'
 
 const ESTADOS_PROYECTO = ['planificacion','en_ejecucion','pausado','completado','cancelado']
@@ -349,8 +349,9 @@ export default function Proyectos({ onNavigate }) {
           </Field>
           <Field label={t('proy_form_country')}>
             <select className={selectCls} value={form.pais} onChange={e => {
-              const val = e.target.value
-              setForm(f => ({ ...f, pais: val, estado_usa: '' }))
+              const pais = e.target.value
+              const moneda = PAIS_MONEDA[pais] || form.moneda || 'USD'
+              setForm(f => ({ ...f, pais, estado_usa: '', moneda }))
             }}>
               <option value="">— {t('lbl_select')} —</option>
               {PAISES_AMERICA.map(p => <option key={p} value={p}>{p}</option>)}

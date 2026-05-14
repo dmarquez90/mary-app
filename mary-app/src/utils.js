@@ -1,12 +1,87 @@
 export const uuid = () => crypto.randomUUID()
 
-export const fmt = (n, moneda = 'USD') => {
-  const currency = ['USD','NIO','COP','GTQ','PEN','MXN'].includes(moneda) ? moneda : 'USD'
-  return new Intl.NumberFormat('es-US', { style:'currency', currency, minimumFractionDigits:2 }).format(n || 0)
+// Mapa de países a moneda
+export const PAIS_MONEDA = {
+  'Argentina':             'ARS',
+  'Belice':                'BZD',
+  'Bolivia':               'BOB',
+  'Brasil':                'BRL',
+  'Canadá':                'CAD',
+  'Chile':                 'CLP',
+  'Colombia':              'COP',
+  'Costa Rica':            'CRC',
+  'Cuba':                  'CUP',
+  'Ecuador':               'USD',
+  'El Salvador':           'USD',
+  'United States':         'USD',
+  'Guatemala':             'GTQ',
+  'Guyana':                'GYD',
+  'Haití':                 'HTG',
+  'Honduras':              'HNL',
+  'Jamaica':               'JMD',
+  'México':                'MXN',
+  'Nicaragua':             'NIO',
+  'Panamá':                'USD',
+  'Paraguay':              'PYG',
+  'Perú':                  'PEN',
+  'República Dominicana':  'DOP',
+  'Trinidad y Tobago':     'TTD',
+  'Uruguay':               'UYU',
+  'Venezuela':             'VES',
 }
 
+// Símbolo de moneda
+export const MONEDA_SIMBOLO = {
+  USD: '$',
+  NIO: 'C$',
+  COP: '$',
+  GTQ: 'Q',
+  PEN: 'S/',
+  MXN: '$',
+  CRC: '₡',
+  HNL: 'L',
+  DOP: 'RD$',
+  BRL: 'R$',
+  ARS: '$',
+  CLP: '$',
+  BOB: 'Bs.',
+  PYG: '₲',
+  UYU: '$U',
+  CAD: 'CA$',
+  VES: 'Bs.S',
+  BZD: 'BZ$',
+  CUP: '$',
+  GYD: 'G$',
+  HTG: 'G',
+  JMD: 'J$',
+  TTD: 'TT$',
+  GYD: '$',
+}
+
+// Monedas soportadas por Intl.NumberFormat
+const MONEDAS_INTL = [
+  'USD','NIO','COP','GTQ','PEN','MXN','CRC','HNL','DOP',
+  'BRL','ARS','CLP','BOB','PYG','UYU','CAD','VES','BZD',
+  'CUP','GYD','HTG','JMD','TTD',
+]
+
+// Formato de moneda: $1,200.00
+export const fmt = (n, moneda = 'USD') => {
+  const currency = MONEDAS_INTL.includes(moneda) ? moneda : 'USD'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n || 0)
+}
+
+// Formato de número: 1,200.00
 export const fmtNum = (n) =>
-  new Intl.NumberFormat('es', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n || 0)
+  new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n || 0)
 
 export const today = () => new Date().toISOString().split('T')[0]
 
@@ -75,32 +150,49 @@ export const calcGrandTotal = (items) =>
     .reduce((s, a) => s + (a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0)), 0)
 
 export const ESTADO_COLORS = {
-  planificacion: 'bg-blue-100 text-blue-700',
-  en_ejecucion:  'bg-green-100 text-green-700',
-  pausado:       'bg-yellow-100 text-yellow-700',
-  completado:    'bg-gray-100 text-gray-600',
-  cancelado:     'bg-red-100 text-red-600',
-  pendiente:     'bg-yellow-100 text-yellow-700',
-  aprobada:      'bg-green-100 text-green-700',
-  rechazada:     'bg-red-100 text-red-600',
-  oc_generada:   'bg-blue-100 text-blue-700',
-  borrador:      'bg-gray-100 text-gray-600',
+  planificacion:        'bg-blue-100 text-blue-700',
+  en_ejecucion:         'bg-green-100 text-green-700',
+  pausado:              'bg-yellow-100 text-yellow-700',
+  completado:           'bg-gray-100 text-gray-600',
+  cancelado:            'bg-red-100 text-red-600',
+  pendiente:            'bg-yellow-100 text-yellow-700',
+  aprobada:             'bg-green-100 text-green-700',
+  rechazada:            'bg-red-100 text-red-600',
+  oc_generada:          'bg-blue-100 text-blue-700',
+  borrador:             'bg-gray-100 text-gray-600',
   pendiente_aprobacion: 'bg-yellow-100 text-yellow-700',
-  recibida_parcial: 'bg-blue-100 text-blue-700',
-  recibida_total:   'bg-green-100 text-green-700',
-  cancelada:        'bg-red-100 text-red-600',
-  activo:           'bg-green-100 text-green-700',
+  recibida_parcial:     'bg-blue-100 text-blue-700',
+  recibida_total:       'bg-green-100 text-green-700',
+  cancelada:            'bg-red-100 text-red-600',
+  activo:               'bg-green-100 text-green-700',
 }
 
 export const ESTADO_LABELS = {
-  planificacion: 'Planificación', en_ejecucion: 'En Ejecución',
-  pausado: 'Pausado', completado: 'Completado', cancelado: 'Cancelado',
-  pendiente: 'Pendiente', aprobada: 'Aprobada', rechazada: 'Rechazada',
-  oc_generada: 'OC Generada', borrador: 'Borrador',
-  pendiente_aprobacion: 'Pend. Aprobación', recibida_parcial: 'Recibida Parcial',
-  recibida_total: 'Recibida Total', cancelada: 'Cancelada',
-  activo: 'Activo', completado_sub: 'Completado',
+  planificacion:        'Planificación',
+  en_ejecucion:         'En Ejecución',
+  pausado:              'Pausado',
+  completado:           'Completado',
+  cancelado:            'Cancelado',
+  pendiente:            'Pendiente',
+  aprobada:             'Aprobada',
+  rechazada:            'Rechazada',
+  oc_generada:          'OC Generada',
+  borrador:             'Borrador',
+  pendiente_aprobacion: 'Pend. Aprobación',
+  recibida_parcial:     'Recibida Parcial',
+  recibida_total:       'Recibida Total',
+  cancelada:            'Cancelada',
+  activo:               'Activo',
+  completado_sub:       'Completado',
 }
 
-export const MONEDAS = ['USD','NIO','COP','GTQ','PEN','MXN']
-export const UNIDADES = ['m²','m³','m','ml','kg','ton','und','gl','hr','día','semana','mes','lote','viaje','%','lb','pie²','LF']
+export const MONEDAS = [
+  'USD','NIO','COP','GTQ','PEN','MXN','CRC','HNL',
+  'DOP','BRL','ARS','CLP','BOB','PYG','UYU','CAD',
+]
+
+export const UNIDADES = [
+  'm²','m³','m','ml','kg','ton','und','gl',
+  'hr','día','semana','mes','lote','viaje','%',
+  'lb','pie²','LF',
+]

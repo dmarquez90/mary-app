@@ -223,7 +223,7 @@ export default function Compras() {
   }
 
   const saveSol = () => {
-    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre) && i.cantidad)
+    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre || i.mat_pres_id) && i.cantidad)
     if (!form.proyecto_id || !validItems.length) return
     dispatch({ type: 'ADD_SOLICITUD', payload: {
       solicitud: {
@@ -693,7 +693,7 @@ export default function Compras() {
 
         <div className="flex gap-2 mt-auto pt-2">
           <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>!i.material_id||!i.cantidad)} className="flex-1">
+          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>(!i.material_id&&!i.descripcion_libre&&!i.mat_pres_id)||!i.cantidad)} className="flex-1">
             {t('comp_form_submit')}
           </PrimaryBtn>
         </div>
@@ -778,7 +778,7 @@ export default function Compras() {
                 <div key={it.id} className="py-2 border-b border-gray-50">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-700 flex items-center gap-1.5">
-                      {nombre}
+                      {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
                       {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Adicional</span>}
                     </span>
                     <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
@@ -950,11 +950,13 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
           {items.map((it, idx) => {
             const m   = materiales.find(x => x.id === it.material_id)
             const act = presupuesto.find(b => b.id === it.actividad_id)
+            const codigo = m?.codigo || '—'
+            const descripcion = m?.descripcion || it.descripcion || '—'
             return (
               <tr key={it.id} style={{ background: idx%2===0 ? '#fff' : '#F8FAFC' }}>
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
-                <td style={{ ...cell, fontFamily:'monospace' }}>{m?.codigo || '—'}</td>
-                <td style={cell}>{m?.descripcion || '—'}</td>
+                <td style={{ ...cell, fontFamily:'monospace' }}>{codigo}</td>
+                <td style={cell}>{descripcion}{it.es_adicional ? ' *' : ''}</td>
                 <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
                 <td style={{ ...cell, textAlign:'center', fontWeight:'bold' }}>{it.cantidad}</td>
                 <td style={{ ...cell, fontSize:'10px' }}>{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
@@ -1089,11 +1091,13 @@ function PrintOC({ doc, materiales, presupuesto, t }) {
           {items.map((it, idx) => {
             const m   = materiales.find(x => x.id === it.material_id)
             const act = presupuesto.find(b => b.id === it.actividad_id)
+            const codigo = m?.codigo || '—'
+            const descripcion = m?.descripcion || it.descripcion || '—'
             return (
               <tr key={it.id} style={{ background: idx%2===0 ? '#fff' : '#F8FAFC' }}>
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
-                <td style={{ ...cell, fontFamily:'monospace' }}>{m?.codigo || '—'}</td>
-                <td style={cell}>{m?.descripcion || '—'}</td>
+                <td style={{ ...cell, fontFamily:'monospace' }}>{codigo}</td>
+                <td style={cell}>{descripcion}</td>
                 <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
                 <td style={{ ...cell, textAlign:'center', fontWeight:'bold' }}>{it.cantidad}</td>
                 <td style={{ ...cell, fontSize:'10px' }}>{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
