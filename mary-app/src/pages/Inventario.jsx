@@ -9,7 +9,7 @@ import { useAuth } from '../auth'
 
 const emptyMat = () => ({ codigo:'', descripcion:'', categoria:'', unidad:'und', stock_actual:'0', stock_minimo:'0', ubicacion_bodega:'', precio_unitario:'' })
 const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today() })
-const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today() })
+const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today(), solicitud_id:'' })
 
 const CATEGORIAS = [
   { key:'concreto',     es:'Concreto',     en:'Concrete',   color:'#6B7280' },
@@ -567,13 +567,38 @@ export default function Inventario() {
           </div>
         </Drawer>
 
-        <Drawer open={drawer==='out'} onClose={() => setDrawer(null)} title={t('inv_form_exit_title')} width={400}>
+        <Drawer open={drawer==='out'} onClose={() => setDrawer(null)} title={t('inv_form_exit_title')} width={420}>
           <Field label={t('inv_form_exit_project')} required>
-            <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f => ({...f, proyecto_id:e.target.value, actividad_id:''}))}>
+            <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f => ({...f, proyecto_id:e.target.value, actividad_id:'', solicitud_id:''}))}>
               <option value="">{t('lbl_select')}</option>
               {proyectos.filter(p => p.estado!=='completado'&&p.estado!=='cancelado').map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
             </select>
           </Field>
+
+          {/* Vincular con solicitud aprobada */}
+          {form.proyecto_id && solicitudes.filter(s => s.proyecto_id === form.proyecto_id && s.estado === 'aprobada').length > 0 && (
+            <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/30">
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">
+                {t('btn_cancel') === 'Cancel' ? 'Link to approved request (optional)' : 'Vincular a solicitud aprobada (opcional)'}
+              </p>
+              <select className={selectCls} value={form.solicitud_id||''} onChange={e => {
+                const solId = e.target.value
+                const sol = solicitudes.find(s => s.id === solId)
+                setForm(f => ({...f, solicitud_id: solId, actividad_id: sol?.actividad_id || f.actividad_id}))
+              }}>
+                <option value="">{t('btn_cancel') === 'Cancel' ? '— No link —' : '— Sin vincular —'}</option>
+                {solicitudes.filter(s => s.proyecto_id === form.proyecto_id && s.estado === 'aprobada').map(s => (
+                  <option key={s.id} value={s.id}>{s.folio} — {s.created_at}</option>
+                ))}
+              </select>
+              {form.solicitud_id && (
+                <p className="text-xs text-blue-600 mt-1">
+                  {t('btn_cancel') === 'Cancel' ? '✓ Activity inherited from request' : '✓ Actividad heredada de la solicitud'}
+                </p>
+              )}
+            </div>
+          )}
+
           <Field label={t('inv_form_exit_activity')}>
             <select className={selectCls} value={form.actividad_id||''} onChange={set('actividad_id')}>
               <option value="">{t('lbl_select')}</option>

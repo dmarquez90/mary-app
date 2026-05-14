@@ -5,26 +5,47 @@ import { usePermissions } from '../usePermissions'
 import { fmtNum, fmt } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 
-const emptyForm = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad_presupuestada:'' })
+const emptyForm = () => ({
+  proyecto_id: '', nombre_libre: '', unidad_libre: 'und',
+  cantidad_presupuestada: '', actividad_id: '', etapa_id: '', sub_etapa_id: '',
+  material_id: '', es_adicional: false,
+})
+
+const UNIDADES = ['und','m','m2','m3','kg','ton','lt','gl','bolsa','saco','rollo','varilla','tubo','lamina','par','caja','juego']
 
 export default function MatPresupuestados() {
   const { state, dispatch } = useStore()
-  const { t } = useContext(LangContext)
+  const { t, lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const { can } = usePermissions()
-  const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas } = state
+  const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas, solicitud_items = [] } = state
 
-  const [proyId, setProyId] = useState(proyectos[0]?.id || '')
-  const [drawer, setDrawer] = useState(false)
-  const [form, setForm]     = useState(emptyForm())
+  const [proyId, setProyId]   = useState(proyectos[0]?.id || '')
+  const [drawer, setDrawer]   = useState(false)
+  const [form, setForm]       = useState(emptyForm())
   const [editing, setEditing] = useState(null)
   const [search, setSearch]   = useState('')
+  const [filterEtapa, setFilterEtapa] = useState('')
 
   const puedeEditar = can('mat_pres_editar')
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const set      = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
-  const proy     = proyectos.find(p => p.id === proyId)
-  const moneda   = proy?.moneda || 'USD'
+  const proy   = proyectos.find(p => p.id === proyId)
+  const moneda = proy?.moneda || 'USD'
+
+  const etapas      = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'etapa')
+  const subEtapas   = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'sub_etapa')
   const actividades = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
+
+  const subEtapasFiltradas   = subEtapas.filter(s => !form.etapa_id || s.parent_id === form.etapa_id)
+  const actividadesFiltradas = actividades.filter(a => {
+    if (form.sub_etapa_id) return a.parent_id === form.sub_etapa_id
+    if (form.etapa_id) {
+      const subs = subEtapas.filter(s => s.parent_id === form.etapa_id).map(s => s.id)
+      return subs.includes(a.parent_id)
+    }
+    return true
+  })
 
   const matsPres = useMemo(() =>
     materiales_presupuestados.filter(mp => mp.proyecto_id === proyId),
@@ -32,39 +53,79 @@ export default function MatPresupuestados() {
   )
 
   const matsFiltrados = useMemo(() => {
-    if (!search) return matsPres
+    let list = matsPres
+    if (filterEtapa) {
+      const subs = subEtapas.filter(s => s.parent_id === filterEtapa).map(s => s.id)
+      const acts = actividades.filter(a => subs.includes(a.parent_id)).map(a => a.id)
+      list = list.filter(mp => acts.includes(mp.actividad_id))
+    }
+    if (!search) return list
     const q = search.toLowerCase()
-    return matsPres.filter(mp => {
-      const mat = materiales.find(m => m.id === mp.material_id)
-      return mat?.codigo?.toLowerCase().includes(q) || mat?.descripcion?.toLowerCase().includes(q)
+    return list.filter(mp => {
+      const nombre = mp.nombre_libre || materiales.find(m => m.id === mp.material_id)?.descripcion || ''
+      return nombre.toLowerCase().includes(q)
     })
-  }, [matsPres, search, materiales])
+  }, [matsPres, search, filterEtapa, materiales, subEtapas, actividades])
 
-  const consumoReal = (materialId, actividadId) =>
-    salidas.filter(s => s.material_id===materialId && s.proyecto_id===proyId && s.actividad_id===actividadId)
-           .reduce((sum, s) => sum + parseFloat(s.cantidad||0), 0)
+  const cantSolicitada = (mpId) =>
+    solicitud_items.filter(si => si.mat_pres_id === mpId)
+      .reduce((s, si) => s + parseFloat(si.cantidad || 0), 0)
+
+  const cantConsumida = (mp) => {
+    if (!mp.material_id) return 0
+    return salidas
+      .filter(s => s.material_id === mp.material_id && s.proyecto_id === proyId &&
+        (!mp.actividad_id || s.actividad_id === mp.actividad_id))
+      .reduce((s, sa) => s + parseFloat(sa.cantidad || 0), 0)
+  }
 
   const precioPromedio = (materialId) => {
-    const ents     = entradas.filter(e => e.material_id === materialId)
-    const totalCant = ents.reduce((s,e) => s + parseFloat(e.cantidad||0), 0)
-    const totalVal  = ents.reduce((s,e) => s + (parseFloat(e.cantidad||0)*parseFloat(e.precio_unitario||0)), 0)
+    if (!materialId) return 0
+    const ents = entradas.filter(e => e.material_id === materialId)
+    const totalCant = ents.reduce((s, e) => s + parseFloat(e.cantidad || 0), 0)
+    const totalVal  = ents.reduce((s, e) => s + parseFloat(e.cantidad || 0) * parseFloat(e.precio_unitario || 0), 0)
     return totalCant > 0 ? totalVal / totalCant : 0
   }
 
   const totalPresupuestado = useMemo(() =>
-    matsPres.reduce((sum, mp) => sum + (parseFloat(mp.cantidad_presupuestada||0) * precioPromedio(mp.material_id)), 0),
+    matsPres.reduce((sum, mp) => sum + parseFloat(mp.cantidad_presupuestada || 0) * precioPromedio(mp.material_id), 0),
     [matsPres, entradas]
   )
 
+  const totalAdicionales = matsPres.filter(mp => mp.es_adicional).length
+  const totalActividades = [...new Set(matsPres.map(mp => mp.actividad_id).filter(Boolean))].length
+
   const save = () => {
-    if (!form.proyecto_id || !form.material_id || !form.cantidad_presupuestada) return
-    if (editing) dispatch({ type:'UPD_MAT_PRES', payload:{ ...form, id:editing } })
-    else         dispatch({ type:'ADD_MAT_PRES', payload:form })
+    if (!form.proyecto_id || !form.nombre_libre || !form.cantidad_presupuestada) return
+    if (editing) dispatch({ type: 'UPD_MAT_PRES', payload: { ...form, id: editing } })
+    else         dispatch({ type: 'ADD_MAT_PRES', payload: form })
     setDrawer(false); setEditing(null); setForm(emptyForm())
   }
 
-  const openEdit = (mp) => { setForm({...mp}); setEditing(mp.id); setDrawer(true) }
-  const openAdd  = () => { setForm({...emptyForm(), proyecto_id:proyId}); setEditing(null); setDrawer(true) }
+  const openEdit = (mp) => {
+    setForm({
+      proyecto_id: mp.proyecto_id || '',
+      nombre_libre: mp.nombre_libre || '',
+      unidad_libre: mp.unidad_libre || 'und',
+      cantidad_presupuestada: mp.cantidad_presupuestada || '',
+      actividad_id: mp.actividad_id || '',
+      etapa_id: mp.etapa_id || '',
+      sub_etapa_id: mp.sub_etapa_id || '',
+      material_id: mp.material_id || '',
+      es_adicional: mp.es_adicional || false,
+    })
+    setEditing(mp.id)
+    setDrawer(true)
+  }
+
+  const openAdd = () => { setForm({ ...emptyForm(), proyecto_id: proyId }); setEditing(null); setDrawer(true) }
+
+  const getNombre  = (mp) => mp.nombre_libre || materiales.find(m => m.id === mp.material_id)?.descripcion || '...'
+  const getUnidad  = (mp) => mp.unidad_libre || materiales.find(m => m.id === mp.material_id)?.unidad || '...'
+  const getActividad = (mp) => {
+    const act = presupuesto.find(b => b.id === mp.actividad_id)
+    return act ? `${act.code} ${act.descripcion}` : '...'
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -73,10 +134,10 @@ export default function MatPresupuestados() {
           <h1 className="text-xl font-semibold text-gray-800">{t('mp_title')}</h1>
           {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <select
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
-            value={proyId} onChange={e => { setProyId(e.target.value); setSearch('') }}>
+            value={proyId} onChange={e => { setProyId(e.target.value); setSearch(''); setFilterEtapa('') }}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
@@ -88,24 +149,32 @@ export default function MatPresupuestados() {
         <EmptyState icon={Icons.budget} title={t('mp_no_project')} />
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-5">
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-xs text-gray-400 mb-1">{t('mp_kpi_materials')}</p>
-              <p className="text-xl font-semibold text-gray-800">{matsPres.length}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-xs text-gray-400 mb-1">{t('mp_kpi_budget_value')}</p>
-              <p className="text-xl font-semibold" style={{color:'#1D9E75'}}>{fmt(totalPresupuestado, moneda)}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-xs text-gray-400 mb-1">{t('mp_kpi_activities')}</p>
-              <p className="text-xl font-semibold text-gray-800">{actividades.length}</p>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+            {[
+              { label: t('mp_kpi_materials'), value: matsPres.length, color: '#1B3A6B' },
+              { label: isEs ? 'Adicionales' : 'Additional', value: totalAdicionales, color: totalAdicionales > 0 ? '#e0982c' : '#6b7280' },
+              { label: t('mp_kpi_activities'), value: totalActividades, color: '#1B3A6B' },
+              { label: t('mp_kpi_budget_value'), value: fmt(totalPresupuestado, moneda), color: '#1D9E75' },
+            ].map((k, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
+                <p className="text-xs text-gray-400 mb-1">{k.label}</p>
+                <p className="text-xl font-semibold" style={{ color: k.color }}>{k.value}</p>
+              </div>
+            ))}
           </div>
 
           {matsPres.length > 0 && (
-            <div className="mb-4">
-              <input className={inputCls} placeholder={t('mp_search_placeholder')} value={search} onChange={e => setSearch(e.target.value)} />
+            <div className="flex gap-3 mb-4 flex-wrap">
+              <input className={inputCls + ' flex-1 min-w-[200px]'}
+                placeholder={t('mp_search_placeholder')}
+                value={search} onChange={e => setSearch(e.target.value)} />
+              {etapas.length > 0 && (
+                <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+                  value={filterEtapa} onChange={e => setFilterEtapa(e.target.value)}>
+                  <option value="">{isEs ? 'Todas las etapas' : 'All stages'}</option>
+                  {etapas.map(e => <option key={e.id} value={e.id}>{e.code} — {e.descripcion}</option>)}
+                </select>
+              )}
             </div>
           )}
 
@@ -120,38 +189,73 @@ export default function MatPresupuestados() {
           ) : (
             <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="bg-gray-50 border-b border-gray-100">
-                  {[t('inv_col_code'),t('inv_col_desc'),t('inv_col_unit'),t('mp_col_budgeted'),t('mp_col_consumed'),t('mp_col_remaining'),t('mp_col_activity'),t('mp_col_status'), puedeEditar?'':null].filter(h=>h!==null).map((h,i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
-                  ))}
-                </tr></thead>
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {[
+                      isEs ? 'Material' : 'Material',
+                      isEs ? 'Unidad' : 'Unit',
+                      isEs ? 'Presupuestado' : 'Budgeted',
+                      isEs ? 'Solicitado' : 'Requested',
+                      isEs ? 'Consumido' : 'Consumed',
+                      isEs ? 'Diferencia' : 'Difference',
+                      isEs ? 'Actividad' : 'Activity',
+                      isEs ? 'Estado' : 'Status',
+                      puedeEditar ? '' : null,
+                    ].filter(h => h !== null).map((h, i) => (
+                      <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
                   {matsFiltrados.map(mp => {
-                    const mat      = materiales.find(m => m.id === mp.material_id)
-                    const act      = presupuesto.find(b => b.id === mp.actividad_id)
-                    const consumido = consumoReal(mp.material_id, mp.actividad_id)
-                    const presup   = parseFloat(mp.cantidad_presupuestada||0)
-                    const restante = presup - consumido
-                    const pct      = presup > 0 ? (consumido/presup)*100 : 0
-                    const status   = pct>=100 ? 'agotado' : pct>=80 ? 'alerta' : 'ok'
+                    const presup    = parseFloat(mp.cantidad_presupuestada || 0)
+                    const solicit   = cantSolicitada(mp.id)
+                    const consumido = cantConsumida(mp)
+                    const dif       = presup - solicit
+                    const pct       = presup > 0 ? (solicit / presup) * 100 : 0
+                    const status    = pct >= 100 ? 'agotado' : pct >= 80 ? 'alerta' : 'ok'
+
                     return (
                       <tr key={mp.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-4 py-3 text-xs font-mono text-gray-500">{mat?.codigo || '—'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '—'}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{mat?.unidad || '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm text-gray-800">{getNombre(mp)}</span>
+                            {mp.es_adicional && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+                                {isEs ? 'Adicional' : 'Additional'}
+                              </span>
+                            )}
+                            {mp.material_id && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                {isEs ? 'Vinculado' : 'Linked'}
+                              </span>
+                            )}
+                          </div>
+                          {mp.material_id && (
+                            <p className="text-xs text-gray-400 font-mono mt-0.5">
+                              {materiales.find(m => m.id === mp.material_id)?.codigo}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{getUnidad(mp)}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-700">{fmtNum(presup)}</td>
-                        <td className="px-4 py-3 text-sm font-mono text-red-500">{fmtNum(consumido)}</td>
-                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: restante<0?'#ef4444':'#1D9E75' }}>{fmtNum(restante)}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">{act?`${act.code} — ${act.descripcion}`:'—'}</td>
+                        <td className="px-4 py-3 text-sm font-mono" style={{ color: solicit > presup ? '#ef4444' : '#1B3A6B' }}>
+                          {fmtNum(solicit)}{solicit > presup && ' ⚠'}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(consumido)}</td>
+                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: dif < 0 ? '#ef4444' : '#1D9E75' }}>
+                          {dif >= 0 ? '+' : ''}{fmtNum(dif)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">{getActividad(mp)}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-1">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit
-                              ${status==='ok'?'bg-green-100 text-green-700':status==='alerta'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600'}`}>
-                              {status==='ok'?t('mp_status_ok'):status==='alerta'?t('mp_status_alert'):t('mp_status_depleted')}
+                              ${status === 'ok' ? 'bg-green-100 text-green-700' : status === 'alerta' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                              {status === 'ok' ? t('mp_status_ok') : status === 'alerta' ? t('mp_status_alert') : t('mp_status_depleted')}
                             </span>
                             <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all"
-                                style={{ width:`${Math.min(pct,100)}%`, background:status==='ok'?'#1D9E75':status==='alerta'?'#e0982c':'#ef4444' }} />
+                              <div className="h-full rounded-full"
+                                style={{ width: `${Math.min(pct, 100)}%`, background: status === 'ok' ? '#1D9E75' : status === 'alerta' ? '#e0982c' : '#ef4444' }} />
                             </div>
                           </div>
                         </td>
@@ -159,7 +263,7 @@ export default function MatPresupuestados() {
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
                               <TBtn onClick={() => openEdit(mp)}>{t('btn_edit')}</TBtn>
-                              <TBtn danger onClick={() => dispatch({ type:'DEL_MAT_PRES', payload:mp.id })}>{t('btn_delete')}</TBtn>
+                              <TBtn danger onClick={() => dispatch({ type: 'DEL_MAT_PRES', payload: mp.id })}>{t('btn_delete')}</TBtn>
                             </div>
                           </td>
                         )}
@@ -175,38 +279,90 @@ export default function MatPresupuestados() {
 
       {puedeEditar && (
         <Drawer open={drawer} onClose={() => { setDrawer(false); setEditing(null) }}
-          title={editing ? t('mp_form_edit') : t('mp_form_new')} width={420}>
+          title={editing ? t('mp_form_edit') : t('mp_form_new')} width={440}>
+
           <Field label={t('lbl_project')} required>
-            <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f=>({...f, proyecto_id:e.target.value, actividad_id:''}))}>
+            <select className={selectCls} value={form.proyecto_id || ''} onChange={e => setForm(f => ({ ...f, proyecto_id: e.target.value, etapa_id: '', sub_etapa_id: '', actividad_id: '' }))}>
               <option value="">{t('lbl_select')}</option>
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
             </select>
           </Field>
-          <Field label={t('mp_form_material')} required>
-            <select className={selectCls} value={form.material_id||''} onChange={k => setForm(f=>({...f, material_id:k.target.value}))}>
-              <option value="">{t('lbl_select')}</option>
-              {materiales.filter(m=>m.activo!==false).map(m => <option key={m.id} value={m.id}>{m.codigo} — {m.descripcion}</option>)}
-            </select>
+
+          <Field label={isEs ? 'Nombre del material' : 'Material name'} required>
+            <input className={inputCls} value={form.nombre_libre || ''} onChange={set('nombre_libre')}
+              placeholder={isEs ? 'Ej: Cemento Holcim 45kg' : 'E.g.: Portland Cement 50lb'} />
           </Field>
-          {form.material_id && (
-            <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-500">
-              {t('inv_stock_current')}: <span className="font-mono font-medium text-gray-700">
-                {fmtNum(materiales.find(m=>m.id===form.material_id)?.stock_actual||0)} {materiales.find(m=>m.id===form.material_id)?.unidad}
-              </span>
-            </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={isEs ? 'Unidad' : 'Unit'}>
+              <select className={selectCls} value={form.unidad_libre || 'und'} onChange={set('unidad_libre')}>
+                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </Field>
+            <Field label={t('mp_form_qty')} required>
+              <input type="number" className={inputCls} value={form.cantidad_presupuestada || ''}
+                onChange={set('cantidad_presupuestada')} placeholder="0.00" min="0" step="0.01" />
+            </Field>
+          </div>
+
+          <div className="border border-gray-100 rounded-xl p-3 bg-gray-50/50">
+            <p className="text-xs font-medium text-gray-500 mb-2">
+              {isEs ? 'Vincular con catalogo de inventario (opcional)' : 'Link to inventory catalog (optional)'}
+            </p>
+            <select className={selectCls} value={form.material_id || ''} onChange={set('material_id')}>
+              <option value="">{isEs ? 'Sin vincular' : 'Not linked'}</option>
+              {materiales.filter(m => m.activo !== false).map(m => (
+                <option key={m.id} value={m.id}>{m.codigo} {m.descripcion}</option>
+              ))}
+            </select>
+            {form.material_id && (
+              <p className="text-xs text-gray-400 mt-1.5">
+                {isEs ? 'Stock actual:' : 'Current stock:'} <span className="font-mono font-medium text-gray-600">
+                  {fmtNum(materiales.find(m => m.id === form.material_id)?.stock_actual || 0)} {materiales.find(m => m.id === form.material_id)?.unidad}
+                </span>
+              </p>
+            )}
+          </div>
+
+          {form.proyecto_id && etapas.length > 0 && (
+            <>
+              <Field label={isEs ? 'Etapa (opcional)' : 'Stage (optional)'}>
+                <select className={selectCls} value={form.etapa_id || ''} onChange={e => setForm(f => ({ ...f, etapa_id: e.target.value, sub_etapa_id: '', actividad_id: '' }))}>
+                  <option value="">{isEs ? 'Sin asignar' : 'Unassigned'}</option>
+                  {etapas.map(e => <option key={e.id} value={e.id}>{e.code} {e.descripcion}</option>)}
+                </select>
+              </Field>
+              {form.etapa_id && subEtapasFiltradas.length > 0 && (
+                <Field label={isEs ? 'Sub-etapa (opcional)' : 'Sub-stage (optional)'}>
+                  <select className={selectCls} value={form.sub_etapa_id || ''} onChange={e => setForm(f => ({ ...f, sub_etapa_id: e.target.value, actividad_id: '' }))}>
+                    <option value="">{isEs ? 'Sin asignar' : 'Unassigned'}</option>
+                    {subEtapasFiltradas.map(s => <option key={s.id} value={s.id}>{s.code} {s.descripcion}</option>)}
+                  </select>
+                </Field>
+              )}
+              <Field label={t('mp_form_activity')}>
+                <select className={selectCls} value={form.actividad_id || ''} onChange={set('actividad_id')}>
+                  <option value="">{isEs ? 'Sin asignar' : 'Unassigned'}</option>
+                  {actividadesFiltradas.map(a => <option key={a.id} value={a.id}>{a.code} {a.descripcion}</option>)}
+                </select>
+              </Field>
+            </>
           )}
-          <Field label={t('mp_form_activity')}>
-            <select className={selectCls} value={form.actividad_id||''} onChange={k => setForm(f=>({...f, actividad_id:k.target.value}))}>
-              <option value="">{t('lbl_select')}</option>
-              {actividades.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
-            </select>
-          </Field>
-          <Field label={t('mp_form_qty')} required>
-            <input type="number" className={inputCls} value={form.cantidad_presupuestada||''} onChange={k => setForm(f=>({...f, cantidad_presupuestada:k.target.value}))} placeholder="0.00" min="0" step="0.01" />
-          </Field>
+
+          <label className="flex items-center gap-2 cursor-pointer mt-1">
+            <input type="checkbox" className="w-4 h-4 accent-[#1B3A6B]"
+              checked={form.es_adicional || false}
+              onChange={e => setForm(f => ({ ...f, es_adicional: e.target.checked }))} />
+            <span className="text-sm text-gray-600">
+              {isEs ? 'Material adicional (no estaba en el presupuesto original)' : 'Additional material (not in original budget)'}
+            </span>
+          </label>
+
           <div className="flex gap-2 mt-auto pt-2">
             <SecondaryBtn onClick={() => { setDrawer(false); setEditing(null) }} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-            <PrimaryBtn onClick={save} disabled={!form.proyecto_id||!form.material_id||!form.cantidad_presupuestada} className="flex-1">
+            <PrimaryBtn onClick={save}
+              disabled={!form.proyecto_id || !form.nombre_libre || !form.cantidad_presupuestada}
+              className="flex-1">
               {editing ? t('btn_save') : t('btn_add')}
             </PrimaryBtn>
           </div>

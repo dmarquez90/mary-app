@@ -168,13 +168,17 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
 export default function Compras() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
-  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales } = state
+  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
 
-  const [tab, setTab]       = useState(0)
-  const [drawer, setDrawer] = useState(null)
-  const [form, setForm]     = useState({})
-  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
-  const [detail, setDetail] = useState(null)
+  const [tab, setTab]           = useState(0)
+  const [drawer, setDrawer]     = useState(null)
+  const [form, setForm]         = useState({})
+  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
+  const [modoGuiado, setModoGuiado]       = useState(true)
+  const [guiaEtapa, setGuiaEtapa]         = useState('')
+  const [guiaSubEtapa, setGuiaSubEtapa]   = useState('')
+  const [guiaActividad, setGuiaActividad] = useState('')
+  const [detail, setDetail]     = useState(null)
   const [printDoc, setPrintDoc] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -183,19 +187,49 @@ export default function Compras() {
   const todasActsDelProy = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
   const activos          = materiales.filter(m => m.activo !== false)
   const solsAprobadas    = solicitudes.filter(s => s.estado === 'aprobada')
+  const solsAprobadas    = solicitudes.filter(s => s.estado === 'aprobada')
 
   const genFolio = () => {
     const n = solicitudes.length + 1
     return `SOL-${new Date().getFullYear()}-${String(n).padStart(3,'0')}`
   }
 
+  // Jerarquía guiada
+  const etapasGuia    = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'etapa')
+  const subEtapasGuia = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'sub_etapa' && (!guiaEtapa || b.parent_id === guiaEtapa))
+  const actsGuia      = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad' && (!guiaSubEtapa || b.parent_id === guiaSubEtapa))
+
+  // Materiales presupuestados de la actividad seleccionada
+  const matPresActiv = guiaActividad
+    ? materiales_presupuestados.filter(mp => mp.proyecto_id === form.proyecto_id && mp.actividad_id === guiaActividad)
+    : []
+
+  const cargarMatPresEnItems = () => {
+    if (!matPresActiv.length) return
+    const items = matPresActiv.map(mp => {
+      const mat = materiales.find(m => m.id === mp.material_id)
+      return {
+        mat_pres_id: mp.id,
+        material_id: mp.material_id || '',
+        descripcion_libre: mp.nombre_libre || mat?.descripcion || '',
+        cantidad: '',
+        cantidad_presupuestada: parseFloat(mp.cantidad_presupuestada || 0),
+        unidad: mp.unidad_libre || mat?.unidad || 'und',
+        actividad_id: guiaActividad,
+        es_adicional: false,
+        observaciones: '',
+      }
+    })
+    setSolItems(items)
+  }
+
   const saveSol = () => {
-    if (!form.proyecto_id || solItems.every(i => !i.material_id)) return
-    const validItems = solItems.filter(i => i.material_id && i.cantidad)
+    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre) && i.cantidad)
+    if (!form.proyecto_id || !validItems.length) return
     dispatch({ type: 'ADD_SOLICITUD', payload: {
       solicitud: {
         proyecto_id:             form.proyecto_id,
-        actividad_id:            null,
+        actividad_id:            guiaActividad || null,
         folio:                   form.folio || genFolio(),
         justificacion:           form.justificacion || '',
         nombre_solicitante:      form.nombre_solicitante || '',
@@ -206,10 +240,21 @@ export default function Compras() {
         prioridad:               form.prioridad || 'normal',
         observaciones_generales: form.observaciones_generales || '',
       },
-      items: validItems
+      items: validItems.map(it => ({
+        material_id:            it.material_id || null,
+        descripcion:            it.descripcion_libre || '',
+        cantidad:               parseFloat(it.cantidad || 0),
+        unidad:                 it.unidad || 'und',
+        actividad_id:           it.actividad_id || guiaActividad || null,
+        mat_pres_id:            it.mat_pres_id || null,
+        es_adicional:           it.es_adicional || false,
+        cantidad_presupuestada: parseFloat(it.cantidad_presupuestada || 0),
+        observaciones:          it.observaciones || '',
+      }))
     }})
     setDrawer(null)
-    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
+    setGuiaEtapa(''); setGuiaSubEtapa(''); setGuiaActividad('')
   }
 
   const saveOC = () => {
@@ -241,7 +286,7 @@ export default function Compras() {
   const detOC      = ordenes_compra.find(oc => oc.id === detail)
   const detOCItems = detOC ? solicitud_items.filter(i => i.solicitud_id === detOC.solicitud_id) : []
 
-  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
@@ -315,7 +360,8 @@ export default function Compras() {
         {tab === 0 && (
           <PrimaryBtn onClick={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
+            setModoGuiado(true); setGuiaEtapa(''); setGuiaSubEtapa(''); setGuiaActividad('')
             setDrawer('sol')
           }}>{t('comp_new_sol')}</PrimaryBtn>
         )}
@@ -345,7 +391,8 @@ export default function Compras() {
         solicitudes.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={t('comp_new_sol')} onAction={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
+            setModoGuiado(true); setGuiaEtapa(''); setGuiaSubEtapa(''); setGuiaActividad('')
             setDrawer('sol')
           }} />
         ) : (
@@ -494,6 +541,53 @@ export default function Compras() {
           <textarea className={inputCls} rows={2} value={form.justificacion||''} onChange={set('justificacion')} placeholder={t('comp_form_justification_ph')} />
         </Field>
 
+        {/* SELECTOR GUIADO / LIBRE */}
+        <div className="flex gap-2 border border-gray-200 rounded-lg p-1 bg-gray-50">
+          <button onClick={() => setModoGuiado(true)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${modoGuiado ? 'bg-white shadow-sm text-[#1B3A6B]' : 'text-gray-500'}`}>
+            {t('btn_cancel') === 'Cancel' ? 'Guided by budget' : 'Guiado por presupuesto'}
+          </button>
+          <button onClick={() => setModoGuiado(false)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${!modoGuiado ? 'bg-white shadow-sm text-[#1B3A6B]' : 'text-gray-500'}`}>
+            {t('btn_cancel') === 'Cancel' ? 'Free selection' : 'Selección libre'}
+          </button>
+        </div>
+
+        {/* MODO GUIADO */}
+        {modoGuiado && form.proyecto_id && (
+          <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/30 flex flex-col gap-2">
+            <p className="text-xs font-semibold text-gray-500">{t('btn_cancel') === 'Cancel' ? 'Select stage / activity' : 'Selecciona etapa / actividad'}</p>
+            <select className={selectCls} value={guiaEtapa} onChange={e => { setGuiaEtapa(e.target.value); setGuiaSubEtapa(''); setGuiaActividad('') }}>
+              <option value="">{t('btn_cancel') === 'Cancel' ? '— Stage —' : '— Etapa —'}</option>
+              {etapasGuia.map(e => <option key={e.id} value={e.id}>{e.code} {e.descripcion}</option>)}
+            </select>
+            {guiaEtapa && (
+              <select className={selectCls} value={guiaSubEtapa} onChange={e => { setGuiaSubEtapa(e.target.value); setGuiaActividad('') }}>
+                <option value="">{t('btn_cancel') === 'Cancel' ? '— Sub-stage —' : '— Sub-etapa —'}</option>
+                {subEtapasGuia.map(s => <option key={s.id} value={s.id}>{s.code} {s.descripcion}</option>)}
+              </select>
+            )}
+            {guiaEtapa && (
+              <select className={selectCls} value={guiaActividad} onChange={e => { setGuiaActividad(e.target.value) }}>
+                <option value="">{t('btn_cancel') === 'Cancel' ? '— Activity —' : '— Actividad —'}</option>
+                {actsGuia.map(a => <option key={a.id} value={a.id}>{a.code} {a.descripcion}</option>)}
+              </select>
+            )}
+            {guiaActividad && matPresActiv.length > 0 && (
+              <button onClick={cargarMatPresEnItems}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
+                style={{ background:BRAND }}>
+                {t('btn_cancel') === 'Cancel' ? `Load ${matPresActiv.length} budgeted material(s)` : `Cargar ${matPresActiv.length} material(es) presupuestado(s)`}
+              </button>
+            )}
+            {guiaActividad && matPresActiv.length === 0 && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">
+                {t('btn_cancel') === 'Cancel' ? 'No budgeted materials for this activity' : 'No hay materiales presupuestados para esta actividad'}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="border-t border-gray-100 pt-3">
           <div className="flex items-center justify-between mb-3">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('comp_form_items')} *</label>
@@ -503,47 +597,94 @@ export default function Compras() {
             </button>
           </div>
           <div className="flex flex-col gap-3">
-            {solItems.map((it, idx) => (
-              <div key={idx} className="rounded-xl p-3 flex flex-col gap-2 border border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
-                  {solItems.length > 1 && (
-                    <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕ Remove</button>
+            {solItems.map((it, idx) => {
+              const mpRef = it.mat_pres_id ? materiales_presupuestados.find(mp => mp.id === it.mat_pres_id) : null
+              const canSolicitar = !mpRef || parseFloat(it.cantidad||0) <= parseFloat(mpRef.cantidad_presupuestada||0)
+              const esExceso = mpRef && parseFloat(it.cantidad||0) > parseFloat(mpRef.cantidad_presupuestada||0)
+              return (
+                <div key={idx} className={`rounded-xl p-3 flex flex-col gap-2 border ${esExceso ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200 bg-gray-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
+                      {mpRef && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">{t('btn_cancel') === 'Cancel' ? 'Budgeted' : 'Presupuestado'}</span>}
+                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{t('btn_cancel') === 'Cancel' ? 'Additional' : 'Adicional'}</span>}
+                    </div>
+                    {solItems.length > 1 && (
+                      <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                    )}
+                  </div>
+
+                  {/* Nombre del material */}
+                  {mpRef ? (
+                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                      <span className="text-sm text-gray-800 flex-1">{it.descripcion_libre || mpRef.nombre_libre}</span>
+                      <span className="text-xs text-gray-400">{it.unidad}</span>
+                    </div>
+                  ) : (
+                    <MaterialSearchInput
+                      materiales={activos}
+                      value={it.material_id}
+                      onChange={v => {
+                        const mat = activos.find(m => m.id === v)
+                        setSolItem(idx, 'material_id', v)
+                        if (mat) { setSolItem(idx, 'unidad', mat.unidad || 'und'); setSolItem(idx, 'descripcion_libre', mat.descripcion) }
+                      }}
+                      placeholder={t('inv_form_material') + '...'}
+                    />
                   )}
+
+                  {/* Si no está en catálogo, campo libre */}
+                  {!it.material_id && !mpRef && (
+                    <input className={inputCls}
+                      placeholder={t('btn_cancel') === 'Cancel' ? 'Material description (if not in catalog)' : 'Descripción del material (si no está en catálogo)'}
+                      value={it.descripcion_libre||''} onChange={e=>setSolItem(idx,'descripcion_libre',e.target.value)}/>
+                  )}
+
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <input type="number"
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 ${esExceso ? 'border-amber-400 focus:border-amber-400 focus:ring-amber-200' : 'border-gray-200 focus:border-[#1B3A6B] focus:ring-[#1B3A6B]'}`}
+                        style={{ background:'#F2F2F2' }}
+                        placeholder={t('lbl_quantity') + ' *'}
+                        value={it.cantidad} onChange={e=>setSolItem(idx,'cantidad',e.target.value)} min="0" step="0.01"/>
+                      {mpRef && (
+                        <p className={`text-xs mt-0.5 ${esExceso ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+                          {t('btn_cancel') === 'Cancel' ? 'Budgeted:' : 'Presupuestado:'} {mpRef.cantidad_presupuestada} {it.unidad}
+                          {esExceso && (t('btn_cancel') === 'Cancel' ? ' ⚠ Exceeds budget' : ' ⚠ Excede presupuesto')}
+                        </p>
+                      )}
+                    </div>
+                    <input
+                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+                      style={{ background:'#F2F2F2' }}
+                      placeholder={t('lbl_unit')}
+                      value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
+                  </div>
+
+                  {!mpRef && form.proyecto_id && (
+                    <select className={selectCls} value={it.actividad_id||''} onChange={e=>setSolItem(idx,'actividad_id',e.target.value)}>
+                      <option value="">— {t('comp_form_activity')} —</option>
+                      {todasActsDelProy.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
+                    </select>
+                  )}
+
+                  {!mpRef && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#1B3A6B]"
+                        checked={it.es_adicional||false}
+                        onChange={e=>setSolItem(idx,'es_adicional',e.target.checked)}/>
+                      <span className="text-xs text-gray-500">
+                        {t('btn_cancel') === 'Cancel' ? 'Additional (not in budget)' : 'Adicional (no estaba en presupuesto)'}
+                      </span>
+                    </label>
+                  )}
+
+                  <input className={inputCls}
+                    placeholder={t('lbl_notes') + '...'}
+                    value={it.observaciones||''} onChange={e=>setSolItem(idx,'observaciones',e.target.value)}/>
                 </div>
-                <MaterialSearchInput
-                  materiales={activos}
-                  value={it.material_id}
-                  onChange={v => {
-                    const mat = activos.find(m => m.id === v)
-                    setSolItem(idx, 'material_id', v)
-                    if (mat) setSolItem(idx, 'unidad', mat.unidad || 'und')
-                  }}
-                  placeholder={t('inv_form_material') + '...'}
-                />
-                <div className="flex gap-2">
-                  <input type="number"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B]"
-                    style={{ background:'#F2F2F2' }}
-                    placeholder={t('lbl_quantity') + ' *'}
-                    value={it.cantidad} onChange={e=>setSolItem(idx,'cantidad',e.target.value)} min="0" step="0.01"/>
-                  <input
-                    className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
-                    style={{ background:'#F2F2F2' }}
-                    placeholder={t('lbl_unit')}
-                    value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
-                </div>
-                {form.proyecto_id && (
-                  <select className={selectCls} value={it.actividad_id||''} onChange={e=>setSolItem(idx,'actividad_id',e.target.value)}>
-                    <option value="">— {t('comp_form_activity')} ({t('btn_cancel') === 'Cancel' ? 'optional' : 'opcional'}) —</option>
-                    {todasActsDelProy.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
-                  </select>
-                )}
-                <input className={inputCls}
-                  placeholder={t('lbl_notes') + (t('btn_cancel') === 'Cancel' ? ' / Remarks (optional)' : ' / Observaciones (opcional)')}
-                  value={it.observaciones||''} onChange={e=>setSolItem(idx,'observaciones',e.target.value)}/>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
@@ -633,12 +774,21 @@ export default function Compras() {
             {detItems.map(it => {
               const m   = materiales.find(x=>x.id===it.material_id)
               const act = presupuesto.find(b=>b.id===it.actividad_id)
+              const nombre = m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')
               return (
                 <div key={it.id} className="py-2 border-b border-gray-50">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-700">{m?.codigo} — {m?.descripcion || '—'}</span>
+                    <span className="text-gray-700 flex items-center gap-1.5">
+                      {nombre}
+                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Adicional</span>}
+                    </span>
                     <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
                   </div>
+                  {it.cantidad_presupuestada > 0 && (
+                    <p className={`text-xs mt-0.5 ${parseFloat(it.cantidad) > parseFloat(it.cantidad_presupuestada) ? 'text-amber-600' : 'text-gray-400'}`}>
+                      Presupuestado: {it.cantidad_presupuestada} {it.unidad}
+                    </p>
+                  )}
                   {act && <p className="text-xs text-gray-400 mt-0.5">{act.code} — {act.descripcion}</p>}
                   {it.observaciones && <p className="text-xs text-gray-400 italic mt-0.5">{it.observaciones}</p>}
                 </div>

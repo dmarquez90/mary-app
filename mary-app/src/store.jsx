@@ -559,15 +559,36 @@ export function StoreProvider({ children, tenantId }) {
       }
 
       case 'ADD_MAT_PRES': {
-        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
+        const item = {
+          id: uuid(), created_at: today(), tenant_id: tenantId,
+          proyecto_id: action.payload.proyecto_id,
+          nombre_libre: action.payload.nombre_libre || '',
+          unidad_libre: action.payload.unidad_libre || 'und',
+          cantidad_presupuestada: parseFloat(action.payload.cantidad_presupuestada || 0),
+          material_id: action.payload.material_id || null,
+          actividad_id: action.payload.actividad_id || null,
+          etapa_id: action.payload.etapa_id || null,
+          sub_etapa_id: action.payload.sub_etapa_id || null,
+          es_adicional: action.payload.es_adicional || false,
+        }
         await supabase.from('materiales_presupuestados').insert(item)
         dispatch({ type: 'ADD_MAT_PRES', payload: item })
         break
       }
       case 'UPD_MAT_PRES': {
         const { id, ...fields } = action.payload
-        await supabase.from('materiales_presupuestados').update(fields).eq('id', id)
-        dispatch(action)
+        const upd = {
+          nombre_libre: fields.nombre_libre || '',
+          unidad_libre: fields.unidad_libre || 'und',
+          cantidad_presupuestada: parseFloat(fields.cantidad_presupuestada || 0),
+          material_id: fields.material_id || null,
+          actividad_id: fields.actividad_id || null,
+          etapa_id: fields.etapa_id || null,
+          sub_etapa_id: fields.sub_etapa_id || null,
+          es_adicional: fields.es_adicional || false,
+        }
+        await supabase.from('materiales_presupuestados').update(upd).eq('id', id)
+        dispatch({ type: 'UPD_MAT_PRES', payload: { ...upd, id } })
         break
       }
       case 'DEL_MAT_PRES': {
