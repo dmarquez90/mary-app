@@ -168,7 +168,31 @@ export function StoreProvider({ children, tenantId }) {
         break
       }
       case 'DEL_PROYECTO': {
-        await supabase.from('proyectos').delete().eq('id', action.payload)
+        const pid = action.payload
+        // Eliminar todos los datos relacionados antes de eliminar el proyecto
+        await supabase.from('presupuesto').delete().eq('proyecto_id', pid)
+        await supabase.from('fases').delete().eq('proyecto_id', pid)
+        await supabase.from('materiales_presupuestados').delete().eq('proyecto_id', pid)
+        await supabase.from('salidas').delete().eq('proyecto_id', pid)
+        await supabase.from('entradas').delete().eq('proyecto_id', pid)
+        await supabase.from('costos_directos').delete().eq('proyecto_id', pid)
+        await supabase.from('nominas').delete().eq('proyecto_id', pid)
+        await supabase.from('subcontratos').delete().eq('proyecto_id', pid)
+        await supabase.from('equipos').delete().eq('proyecto_id', pid)
+        await supabase.from('costos_indirectos').delete().eq('proyecto_id', pid)
+        // Eliminar solicitudes y sus items
+        const { data: sols } = await supabase.from('solicitudes').select('id').eq('proyecto_id', pid)
+        if (sols?.length) {
+          await supabase.from('solicitud_items').delete().in('solicitud_id', sols.map(s=>s.id))
+          await supabase.from('solicitudes').delete().eq('proyecto_id', pid)
+        }
+        // Eliminar OCs y sus items
+        const { data: ocs } = await supabase.from('ordenes_compra').select('id').eq('proyecto_id', pid)
+        if (ocs?.length) {
+          await supabase.from('ordenes_compra_items').delete().in('oc_id', ocs.map(o=>o.id))
+          await supabase.from('ordenes_compra').delete().eq('proyecto_id', pid)
+        }
+        await supabase.from('proyectos').delete().eq('id', pid)
         dispatch(action)
         break
       }
