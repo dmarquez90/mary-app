@@ -168,17 +168,13 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
 export default function Compras() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
-  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
+  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales } = state
 
-  const [tab, setTab]           = useState(0)
-  const [drawer, setDrawer]     = useState(null)
-  const [form, setForm]         = useState({})
-  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
-  const [modoGuiado, setModoGuiado]       = useState(true)
-  const [guiaEtapa, setGuiaEtapa]         = useState('')
-  const [guiaSubEtapa, setGuiaSubEtapa]   = useState('')
-  const [guiaActividad, setGuiaActividad] = useState('')
-  const [detail, setDetail]     = useState(null)
+  const [tab, setTab]       = useState(0)
+  const [drawer, setDrawer] = useState(null)
+  const [form, setForm]     = useState({})
+  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+  const [detail, setDetail] = useState(null)
   const [printDoc, setPrintDoc] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -193,42 +189,13 @@ export default function Compras() {
     return `SOL-${new Date().getFullYear()}-${String(n).padStart(3,'0')}`
   }
 
-  // Jerarquía guiada
-  const etapasGuia    = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'etapa')
-  const subEtapasGuia = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'sub_etapa' && (!guiaEtapa || b.parent_id === guiaEtapa))
-  const actsGuia      = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad' && (!guiaSubEtapa || b.parent_id === guiaSubEtapa))
-
-  // Materiales presupuestados de la actividad seleccionada
-  const matPresActiv = guiaActividad
-    ? materiales_presupuestados.filter(mp => mp.proyecto_id === form.proyecto_id && mp.actividad_id === guiaActividad)
-    : []
-
-  const cargarMatPresEnItems = () => {
-    if (!matPresActiv.length) return
-    const items = matPresActiv.map(mp => {
-      const mat = materiales.find(m => m.id === mp.material_id)
-      return {
-        mat_pres_id: mp.id,
-        material_id: mp.material_id || '',
-        descripcion_libre: mp.nombre_libre || mat?.descripcion || '',
-        cantidad: '',
-        cantidad_presupuestada: parseFloat(mp.cantidad_presupuestada || 0),
-        unidad: mp.unidad_libre || mat?.unidad || 'und',
-        actividad_id: guiaActividad,
-        es_adicional: false,
-        observaciones: '',
-      }
-    })
-    setSolItems(items)
-  }
-
   const saveSol = () => {
-    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre || i.mat_pres_id) && i.cantidad)
-    if (!form.proyecto_id || !validItems.length) return
+    if (!form.proyecto_id || solItems.every(i => !i.material_id)) return
+    const validItems = solItems.filter(i => i.material_id && i.cantidad)
     dispatch({ type: 'ADD_SOLICITUD', payload: {
       solicitud: {
         proyecto_id:             form.proyecto_id,
-        actividad_id:            guiaActividad || null,
+        actividad_id:            null,
         folio:                   form.folio || genFolio(),
         justificacion:           form.justificacion || '',
         nombre_solicitante:      form.nombre_solicitante || '',
@@ -239,25 +206,25 @@ export default function Compras() {
         prioridad:               form.prioridad || 'normal',
         observaciones_generales: form.observaciones_generales || '',
       },
-      items: validItems.map(it => ({
-        material_id:            it.material_id || null,
-        descripcion:            it.descripcion_libre || '',
-        cantidad:               parseFloat(it.cantidad || 0),
-        unidad:                 it.unidad || 'und',
-        actividad_id:           it.actividad_id || guiaActividad || null,
-        mat_pres_id:            it.mat_pres_id || null,
-        es_adicional:           it.es_adicional || false,
-        cantidad_presupuestada: parseFloat(it.cantidad_presupuestada || 0),
-        observaciones:          it.observaciones || '',
-      }))
+      items: validItems
     }})
     setDrawer(null)
-    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
-    setGuiaEtapa(''); setGuiaSubEtapa(''); setGuiaActividad('')
+    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
   }
+
+  const [ocItems, setOcItems] = useState([])
+  const setOcItem = (idx, k, v) => setOcItems(items => items.map((it,i) => i===idx ? {...it,[k]:v} : it))
+
+  const ocSubtotal = ocItems.reduce((s,it) => s + (parseFloat(it.cantidad||0)*parseFloat(it.precio_unitario||0)), 0)
+  const ocImpPct   = parseFloat(form.impuesto_pct||0)
+  const ocImpMonto = ocSubtotal * (ocImpPct/100)
+  const ocTotal    = ocSubtotal + ocImpMonto
+
+  const fmt2 = (n) => new Intl.NumberFormat('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n||0)
 
   const saveOC = () => {
     if (!form.solicitud_id || !form.proveedor) return
+    const moneda = proyectos.find(p => p.id === solicitudes.find(s=>s.id===form.solicitud_id)?.proyecto_id)?.moneda || 'USD'
     dispatch({ type:'ADD_OC', payload: {
       solicitud_id:       form.solicitud_id,
       proveedor:          form.proveedor,
@@ -269,8 +236,16 @@ export default function Compras() {
       aprobador_nombre:   form.aprobador_nombre || '',
       aprobador_cargo:    form.aprobador_cargo || '',
       notas:              form.notas || '',
+      condiciones_pago:   form.condiciones_pago || 'contado',
+      moneda,
+      impuesto_pct:       ocImpPct,
+      subtotal:           ocSubtotal,
+      impuesto_monto:     ocImpMonto,
+      monto_total:        ocTotal,
+      items:              ocItems,
     }})
     setDrawer(null)
+    setOcItems([])
   }
 
   const confirmDelete = () => {
@@ -285,7 +260,7 @@ export default function Compras() {
   const detOC      = ordenes_compra.find(oc => oc.id === detail)
   const detOCItems = detOC ? solicitud_items.filter(i => i.solicitud_id === detOC.solicitud_id) : []
 
-  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
+  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
@@ -299,7 +274,11 @@ export default function Compras() {
     setPrintDoc({ type:'sol', sol, items, proy })
   }
   const openPrintOC = (oc) => {
-    const items = solicitud_items.filter(i => i.solicitud_id === oc.solicitud_id)
+    const { ordenes_compra_items = [] } = state
+    const ocItemsData = ordenes_compra_items.filter(i => i.oc_id === oc.id)
+    const items = ocItemsData.length > 0
+      ? ocItemsData
+      : solicitud_items.filter(i => i.solicitud_id === oc.solicitud_id)
     const proy  = proyectos.find(p => p.id === oc.proyecto_id)
     setPrintDoc({ type:'oc', oc, items, proy })
   }
@@ -359,8 +338,7 @@ export default function Compras() {
         {tab === 0 && (
           <PrimaryBtn onClick={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
-            setModoGuiado(true); setGuiaEtapa(''); setGuiaSubEtapa(''); setGuiaActividad('')
+            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
             setDrawer('sol')
           }}>{t('comp_new_sol')}</PrimaryBtn>
         )}
@@ -390,8 +368,7 @@ export default function Compras() {
         solicitudes.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={t('comp_new_sol')} onAction={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', mat_pres_id:'', es_adicional:false, descripcion_libre:'', observaciones:'' }])
-            setModoGuiado(true); setGuiaEtapa(''); setGuiaSubEtapa(''); setGuiaActividad('')
+            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
             setDrawer('sol')
           }} />
         ) : (
@@ -540,53 +517,6 @@ export default function Compras() {
           <textarea className={inputCls} rows={2} value={form.justificacion||''} onChange={set('justificacion')} placeholder={t('comp_form_justification_ph')} />
         </Field>
 
-        {/* SELECTOR GUIADO / LIBRE */}
-        <div className="flex gap-2 border border-gray-200 rounded-lg p-1 bg-gray-50">
-          <button onClick={() => setModoGuiado(true)}
-            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${modoGuiado ? 'bg-white shadow-sm text-[#1B3A6B]' : 'text-gray-500'}`}>
-            {t('btn_cancel') === 'Cancel' ? 'Guided by budget' : 'Guiado por presupuesto'}
-          </button>
-          <button onClick={() => setModoGuiado(false)}
-            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${!modoGuiado ? 'bg-white shadow-sm text-[#1B3A6B]' : 'text-gray-500'}`}>
-            {t('btn_cancel') === 'Cancel' ? 'Free selection' : 'Selección libre'}
-          </button>
-        </div>
-
-        {/* MODO GUIADO */}
-        {modoGuiado && form.proyecto_id && (
-          <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/30 flex flex-col gap-2">
-            <p className="text-xs font-semibold text-gray-500">{t('btn_cancel') === 'Cancel' ? 'Select stage / activity' : 'Selecciona etapa / actividad'}</p>
-            <select className={selectCls} value={guiaEtapa} onChange={e => { setGuiaEtapa(e.target.value); setGuiaSubEtapa(''); setGuiaActividad('') }}>
-              <option value="">{t('btn_cancel') === 'Cancel' ? '— Stage —' : '— Etapa —'}</option>
-              {etapasGuia.map(e => <option key={e.id} value={e.id}>{e.code} {e.descripcion}</option>)}
-            </select>
-            {guiaEtapa && (
-              <select className={selectCls} value={guiaSubEtapa} onChange={e => { setGuiaSubEtapa(e.target.value); setGuiaActividad('') }}>
-                <option value="">{t('btn_cancel') === 'Cancel' ? '— Sub-stage —' : '— Sub-etapa —'}</option>
-                {subEtapasGuia.map(s => <option key={s.id} value={s.id}>{s.code} {s.descripcion}</option>)}
-              </select>
-            )}
-            {guiaEtapa && (
-              <select className={selectCls} value={guiaActividad} onChange={e => { setGuiaActividad(e.target.value) }}>
-                <option value="">{t('btn_cancel') === 'Cancel' ? '— Activity —' : '— Actividad —'}</option>
-                {actsGuia.map(a => <option key={a.id} value={a.id}>{a.code} {a.descripcion}</option>)}
-              </select>
-            )}
-            {guiaActividad && matPresActiv.length > 0 && (
-              <button onClick={cargarMatPresEnItems}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg text-white"
-                style={{ background:BRAND }}>
-                {t('btn_cancel') === 'Cancel' ? `Load ${matPresActiv.length} budgeted material(s)` : `Cargar ${matPresActiv.length} material(es) presupuestado(s)`}
-              </button>
-            )}
-            {guiaActividad && matPresActiv.length === 0 && (
-              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">
-                {t('btn_cancel') === 'Cancel' ? 'No budgeted materials for this activity' : 'No hay materiales presupuestados para esta actividad'}
-              </p>
-            )}
-          </div>
-        )}
-
         <div className="border-t border-gray-100 pt-3">
           <div className="flex items-center justify-between mb-3">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('comp_form_items')} *</label>
@@ -596,94 +526,47 @@ export default function Compras() {
             </button>
           </div>
           <div className="flex flex-col gap-3">
-            {solItems.map((it, idx) => {
-              const mpRef = it.mat_pres_id ? materiales_presupuestados.find(mp => mp.id === it.mat_pres_id) : null
-              const canSolicitar = !mpRef || parseFloat(it.cantidad||0) <= parseFloat(mpRef.cantidad_presupuestada||0)
-              const esExceso = mpRef && parseFloat(it.cantidad||0) > parseFloat(mpRef.cantidad_presupuestada||0)
-              return (
-                <div key={idx} className={`rounded-xl p-3 flex flex-col gap-2 border ${esExceso ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200 bg-gray-50'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
-                      {mpRef && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">{t('btn_cancel') === 'Cancel' ? 'Budgeted' : 'Presupuestado'}</span>}
-                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{t('btn_cancel') === 'Cancel' ? 'Additional' : 'Adicional'}</span>}
-                    </div>
-                    {solItems.length > 1 && (
-                      <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
-                    )}
-                  </div>
-
-                  {/* Nombre del material */}
-                  {mpRef ? (
-                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
-                      <span className="text-sm text-gray-800 flex-1">{it.descripcion_libre || mpRef.nombre_libre}</span>
-                      <span className="text-xs text-gray-400">{it.unidad}</span>
-                    </div>
-                  ) : (
-                    <MaterialSearchInput
-                      materiales={activos}
-                      value={it.material_id}
-                      onChange={v => {
-                        const mat = activos.find(m => m.id === v)
-                        setSolItem(idx, 'material_id', v)
-                        if (mat) { setSolItem(idx, 'unidad', mat.unidad || 'und'); setSolItem(idx, 'descripcion_libre', mat.descripcion) }
-                      }}
-                      placeholder={t('inv_form_material') + '...'}
-                    />
+            {solItems.map((it, idx) => (
+              <div key={idx} className="rounded-xl p-3 flex flex-col gap-2 border border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
+                  {solItems.length > 1 && (
+                    <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕ Remove</button>
                   )}
-
-                  {/* Si no está en catálogo, campo libre */}
-                  {!it.material_id && !mpRef && (
-                    <input className={inputCls}
-                      placeholder={t('btn_cancel') === 'Cancel' ? 'Material description (if not in catalog)' : 'Descripción del material (si no está en catálogo)'}
-                      value={it.descripcion_libre||''} onChange={e=>setSolItem(idx,'descripcion_libre',e.target.value)}/>
-                  )}
-
-                  <div className="flex gap-2 items-start">
-                    <div className="flex-1">
-                      <input type="number"
-                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 ${esExceso ? 'border-amber-400 focus:border-amber-400 focus:ring-amber-200' : 'border-gray-200 focus:border-[#1B3A6B] focus:ring-[#1B3A6B]'}`}
-                        style={{ background:'#F2F2F2' }}
-                        placeholder={t('lbl_quantity') + ' *'}
-                        value={it.cantidad} onChange={e=>setSolItem(idx,'cantidad',e.target.value)} min="0" step="0.01"/>
-                      {mpRef && (
-                        <p className={`text-xs mt-0.5 ${esExceso ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
-                          {t('btn_cancel') === 'Cancel' ? 'Budgeted:' : 'Presupuestado:'} {mpRef.cantidad_presupuestada} {it.unidad}
-                          {esExceso && (t('btn_cancel') === 'Cancel' ? ' ⚠ Exceeds budget' : ' ⚠ Excede presupuesto')}
-                        </p>
-                      )}
-                    </div>
-                    <input
-                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
-                      style={{ background:'#F2F2F2' }}
-                      placeholder={t('lbl_unit')}
-                      value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
-                  </div>
-
-                  {!mpRef && form.proyecto_id && (
-                    <select className={selectCls} value={it.actividad_id||''} onChange={e=>setSolItem(idx,'actividad_id',e.target.value)}>
-                      <option value="">— {t('comp_form_activity')} —</option>
-                      {todasActsDelProy.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
-                    </select>
-                  )}
-
-                  {!mpRef && (
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#1B3A6B]"
-                        checked={it.es_adicional||false}
-                        onChange={e=>setSolItem(idx,'es_adicional',e.target.checked)}/>
-                      <span className="text-xs text-gray-500">
-                        {t('btn_cancel') === 'Cancel' ? 'Additional (not in budget)' : 'Adicional (no estaba en presupuesto)'}
-                      </span>
-                    </label>
-                  )}
-
-                  <input className={inputCls}
-                    placeholder={t('lbl_notes') + '...'}
-                    value={it.observaciones||''} onChange={e=>setSolItem(idx,'observaciones',e.target.value)}/>
                 </div>
-              )
-            })}
+                <MaterialSearchInput
+                  materiales={activos}
+                  value={it.material_id}
+                  onChange={v => {
+                    const mat = activos.find(m => m.id === v)
+                    setSolItem(idx, 'material_id', v)
+                    if (mat) setSolItem(idx, 'unidad', mat.unidad || 'und')
+                  }}
+                  placeholder={t('inv_form_material') + '...'}
+                />
+                <div className="flex gap-2">
+                  <input type="number"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B]"
+                    style={{ background:'#F2F2F2' }}
+                    placeholder={t('lbl_quantity') + ' *'}
+                    value={it.cantidad} onChange={e=>setSolItem(idx,'cantidad',e.target.value)} min="0" step="0.01"/>
+                  <input
+                    className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+                    style={{ background:'#F2F2F2' }}
+                    placeholder={t('lbl_unit')}
+                    value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
+                </div>
+                {form.proyecto_id && (
+                  <select className={selectCls} value={it.actividad_id||''} onChange={e=>setSolItem(idx,'actividad_id',e.target.value)}>
+                    <option value="">— {t('comp_form_activity')} ({t('btn_cancel') === 'Cancel' ? 'optional' : 'opcional'}) —</option>
+                    {todasActsDelProy.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
+                  </select>
+                )}
+                <input className={inputCls}
+                  placeholder={t('lbl_notes') + (t('btn_cancel') === 'Cancel' ? ' / Remarks (optional)' : ' / Observaciones (opcional)')}
+                  value={it.observaciones||''} onChange={e=>setSolItem(idx,'observaciones',e.target.value)}/>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -693,14 +576,14 @@ export default function Compras() {
 
         <div className="flex gap-2 mt-auto pt-2">
           <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>(!i.material_id&&!i.descripcion_libre&&!i.mat_pres_id)||!i.cantidad)} className="flex-1">
+          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>!i.material_id||!i.cantidad)} className="flex-1">
             {t('comp_form_submit')}
           </PrimaryBtn>
         </div>
       </Drawer>
 
       {/* DRAWER OC */}
-      <Drawer open={drawer==='oc'} onClose={() => setDrawer(null)} title={t('comp_form_oc_title')} width={520}>
+      <Drawer open={drawer==='oc'} onClose={() => setDrawer(null)} title={t('comp_form_oc_title')} width={600}>
         <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">{t('comp_form_sol_ref')} *</label>
           <SolicitudSearchInput
@@ -710,14 +593,109 @@ export default function Compras() {
             proyectos={proyectos}
             value={form.solicitud_id || ''}
             onChange={sol => {
-              if (!sol) { setForm(f => ({ ...f, solicitud_id:'', solicitante_nombre:'', solicitante_cargo:'' })); return }
+              if (!sol) { setForm(f => ({ ...f, solicitud_id:'', solicitante_nombre:'', solicitante_cargo:'' })); setOcItems([]); return }
               setForm(f => ({ ...f, solicitud_id: sol.id, solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'' }))
+              // Pre-cargar items de la solicitud
+              const items = solicitud_items.filter(i => i.solicitud_id === sol.id)
+              setOcItems(items.map(it => {
+                const m = materiales.find(x => x.id === it.material_id)
+                return {
+                  solicitud_item_id: it.id,
+                  material_id:       it.material_id || null,
+                  descripcion:       m?.descripcion || it.descripcion || '',
+                  codigo:            m?.codigo || '',
+                  unidad:            it.unidad || 'und',
+                  cantidad:          parseFloat(it.cantidad || 0),
+                  precio_unitario:   '',
+                  impuesto_pct:      '',
+                }
+              }))
             }}
           />
         </div>
         <Field label={t('comp_form_supplier')} required>
           <input className={inputCls} value={form.proveedor||''} onChange={set('proveedor')} placeholder={t('comp_form_supplier_ph')} />
         </Field>
+
+        {/* CONDICIONES DE PAGO */}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t('btn_cancel')==='Cancel' ? 'Payment conditions' : 'Condiciones de pago'}>
+            <select className={selectCls} value={form.condiciones_pago||'contado'} onChange={set('condiciones_pago')}>
+              <option value="contado">{t('btn_cancel')==='Cancel' ? 'Cash' : 'Contado'}</option>
+              <option value="15_dias">{t('btn_cancel')==='Cancel' ? '15 days credit' : 'Crédito 15 días'}</option>
+              <option value="30_dias">{t('btn_cancel')==='Cancel' ? '30 days credit' : 'Crédito 30 días'}</option>
+              <option value="45_dias">{t('btn_cancel')==='Cancel' ? '45 days credit' : 'Crédito 45 días'}</option>
+              <option value="60_dias">{t('btn_cancel')==='Cancel' ? '60 days credit' : 'Crédito 60 días'}</option>
+              <option value="otro">{t('btn_cancel')==='Cancel' ? 'Other' : 'Otro'}</option>
+            </select>
+          </Field>
+          <Field label={t('btn_cancel')==='Cancel' ? 'Tax (%)' : 'Impuesto (%)'}>
+            <input type="number" className={inputCls} value={form.impuesto_pct||''} onChange={set('impuesto_pct')} placeholder="15" min="0" max="100" step="0.01" />
+          </Field>
+        </div>
+
+        {/* ITEMS CON PRECIOS */}
+        {ocItems.length > 0 && (
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              {t('btn_cancel')==='Cancel' ? 'Items & Prices (from proforma)' : 'Ítems y Precios (de la proforma)'}
+            </p>
+            <div className="flex flex-col gap-2">
+              {ocItems.map((it, idx) => {
+                const subtotalItem = parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)
+                const impItem = subtotalItem * (parseFloat(it.impuesto_pct || form.impuesto_pct || 0)/100)
+                const totalItem = subtotalItem + impItem
+                return (
+                  <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      {it.codigo && <span className="font-mono text-xs text-gray-400">{it.codigo}</span>}
+                      <span className="text-sm font-medium text-gray-800 flex-1">{it.descripcion}</span>
+                      <span className="text-xs text-gray-400">{it.cantidad} {it.unidad}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">{t('btn_cancel')==='Cancel' ? 'Unit price *' : 'Precio unitario *'}</p>
+                        <input type="number" className={inputCls} value={it.precio_unitario||''} min="0" step="0.01"
+                          placeholder="0.00"
+                          onChange={e => setOcItem(idx,'precio_unitario',e.target.value)} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">{t('btn_cancel')==='Cancel' ? 'Tax % (override)' : 'Imp. % (individual)'}</p>
+                        <input type="number" className={inputCls} value={it.impuesto_pct||''} min="0" max="100" step="0.01"
+                          placeholder={form.impuesto_pct||'—'}
+                          onChange={e => setOcItem(idx,'impuesto_pct',e.target.value)} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Total</p>
+                        <div className="border border-gray-200 rounded-lg px-3 py-2 bg-white text-sm font-mono font-medium" style={{color:BRAND}}>
+                          {fmt2(totalItem)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* TOTALES */}
+            <div className="mt-3 border border-gray-200 rounded-xl overflow-hidden">
+              {[
+                [t('btn_cancel')==='Cancel' ? 'Subtotal' : 'Subtotal', fmt2(ocSubtotal)],
+                [t('btn_cancel')==='Cancel' ? `Tax (${ocImpPct}%)` : `Impuesto (${ocImpPct}%)`, fmt2(ocImpMonto)],
+              ].map(([label, val], i) => (
+                <div key={i} className="flex justify-between px-4 py-2 border-b border-gray-100 text-sm">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-mono text-gray-700">{val}</span>
+                </div>
+              ))}
+              <div className="flex justify-between px-4 py-2.5 bg-gray-50">
+                <span className="font-semibold text-gray-800">TOTAL</span>
+                <span className="font-mono font-bold text-lg" style={{color:BRAND}}>{fmt2(ocTotal)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('comp_prepared_by')}</p>
           <div className="grid grid-cols-2 gap-3">
@@ -773,21 +751,12 @@ export default function Compras() {
             {detItems.map(it => {
               const m   = materiales.find(x=>x.id===it.material_id)
               const act = presupuesto.find(b=>b.id===it.actividad_id)
-              const nombre = m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')
               return (
                 <div key={it.id} className="py-2 border-b border-gray-50">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-700 flex items-center gap-1.5">
-                      {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
-                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Adicional</span>}
-                    </span>
+                    <span className="text-gray-700">{m?.codigo} — {m?.descripcion || '—'}</span>
                     <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
                   </div>
-                  {it.cantidad_presupuestada > 0 && (
-                    <p className={`text-xs mt-0.5 ${parseFloat(it.cantidad) > parseFloat(it.cantidad_presupuestada) ? 'text-amber-600' : 'text-gray-400'}`}>
-                      Presupuestado: {it.cantidad_presupuestada} {it.unidad}
-                    </p>
-                  )}
                   {act && <p className="text-xs text-gray-400 mt-0.5">{act.code} — {act.descripcion}</p>}
                   {it.observaciones && <p className="text-xs text-gray-400 italic mt-0.5">{it.observaciones}</p>}
                 </div>
@@ -950,13 +919,11 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
           {items.map((it, idx) => {
             const m   = materiales.find(x => x.id === it.material_id)
             const act = presupuesto.find(b => b.id === it.actividad_id)
-            const codigo = m?.codigo || '—'
-            const descripcion = m?.descripcion || it.descripcion || '—'
             return (
               <tr key={it.id} style={{ background: idx%2===0 ? '#fff' : '#F8FAFC' }}>
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
-                <td style={{ ...cell, fontFamily:'monospace' }}>{codigo}</td>
-                <td style={cell}>{descripcion}{it.es_adicional ? ' *' : ''}</td>
+                <td style={{ ...cell, fontFamily:'monospace' }}>{m?.codigo || '—'}</td>
+                <td style={cell}>{m?.descripcion || '—'}</td>
                 <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
                 <td style={{ ...cell, textAlign:'center', fontWeight:'bold' }}>{it.cantidad}</td>
                 <td style={{ ...cell, fontSize:'10px' }}>{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
@@ -1007,31 +974,67 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
 // ── PRINT: ORDEN DE COMPRA ────────────────────────────────
 function PrintOC({ doc, materiales, presupuesto, t }) {
   const { oc, items, proy } = doc
-  const cell = { padding:'6px 8px', border:'1px solid #ccc', fontSize:'11px' }
-  const hdr  = { ...cell, background:BRAND, color:'white', fontWeight:'bold', fontSize:'10px' }
-  const lbl  = { ...cell, background:'#EEF2F7', fontWeight:'bold', color:BRAND }
+  const cell    = { padding:'6px 8px', border:'1px solid #ccc', fontSize:'11px' }
+  const hdr     = { ...cell, background:BRAND, color:'white', fontWeight:'bold', fontSize:'10px' }
+  const lbl     = { ...cell, background:'#EEF2F7', fontWeight:'bold', color:BRAND }
+  const numCell = { ...cell, textAlign:'right', fontFamily:'monospace' }
+
+  const fmt2 = (n) => new Intl.NumberFormat('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n||0)
+
+  // Calcular totales por ítem
+  const itemsConTotales = items.map(it => {
+    const precio    = parseFloat(it.precio_unitario || 0)
+    const cantidad  = parseFloat(it.cantidad || 0)
+    const subtotal  = precio * cantidad
+    const impPct    = parseFloat(it.impuesto_pct !== undefined && it.impuesto_pct !== '' ? it.impuesto_pct : (oc.impuesto_pct || 0))
+    const impMonto  = subtotal * (impPct/100)
+    const total     = subtotal + impMonto
+    return { ...it, precio, cantidad, subtotal, impPct, impMonto, total }
+  })
+
+  const subtotalOC  = itemsConTotales.reduce((s,it) => s + it.subtotal, 0)
+  const impuestoOC  = itemsConTotales.reduce((s,it) => s + it.impMonto, 0)
+  const totalOC     = subtotalOC + impuestoOC
+  const moneda      = oc.moneda || 'USD'
+
+  const condPago = {
+    contado: isEn => isEn ? 'Cash' : 'Contado',
+    '15_dias': isEn => isEn ? '15 days credit' : 'Crédito 15 días',
+    '30_dias': isEn => isEn ? '30 days credit' : 'Crédito 30 días',
+    '45_dias': isEn => isEn ? '45 days credit' : 'Crédito 45 días',
+    '60_dias': isEn => isEn ? '60 days credit' : 'Crédito 60 días',
+    otro: isEn => isEn ? 'Other' : 'Otro',
+  }
 
   const isEn = t('btn_save') === 'Save'
   const L = {
-    title:      isEn ? 'PURCHASE ORDER' : 'ORDEN DE COMPRA',
-    subtitle:   isEn ? 'Purchase Order' : 'Orden de Compra',
-    oc:         isEn ? 'PO No.' : 'N° OC',
-    project:    isEn ? 'PROJECT' : 'PROYECTO',
-    supplier:   isEn ? 'SUPPLIER' : 'PROVEEDOR',
-    status:     isEn ? 'STATUS' : 'ESTADO',
-    approval:   isEn ? 'APPROVAL DATE' : 'FECHA APROBACIÓN',
-    num:        '#',
-    code:       isEn ? 'CODE' : 'CÓDIGO',
-    desc:       isEn ? 'DESCRIPTION' : 'DESCRIPCIÓN',
-    unit:       isEn ? 'UNIT' : 'UNIDAD',
-    qty:        isEn ? 'QUANTITY' : 'CANTIDAD',
-    activity:   isEn ? 'ACTIVITY' : 'ACTIVIDAD',
-    notes:      isEn ? 'NOTES' : 'NOTAS',
-    elaborated: isEn ? 'PREPARED BY' : 'ELABORADO POR',
-    requested:  isEn ? 'REQUESTED BY' : 'SOLICITADO POR',
-    authorized: isEn ? 'AUTHORIZED BY' : 'AUTORIZADO POR',
-    date:       isEn ? 'Date' : 'Fecha',
-    footer:     isEn
+    title:       isEn ? 'PURCHASE ORDER' : 'ORDEN DE COMPRA',
+    subtitle:    isEn ? 'Purchase Order' : 'Orden de Compra',
+    oc:          isEn ? 'PO No.' : 'N° OC',
+    project:     isEn ? 'PROJECT' : 'PROYECTO',
+    supplier:    isEn ? 'SUPPLIER' : 'PROVEEDOR',
+    status:      isEn ? 'STATUS' : 'ESTADO',
+    payment:     isEn ? 'PAYMENT' : 'CONDICIONES DE PAGO',
+    approval:    isEn ? 'APPROVAL DATE' : 'FECHA APROBACIÓN',
+    currency:    isEn ? 'CURRENCY' : 'MONEDA',
+    num:         '#',
+    code:        isEn ? 'CODE' : 'CÓDIGO',
+    desc:        isEn ? 'DESCRIPTION' : 'DESCRIPCIÓN',
+    unit:        isEn ? 'UNIT' : 'UNIDAD',
+    qty:         isEn ? 'QTY' : 'CANT.',
+    unitPrice:   isEn ? 'UNIT PRICE' : 'P. UNITARIO',
+    subtotal:    isEn ? 'SUBTOTAL' : 'SUBTOTAL',
+    tax:         isEn ? 'TAX %' : 'IMP. %',
+    total:       isEn ? 'TOTAL' : 'TOTAL',
+    notes:       isEn ? 'NOTES' : 'NOTAS',
+    elaborated:  isEn ? 'PREPARED BY' : 'ELABORADO POR',
+    requested:   isEn ? 'REQUESTED BY' : 'SOLICITADO POR',
+    authorized:  isEn ? 'AUTHORIZED BY' : 'AUTORIZADO POR',
+    date:        isEn ? 'Date' : 'Fecha',
+    subtotalLbl: isEn ? 'SUBTOTAL' : 'SUBTOTAL',
+    taxLbl:      isEn ? `TAX (${oc.impuesto_pct||0}%)` : `IMPUESTO (${oc.impuesto_pct||0}%)`,
+    totalLbl:    isEn ? 'GRAND TOTAL' : 'TOTAL GENERAL',
+    footer:      isEn
       ? 'Marquez Project Solutions LLC · Format: F-OC-001 · Rev. 2026 · Controlled document – Do not duplicate without authorization'
       : 'Marquez Project Solutions LLC · Formato: F-OC-001 · Rev. 2026 · Documento controlado – No duplicar sin autorización',
   }
@@ -1072,49 +1075,72 @@ function PrintOC({ doc, materiales, presupuesto, t }) {
             <td style={lbl}>{L.approval}</td>
             <td style={cell}>{oc.fecha_aprobacion || '___________________'}</td>
           </tr>
+          <tr>
+            <td style={lbl}>{L.payment}</td>
+            <td style={cell}>{condPago[oc.condiciones_pago]?.(isEn) || (oc.condiciones_pago || '—')}</td>
+            <td style={lbl}>{L.currency}</td>
+            <td style={cell}>{moneda}</td>
+          </tr>
         </tbody>
       </table>
 
-      {/* TABLA */}
+      {/* TABLA DE MATERIALES CON PRECIOS */}
       <table style={{ width:'100%', borderCollapse:'collapse', marginTop:'8px' }}>
         <thead>
           <tr>
             <th style={{ ...hdr, width:'4%' }}>{L.num}</th>
-            <th style={{ ...hdr, width:'12%' }}>{L.code}</th>
-            <th style={{ ...hdr, width:'34%' }}>{L.desc}</th>
-            <th style={{ ...hdr, width:'8%' }}>{L.unit}</th>
-            <th style={{ ...hdr, width:'10%' }}>{L.qty}</th>
-            <th style={{ ...hdr, width:'32%' }}>{L.activity}</th>
+            <th style={{ ...hdr, width:'10%' }}>{L.code}</th>
+            <th style={{ ...hdr, width:'26%' }}>{L.desc}</th>
+            <th style={{ ...hdr, width:'6%' }}>{L.unit}</th>
+            <th style={{ ...hdr, width:'7%', textAlign:'right' }}>{L.qty}</th>
+            <th style={{ ...hdr, width:'13%', textAlign:'right' }}>{L.unitPrice}</th>
+            <th style={{ ...hdr, width:'13%', textAlign:'right' }}>{L.subtotal}</th>
+            <th style={{ ...hdr, width:'7%', textAlign:'right' }}>{L.tax}</th>
+            <th style={{ ...hdr, width:'14%', textAlign:'right' }}>{L.total}</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it, idx) => {
-            const m   = materiales.find(x => x.id === it.material_id)
-            const act = presupuesto.find(b => b.id === it.actividad_id)
-            const codigo = m?.codigo || '—'
+          {itemsConTotales.map((it, idx) => {
+            const m = materiales.find(x => x.id === it.material_id)
+            const codigo = m?.codigo || it.codigo || '—'
             const descripcion = m?.descripcion || it.descripcion || '—'
             return (
-              <tr key={it.id} style={{ background: idx%2===0 ? '#fff' : '#F8FAFC' }}>
+              <tr key={it.id || idx} style={{ background: idx%2===0 ? '#fff' : '#F8FAFC' }}>
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
-                <td style={{ ...cell, fontFamily:'monospace' }}>{codigo}</td>
+                <td style={{ ...cell, fontFamily:'monospace', fontSize:'10px' }}>{codigo}</td>
                 <td style={cell}>{descripcion}</td>
                 <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
-                <td style={{ ...cell, textAlign:'center', fontWeight:'bold' }}>{it.cantidad}</td>
-                <td style={{ ...cell, fontSize:'10px' }}>{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
+                <td style={{ ...numCell }}>{fmt2(it.cantidad)}</td>
+                <td style={{ ...numCell }}>{it.precio > 0 ? fmt2(it.precio) : '___________'}</td>
+                <td style={{ ...numCell }}>{it.precio > 0 ? fmt2(it.subtotal) : '___________'}</td>
+                <td style={{ ...numCell }}>{it.impPct > 0 ? `${it.impPct}%` : '—'}</td>
+                <td style={{ ...numCell, fontWeight:'bold' }}>{it.precio > 0 ? fmt2(it.total) : '___________'}</td>
               </tr>
             )
           })}
         </tbody>
       </table>
 
-      {oc.notas && (
-        <table style={{ width:'100%', borderCollapse:'collapse', marginTop:'-1px' }}>
-          <tbody><tr>
-            <td style={{ ...lbl, width:'15%' }}>{L.notes}</td>
-            <td style={cell}>{oc.notas}</td>
-          </tr></tbody>
-        </table>
-      )}
+      {/* TOTALES */}
+      <table style={{ width:'100%', borderCollapse:'collapse', marginTop:'-1px' }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cell, width:'72%', borderRight:'none' }} rowSpan={3}>
+              {oc.notas && <><strong style={{fontSize:'10px'}}>{L.notes}:</strong> {oc.notas}</>}
+            </td>
+            <td style={{ ...lbl, width:'14%', textAlign:'right' }}>{L.subtotalLbl}</td>
+            <td style={{ ...numCell, width:'14%', fontWeight:'bold' }}>{fmt2(subtotalOC)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...lbl, textAlign:'right' }}>{L.taxLbl}</td>
+            <td style={numCell}>{fmt2(impuestoOC)}</td>
+          </tr>
+          <tr>
+            <td style={{ ...lbl, textAlign:'right', background:BRAND, color:'white' }}>{L.totalLbl}</td>
+            <td style={{ ...numCell, fontWeight:'bold', fontSize:'13px', color:BRAND }}>{fmt2(totalOC)}</td>
+          </tr>
+        </tbody>
+      </table>
 
       {/* FIRMAS */}
       <table style={{ width:'100%', borderCollapse:'collapse', marginTop:'24px' }}>

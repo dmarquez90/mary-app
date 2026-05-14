@@ -459,32 +459,44 @@ export function StoreProvider({ children, tenantId }) {
 
       case 'ADD_OC': {
         const oc_number   = genOCCode(state.ordenes_compra)
-        const monto_total = (action.payload.items||[]).reduce((s, it) =>
-          s + (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
+        const monto_total = parseFloat(action.payload.monto_total || 0) ||
+          (action.payload.items||[]).reduce((s, it) =>
+            s + (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
         const oc = {
           id: uuid(), oc_number, estado: 'pendiente_aprobacion',
           created_at: today(), fecha_elaboracion: today(),
-          solicitud_id: action.payload.solicitud_id,
-          proyecto_id: action.payload.proyecto_id,
-          proveedor: action.payload.proveedor,
-          elaboro_nombre: action.payload.elaboro_nombre || '',
-          elaboro_cargo: action.payload.elaboro_cargo || '',
+          solicitud_id:       action.payload.solicitud_id,
+          proyecto_id:        action.payload.proyecto_id,
+          proveedor:          action.payload.proveedor,
+          elaboro_nombre:     action.payload.elaboro_nombre || '',
+          elaboro_cargo:      action.payload.elaboro_cargo || '',
           solicitante_nombre: action.payload.solicitante_nombre || '',
-          solicitante_cargo: action.payload.solicitante_cargo || '',
-          aprobador_nombre: action.payload.aprobador_nombre || '',
-          aprobador_cargo: action.payload.aprobador_cargo || '',
-          notas: action.payload.notas || '',
-          monto_total, tenant_id: tenantId,
+          solicitante_cargo:  action.payload.solicitante_cargo || '',
+          aprobador_nombre:   action.payload.aprobador_nombre || '',
+          aprobador_cargo:    action.payload.aprobador_cargo || '',
+          notas:              action.payload.notas || '',
+          condiciones_pago:   action.payload.condiciones_pago || 'contado',
+          moneda:             action.payload.moneda || 'USD',
+          impuesto_pct:       parseFloat(action.payload.impuesto_pct || 0),
+          subtotal:           parseFloat(action.payload.subtotal || 0),
+          impuesto_monto:     parseFloat(action.payload.impuesto_monto || 0),
+          monto_total,
+          tenant_id: tenantId,
         }
         const ocItems = (action.payload.items||[]).map(it => ({
           id: uuid(), oc_id: oc.id,
-          solicitud_item_id: it.solicitud_item_id || null,
-          material_id: it.material_id,
-          descripcion: it.descripcion || '',
-          cantidad: parseFloat(it.cantidad||0),
-          unidad: it.unidad || 'und',
-          precio_unitario: parseFloat(it.precio_unitario||0),
-          tenant_id: tenantId,
+          solicitud_item_id: it.solicitud_item_id || it.id || null,
+          material_id:       it.material_id || null,
+          descripcion:       it.descripcion || '',
+          codigo:            it.codigo || '',
+          cantidad:          parseFloat(it.cantidad||0),
+          unidad:            it.unidad || 'und',
+          precio_unitario:   parseFloat(it.precio_unitario||0),
+          subtotal:          parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0),
+          impuesto_pct:      parseFloat(it.impuesto_pct !== '' && it.impuesto_pct !== undefined ? it.impuesto_pct : (action.payload.impuesto_pct||0)),
+          impuesto_monto:    (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)) * (parseFloat(it.impuesto_pct !== '' && it.impuesto_pct !== undefined ? it.impuesto_pct : (action.payload.impuesto_pct||0))/100),
+          total:             (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)) * (1 + parseFloat(it.impuesto_pct !== '' && it.impuesto_pct !== undefined ? it.impuesto_pct : (action.payload.impuesto_pct||0))/100),
+          tenant_id:         tenantId,
         }))
         await supabase.from('ordenes_compra').insert(oc)
         if (ocItems.length) await supabase.from('ordenes_compra_items').insert(ocItems)
