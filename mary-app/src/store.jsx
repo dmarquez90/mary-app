@@ -212,7 +212,7 @@ export function StoreProvider({ children, tenantId }) {
           return
         }
         const stockInicial = parseFloat(action.payload.stock_actual) || 0
-        const item = { ...action.payload, id: uuid(), stock_actual: stockInicial, created_at: today(), tenant_id: tenantId }
+        const item = { ...action.payload, id: action.payload.id || uuid(), stock_actual: stockInicial, created_at: today(), tenant_id: tenantId }
         await supabase.from('materiales').insert(item)
         dispatch({ type: 'ADD_MATERIAL', payload: item })
 

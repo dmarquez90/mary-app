@@ -209,23 +209,23 @@ export default function Inventario() {
 
     let materialId = form.material_id
 
-    // Si el material no existe en el catálogo, crearlo primero
+    // Si el material no existe en el catálogo, crearlo primero con UUID fijo
     if (form._material_nuevo && form._mat_codigo) {
+      const nuevoId = crypto.randomUUID()
       const nuevoMat = {
-        codigo:          form._mat_codigo,
-        descripcion:     form._mat_nombre || form._oc_item_desc || '',
-        unidad:          form._mat_unidad || 'und',
-        stock_actual:    0,
-        stock_minimo:    parseFloat(form._mat_stock_min || 0),
+        id:               nuevoId,
+        codigo:           form._mat_codigo,
+        descripcion:      form._mat_nombre || form._oc_item_desc || '',
+        unidad:           form._mat_unidad || 'und',
+        stock_actual:     0,
+        stock_minimo:     parseFloat(form._mat_stock_min || 0),
         ubicacion_bodega: '',
-        categoria:       '',
-        precio_unitario: parseFloat(form.precio_unitario || 0),
-        activo:          true,
+        categoria:        '',
+        precio_unitario:  parseFloat(form.precio_unitario || 0),
+        activo:           true,
       }
-      // dispatch ADD_MATERIAL y obtener el nuevo ID
-      const tempId = crypto.randomUUID()
-      await dispatch({ type: 'ADD_MATERIAL', payload: { ...nuevoMat, id: tempId } })
-      materialId = tempId
+      await dispatch({ type: 'ADD_MATERIAL', payload: nuevoMat })
+      materialId = nuevoId
     }
 
     dispatch({ type: 'ADD_ENTRADA', payload: {
