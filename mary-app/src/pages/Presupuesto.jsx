@@ -116,7 +116,7 @@ export default function Presupuesto() {
         <EmptyState icon={Icons.budget} title={t('pres_no_project')} subtitle={t('pres_empty_sub')} />
       ) : (
         <>
-          <div className="bg-white border border-gray-100 rounded-xl mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0">
+          <div className="bg-white border border-gray-100 rounded-xl mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0 sticky top-0 z-20">
             {puedeEditar && !closed && <>
               <TBtn onClick={() => openAdd('etapa')}>
                 <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>
@@ -156,7 +156,7 @@ export default function Presupuesto() {
             <div className="bg-white border border-gray-100 rounded-xl rounded-t-none overflow-x-auto">
               <table className="w-full min-w-[860px]">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
+                  <tr className="bg-gray-50 border-b border-gray-100 sticky top-[52px] z-10">
                     {['ID',t('pres_col_desc'),t('pres_col_unit'),t('pres_col_qty'),t('pres_col_mo'),t('pres_col_mat'),t('pres_col_eq'),t('pres_col_uc'),t('pres_col_total')].map((h,i) => (
                       <th key={i} className={`px-3 py-3 text-xs text-gray-500 whitespace-nowrap ${i>=3?'text-right':'text-left'}`}>{h}</th>
                     ))}
@@ -293,3 +293,4 @@ export default function Presupuesto() {
     </div>
   )
 }
+
