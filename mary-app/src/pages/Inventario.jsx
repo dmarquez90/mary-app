@@ -346,6 +346,7 @@ export default function Inventario() {
                       t('inv_col_code'), t('inv_col_desc'),
                       isEs ? 'Categoría' : 'Category',
                       t('inv_col_unit'), t('inv_col_stock'), t('inv_col_min'),
+                      isEs ? 'Precio' : 'Price',
                       t('inv_col_location'), t('inv_col_status'),
                       puedeEditar ? '' : null
                     ].filter(h => h !== null).map((h,i) => (
@@ -370,6 +371,18 @@ export default function Inventario() {
                             {fmtNum(m.stock_actual)} {crit && <span className="text-xs">⚠</span>}
                           </td>
                           <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(m.stock_minimo)}</td>
+                          <td className="px-4 py-3 text-sm font-mono text-gray-600">
+                            {(() => {
+                              const entsM = entradas.filter(e => e.material_id === m.id)
+                              if (entsM.length > 0) {
+                                const totalCant = entsM.reduce((s,e) => s + parseFloat(e.cantidad||0), 0)
+                                const totalVal  = entsM.reduce((s,e) => s + parseFloat(e.cantidad||0) * parseFloat(e.precio_unitario||0), 0)
+                                const prom = totalCant > 0 ? totalVal / totalCant : 0
+                                return prom > 0 ? `${fmt(prom, m.moneda || 'USD')}` : '—'
+                              }
+                              return m.precio_unitario > 0 ? fmt(m.precio_unitario, 'USD') : '—'
+                            })()}
+                          </td>
                           <td className="px-4 py-3 text-xs text-gray-500">{m.ubicacion_bodega || '—'}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>

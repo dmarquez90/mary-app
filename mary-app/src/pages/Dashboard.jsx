@@ -26,33 +26,31 @@ export default function Dashboard() {
       const stock = parseFloat(mat.stock_actual || 0)
       if (stock <= 0) return total
 
-      // Entradas de este material ordenadas por fecha (FIFO = más antiguas primero)
       const entsOrdenadas = [...entradas]
         .filter(e => e.material_id === mat.id)
         .sort((a, b) => new Date(a.fecha_recepcion) - new Date(b.fecha_recepcion))
 
-      // Total salidas de este material
+      // Si no hay entradas, usar precio_unitario del catálogo como fallback
+      if (entsOrdenadas.length === 0) {
+        const precio = parseFloat(mat.precio_unitario || 0)
+        return total + (stock * precio)
+      }
+
       const totalSalidasMat = salidas
         .filter(s => s.material_id === mat.id)
         .reduce((s, sal) => s + parseFloat(sal.cantidad || 0), 0)
 
-      // Aplicar FIFO: consumir las entradas más antiguas primero
       let restante = totalSalidasMat
       let valorStock = 0
-      let cantidadEnStock = 0
 
       for (const entrada of entsOrdenadas) {
         const cantEntrada = parseFloat(entrada.cantidad || 0)
-        const precioEntrada = parseFloat(entrada.precio_unitario || 0)
-
+        const precioEntrada = parseFloat(entrada.precio_unitario || mat.precio_unitario || 0)
         if (restante >= cantEntrada) {
-          // Esta entrada ya fue consumida completamente
           restante -= cantEntrada
         } else {
-          // Esta entrada está parcialmente consumida
           const cantDisponible = cantEntrada - restante
           valorStock += cantDisponible * precioEntrada
-          cantidadEnStock += cantDisponible
           restante = 0
         }
       }
