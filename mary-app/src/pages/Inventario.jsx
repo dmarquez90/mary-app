@@ -347,6 +347,7 @@ export default function Inventario() {
                       isEs ? 'Categoría' : 'Category',
                       t('inv_col_unit'), t('inv_col_stock'), t('inv_col_min'),
                       isEs ? 'Precio' : 'Price',
+                      isEs ? 'Total' : 'Total',
                       t('inv_col_location'), t('inv_col_status'),
                       puedeEditar ? '' : null
                     ].filter(h => h !== null).map((h,i) => (
@@ -754,3 +755,5 @@ export default function Inventario() {
     </div>
   )
 }
+
+
