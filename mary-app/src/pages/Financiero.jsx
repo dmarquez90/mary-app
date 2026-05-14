@@ -922,7 +922,7 @@ function SubcontratosModule({
                       value={it.actividad_id||''} onChange={e => {
                         const act = acts.find(a => a.id === e.target.value)
                         setScItem(idx, 'actividad_id', e.target.value)
-                        if (act) setScItem(idx, 'descripcion', act.descripcion)
+                        if (act) { setScItem(idx, 'descripcion', act.descripcion); setScItem(idx, 'unidad', act.unidad || 'und'); setScItem(idx, 'cantidad_contrato', act.cantidad ? String(act.cantidad) : '') }
                       }}>
                       <option value="">— {isEs ? 'Seleccionar (opcional)' : 'Select (optional)'} —</option>
                       {acts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
@@ -1286,3 +1286,4 @@ function SubcontratosModule({
 
   return null
 }
+

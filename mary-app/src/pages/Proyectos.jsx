@@ -69,12 +69,10 @@ export default function Proyectos({ onNavigate }) {
 
     // Verificar datos relacionados
     const checks = {
-      pres:    presupuesto.some(b => b.proyecto_id === id),
       ent:     entradas.some(e => e.proyecto_id === id),
       sal:     salidas.some(s => s.proyecto_id === id),
       sol:     solicitudes.some(s => s.proyecto_id === id),
       oc:      ordenes_compra.some(oc => oc.proyecto_id === id),
-      matPres: (materiales_presupuestados || []).some(m => m.proyecto_id === id),
       dir:     costos_directos.some(c => c.proyecto_id === id),
       nom:     nominas.some(n => n.proyecto_id === id),
       sub:     subcontratos.some(s => s.proyecto_id === id),
@@ -407,3 +405,4 @@ export default function Proyectos({ onNavigate }) {
     </div>
   )
 }
+
