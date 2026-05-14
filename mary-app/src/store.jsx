@@ -10,6 +10,8 @@ const INIT = {
   equipos: [], costos_indirectos: [],
   materiales_presupuestados: [],
   solicitudes_eliminacion: [],
+  subcontratos_contratos: [], subcontratos_items: [],
+  subcontratos_avaluos: [], subcontratos_avaluo_items: [],
   loaded: false
 }
 
@@ -100,6 +102,38 @@ function reducer(state, action) {
     case 'UPD_NOMINA':          return { ...state, nominas: state.nominas.map(n => n.id === action.payload.id ? { ...n, ...action.payload } : n) }
     case 'DEL_NOMINA':          return { ...state, nominas: state.nominas.filter(n => n.id !== action.payload) }
 
+    // ── Subcontratos con avalúos ──
+    case 'ADD_SC_CONTRATO': return {
+      ...state,
+      subcontratos_contratos: [...(state.subcontratos_contratos||[]), action.payload.contrato],
+      subcontratos_items:     [...(state.subcontratos_items||[]), ...action.payload.items],
+    }
+    case 'DEL_SC_CONTRATO': return {
+      ...state,
+      subcontratos_contratos:    (state.subcontratos_contratos||[]).filter(s => s.id !== action.payload),
+      subcontratos_items:        (state.subcontratos_items||[]).filter(i => i.subcontrato_id !== action.payload),
+      subcontratos_avaluos:      (state.subcontratos_avaluos||[]).filter(a => a.subcontrato_id !== action.payload),
+      subcontratos_avaluo_items: (state.subcontratos_avaluo_items||[]).filter(i => {
+        const av = (state.subcontratos_avaluos||[]).find(a => a.id === i.avaluo_id)
+        return av?.subcontrato_id !== action.payload
+      }),
+    }
+    case 'ADD_SC_AVALUO': return {
+      ...state,
+      subcontratos_avaluos:      [...(state.subcontratos_avaluos||[]), action.payload.avaluo],
+      subcontratos_avaluo_items: [...(state.subcontratos_avaluo_items||[]), ...action.payload.items],
+    }
+    case 'APROBAR_SC_AVALUO': return {
+      ...state,
+      subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
+        a.id === action.payload.avaluo.id ? { ...a, estado: 'aprobado' } : a),
+      subcontratos_contratos: (state.subcontratos_contratos||[]).map(sc =>
+        sc.id === action.payload.avaluo.subcontrato_id
+          ? { ...sc, monto_pagado: (parseFloat(sc.monto_pagado||0) + parseFloat(action.payload.avaluo.monto_total||0)) }
+          : sc),
+      costos_directos: [...state.costos_directos, action.payload.costo],
+    }
+
     case 'ADD_SUBCONTRATO':     return { ...state, subcontratos: [...state.subcontratos, action.payload] }
     case 'UPD_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
     case 'DEL_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.filter(s => s.id !== action.payload) }
@@ -137,7 +171,9 @@ export function StoreProvider({ children, tenantId }) {
         'proyectos','fases','presupuesto','materiales','entradas','salidas',
         'solicitudes','solicitud_items','ordenes_compra','ordenes_compra_items',
         'costos_directos','nominas','subcontratos','equipos','costos_indirectos',
-        'materiales_presupuestados','solicitudes_eliminacion'
+        'materiales_presupuestados','solicitudes_eliminacion',
+        'subcontratos_contratos','subcontratos_items',
+        'subcontratos_avaluos','subcontratos_avaluo_items',
       ]
 
       const tenantResults = await Promise.all(
@@ -578,6 +614,56 @@ export function StoreProvider({ children, tenantId }) {
       case 'DEL_NOMINA': {
         await supabase.from('nominas').delete().eq('id', action.payload)
         dispatch(action)
+        break
+      }
+
+      case 'ADD_SC_CONTRATO': {
+        const sc = { ...action.payload.contrato, id: uuid(), created_at: today(), tenant_id: tenantId }
+        const items = action.payload.items.map(it => ({ ...it, id: uuid(), subcontrato_id: sc.id, created_at: today(), tenant_id: tenantId }))
+        await supabase.from('subcontratos_contratos').insert(sc)
+        if (items.length) await supabase.from('subcontratos_items').insert(items)
+        dispatch({ type: 'ADD_SC_CONTRATO', payload: { contrato: sc, items } })
+        break
+      }
+      case 'DEL_SC_CONTRATO': {
+        const pid = action.payload
+        const { data: avs } = await supabase.from('subcontratos_avaluos').select('id').eq('subcontrato_id', pid)
+        if (avs?.length) await supabase.from('subcontratos_avaluo_items').delete().in('avaluo_id', avs.map(a=>a.id))
+        await supabase.from('subcontratos_avaluos').delete().eq('subcontrato_id', pid)
+        await supabase.from('subcontratos_items').delete().eq('subcontrato_id', pid)
+        await supabase.from('subcontratos_contratos').delete().eq('id', pid)
+        dispatch({ type: 'DEL_SC_CONTRATO', payload: pid })
+        break
+      }
+      case 'ADD_SC_AVALUO': {
+        const av  = { ...action.payload.avaluo, id: uuid(), created_at: today(), tenant_id: tenantId }
+        const avi = action.payload.items.map(it => ({ ...it, id: uuid(), avaluo_id: av.id, created_at: today(), tenant_id: tenantId }))
+        await supabase.from('subcontratos_avaluos').insert(av)
+        if (avi.length) await supabase.from('subcontratos_avaluo_items').insert(avi)
+        dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
+        break
+      }
+      case 'APROBAR_SC_AVALUO': {
+        const av       = action.payload.avaluo
+        const contrato = action.payload.contrato
+        await supabase.from('subcontratos_avaluos').update({ estado: 'aprobado' }).eq('id', av.id)
+        const nuevoPagado = (parseFloat(contrato.monto_pagado||0) + parseFloat(av.monto_total||0))
+        await supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id)
+        // Registrar automáticamente en costos_directos
+        const costo = {
+          id:          uuid(),
+          proyecto_id: contrato.proyecto_id,
+          categoria:   'Subcontratos',
+          descripcion: `Avalúo #${av.numero} — ${contrato.subcontratista}`,
+          proveedor:   contrato.subcontratista,
+          monto:       parseFloat(av.monto_total||0),
+          fecha:       av.fecha_elaboracion || today(),
+          referencia:  `SC-AV-${av.numero}`,
+          created_at:  today(),
+          tenant_id:   tenantId,
+        }
+        await supabase.from('costos_directos').insert(costo)
+        dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
         break
       }
 

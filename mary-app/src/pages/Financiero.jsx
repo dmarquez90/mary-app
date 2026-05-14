@@ -58,6 +58,23 @@ export default function Financiero() {
   const [form, setForm]     = useState({})
   const [editId, setEditId] = useState(null)
 
+  // Subcontratos module state
+  const [scView, setScView]       = useState('list')   // 'list' | 'detail' | 'avaluo'
+  const [scSelected, setScSelected] = useState(null)   // subcontrato activo
+  const [scAvaluoId, setScAvaluoId] = useState(null)   // avaluo en edicion
+  const [scItems, setScItems]     = useState([])        // items del contrato (crear)
+  const [avItems, setAvItems]     = useState([])        // items del avaluo
+  const [scForm, setScForm]       = useState({})
+  const [avForm, setAvForm]       = useState({})
+  const setScF  = k => e => setScForm(f => ({ ...f, [k]: e.target.value }))
+  const setAvF  = k => e => setAvForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Load subcontratos data from store
+  const { subcontratos_contratos = [], subcontratos_items = [],
+          subcontratos_avaluos = [], subcontratos_avaluo_items = [] } = state
+
+  const fmt2 = (n) => new Intl.NumberFormat('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n||0)
+
   const puedeEditar = can('financiero_editar')
   const set         = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -310,58 +327,23 @@ export default function Financiero() {
           )}
 
           {/* ── TAB 2: SUBCONTRATOS ───────────────────────────────────── */}
-          {tab === 2 && (
-            subs.length === 0 ? (
-              <EmptyState icon={Icons.financial} title={t('fin_empty_subcontracts')}
-                action={puedeEditar&&!closed ? `+ ${TABS[2]}` : null}
-                onAction={puedeEditar&&!closed ? openDrawer : null} />
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_subcontractor'), t('fin_col_work'), t('fin_col_activity'),
-                      t('fin_col_contract'), t('fin_col_paid'),
-                      isEs?'% Avance':'% Progress',
-                      puedeEditar?'':null].filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {subs.map(s => {
-                      const act  = acts.find(a => a.id === s.actividad_id)
-                      const pct  = s.monto_contrato > 0
-                        ? Math.min(100, ((parseFloat(s.monto_pagado)||0)/(parseFloat(s.monto_contrato)||1)*100)).toFixed(1)
-                        : '0.0'
-                      return (
-                        <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className={tdCls+' font-medium'}>{s.subcontratista}</td>
-                          <td className={tdCls+' text-xs text-gray-500 max-w-[160px] truncate'}>{s.descripcion_trabajo||'—'}</td>
-                          <td className={tdCls+' text-xs text-gray-400'}>{act?`${act.code} — ${act.descripcion}`:'—'}</td>
-                          <td className={tdCls+' font-mono'}>{fmt(s.monto_contrato,moneda)}</td>
-                          <td className={tdCls+' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(s.monto_pagado,moneda)}</td>
-                          <td className={tdCls}>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-gray-100 rounded-full h-1.5 min-w-[60px]">
-                                <div className="h-1.5 rounded-full" style={{width:`${pct}%`, background:'#1D9E75'}}/>
-                              </div>
-                              <span className="text-xs font-mono font-medium" style={{color:'#1D9E75'}}>{pct}%</span>
-                            </div>
-                          </td>
-                          {puedeEditar && <td className={tdCls}><div className="flex gap-1">
-                            <TBtn onClick={()=>openEdit(s)}>{isEs?'Modificar':'Edit'}</TBtn>
-                            <TBtn danger onClick={()=>del(s.id)}>{isEs?'Eliminar':'Delete'}</TBtn>
-                          </div></td>}
-                        </tr>
-                      )
-                    })}
-                    <tr className="bg-gray-50">
-                      <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
-                      <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalSub,moneda)}</td>
-                      <td/>{puedeEditar&&<td/>}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )
-          )}
+          {tab === 2 && <SubcontratosModule
+            proyId={proyId} moneda={moneda} puedeEditar={puedeEditar} closed={closed}
+            presupuesto={presupuesto} isEs={isEs}
+            scView={scView} setScView={setScView}
+            scSelected={scSelected} setScSelected={setScSelected}
+            scAvaluoId={scAvaluoId} setScAvaluoId={setScAvaluoId}
+            scItems={scItems} setScItems={setScItems}
+            avItems={avItems} setAvItems={setAvItems}
+            scForm={scForm} setScForm={setScForm} setScF={setScF}
+            avForm={avForm} setAvForm={setAvForm} setAvF={setAvF}
+            subcontratos_contratos={subcontratos_contratos}
+            subcontratos_items={subcontratos_items}
+            subcontratos_avaluos={subcontratos_avaluos}
+            subcontratos_avaluo_items={subcontratos_avaluo_items}
+            dispatch={dispatch} fmt2={fmt2} fmt={fmt}
+            t={t}
+          />}
 
           {/* ── TAB 3: EQUIPOS ────────────────────────────────────────── */}
           {tab === 3 && (
@@ -567,38 +549,7 @@ export default function Financiero() {
             </div>
           </>}
 
-          {/* SUBCONTRATOS */}
-          {tab===2 && <>
-            <Field label={t('fin_form_subcontractor')} required>
-              <input className={inputCls} value={form.subcontratista||''} onChange={set('subcontratista')} placeholder={t('fin_form_subcontractor')}/>
-            </Field>
-            <Field label={t('fin_form_work_desc')}>
-              <textarea className={inputCls} rows={2} value={form.descripcion_trabajo||''} onChange={set('descripcion_trabajo')}/>
-            </Field>
-            <Field label={t('fin_form_activity')}>
-              <select className={selectCls} value={form.actividad_id||''} onChange={set('actividad_id')}>
-                <option value="">{t('lbl_select')}</option>
-                {acts.map(a=><option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
-              </select>
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={t('fin_form_contract_amt')} required>
-                <input type="number" className={inputCls} value={form.monto_contrato||''} onChange={set('monto_contrato')} placeholder="0.00" min="0" step="0.01"/>
-              </Field>
-              <Field label={t('fin_form_paid')}>
-                <input type="number" className={inputCls} value={form.monto_pagado||''} onChange={set('monto_pagado')} placeholder="0.00" min="0" step="0.01"/>
-              </Field>
-            </div>
-            {/* % calculado automáticamente */}
-            {form.monto_contrato > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3 flex justify-between text-sm font-medium">
-                <span className="text-gray-600">{isEs?'% Avance calculado:':'Calculated progress:'}</span>
-                <span style={{color:'#1D9E75'}}>
-                  {Math.min(100,((parseFloat(form.monto_pagado)||0)/(parseFloat(form.monto_contrato)||1)*100)).toFixed(1)}%
-                </span>
-              </div>
-            )}
-          </>}
+          {/* SUBCONTRATOS — handled by SubcontratosModule */}
 
           {/* EQUIPOS */}
           {tab===3 && <>
@@ -671,4 +622,667 @@ export default function Financiero() {
       )}
     </div>
   )
+}
+
+// ── SUBCONTRATOS MODULE ──────────────────────────────────────────────────────
+function SubcontratosModule({
+  proyId, moneda, puedeEditar, closed, presupuesto, isEs,
+  scView, setScView, scSelected, setScSelected,
+  scAvaluoId, setScAvaluoId,
+  scItems, setScItems, avItems, setAvItems,
+  scForm, setScForm, setScF, avForm, setAvForm, setAvF,
+  subcontratos_contratos, subcontratos_items,
+  subcontratos_avaluos, subcontratos_avaluo_items,
+  dispatch, fmt2, fmt, t,
+}) {
+  const BRAND = '#1B3A6B'
+  const acts  = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
+  const contratosProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
+
+  const thCls = 'px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap font-medium'
+  const tdCls = 'px-4 py-3 text-sm text-gray-700'
+
+  // ── Helpers ──
+  const scSubtotal = scItems.reduce((s,it) =>
+    s + parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0), 0)
+  const scImpPct   = parseFloat(scForm.impuesto_pct||0)
+  const scImpMonto = scSubtotal * (scImpPct/100)
+  const scTotal    = scSubtotal + scImpMonto
+
+  const setScItem = (idx, k, v) =>
+    setScItems(items => items.map((it,i) => i===idx ? {...it,[k]:v} : it))
+
+  // Para el avalúo activo
+  const avaluosPrevios = scSelected
+    ? subcontratos_avaluos.filter(a =>
+        a.subcontrato_id === scSelected.id && a.estado === 'aprobado')
+    : []
+
+  // Calcular cantidad anterior para cada item
+  const getCantAnterior = (itemId) =>
+    avaluosPrevios.reduce((s, av) => {
+      const avItem = subcontratos_avaluo_items.find(
+        i => i.avaluo_id === av.id && i.subcontrato_item_id === itemId)
+      return s + parseFloat(avItem?.cantidad_actual||0)
+    }, 0)
+
+  const avSubtotal = avItems.reduce((s,it) => {
+    const scIt = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
+    return s + parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0)
+  }, 0)
+  const avImpMonto = avSubtotal * (parseFloat(scSelected?.impuesto_pct||0)/100)
+  const avTotal    = avSubtotal + avImpMonto
+
+  const numAvaluo = scSelected
+    ? subcontratos_avaluos.filter(a => a.subcontrato_id === scSelected.id).length + 1
+    : 1
+
+  // ── Guardar contrato ──
+  const saveContrato = () => {
+    if (!scForm.subcontratista || scItems.length === 0) return
+    dispatch({
+      type: 'ADD_SC_CONTRATO',
+      payload: {
+        contrato: {
+          proyecto_id:   proyId,
+          subcontratista: scForm.subcontratista,
+          descripcion:   scForm.descripcion || '',
+          fecha_contrato: scForm.fecha_contrato || null,
+          fecha_inicio:  scForm.fecha_inicio || null,
+          fecha_fin:     scForm.fecha_fin || null,
+          moneda,
+          impuesto_pct:  parseFloat(scForm.impuesto_pct||0),
+          subtotal:      scSubtotal,
+          impuesto_monto: scImpMonto,
+          monto_total:   scTotal,
+          monto_pagado:  0,
+          avance_pct:    0,
+          estado:        'activo',
+          notas:         scForm.notas || '',
+        },
+        items: scItems.map(it => ({
+          actividad_id:      it.actividad_id || null,
+          descripcion:       it.descripcion,
+          unidad:            it.unidad || 'und',
+          cantidad_contrato: parseFloat(it.cantidad_contrato||0),
+          costo_unitario:    parseFloat(it.costo_unitario||0),
+          costo_total:       parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0),
+        }))
+      }
+    })
+    setScView('list')
+    setScForm({})
+    setScItems([])
+  }
+
+  // ── Guardar avalúo ──
+  const saveAvaluo = () => {
+    if (!scSelected) return
+    const avaluo = {
+      subcontrato_id:    scSelected.id,
+      numero:            numAvaluo,
+      periodo_inicio:    avForm.periodo_inicio || null,
+      periodo_fin:       avForm.periodo_fin || null,
+      fecha_elaboracion: avForm.fecha_elaboracion || new Date().toISOString().split('T')[0],
+      subtotal:          avSubtotal,
+      impuesto_monto:    avImpMonto,
+      monto_total:       avTotal,
+      estado:            'borrador',
+      notas:             avForm.notas || '',
+    }
+    const items = avItems.map(it => {
+      const scIt = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
+      return {
+        subcontrato_item_id: it.subcontrato_item_id,
+        cantidad_anterior:   getCantAnterior(it.subcontrato_item_id),
+        cantidad_actual:     parseFloat(it.cantidad_actual||0),
+        cantidad_acumulada:  getCantAnterior(it.subcontrato_item_id) + parseFloat(it.cantidad_actual||0),
+        costo_unitario:      parseFloat(scIt?.costo_unitario||0),
+        monto_actual:        parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0),
+      }
+    })
+    dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo, items, contrato: scSelected } })
+    setScView('detail')
+    setAvForm({})
+    setAvItems([])
+  }
+
+  // ── Aprobar avalúo ──
+  const aprobarAvaluo = (av) => {
+    dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato: scSelected } })
+  }
+
+  // ── VISTA: LISTA DE CONTRATOS ──
+  if (scView === 'list') return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          {contratosProy.length} {isEs ? 'subcontrato(s)' : 'subcontract(s)'}
+        </p>
+        {puedeEditar && !closed && (
+          <button onClick={() => { setScForm({ impuesto_pct: '0' }); setScItems([]); setScView('nuevo') }}
+            className="text-sm font-medium px-4 py-2 rounded-lg text-white"
+            style={{ background: BRAND }}>
+            + {isEs ? 'Nuevo subcontrato' : 'New subcontract'}
+          </button>
+        )}
+      </div>
+
+      {contratosProy.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+          <p className="text-gray-400 text-sm">{isEs ? 'No hay subcontratos registrados' : 'No subcontracts registered'}</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <table className="w-full">
+            <thead><tr className="bg-gray-50 border-b border-gray-100">
+              {[
+                isEs ? 'Subcontratista' : 'Subcontractor',
+                isEs ? 'Descripción' : 'Description',
+                isEs ? 'Monto Contrato' : 'Contract Amount',
+                isEs ? 'Monto Pagado' : 'Amount Paid',
+                isEs ? '% Avance' : '% Progress',
+                isEs ? 'Estado' : 'Status',
+                '',
+              ].map((h,i) => <th key={i} className={thCls}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {contratosProy.map(sc => {
+                const avaluos = subcontratos_avaluos.filter(a => a.subcontrato_id === sc.id)
+                const pagado  = avaluos.filter(a => a.estado === 'aprobado')
+                  .reduce((s,a) => s + parseFloat(a.monto_total||0), 0)
+                const pct = sc.monto_total > 0
+                  ? Math.min(100, (pagado / parseFloat(sc.monto_total)) * 100).toFixed(1)
+                  : '0.0'
+                return (
+                  <tr key={sc.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className={tdCls + ' font-medium'}>{sc.subcontratista}</td>
+                    <td className={tdCls + ' text-xs text-gray-500 max-w-[180px] truncate'}>{sc.descripcion || '—'}</td>
+                    <td className={tdCls + ' font-mono'}>{fmt(sc.monto_total, moneda)}</td>
+                    <td className={tdCls + ' font-mono font-bold'} style={{ color: '#1D9E75' }}>{fmt(pagado, moneda)}</td>
+                    <td className={tdCls}>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-100 rounded-full h-1.5 min-w-[60px]">
+                          <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: '#1D9E75' }} />
+                        </div>
+                        <span className="text-xs font-mono font-medium" style={{ color: '#1D9E75' }}>{pct}%</span>
+                      </div>
+                    </td>
+                    <td className={tdCls}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        sc.estado === 'activo' ? 'bg-green-100 text-green-700' :
+                        sc.estado === 'completado' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-500'}`}>
+                        {sc.estado === 'activo' ? (isEs ? 'Activo' : 'Active') :
+                         sc.estado === 'completado' ? (isEs ? 'Completado' : 'Completed') :
+                         sc.estado}
+                      </span>
+                    </td>
+                    <td className={tdCls}>
+                      <div className="flex gap-1">
+                        <button onClick={() => { setScSelected(sc); setScView('detail') }}
+                          className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">
+                          {isEs ? 'Ver' : 'View'}
+                        </button>
+                        {puedeEditar && (
+                          <button onClick={() => dispatch({ type: 'DEL_SC_CONTRATO', payload: sc.id })}
+                            className="text-xs px-2 py-1 border border-red-200 text-red-500 rounded-lg hover:bg-red-50">
+                            {isEs ? 'Eliminar' : 'Delete'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+
+  // ── VISTA: NUEVO CONTRATO ──
+  if (scView === 'nuevo') return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center gap-3 mb-5">
+        <button onClick={() => setScView('list')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+        <h2 className="text-base font-semibold text-gray-800">{isEs ? 'Nuevo Subcontrato' : 'New Subcontract'}</h2>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+        {/* Datos generales */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Subcontratista *' : 'Subcontractor *'}</label>
+            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+              value={scForm.subcontratista||''} onChange={setScF('subcontratista')} placeholder={isEs ? 'Nombre de la empresa' : 'Company name'} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Impuesto (%)' : 'Tax (%)'}</label>
+            <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+              value={scForm.impuesto_pct||''} onChange={setScF('impuesto_pct')} placeholder="0" min="0" max="100" step="0.01" />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Descripción' : 'Description'}</label>
+          <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+            rows={2} value={scForm.descripcion||''} onChange={setScF('descripcion')} />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha contrato' : 'Contract date'}</label>
+            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+              value={scForm.fecha_contrato||''} onChange={setScF('fecha_contrato')} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha inicio' : 'Start date'}</label>
+            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+              value={scForm.fecha_inicio||''} onChange={setScF('fecha_inicio')} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha fin estimada' : 'Est. end date'}</label>
+            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+              value={scForm.fecha_fin||''} onChange={setScF('fecha_fin')} />
+          </div>
+        </div>
+
+        {/* Ítems del contrato */}
+        <div className="border-t border-gray-100 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {isEs ? 'Actividades a subcontratar *' : 'Activities to subcontract *'}
+            </p>
+            <button onClick={() => setScItems(i => [...i, { actividad_id:'', descripcion:'', unidad:'und', cantidad_contrato:'', costo_unitario:'' }])}
+              className="text-xs font-medium px-3 py-1 rounded-lg"
+              style={{ color: BRAND, background: '#EEF2F7' }}>
+              + {isEs ? 'Agregar' : 'Add'}
+            </button>
+          </div>
+
+          {scItems.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-4">
+              {isEs ? 'Agrega al menos una actividad' : 'Add at least one activity'}
+            </p>
+          )}
+
+          <div className="flex flex-col gap-2">
+            {scItems.map((it, idx) => {
+              const subtotalIt = parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0)
+              return (
+                <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400">#{idx+1}</span>
+                    <button onClick={() => setScItems(i => i.filter((_,j) => j!==idx))}
+                      className="text-xs text-red-400 hover:text-red-600">✕</button>
+                  </div>
+                  <div className="mb-2">
+                    <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Actividad del presupuesto' : 'Budget activity'}</label>
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#1B3A6B]"
+                      value={it.actividad_id||''} onChange={e => {
+                        const act = acts.find(a => a.id === e.target.value)
+                        setScItem(idx, 'actividad_id', e.target.value)
+                        if (act) setScItem(idx, 'descripcion', act.descripcion)
+                      }}>
+                      <option value="">— {isEs ? 'Seleccionar (opcional)' : 'Select (optional)'} —</option>
+                      {acts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
+                    </select>
+                  </div>
+                  <div className="mb-2">
+                    <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Descripción *' : 'Description *'}</label>
+                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                      value={it.descripcion||''} onChange={e => setScItem(idx,'descripcion',e.target.value)}
+                      placeholder={isEs ? 'Descripción del trabajo' : 'Work description'} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
+                      <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                        value={it.unidad||'und'} onChange={e => setScItem(idx,'unidad',e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Cantidad *' : 'Quantity *'}</label>
+                      <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                        value={it.cantidad_contrato||''} onChange={e => setScItem(idx,'cantidad_contrato',e.target.value)} placeholder="0" min="0" step="0.01" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Costo unitario *' : 'Unit cost *'}</label>
+                      <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                        value={it.costo_unitario||''} onChange={e => setScItem(idx,'costo_unitario',e.target.value)} placeholder="0.00" min="0" step="0.01" />
+                    </div>
+                  </div>
+                  {subtotalIt > 0 && (
+                    <div className="mt-2 text-right text-xs font-mono text-gray-500">
+                      Subtotal: <span className="font-bold text-gray-700">{fmt2(subtotalIt)}</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Totales */}
+        {scItems.length > 0 && (
+          <div className="border-t border-gray-100 pt-3">
+            {[
+              [isEs ? 'Subtotal' : 'Subtotal', fmt2(scSubtotal)],
+              [`${isEs ? 'Impuesto' : 'Tax'} (${scImpPct}%)`, fmt2(scImpMonto)],
+            ].map(([label, val]) => (
+              <div key={label} className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">{label}</span>
+                <span className="font-mono text-gray-700">{val}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-100">
+              <span>{isEs ? 'Gran Total' : 'Grand Total'}</span>
+              <span style={{ color: BRAND }}>{fmt2(scTotal)}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={() => setScView('list')}
+            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+            {isEs ? 'Cancelar' : 'Cancel'}
+          </button>
+          <button onClick={saveContrato}
+            disabled={!scForm.subcontratista || scItems.length === 0}
+            className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
+            style={{ background: BRAND }}>
+            {isEs ? 'Guardar subcontrato' : 'Save subcontract'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── VISTA: DETALLE DEL CONTRATO + AVALÚOS ──
+  if (scView === 'detail' && scSelected) {
+    const itemsContrato = subcontratos_items.filter(i => i.subcontrato_id === scSelected.id)
+    const avaluosSc     = subcontratos_avaluos.filter(a => a.subcontrato_id === scSelected.id)
+      .sort((a,b) => a.numero - b.numero)
+    const totalPagado   = avaluosSc.filter(a => a.estado === 'aprobado')
+      .reduce((s,a) => s + parseFloat(a.monto_total||0), 0)
+
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <button onClick={() => { setScView('list'); setScSelected(null) }}
+            className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+          <div className="flex-1">
+            <h2 className="text-base font-semibold text-gray-800">{scSelected.subcontratista}</h2>
+            {scSelected.descripcion && <p className="text-xs text-gray-400">{scSelected.descripcion}</p>}
+          </div>
+          {puedeEditar && !closed && (
+            <button onClick={() => {
+              setAvForm({
+                periodo_inicio: '',
+                periodo_fin: '',
+                fecha_elaboracion: new Date().toISOString().split('T')[0],
+              })
+              setAvItems(itemsContrato.map(it => ({
+                subcontrato_item_id: it.id,
+                cantidad_actual: '',
+              })))
+              setScView('avaluo')
+            }}
+              className="text-sm font-medium px-4 py-2 rounded-lg text-white"
+              style={{ background: BRAND }}>
+              + {isEs ? 'Nuevo avalúo' : 'New valuation'}
+            </button>
+          )}
+        </div>
+
+        {/* Resumen financiero */}
+        <div className="grid grid-cols-3 gap-4 mb-5">
+          {[
+            [isEs ? 'Monto Contrato' : 'Contract Amount', fmt(scSelected.monto_total, moneda), '#1B3A6B'],
+            [isEs ? 'Avaluado (aprobado)' : 'Valued (approved)', fmt(totalPagado, moneda), '#1D9E75'],
+            [isEs ? 'Saldo' : 'Balance', fmt(parseFloat(scSelected.monto_total||0) - totalPagado, moneda), '#D97706'],
+          ].map(([label, val, color]) => (
+            <div key={label} className="bg-white border border-gray-100 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-1">{label}</p>
+              <p className="text-xl font-bold font-mono" style={{ color }}>{val}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Items del contrato */}
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden mb-5">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {isEs ? 'Actividades del contrato' : 'Contract activities'}
+            </p>
+          </div>
+          <table className="w-full">
+            <thead><tr className="border-b border-gray-100">
+              {[isEs?'Descripción':'Description', isEs?'Unidad':'Unit',
+                isEs?'Cant. Contrato':'Contract Qty', isEs?'C. Unitario':'Unit Cost',
+                isEs?'Total Contrato':'Contract Total',
+                isEs?'Acumulado':'Accumulated', isEs?'Saldo':'Balance'].map((h,i) =>
+                <th key={i} className={thCls}>{h}</th>
+              )}
+            </tr></thead>
+            <tbody>
+              {itemsContrato.map(it => {
+                const acum  = getCantAnterior(it.id) +
+                  avaluosSc.filter(a => a.estado === 'borrador')
+                    .reduce((s,av) => {
+                      const ai = subcontratos_avaluo_items.find(x => x.avaluo_id===av.id && x.subcontrato_item_id===it.id)
+                      return s + parseFloat(ai?.cantidad_actual||0)
+                    }, 0)
+                const saldo = parseFloat(it.cantidad_contrato||0) - acum
+                return (
+                  <tr key={it.id} className="border-b border-gray-50">
+                    <td className={tdCls}>{it.descripcion}</td>
+                    <td className={tdCls + ' text-xs text-gray-400'}>{it.unidad}</td>
+                    <td className={tdCls + ' font-mono'}>{it.cantidad_contrato}</td>
+                    <td className={tdCls + ' font-mono'}>{fmt2(it.costo_unitario)}</td>
+                    <td className={tdCls + ' font-mono font-medium'}>{fmt2(it.costo_total)}</td>
+                    <td className={tdCls + ' font-mono'} style={{ color: '#1D9E75' }}>{fmt2(acum * parseFloat(it.costo_unitario||0))}</td>
+                    <td className={tdCls + ' font-mono'} style={{ color: saldo < 0 ? '#ef4444' : '#D97706' }}>{fmt2(saldo * parseFloat(it.costo_unitario||0))}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Lista de avalúos */}
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {isEs ? 'Avalúos' : 'Valuations'}
+            </p>
+          </div>
+          {avaluosSc.length === 0 ? (
+            <p className="text-center text-sm text-gray-400 py-8">
+              {isEs ? 'No hay avalúos registrados' : 'No valuations registered'}
+            </p>
+          ) : (
+            <table className="w-full">
+              <thead><tr className="border-b border-gray-100">
+                {['#', isEs?'Período':'Period', isEs?'Fecha':'Date',
+                  isEs?'Subtotal':'Subtotal', isEs?'Impuesto':'Tax',
+                  isEs?'Total Avalúo':'Valuation Total',
+                  isEs?'Estado':'Status', ''].map((h,i) =>
+                  <th key={i} className={thCls}>{h}</th>
+                )}
+              </tr></thead>
+              <tbody>
+                {avaluosSc.map(av => (
+                  <tr key={av.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className={tdCls + ' font-mono font-bold'} style={{ color: BRAND }}>#{av.numero}</td>
+                    <td className={tdCls + ' text-xs text-gray-400'}>
+                      {av.periodo_inicio && av.periodo_fin
+                        ? `${av.periodo_inicio} → ${av.periodo_fin}`
+                        : '—'}
+                    </td>
+                    <td className={tdCls + ' text-xs text-gray-400'}>{av.fecha_elaboracion}</td>
+                    <td className={tdCls + ' font-mono'}>{fmt2(av.subtotal)}</td>
+                    <td className={tdCls + ' font-mono'}>{fmt2(av.impuesto_monto)}</td>
+                    <td className={tdCls + ' font-mono font-bold'} style={{ color: '#1D9E75' }}>
+                      {fmt(av.monto_total, moneda)}
+                    </td>
+                    <td className={tdCls}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        av.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                        av.estado === 'borrador' ? 'bg-gray-100 text-gray-500' :
+                        'bg-amber-100 text-amber-700'}`}>
+                        {av.estado === 'aprobado' ? (isEs ? 'Aprobado' : 'Approved') :
+                         av.estado === 'borrador' ? (isEs ? 'Borrador' : 'Draft') :
+                         av.estado}
+                      </span>
+                    </td>
+                    <td className={tdCls}>
+                      {av.estado === 'borrador' && puedeEditar && (
+                        <button onClick={() => aprobarAvaluo(av)}
+                          className="text-xs px-3 py-1 rounded-lg text-white font-medium"
+                          style={{ background: '#1D9E75' }}>
+                          {isEs ? 'Aprobar' : 'Approve'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── VISTA: NUEVO AVALÚO ──
+  if (scView === 'avaluo' && scSelected) {
+    const itemsContrato = subcontratos_items.filter(i => i.subcontrato_id === scSelected.id)
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <button onClick={() => setScView('detail')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+          <h2 className="text-base font-semibold text-gray-800">
+            {isEs ? `Avalúo #${numAvaluo}` : `Valuation #${numAvaluo}`} — {scSelected.subcontratista}
+          </h2>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+          {/* Cabecera */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Período inicio' : 'Period start'}</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                value={avForm.periodo_inicio||''} onChange={setAvF('periodo_inicio')} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Período fin' : 'Period end'}</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                value={avForm.periodo_fin||''} onChange={setAvF('periodo_fin')} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha elaboración' : 'Prepared date'}</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                value={avForm.fecha_elaboracion||''} onChange={setAvF('fecha_elaboracion')} />
+            </div>
+          </div>
+
+          {/* Tabla de ítems */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr className="bg-gray-50 border-b border-gray-100">
+                {[isEs?'Descripción':'Description', isEs?'UM':'UM',
+                  isEs?'Cant. Contrato':'Contract Qty',
+                  isEs?'C. Unitario':'Unit Cost',
+                  isEs?'Período Anterior':'Prev. Period',
+                  isEs?'Período Actual *':'Current Period *',
+                  isEs?'Acumulado':'Accumulated',
+                  isEs?'Saldo':'Balance',
+                  isEs?'Monto Actual':'Current Amount'].map((h,i) =>
+                  <th key={i} className="px-3 py-2 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                )}
+              </tr></thead>
+              <tbody>
+                {itemsContrato.map((it, idx) => {
+                  const avItem    = avItems.find(x => x.subcontrato_item_id === it.id)
+                  const cantAnt   = getCantAnterior(it.id)
+                  const cantAct   = parseFloat(avItem?.cantidad_actual||0)
+                  const cantAcum  = cantAnt + cantAct
+                  const cantSaldo = parseFloat(it.cantidad_contrato||0) - cantAcum
+                  const montoAct  = cantAct * parseFloat(it.costo_unitario||0)
+                  const excede    = cantAcum > parseFloat(it.cantidad_contrato||0)
+                  return (
+                    <tr key={it.id} className={`border-b border-gray-50 ${excede ? 'bg-red-50/30' : ''}`}>
+                      <td className="px-3 py-2 text-sm text-gray-700">{it.descripcion}</td>
+                      <td className="px-3 py-2 text-xs text-gray-400">{it.unidad}</td>
+                      <td className="px-3 py-2 text-sm font-mono">{it.cantidad_contrato}</td>
+                      <td className="px-3 py-2 text-sm font-mono text-gray-500">{fmt2(it.costo_unitario)}</td>
+                      <td className="px-3 py-2 text-sm font-mono text-gray-400">{cantAnt > 0 ? cantAnt : '—'}</td>
+                      <td className="px-3 py-2">
+                        <input type="number"
+                          className={`w-24 border rounded-lg px-2 py-1 text-sm focus:outline-none ${excede ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-[#1B3A6B]'}`}
+                          value={avItem?.cantidad_actual||''}
+                          placeholder="0"
+                          min="0" step="0.01"
+                          onChange={e => {
+                            const val = e.target.value
+                            setAvItems(prev => {
+                              const exists = prev.find(x => x.subcontrato_item_id === it.id)
+                              if (exists) return prev.map(x => x.subcontrato_item_id===it.id ? {...x, cantidad_actual:val} : x)
+                              return [...prev, { subcontrato_item_id: it.id, cantidad_actual: val }]
+                            })
+                          }}
+                        />
+                        {excede && <p className="text-xs text-red-500 mt-0.5">{isEs ? '⚠ Excede contrato' : '⚠ Exceeds contract'}</p>}
+                      </td>
+                      <td className="px-3 py-2 text-sm font-mono" style={{ color: excede ? '#ef4444' : '#1D9E75' }}>{fmt2(cantAcum)}</td>
+                      <td className="px-3 py-2 text-sm font-mono text-gray-500">{fmt2(cantSaldo)}</td>
+                      <td className="px-3 py-2 text-sm font-mono font-medium" style={{ color: BRAND }}>{montoAct > 0 ? fmt2(montoAct) : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totales */}
+          <div className="border-t border-gray-100 pt-3">
+            {[
+              [isEs ? 'Subtotal período actual' : 'Current period subtotal', fmt2(avSubtotal)],
+              [`${isEs ? 'Impuesto' : 'Tax'} (${scSelected.impuesto_pct||0}%)`, fmt2(avImpMonto)],
+            ].map(([label, val]) => (
+              <div key={label} className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">{label}</span>
+                <span className="font-mono text-gray-700">{val}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-100">
+              <span>{isEs ? 'Total Avalúo' : 'Valuation Total'}</span>
+              <span style={{ color: BRAND }}>{fmt(avTotal, moneda)}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Notas' : 'Notes'}</label>
+            <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+              rows={2} value={avForm.notas||''} onChange={setAvF('notas')} />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button onClick={() => setScView('detail')}
+              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+              {isEs ? 'Cancelar' : 'Cancel'}
+            </button>
+            <button onClick={saveAvaluo}
+              disabled={avItems.every(i => !i.cantidad_actual || parseFloat(i.cantidad_actual)===0)}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
+              style={{ background: BRAND }}>
+              {isEs ? 'Guardar avalúo (borrador)' : 'Save valuation (draft)'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
