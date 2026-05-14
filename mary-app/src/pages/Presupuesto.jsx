@@ -4,7 +4,7 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
-
+import ImportarPresupuesto from './ImportarPresupuesto'
 const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unidad:'m²', cantidad:'', costo_mo:'', costo_materiales:'', costo_equipos:'' })
 
 export default function Presupuesto() {
@@ -137,7 +137,9 @@ export default function Presupuesto() {
               <span className="font-semibold font-mono text-sm" style={{color:'#1D9E75'}}>{fmt(grandTotal, moneda)}</span>
             </div>
           </div>
-
+{puedeEditar && !closed && (
+  <ImportarPresupuesto proyId={proyId} moneda={moneda} onDone={() => setSelected(null)} />
+)}
           {flat.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-xl rounded-t-none py-16">
               <EmptyState icon={Icons.table} title={t('pres_empty')} subtitle={t('pres_empty_sub')}
