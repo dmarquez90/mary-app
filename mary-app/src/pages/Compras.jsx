@@ -187,7 +187,6 @@ export default function Compras() {
   const todasActsDelProy = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
   const activos          = materiales.filter(m => m.activo !== false)
   const solsAprobadas    = solicitudes.filter(s => s.estado === 'aprobada')
-  const solsAprobadas    = solicitudes.filter(s => s.estado === 'aprobada')
 
   const genFolio = () => {
     const n = solicitudes.length + 1
