@@ -31,6 +31,11 @@ function reducer(state, action) {
     case 'DEL_BUDGET': return { ...state, presupuesto: state.presupuesto.filter(b => b.id !== action.payload) }
 
     case 'ADD_MATERIAL':    return { ...state, materiales: [...state.materiales, action.payload] }
+    case 'ADD_MATERIAL_CON_ENTRADA': return {
+      ...state,
+      materiales: [...state.materiales, action.payload.material],
+      entradas:   [...state.entradas,   action.payload.entrada],
+    }
     case 'UPD_MATERIAL':    return { ...state, materiales: state.materiales.map(m => m.id === action.payload.id ? { ...m, ...action.payload } : m) }
     case 'TOGGLE_MATERIAL': return { ...state, materiales: state.materiales.map(m => m.id === action.payload ? { ...m, activo: !m.activo } : m) }
     case 'DEL_MATERIAL':    return { ...state, materiales: state.materiales.filter(m => m.id !== action.payload) }
@@ -205,6 +210,21 @@ export function StoreProvider({ children, tenantId }) {
         break
       }
 
+      case 'ADD_MATERIAL_CON_ENTRADA': {
+        const { material, entrada } = action.payload
+        // Verificar código duplicado
+        const existe = state.materiales.find(m => m.codigo === material.codigo && m.activo !== false)
+        if (existe) { alert('Error: El código de material ya existe.'); return }
+        const mat = { ...material, created_at: today(), tenant_id: tenantId }
+        const ent = { ...entrada, id: uuid(), created_at: today(), tenant_id: tenantId }
+        await supabase.from('materiales').insert(mat)
+        await supabase.from('entradas').insert(ent)
+        // Actualizar stock en Supabase
+        await supabase.from('materiales').update({ stock_actual: mat.stock_actual })
+          .eq('id', mat.id)
+        dispatch({ type: 'ADD_MATERIAL_CON_ENTRADA', payload: { material: mat, entrada: ent } })
+        break
+      }
       case 'ADD_MATERIAL': {
         const existe = state.materiales.find(m => m.codigo === action.payload.codigo && m.activo !== false)
         if (existe) {

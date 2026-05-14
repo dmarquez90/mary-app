@@ -207,31 +207,41 @@ export default function Inventario() {
   const saveIn = async () => {
     if ((!form.material_id && !form._material_nuevo) || !form.cantidad || !form.fecha_recepcion) return
 
-    let materialId = form.material_id
-
-    // Si el material no existe en el catálogo, crearlo primero con UUID fijo
     if (form._material_nuevo && form._mat_codigo) {
+      // Crear material y entrada en un solo dispatch combinado
       const nuevoId = crypto.randomUUID()
-      const nuevoMat = {
-        id:               nuevoId,
-        codigo:           form._mat_codigo,
-        descripcion:      form._mat_nombre || form._oc_item_desc || '',
-        unidad:           form._mat_unidad || 'und',
-        stock_actual:     0,
-        stock_minimo:     parseFloat(form._mat_stock_min || 0),
-        ubicacion_bodega: '',
-        categoria:        '',
-        precio_unitario:  parseFloat(form.precio_unitario || 0),
-        activo:           true,
-      }
-      await dispatch({ type: 'ADD_MATERIAL', payload: nuevoMat })
-      materialId = nuevoId
+      const cantidad = parseFloat(form.cantidad || 0)
+      const precio   = parseFloat(form.precio_unitario || 0)
+      await dispatch({
+        type: 'ADD_MATERIAL_CON_ENTRADA',
+        payload: {
+          material: {
+            id:               nuevoId,
+            codigo:           form._mat_codigo,
+            descripcion:      form._mat_nombre || form._oc_item_desc || '',
+            unidad:           form._mat_unidad || 'und',
+            stock_actual:     cantidad,
+            stock_minimo:     parseFloat(form._mat_stock_min || 0),
+            ubicacion_bodega: '',
+            categoria:        '',
+            precio_unitario:  precio,
+            activo:           true,
+          },
+          entrada: {
+            material_id:     nuevoId,
+            proyecto_id:     form.proyecto_id || null,
+            oc_id:           form.oc_id || null,
+            cantidad,
+            precio_unitario: precio,
+            numero_factura:  form.numero_factura || '',
+            proveedor:       form.proveedor || '',
+            fecha_recepcion: form.fecha_recepcion,
+          }
+        }
+      })
+    } else {
+      dispatch({ type: 'ADD_ENTRADA', payload: { ...form, material_id: form.material_id } })
     }
-
-    dispatch({ type: 'ADD_ENTRADA', payload: {
-      ...form,
-      material_id: materialId,
-    }})
     setDrawer(null)
   }
 
