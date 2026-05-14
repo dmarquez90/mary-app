@@ -67,7 +67,21 @@ export function AuthProvider({ children }) {
 
     // ── Acceso permitido ──────────────────────────────────────────────
     setBlockedReason(null)
-    setPerfil(data)
+
+    // Cargar permisos personalizados si existen
+    const { data: permData } = await supabase
+      .from('usuario_permisos')
+      .select('permisos, proyectos, todos_proyectos')
+      .eq('usuario_id', authUser.id)
+      .maybeSingle()
+
+    const perfilFinal = {
+      ...data,
+      permisos_custom:      permData?.permisos || null,
+      proyectos_permitidos: permData?.todos_proyectos !== false ? null : (permData?.proyectos || null),
+    }
+
+    setPerfil(perfilFinal)
     await supabase.from('usuarios')
       .update({ fecha_acceso: new Date().toISOString() })
       .eq('id', authUser.id)
