@@ -344,6 +344,31 @@ export function StoreProvider({ children, tenantId }) {
           dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
         }
         dispatch({ type: 'ADD_SALIDA', payload: item })
+
+        // Auto-crear en materiales_presupuestados como adicional si no existe
+        if (item.proyecto_id && item.material_id && item.actividad_id) {
+          const yaExiste = state.materiales_presupuestados.some(mp =>
+            mp.proyecto_id === item.proyecto_id &&
+            mp.material_id === item.material_id &&
+            mp.actividad_id === item.actividad_id
+          )
+          if (!yaExiste && mat) {
+            const mpNuevo = {
+              id:                    uuid(),
+              proyecto_id:           item.proyecto_id,
+              material_id:           item.material_id,
+              nombre_libre:          mat.descripcion,
+              unidad_libre:          mat.unidad,
+              cantidad_presupuestada: 0,
+              actividad_id:          item.actividad_id,
+              es_adicional:          true,
+              tenant_id:             tenantId,
+              created_at:            today(),
+            }
+            await supabase.from('materiales_presupuestados').insert(mpNuevo)
+            dispatch({ type: 'ADD_MAT_PRES', payload: mpNuevo })
+          }
+        }
         break
       }
       case 'UPD_SALIDA': {
