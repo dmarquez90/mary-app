@@ -9,7 +9,7 @@ import { useAuth } from '../auth'
 
 const emptyMat = () => ({ codigo:'', descripcion:'', categoria:'', unidad:'und', stock_actual:'0', stock_minimo:'0', ubicacion_bodega:'', precio_unitario:'' })
 const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today() })
-const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today(), solicitud_id:'' })
+const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today() })
 
 const CATEGORIAS = [
   { key:'concreto',     es:'Concreto',     en:'Concrete',   color:'#6B7280' },
@@ -78,7 +78,7 @@ export default function Inventario() {
   const { perfil } = useAuth()
   const { lang } = useContext(LangContext)
   const isEs = lang === 'ES'
-  const { materiales, entradas, salidas, proyectos, presupuesto, ordenes_compra } = state
+  const { materiales, entradas, salidas, proyectos, presupuesto, ordenes_compra, solicitudes = [], solicitud_items = [], ordenes_compra_items = [] } = state
 
   const [tab, setTab]             = useState(0)
   const [drawer, setDrawer]       = useState(null)
@@ -204,9 +204,34 @@ export default function Inventario() {
     ...salidas.map(s => ({ ...s, mov:'salida',   fecha: s.fecha_salida })),
   ].sort((a,b) => new Date(b.fecha) - new Date(a.fecha))
 
-  const saveIn = () => {
-    if (!form.material_id || !form.cantidad || !form.fecha_recepcion) return
-    dispatch({ type:'ADD_ENTRADA', payload:form })
+  const saveIn = async () => {
+    if ((!form.material_id && !form._material_nuevo) || !form.cantidad || !form.fecha_recepcion) return
+
+    let materialId = form.material_id
+
+    // Si el material no existe en el catálogo, crearlo primero
+    if (form._material_nuevo && form._mat_codigo) {
+      const nuevoMat = {
+        codigo:          form._mat_codigo,
+        descripcion:     form._mat_nombre || form._oc_item_desc || '',
+        unidad:          form._mat_unidad || 'und',
+        stock_actual:    0,
+        stock_minimo:    parseFloat(form._mat_stock_min || 0),
+        ubicacion_bodega: '',
+        categoria:       '',
+        precio_unitario: parseFloat(form.precio_unitario || 0),
+        activo:          true,
+      }
+      // dispatch ADD_MATERIAL y obtener el nuevo ID
+      const tempId = crypto.randomUUID()
+      await dispatch({ type: 'ADD_MATERIAL', payload: { ...nuevoMat, id: tempId } })
+      materialId = tempId
+    }
+
+    dispatch({ type: 'ADD_ENTRADA', payload: {
+      ...form,
+      material_id: materialId,
+    }})
     setDrawer(null)
   }
 
@@ -533,72 +558,153 @@ export default function Inventario() {
           </div>
         </Drawer>
 
-        <Drawer open={drawer==='in'} onClose={() => setDrawer(null)} title={t('inv_form_entry_title')} width={400}>
-          <Field label={t('inv_form_material')} required>
-            <select className={selectCls} value={form.material_id||''} onChange={set('material_id')}>
-              <option value="">{t('lbl_select')}</option>
-              {activos.map(m => <option key={m.id} value={m.id}>{m.codigo} — {m.descripcion}</option>)}
-            </select>
-          </Field>
+        <Drawer open={drawer==='in'} onClose={() => setDrawer(null)} title={t('inv_form_entry_title')} width={440}>
+
+          {/* PASO 1: Vincular OC opcional */}
           <Field label={t('inv_form_oc')}>
-            <select className={selectCls} value={form.oc_id||''} onChange={set('oc_id')}>
+            <select className={selectCls} value={form.oc_id||''} onChange={e => {
+              const ocId = e.target.value
+              setForm(f => ({ ...f, oc_id: ocId, material_id: '', proyecto_id: '' }))
+            }}>
               <option value="">{t('inv_no_oc')}</option>
-              {ocAprobadas.map(oc => <option key={oc.id} value={oc.id}>{oc.oc_number} — {oc.proveedor || '—'}</option>)}
+              {ocAprobadas.map(oc => {
+                const proy = proyectos.find(p => p.id === oc.proyecto_id)
+                return <option key={oc.id} value={oc.id}>{oc.oc_number} — {oc.proveedor || '—'} ({proy?.project_code || '—'})</option>
+              })}
             </select>
           </Field>
+
+          {/* Si hay OC seleccionada, mostrar sus materiales */}
+          {form.oc_id && (() => {
+            const oc = ordenes_compra.find(o => o.id === form.oc_id)
+            const ocItems = ordenes_compra_items.filter(i => i.oc_id === form.oc_id)
+            const solItems_ = oc ? solicitud_items.filter(i => i.solicitud_id === oc.solicitud_id) : []
+            const itemsOC = ocItems.length > 0 ? ocItems : solItems_
+            return itemsOC.length > 0 ? (
+              <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/30">
+                <p className="text-xs font-semibold text-gray-500 mb-2">
+                  {isEs ? 'Materiales de la OC — selecciona cuál estás recibiendo' : 'OC materials — select which one you are receiving'}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {itemsOC.map((it, idx) => {
+                    const matExistente = materiales.find(m => m.id === it.material_id)
+                    const nombre = matExistente?.descripcion || it.descripcion || `Material #${idx+1}`
+                    const seleccionado = form.material_id === it.material_id && form._oc_item_id === it.id
+                    return (
+                      <button key={it.id} onClick={() => setForm(f => ({
+                        ...f,
+                        material_id: it.material_id || '',
+                        proyecto_id: oc?.proyecto_id || '',
+                        _oc_item_id: it.id,
+                        _oc_item_desc: nombre,
+                        _oc_item_unidad: it.unidad || 'und',
+                        _material_nuevo: !matExistente,
+                        _mat_nombre: nombre,
+                        _mat_unidad: it.unidad || 'und',
+                      }))}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm border transition-colors ${seleccionado ? 'border-[#1B3A6B] bg-[#EEF2F7] text-[#1B3A6B]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{nombre}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">{it.cantidad} {it.unidad}</span>
+                            {!matExistente && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                                {isEs ? 'Crear en catálogo' : 'Create in catalog'}
+                              </span>
+                            )}
+                            {matExistente && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                                {isEs ? 'En catálogo' : 'In catalog'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null
+          })()}
+
+          {/* Si el material seleccionado NO existe en catálogo, pedir datos para crearlo */}
+          {form._material_nuevo && (
+            <div className="border border-amber-200 rounded-xl p-3 bg-amber-50/30">
+              <p className="text-xs font-semibold text-amber-700 mb-2">
+                {isEs ? '⚠ Este material no existe en el catálogo. Se creará automáticamente.' : '⚠ This material is not in the catalog. It will be created automatically.'}
+              </p>
+              <div className="flex flex-col gap-2">
+                <Field label={isEs ? 'Código para el catálogo' : 'Catalog code'} required>
+                  <input className={inputCls} value={form._mat_codigo||''} onChange={e => setForm(f => ({...f, _mat_codigo: e.target.value}))}
+                    placeholder="Ej: BLQ-6" />
+                </Field>
+                <Field label={isEs ? 'Nombre en catálogo' : 'Catalog name'}>
+                  <input className={inputCls} value={form._mat_nombre||''} onChange={e => setForm(f => ({...f, _mat_nombre: e.target.value}))} />
+                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label={isEs ? 'Unidad' : 'Unit'}>
+                    <input className={inputCls} value={form._mat_unidad||'und'} onChange={e => setForm(f => ({...f, _mat_unidad: e.target.value}))} />
+                  </Field>
+                  <Field label={isEs ? 'Stock mínimo' : 'Min. stock'}>
+                    <input type="number" className={inputCls} value={form._mat_stock_min||'0'} onChange={e => setForm(f => ({...f, _mat_stock_min: e.target.value}))} placeholder="0" />
+                  </Field>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Si no hay OC, selección manual del catálogo */}
+          {!form.oc_id && (
+            <Field label={t('inv_form_material')} required>
+              <select className={selectCls} value={form.material_id||''} onChange={set('material_id')}>
+                <option value="">{t('lbl_select')}</option>
+                {activos.map(m => <option key={m.id} value={m.id}>{m.codigo} — {m.descripcion}</option>)}
+              </select>
+            </Field>
+          )}
+
           <Field label={t('inv_form_project')}>
             <select className={selectCls} value={form.proyecto_id||''} onChange={set('proyecto_id')}>
               <option value="">{t('lbl_select')}</option>
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
             </select>
           </Field>
+
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('inv_form_qty')} required><input type="number" className={inputCls} value={form.cantidad||''} onChange={set('cantidad')} placeholder="0.00" min="0" step="0.01" /></Field>
-            <Field label={t('inv_form_price')} required><input type="number" className={inputCls} value={form.precio_unitario||''} onChange={set('precio_unitario')} placeholder="0.00" min="0" step="0.01" /></Field>
+            <Field label={t('inv_form_qty')} required>
+              <input type="number" className={inputCls} value={form.cantidad||''} onChange={set('cantidad')} placeholder="0.00" min="0" step="0.01" />
+            </Field>
+            <Field label={t('inv_form_price')} required>
+              <input type="number" className={inputCls} value={form.precio_unitario||''} onChange={set('precio_unitario')} placeholder="0.00" min="0" step="0.01" />
+            </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('inv_form_invoice')}><input className={inputCls} value={form.numero_factura||''} onChange={set('numero_factura')} placeholder="FAC-0001" /></Field>
-            <Field label={t('inv_form_supplier')}><input className={inputCls} value={form.proveedor||''} onChange={set('proveedor')} placeholder={t('inv_form_supplier')} /></Field>
+            <Field label={t('inv_form_invoice')}>
+              <input className={inputCls} value={form.numero_factura||''} onChange={set('numero_factura')} placeholder="FAC-0001" />
+            </Field>
+            <Field label={t('inv_form_supplier')}>
+              <input className={inputCls} value={form.proveedor||''} onChange={set('proveedor')} placeholder={t('inv_form_supplier')} />
+            </Field>
           </div>
-          <Field label={t('inv_form_date')} required><input type="date" className={inputCls} value={form.fecha_recepcion||today()} onChange={set('fecha_recepcion')} /></Field>
+          <Field label={t('inv_form_date')} required>
+            <input type="date" className={inputCls} value={form.fecha_recepcion||today()} onChange={set('fecha_recepcion')} />
+          </Field>
+
           <div className="flex gap-2 mt-auto pt-2">
             <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-            <PrimaryBtn onClick={saveIn} disabled={!form.material_id||!form.cantidad} className="flex-1">{t('inv_add_entry')}</PrimaryBtn>
+            <PrimaryBtn onClick={saveIn}
+              disabled={(!form.material_id && !form._material_nuevo) || !form.cantidad || (form._material_nuevo && !form._mat_codigo)}
+              className="flex-1">{t('inv_add_entry')}</PrimaryBtn>
           </div>
         </Drawer>
 
-        <Drawer open={drawer==='out'} onClose={() => setDrawer(null)} title={t('inv_form_exit_title')} width={420}>
+        <Drawer open={drawer==='out'} onClose={() => setDrawer(null)} title={t('inv_form_exit_title')} width={400}>
           <Field label={t('inv_form_exit_project')} required>
-            <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f => ({...f, proyecto_id:e.target.value, actividad_id:'', solicitud_id:''}))}>
+            <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f => ({...f, proyecto_id:e.target.value, actividad_id:''}))}>
               <option value="">{t('lbl_select')}</option>
               {proyectos.filter(p => p.estado!=='completado'&&p.estado!=='cancelado').map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
             </select>
           </Field>
-
-          {/* Vincular con solicitud aprobada */}
-          {form.proyecto_id && solicitudes.filter(s => s.proyecto_id === form.proyecto_id && s.estado === 'aprobada').length > 0 && (
-            <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/30">
-              <p className="text-xs font-semibold text-gray-500 mb-1.5">
-                {t('btn_cancel') === 'Cancel' ? 'Link to approved request (optional)' : 'Vincular a solicitud aprobada (opcional)'}
-              </p>
-              <select className={selectCls} value={form.solicitud_id||''} onChange={e => {
-                const solId = e.target.value
-                const sol = solicitudes.find(s => s.id === solId)
-                setForm(f => ({...f, solicitud_id: solId, actividad_id: sol?.actividad_id || f.actividad_id}))
-              }}>
-                <option value="">{t('btn_cancel') === 'Cancel' ? '— No link —' : '— Sin vincular —'}</option>
-                {solicitudes.filter(s => s.proyecto_id === form.proyecto_id && s.estado === 'aprobada').map(s => (
-                  <option key={s.id} value={s.id}>{s.folio} — {s.created_at}</option>
-                ))}
-              </select>
-              {form.solicitud_id && (
-                <p className="text-xs text-blue-600 mt-1">
-                  {t('btn_cancel') === 'Cancel' ? '✓ Activity inherited from request' : '✓ Actividad heredada de la solicitud'}
-                </p>
-              )}
-            </div>
-          )}
-
           <Field label={t('inv_form_exit_activity')}>
             <select className={selectCls} value={form.actividad_id||''} onChange={set('actividad_id')}>
               <option value="">{t('lbl_select')}</option>

@@ -130,20 +130,17 @@ export function StoreProvider({ children, tenantId }) {
     async function loadAll() {
       const tablasTenant = [
         'proyectos','fases','presupuesto','materiales','entradas','salidas',
-        'solicitudes','ordenes_compra','costos_directos','nominas',
-        'subcontratos','equipos','costos_indirectos','materiales_presupuestados',
-        'solicitudes_eliminacion'
+        'solicitudes','solicitud_items','ordenes_compra','ordenes_compra_items',
+        'costos_directos','nominas','subcontratos','equipos','costos_indirectos',
+        'materiales_presupuestados','solicitudes_eliminacion'
       ]
-      const tablasSinFiltro = ['solicitud_items','ordenes_compra_items']
 
-      const [tenantResults, sinFiltroResults] = await Promise.all([
-        Promise.all(tablasTenant.map(t => supabase.from(t).select('*').eq('tenant_id', tenantId))),
-        Promise.all(tablasSinFiltro.map(t => supabase.from(t).select('*'))),
-      ])
+      const tenantResults = await Promise.all(
+        tablasTenant.map(t => supabase.from(t).select('*').eq('tenant_id', tenantId))
+      )
 
       const payload = {}
       tablasTenant.forEach((t, i) => { payload[t] = tenantResults[i].data || [] })
-      tablasSinFiltro.forEach((t, i) => { payload[t] = sinFiltroResults[i].data || [] })
 
       dispatch({ type: 'LOAD_ALL', payload })
     }
@@ -397,7 +394,7 @@ export function StoreProvider({ children, tenantId }) {
 
       case 'ADD_SOLICITUD': {
         const sol   = { ...action.payload.solicitud, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
-        const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), solicitud_id: sol.id }))
+        const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), solicitud_id: sol.id, tenant_id: tenantId }))
         await supabase.from('solicitudes').insert(sol)
         if (items.length) await supabase.from('solicitud_items').insert(items)
         dispatch({ type: 'ADD_SOLICITUD', payload: { solicitud: sol, items } })
@@ -442,6 +439,7 @@ export function StoreProvider({ children, tenantId }) {
           cantidad: parseFloat(it.cantidad||0),
           unidad: it.unidad || 'und',
           precio_unitario: parseFloat(it.precio_unitario||0),
+          tenant_id: tenantId,
         }))
         await supabase.from('ordenes_compra').insert(oc)
         if (ocItems.length) await supabase.from('ordenes_compra_items').insert(ocItems)
