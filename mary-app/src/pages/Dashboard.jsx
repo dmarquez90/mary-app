@@ -59,10 +59,22 @@ export default function Dashboard() {
     }, 0)
   }, [activos, entradas, salidas])
 
+  // Moneda predominante — la más usada entre los proyectos activos
+  // Si todos usan la misma, esa es. Si hay mezcla, mostrar la del primer proyecto.
+  const monedaPrincipal = useMemo(() => {
+    if (proyectos.length === 0) return 'USD'
+    const conteo = proyectos.reduce((acc, p) => {
+      const m = p.moneda || 'USD'
+      acc[m] = (acc[m] || 0) + 1
+      return acc
+    }, {})
+    return Object.entries(conteo).sort((a, b) => b[1] - a[1])[0][0]
+  }, [proyectos])
+
   const cards = [
     { label: t('dash_projects'),        value: totalProyectos,   color: 'text-blue-600'   },
     { label: t('dash_materials'),       value: totalMateriales,  color: 'text-green-600'  },
-    { label: t('dash_inv_value'),       value: fmt(valorInventario, 'USD'), color: 'text-emerald-600', big: true },
+    { label: t('dash_inv_value'),       value: fmt(valorInventario, monedaPrincipal), color: 'text-emerald-600', big: true },
     { label: t('dash_entries'),         value: totalEntradas,    color: 'text-indigo-600' },
     { label: t('dash_outputs'),         value: totalSalidas,     color: 'text-red-600'    },
     { label: t('dash_requests'),        value: totalSolicitudes, color: 'text-yellow-600' },

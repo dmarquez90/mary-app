@@ -31,6 +31,13 @@ function reducer(state, action) {
     case 'ADD_BUDGET': return { ...state, presupuesto: [...state.presupuesto, action.payload] }
     case 'UPD_BUDGET': return { ...state, presupuesto: state.presupuesto.map(b => b.id === action.payload.id ? { ...b, ...action.payload } : b) }
     case 'DEL_BUDGET': return { ...state, presupuesto: state.presupuesto.filter(b => b.id !== action.payload) }
+    case 'REFRESH_PRESUPUESTO': return {
+      ...state,
+      presupuesto: [
+        ...state.presupuesto.filter(b => b.proyecto_id !== action.payload.proyectoId),
+        ...action.payload.items
+      ]
+    }
 
     case 'ADD_MATERIAL':    return { ...state, materiales: [...state.materiales, action.payload] }
     case 'ADD_MATERIAL_CON_ENTRADA': return {
@@ -72,6 +79,20 @@ function reducer(state, action) {
       return { ...state, solicitudes: [...state.solicitudes, action.payload.solicitud], solicitud_items: [...state.solicitud_items, ...action.payload.items] }
     case 'UPD_SOLICITUD_ESTADO':
       return { ...state, solicitudes: state.solicitudes.map(s => s.id === action.payload.id ? { ...s, estado: action.payload.estado } : s) }
+    case 'REFRESH_SOLICITUD_ITEMS':
+      return {
+        ...state,
+        solicitud_items: [
+          ...state.solicitud_items.filter(i => i.solicitud_id !== action.payload.solicitudId),
+          ...action.payload.items
+        ]
+      }
+    case 'REFRESH_SOLICITUDES':
+      return {
+        ...state,
+        solicitudes:     action.payload.solicitudes,
+        solicitud_items: action.payload.items,
+      }
     case 'DEL_SOLICITUD':
       return {
         ...state,
@@ -259,6 +280,15 @@ export function StoreProvider({ children, tenantId }) {
         dispatch({ type: 'ADD_BUDGET', payload: item })
         break
       }
+      case 'REFRESH_PRESUPUESTO': {
+        const { data } = await supabase
+          .from('presupuesto')
+          .select('*')
+          .eq('proyecto_id', action.payload.proyectoId)
+          .eq('tenant_id', tenantId)
+        dispatch({ type: 'REFRESH_PRESUPUESTO', payload: { proyectoId: action.payload.proyectoId, items: data || [] } })
+        break
+      }
       case 'UPD_BUDGET': {
         await supabase.from('presupuesto').update(action.payload).eq('id', action.payload.id)
         dispatch(action)
@@ -272,44 +302,63 @@ export function StoreProvider({ children, tenantId }) {
 
       case 'ADD_MATERIAL_CON_ENTRADA': {
         const { material, entrada } = action.payload
-        // Verificar código duplicado
         const existe = state.materiales.find(m => m.codigo === material.codigo && m.activo !== false)
         if (existe) { alert('Error: El código de material ya existe.'); return }
-        const mat = { ...material, created_at: today(), tenant_id: tenantId }
-        const ent = { ...entrada, id: uuid(), created_at: today(), tenant_id: tenantId }
-        await supabase.from('materiales').insert(mat)
-        await supabase.from('entradas').insert(ent)
-        // Actualizar stock en Supabase
-        await supabase.from('materiales').update({ stock_actual: mat.stock_actual })
-          .eq('id', mat.id)
-        dispatch({ type: 'ADD_MATERIAL_CON_ENTRADA', payload: { material: mat, entrada: ent } })
+        const cleanMat = {
+          ...Object.fromEntries(Object.entries(material).filter(([k]) => !k.startsWith('_'))),
+          created_at:      today(),
+          tenant_id:       tenantId,
+          stock_actual:    parseFloat(material.stock_actual)    || 0,
+          stock_minimo:    parseFloat(material.stock_minimo)    || 0,
+          precio_unitario: parseFloat(material.precio_unitario) || 0,
+        }
+        const cleanEnt = {
+          ...Object.fromEntries(Object.entries(entrada).filter(([k]) => !k.startsWith('_'))),
+          id:              uuid(),
+          created_at:      today(),
+          tenant_id:       tenantId,
+          cantidad:        parseFloat(entrada.cantidad)        || 0,
+          precio_unitario: parseFloat(entrada.precio_unitario) || 0,
+          proyecto_id:     entrada.proyecto_id || null,
+          oc_id:           entrada.oc_id       || null,
+        }
+        const { error: eM } = await supabase.from('materiales').insert(cleanMat)
+        if (eM) { console.error('ADD_MATERIAL_CON_ENTRADA — materiales:', JSON.stringify(eM)); break }
+        const { error: eE } = await supabase.from('entradas').insert(cleanEnt)
+        if (eE) console.error('ADD_MATERIAL_CON_ENTRADA — entradas:', JSON.stringify(eE))
+        await supabase.from('materiales').update({ stock_actual: cleanMat.stock_actual }).eq('id', cleanMat.id)
+        dispatch({ type: 'ADD_MATERIAL_CON_ENTRADA', payload: { material: cleanMat, entrada: cleanEnt } })
         break
       }
       case 'ADD_MATERIAL': {
         const existe = state.materiales.find(m => m.codigo === action.payload.codigo && m.activo !== false)
-        if (existe) {
-          alert('Error: El código de material ya existe.')
-          return
-        }
+        if (existe) { alert('Error: El código de material ya existe.'); return }
         const stockInicial = parseFloat(action.payload.stock_actual) || 0
-        const item = { ...action.payload, id: action.payload.id || uuid(), stock_actual: stockInicial, created_at: today(), tenant_id: tenantId }
-        await supabase.from('materiales').insert(item)
+        const cleanP = Object.fromEntries(
+          Object.entries(action.payload).filter(([k]) => !k.startsWith('_'))
+        )
+        // Convertir campos numéricos vacíos a null
+        const item = {
+          ...cleanP,
+          id:              cleanP.id || uuid(),
+          stock_actual:    stockInicial,
+          stock_minimo:    parseFloat(cleanP.stock_minimo)    || 0,
+          precio_unitario: parseFloat(cleanP.precio_unitario) || 0,
+          created_at:      today(),
+          tenant_id:       tenantId,
+        }
+        const { error: eM } = await supabase.from('materiales').insert(item)
+        if (eM) { console.error('ADD_MATERIAL — materiales:', JSON.stringify(eM)); break }
         dispatch({ type: 'ADD_MATERIAL', payload: item })
-
-        // Registrar entrada automática si hay stock inicial
         if (stockInicial > 0) {
           const entrada = {
-            id:              uuid(),
-            material_id:     item.id,
-            cantidad:        stockInicial,
-            precio_unitario: parseFloat(action.payload.precio_unitario) || 0,
-            numero_factura:  'STOCK-INICIAL',
-            proveedor:       'Stock inicial',
-            fecha_recepcion: today(),
-            created_at:      today(),
-            tenant_id:       tenantId,
+            id: uuid(), material_id: item.id, cantidad: stockInicial,
+            precio_unitario: parseFloat(cleanP.precio_unitario) || 0,
+            numero_factura: 'STOCK-INICIAL', proveedor: 'Stock inicial',
+            fecha_recepcion: today(), created_at: today(), tenant_id: tenantId,
           }
-          await supabase.from('entradas').insert(entrada)
+          const { error: eE } = await supabase.from('entradas').insert(entrada)
+          if (eE) console.error('ADD_MATERIAL — entradas stock inicial:', JSON.stringify(eE))
           dispatch({ type: 'ADD_ENTRADA', payload: entrada })
         }
         break
@@ -332,11 +381,23 @@ export function StoreProvider({ children, tenantId }) {
       }
 
       case 'ADD_ENTRADA': {
-        const payload = { ...action.payload }
-        if (!payload.oc_id) delete payload.oc_id
-        if (!payload.proyecto_id) delete payload.proyecto_id
-        const item = { ...payload, id: uuid(), created_at: today(), tenant_id: tenantId }
-        await supabase.from('entradas').insert(item)
+        const payload = Object.fromEntries(
+          Object.entries(action.payload).filter(([k]) => !k.startsWith('_'))
+        )
+        const item = {
+          ...payload,
+          id:              uuid(),
+          created_at:      today(),
+          tenant_id:       tenantId,
+          cantidad:        parseFloat(payload.cantidad)        || 0,
+          precio_unitario: parseFloat(payload.precio_unitario) || 0,
+          oc_id:           payload.oc_id      || null,
+          proyecto_id:     payload.proyecto_id || null,
+        }
+        if (!item.oc_id)      delete item.oc_id
+        if (!item.proyecto_id) delete item.proyecto_id
+        const { error: eE } = await supabase.from('entradas').insert(item)
+        if (eE) { console.error('ADD_ENTRADA — entradas:', JSON.stringify(eE)); break }
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) {
           const nuevoStock = (parseFloat(mat.stock_actual)||0) + (parseFloat(item.cantidad)||0)
@@ -392,11 +453,15 @@ export function StoreProvider({ children, tenantId }) {
       }
 
       case 'ADD_SALIDA': {
-        const payload = { ...action.payload }
+        const payload = Object.fromEntries(
+          Object.entries(action.payload).filter(([k]) => !k.startsWith('_'))
+        )
         if (!payload.proyecto_id) delete payload.proyecto_id
         if (!payload.actividad_id) delete payload.actividad_id
+        if (!payload.origen_proyecto_id) delete payload.origen_proyecto_id
         const item = { ...payload, id: uuid(), created_at: today(), tenant_id: tenantId }
-        await supabase.from('salidas').insert(item)
+        const { error: eS } = await supabase.from('salidas').insert(item)
+        if (eS) { console.error('ADD_SALIDA — salidas:', eS, item); break }
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) {
           const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) - (parseFloat(item.cantidad)||0))
@@ -500,8 +565,12 @@ export function StoreProvider({ children, tenantId }) {
       case 'ADD_SOLICITUD': {
         const sol   = { ...action.payload.solicitud, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
         const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), solicitud_id: sol.id, tenant_id: tenantId }))
-        await supabase.from('solicitudes').insert(sol)
-        if (items.length) await supabase.from('solicitud_items').insert(items)
+        const { error: solError } = await supabase.from('solicitudes').insert(sol)
+        if (solError) { console.error('Error al insertar solicitud:', solError); break }
+        if (items.length) {
+          const { error: itemsError } = await supabase.from('solicitud_items').insert(items)
+          if (itemsError) console.error('Error al insertar solicitud_items:', itemsError, items)
+        }
         dispatch({ type: 'ADD_SOLICITUD', payload: { solicitud: sol, items } })
         break
       }
@@ -514,6 +583,14 @@ export function StoreProvider({ children, tenantId }) {
         await supabase.from('solicitud_items').delete().eq('solicitud_id', action.payload)
         await supabase.from('solicitudes').delete().eq('id', action.payload)
         dispatch(action)
+        break
+      }
+      case 'REFRESH_SOLICITUDES': {
+        const [{ data: sols }, { data: items }] = await Promise.all([
+          supabase.from('solicitudes').select('*').eq('tenant_id', tenantId),
+          supabase.from('solicitud_items').select('*').eq('tenant_id', tenantId),
+        ])
+        dispatch({ type: 'REFRESH_SOLICITUDES', payload: { solicitudes: sols || [], items: items || [] } })
         break
       }
 
@@ -725,18 +802,21 @@ export function StoreProvider({ children, tenantId }) {
 
       case 'ADD_MAT_PRES': {
         const item = {
-          id: uuid(), created_at: today(), tenant_id: tenantId,
-          proyecto_id: action.payload.proyecto_id,
-          nombre_libre: action.payload.nombre_libre || '',
-          unidad_libre: action.payload.unidad_libre || 'und',
-          cantidad_presupuestada: parseFloat(action.payload.cantidad_presupuestada || 0),
-          material_id: action.payload.material_id || null,
-          actividad_id: action.payload.actividad_id || null,
-          etapa_id: action.payload.etapa_id || null,
-          sub_etapa_id: action.payload.sub_etapa_id || null,
-          es_adicional: action.payload.es_adicional || false,
+          id:                     uuid(),
+          created_at:             today(),
+          tenant_id:              tenantId,
+          proyecto_id:            action.payload.proyecto_id            || null,
+          nombre_libre:           action.payload.nombre_libre           || '',
+          unidad_libre:           action.payload.unidad_libre           || 'und',
+          cantidad_presupuestada: parseFloat(action.payload.cantidad_presupuestada) || 0,
+          material_id:            action.payload.material_id            || null,
+          actividad_id:           action.payload.actividad_id           || null,
+          etapa_id:               action.payload.etapa_id               || null,
+          sub_etapa_id:           action.payload.sub_etapa_id           || null,
+          es_adicional:           action.payload.es_adicional           || false,
         }
-        await supabase.from('materiales_presupuestados').insert(item)
+        const { error: eMP } = await supabase.from('materiales_presupuestados').insert(item)
+        if (eMP) { console.error('ADD_MAT_PRES:', JSON.stringify(eMP)); break }
         dispatch({ type: 'ADD_MAT_PRES', payload: item })
         break
       }

@@ -1,10 +1,48 @@
-import { useState, useContext, useRef, useEffect } from 'react'
+import { useState, useContext, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { today } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import { supabase } from '../supabase'
 
 const BRAND = '#1B3A6B'
+
+// ── BADGE DE FLUJO ────────────────────────────────────────
+function FlujoBadge({ flujo }) {
+  if (!flujo || flujo === 'sin_determinar') return null
+  const config = {
+    stock_total:   { label: 'En Bodega',     cls: 'bg-green-100 text-green-700' },
+    sin_stock:     { label: 'OC Requerida',  cls: 'bg-amber-100 text-amber-700' },
+    stock_parcial: { label: 'Dividida',      cls: 'bg-blue-100 text-blue-700'   },
+  }
+  const c = config[flujo] || { label: flujo, cls: 'bg-gray-100 text-gray-600' }
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.cls}`}>{c.label}</span>
+  )
+}
+
+// ── PANEL DE FLUJO POR ITEM ───────────────────────────────
+function ItemFlujoBadge({ item, materiales }) {
+  const mat = materiales.find(m => m.id === item.material_id)
+  if (!item.flujo_item || item.flujo_item === 'sin_determinar') return null
+  return (
+    <div className="mt-1 flex flex-wrap gap-1 items-center">
+      <FlujoBadge flujo={item.flujo_item} />
+      {item.flujo_item === 'stock_total' && (
+        <span className="text-xs text-green-600">✓ {item.cantidad_bodega} {item.unidad} disponibles en bodega</span>
+      )}
+      {item.flujo_item === 'sin_stock' && (
+        <span className="text-xs text-amber-600">⚠ {item.cantidad_oc} {item.unidad} requieren OC</span>
+      )}
+      {item.flujo_item === 'stock_parcial' && (
+        <div className="flex gap-2 text-xs">
+          <span className="text-green-600">✓ {item.cantidad_bodega} de bodega</span>
+          <span className="text-amber-600">+ {item.cantidad_oc} por OC</span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const printStyles = `
   @media print {
@@ -62,7 +100,13 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
               <span className="font-mono text-xs text-gray-400 w-24 flex-shrink-0">{m.codigo}</span>
               <span className="text-sm text-gray-800 flex-1">{m.descripcion}</span>
               <span className="text-xs text-gray-400 flex-shrink-0">{m.unidad}</span>
-              <span className="text-xs font-mono font-medium text-green-600 flex-shrink-0">Stock: {m.stock_actual}</span>
+              <span className={`text-xs font-mono font-medium flex-shrink-0 ${
+                m.stock_actual <= 0 ? 'text-red-500' :
+                m.stock_actual <= (m.stock_minimo || 0) ? 'text-amber-500' :
+                'text-green-600'
+              }`}>
+                Stock: {m.stock_actual}{m.stock_actual <= 0 ? ' ⚠' : ''}
+              </span>
             </button>
           ))}
         </div>
@@ -182,7 +226,9 @@ export default function Compras() {
   const TABS             = [t('comp_tab_sol'), t('comp_tab_oc')]
   const todasActsDelProy = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
   const activos          = materiales.filter(m => m.activo !== false)
-  const solsAprobadas    = solicitudes.filter(s => s.estado === 'aprobada')
+  const solsAprobadas    = solicitudes.filter(s =>
+    ['aprobada', 'pendiente_oc', 'oc_generada', 'dividida'].includes(s.estado)
+  )
 
   const genFolio = () => {
     const n = solicitudes.length + 1
@@ -273,8 +319,71 @@ export default function Compras() {
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
-  const pendSol = solicitudes.filter(s => s.estado === 'pendiente').length
+  const pendSol = solicitudes.filter(s =>
+    ['pendiente', 'pendiente_bodega', 'pendiente_oc', 'dividida'].includes(s.estado)
+  ).length
   const pendOC  = ordenes_compra.filter(oc => oc.estado === 'pendiente_aprobacion').length
+
+  // Sync desde Supabase — por si el store tiene datos desincronizados
+  const [syncing, setSyncing] = useState(false)
+  const syncSolicitudes = async () => {
+    setSyncing(true)
+    await dispatch({ type: 'REFRESH_SOLICITUDES' })
+    setSyncing(false)
+  }
+  const procesarFlujo = useCallback(async (solicitudId) => {
+    try {
+      const items = solicitud_items.filter(i => i.solicitud_id === solicitudId)
+      const resultados = []
+      for (const item of items) {
+        if (item.material_id) {
+          // Item vinculado al catálogo — detectar flujo A/B/C automáticamente
+          const { data, error } = await supabase.rpc('procesar_solicitud_item', {
+            p_solicitud_item_id: item.id
+          })
+          if (!error && data) resultados.push(data)
+        } else {
+          // Item sin material en catálogo (descripción libre) — siempre OC
+          const { error } = await supabase
+            .from('solicitud_items')
+            .update({
+              flujo_item:   'sin_stock',
+              cantidad_oc:  parseFloat(item.cantidad || 0),
+              cantidad_bodega: 0,
+              estado_bodega: 'no_aplica',
+              estado_oc:    'pendiente_aprobacion',
+            })
+            .eq('id', item.id)
+          if (!error) resultados.push({
+            flujo: 'sin_stock',
+            cantidad_oc: item.cantidad,
+            mensaje: 'Material sin catálogo — requiere Orden de Compra.'
+          })
+        }
+      }
+      // Refrescar estado desde Supabase
+      const { data: solActualizada } = await supabase
+        .from('solicitudes')
+        .select('estado, flujo_tipo')
+        .eq('id', solicitudId)
+        .single()
+      if (solActualizada) {
+        dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: { id: solicitudId, estado: solActualizada.estado } })
+      }
+      // Refrescar items con flujo calculado
+      const { data: itemsActualizados } = await supabase
+        .from('solicitud_items')
+        .select('*')
+        .eq('solicitud_id', solicitudId)
+      if (itemsActualizados) {
+        dispatch({ type: 'REFRESH_SOLICITUD_ITEMS', payload: { solicitudId, items: itemsActualizados } })
+      }
+      return resultados
+    } catch (err) {
+      console.error('Error procesando flujo:', err)
+      return []
+    }
+  }, [solicitud_items, dispatch])
 
   const handlePrint  = () => window.print()
   const openPrintSol = (sol) => {
@@ -344,6 +453,11 @@ export default function Compras() {
           <h1 className="text-xl font-semibold text-gray-800">{t('comp_title')}</h1>
           <p className="text-sm text-gray-400 mt-0.5">{t('comp_sub_pending', { n: pendSol })} · {t('comp_sub_oc', { n: pendOC })}</p>
         </div>
+        <div className="flex items-center gap-2">
+          <button onClick={syncSolicitudes} disabled={syncing} title="Recargar desde servidor"
+            className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-40 transition-colors text-sm">
+            {syncing ? '⟳' : '↺'}
+          </button>
         {tab === 0 && (
           <PrimaryBtn onClick={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
@@ -357,6 +471,7 @@ export default function Compras() {
             setDrawer('oc')
           }}>{t('comp_new_oc')}</PrimaryBtn>
         )}
+        </div>
       </div>
 
       {/* TABS */}
@@ -397,7 +512,12 @@ export default function Compras() {
                       <td className="px-4 py-3 text-xs font-mono font-semibold" style={{color:BRAND}}>{sol.folio || '—'}</td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-600">{proy?.project_code || '—'}</td>
                       <td className="px-4 py-3 text-xs text-gray-600">{sol.nombre_solicitante || '—'}</td>
-                      <td className="px-4 py-3"><Badge estado={sol.estado} /></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <Badge estado={sol.estado} />
+                          <FlujoBadge flujo={sol.flujo_tipo} />
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORIDAD_COLORS[sol.prioridad] || PRIORIDAD_COLORS.normal}`}>
                           {sol.prioridad === 'normal' ? t('comp_sol_priority_normal') : sol.prioridad === 'alta' ? t('comp_sol_priority_alta') : t('comp_sol_priority_urgente')}
@@ -409,16 +529,52 @@ export default function Compras() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetail(sol.id); setDrawer('detalle') }}>{t('btn_view')}</TBtn>
                           <TBtn onClick={() => openPrintSol(sol)}>🖨</TBtn>
+
+                          {/* FLUJO: Pendiente — Aprobar activa detección automática */}
                           {sol.estado === 'pendiente' && <>
-                            <TBtn onClick={() => dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'aprobada' } })}>{t('btn_approve')}</TBtn>
+                            <TBtn onClick={async () => {
+                              await dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'pendiente_bodega' } })
+                              await procesarFlujo(sol.id)
+                            }}>
+                              {t('btn_approve')}
+                            </TBtn>
                             <TBtn danger onClick={() => dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'rechazada' } })}>{t('btn_reject')}</TBtn>
                           </>}
+
+                          {/* FLUJO A: Todo en bodega — solo despacho */}
+                          {sol.estado === 'pendiente_bodega' && (
+                            <span className="text-xs text-green-600 font-medium px-2 flex items-center gap-1">
+                              📦 En Bodega
+                            </span>
+                          )}
+
+                          {/* FLUJO B: Sin stock — generar OC */}
+                          {(sol.estado === 'pendiente_oc' || sol.estado === 'oc_generada') && (
+                            <TBtn onClick={() => {
+                              setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
+                              setDrawer('oc')
+                            }}>{t('comp_generate_oc')}</TBtn>
+                          )}
+
+                          {/* FLUJO C: Dividida — muestra ambas rutas */}
+                          {sol.estado === 'dividida' && (
+                            <div className="flex gap-1">
+                              <span className="text-xs text-blue-600 font-medium px-1 flex items-center">📦+🛒</span>
+                              <TBtn onClick={() => {
+                                setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
+                                setDrawer('oc')
+                              }}>OC Faltante</TBtn>
+                            </div>
+                          )}
+
+                          {/* Estado legacy aprobada */}
                           {sol.estado === 'aprobada' && (
                             <TBtn onClick={() => {
                               setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
                               setDrawer('oc')
                             }}>{t('comp_generate_oc')}</TBtn>
                           )}
+
                           <TBtn danger onClick={() => setConfirmDel({ type:'sol', id:sol.id })}>{t('btn_delete')}</TBtn>
                         </div>
                       </td>
@@ -801,6 +957,32 @@ export default function Compras() {
                   </div>
                   {act && <p className="text-xs text-gray-400 mt-0.5">{act.code} — {act.descripcion}</p>}
                   {it.observaciones && <p className="text-xs text-gray-400 italic mt-0.5">{it.observaciones}</p>}
+                  {/* FLUJO POR ITEM */}
+                  <ItemFlujoBadge item={it} materiales={materiales} />
+                  {/* Estados de despacho */}
+                  {it.flujo_item && it.flujo_item !== 'sin_determinar' && (
+                    <div className="flex gap-2 mt-1.5">
+                      {(it.flujo_item === 'stock_total' || it.flujo_item === 'stock_parcial') && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          it.estado_bodega === 'despachado' ? 'bg-green-100 text-green-700' :
+                          it.estado_bodega === 'no_aplica'  ? 'bg-gray-100 text-gray-400' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          Bodega: {it.estado_bodega === 'despachado' ? '✓ Despachado' : it.estado_bodega === 'no_aplica' ? '—' : '⏳ Pendiente'}
+                        </span>
+                      )}
+                      {(it.flujo_item === 'sin_stock' || it.flujo_item === 'stock_parcial') && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          it.estado_oc === 'recibida'  ? 'bg-green-100 text-green-700' :
+                          it.estado_oc === 'aprobada'  ? 'bg-blue-100 text-blue-700' :
+                          it.estado_oc === 'no_aplica' ? 'bg-gray-100 text-gray-400' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          OC: {it.estado_oc === 'recibida' ? '✓ Recibida' : it.estado_oc === 'aprobada' ? '✓ Aprobada' : it.estado_oc === 'no_aplica' ? '—' : '⏳ Pendiente'}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

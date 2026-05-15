@@ -24,6 +24,24 @@ export default function Presupuesto() {
   const isEs = lang === 'ES'
   const puedeEditar = can('presupuesto_editar')
 
+  // Auto-sync desde Supabase al seleccionar un proyecto
+  // Evita mostrar datos desincronizados del store local
+  const [syncing, setSyncing] = useState(false)
+
+  const syncPresupuesto = async (pid) => {
+    if (!pid) return
+    setSyncing(true)
+    await dispatch({ type: 'REFRESH_PRESUPUESTO', payload: { proyectoId: pid } })
+    setSyncing(false)
+  }
+
+  // Sincroniza automáticamente al cambiar de proyecto
+  const handleProyChange = (pid) => {
+    setProyId(pid)
+    setSelected(null)
+    syncPresupuesto(pid)
+  }
+
   const proy   = proyectos.find(p => p.id === proyId)
   const items  = useMemo(() => presupuesto.filter(b => b.proyecto_id === proyId), [presupuesto, proyId])
   const flat   = useMemo(() => flatBudgetItems(items), [items])
@@ -104,12 +122,21 @@ export default function Presupuesto() {
           <h1 className="text-xl font-semibold text-gray-800">{t('pres_title')}</h1>
           {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
         </div>
-        <select
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
-          value={proyId} onChange={e => { setProyId(e.target.value); setSelected(null) }}>
-          <option value="">{t('lbl_select')}</option>
-          {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => syncPresupuesto(proyId)}
+            disabled={!proyId || syncing}
+            title={isEs ? 'Recargar desde servidor' : 'Reload from server'}
+            className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-40 transition-colors text-sm">
+            {syncing ? '⟳' : '↺'}
+          </button>
+          <select
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+            value={proyId} onChange={e => handleProyChange(e.target.value)}>
+            <option value="">{t('lbl_select')}</option>
+            {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
+          </select>
+        </div>
       </div>
 
       {!proyId ? (
@@ -156,7 +183,7 @@ export default function Presupuesto() {
             <div className="bg-white border border-gray-100 rounded-xl rounded-t-none overflow-x-auto">
               <table className="w-full min-w-[860px]">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 sticky top-[52px] z-10">
+                  <tr className="bg-gray-50 border-b border-gray-100 ">
                     {['ID',t('pres_col_desc'),t('pres_col_unit'),t('pres_col_qty'),t('pres_col_mo'),t('pres_col_mat'),t('pres_col_eq'),t('pres_col_uc'),t('pres_col_total')].map((h,i) => (
                       <th key={i} className={`px-3 py-3 text-xs text-gray-500 whitespace-nowrap ${i>=3?'text-right':'text-left'}`}>{h}</th>
                     ))}
@@ -173,14 +200,24 @@ export default function Presupuesto() {
                     return (
                       <tr key={item.id}
                         onClick={() => puedeEditar ? setSelected(sel ? null : item.id) : null}
-                        className={`border-b border-gray-50 transition-colors
+                        className={`transition-colors
+                          ${isEt ? 'border-b-2 border-t border-gray-200' : 'border-b border-gray-50'}
                           ${puedeEditar ? 'cursor-pointer' : ''}
-                          ${sel ? 'bg-blue-50' : isEt ? 'bg-gray-50/70 hover:bg-gray-100/50' : 'hover:bg-gray-50/50'}`}>
+                          ${sel ? 'bg-blue-50' : isEt ? 'bg-green-50/60 hover:bg-green-50' : 'hover:bg-gray-50/50'}`}>
                         <td className="px-3 py-2.5">
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-mono font-medium
-                            ${isEt?'bg-green-100 text-green-700':isSs?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-600'}`}>
-                            {item.code}
-                          </span>
+                          {isEt ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-1 h-5 rounded-full bg-green-500 flex-shrink-0"/>
+                              <span className="inline-block px-2 py-0.5 rounded text-xs font-mono font-bold bg-green-100 text-green-700">
+                                {item.code}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-mono font-medium
+                              ${isSs?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-600'}`}>
+                              {item.code}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 max-w-xs">
                           <span className={`text-sm ${isEt?'font-semibold text-gray-800':isSs?'font-medium text-gray-700':'text-gray-600'}`}

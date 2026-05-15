@@ -8,8 +8,8 @@ import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
 
 const emptyMat = () => ({ codigo:'', descripcion:'', categoria:'', unidad:'und', stock_actual:'0', stock_minimo:'0', ubicacion_bodega:'', precio_unitario:'' })
-const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today() })
-const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today() })
+const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today(), tipo_entrada:'compra_proyecto' })
+const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today(), tipo_salida:'uso_directo', origen_proyecto_id:'' })
 
 const CATEGORIAS = [
   { key:'concreto',     es:'Concreto',     en:'Concrete',   color:'#6B7280' },
@@ -207,8 +207,10 @@ export default function Inventario() {
   const saveIn = async () => {
     if ((!form.material_id && !form._material_nuevo) || !form.cantidad || !form.fecha_recepcion) return
 
+    // tipo_entrada: si no hay proyecto_id, forzar 'compra_general'
+    const tipoEntrada = !form.proyecto_id ? 'compra_general' : (form.tipo_entrada || 'compra_proyecto')
+
     if (form._material_nuevo && form._mat_codigo) {
-      // Crear material y entrada en un solo dispatch combinado
       const nuevoId = crypto.randomUUID()
       const cantidad = parseFloat(form.cantidad || 0)
       const precio   = parseFloat(form.precio_unitario || 0)
@@ -236,11 +238,17 @@ export default function Inventario() {
             numero_factura:  form.numero_factura || '',
             proveedor:       form.proveedor || '',
             fecha_recepcion: form.fecha_recepcion,
+            tipo_entrada:    tipoEntrada,
           }
         }
       })
     } else {
-      dispatch({ type: 'ADD_ENTRADA', payload: { ...form, material_id: form.material_id } })
+      dispatch({ type: 'ADD_ENTRADA', payload: {
+        ...form,
+        material_id:  form.material_id,
+        proyecto_id:  form.proyecto_id || null,
+        tipo_entrada: tipoEntrada,
+      }})
     }
     setDrawer(null)
   }
@@ -248,7 +256,12 @@ export default function Inventario() {
   const saveOut = () => {
     if (!form.material_id || !form.cantidad || !form.proyecto_id) return
     if (stockAlerta) return
-    dispatch({ type:'ADD_SALIDA', payload:form })
+    dispatch({ type:'ADD_SALIDA', payload: {
+      ...form,
+      tipo_salida:        form.tipo_salida || 'uso_directo',
+      origen_proyecto_id: form.tipo_salida === 'sobrante_transferido' ? (form.origen_proyecto_id || null) : null,
+      costo_cargo:        form.tipo_salida === 'uso_directo' ? null : 0,
+    }})
     setDrawer(null)
   }
 
@@ -384,6 +397,7 @@ export default function Inventario() {
                               return m.precio_unitario > 0 ? fmt(m.precio_unitario, 'USD') : '—'
                             })()}
                           </td>
+                          <td className="px-4 py-3 text-sm font-mono font-semibold" style={{color:"#1B3A6B"}}>{(() => { const entsM = entradas.filter(e => e.material_id === m.id); const precio = entsM.length > 0 ? entsM.reduce((s,e) => s + parseFloat(e.cantidad||0)*parseFloat(e.precio_unitario||0), 0) / entsM.reduce((s,e) => s + parseFloat(e.cantidad||0), 0) : parseFloat(m.precio_unitario||0); const total = parseFloat(m.stock_actual||0) * precio; return total > 0 ? fmt(total, "USD") : "�" })()}</td>
                           <td className="px-4 py-3 text-xs text-gray-500">{m.ubicacion_bodega || '—'}</td>
                           <td className="px-4 py-3">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
@@ -423,7 +437,8 @@ export default function Inventario() {
                 {[
                   t('inv_col_date'), t('inv_col_material'), t('inv_col_qty'),
                   t('inv_col_price'), t('inv_col_invoice'), t('inv_col_supplier'),
-                  t('inv_col_project'), puedeEditar ? '' : null
+                  t('inv_col_project'), isEs ? 'Tipo' : 'Type',
+                  puedeEditar ? '' : null
                 ].filter(h => h !== null).map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
@@ -445,7 +460,22 @@ export default function Inventario() {
                           : e.numero_factura || '—'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{e.proveedor || '—'}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{proy?.project_code || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {proy?.project_code || <span className="text-amber-600 font-medium">{isEs ? 'Sin proyecto' : 'No project'}</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const tipo = e.tipo_entrada || 'compra_proyecto'
+                          const cfg = {
+                            compra_proyecto:   { label: isEs ? 'Compra proyecto' : 'Project purchase', cls: 'bg-blue-100 text-blue-700' },
+                            compra_general:    { label: isEs ? 'Reserva general' : 'General reserve',  cls: 'bg-amber-100 text-amber-700' },
+                            sobrante_proyecto: { label: isEs ? 'Sobrante' : 'Surplus',                 cls: 'bg-purple-100 text-purple-700' },
+                            devolucion:        { label: isEs ? 'Devolución' : 'Return',                cls: 'bg-gray-100 text-gray-600' },
+                          }
+                          const c = cfg[tipo] || cfg.compra_proyecto
+                          return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.cls}`}>{c.label}</span>
+                        })()}
+                      </td>
                       {puedeEditar && (
                         <td className="px-4 py-3">
                           <TBtn danger onClick={() => delEntrada(e)}>
@@ -477,6 +507,7 @@ export default function Inventario() {
                 {[
                   t('inv_col_date'), t('inv_col_material'), t('inv_col_qty'),
                   t('inv_col_project'), t('inv_col_activity'),
+                  isEs ? 'Tipo' : 'Type',
                   puedeEditar ? '' : null
                 ].filter(h => h !== null).map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
@@ -494,6 +525,19 @@ export default function Inventario() {
                       <td className="px-4 py-3 text-sm font-mono text-red-500">-{fmtNum(s.cantidad)} {mat?.unidad}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{proy?.project_code || '—'}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const tipo = s.tipo_salida || 'uso_directo'
+                          const origenProy = proyectos.find(p => p.id === s.origen_proyecto_id)
+                          const cfg = {
+                            uso_directo:          { label: isEs ? 'Uso directo' : 'Direct use',     cls: 'bg-blue-100 text-blue-700' },
+                            sobrante_transferido:  { label: isEs ? `Sobrante${origenProy ? ` (${origenProy.project_code})` : ''}` : `Surplus${origenProy ? ` (${origenProy.project_code})` : ''}`, cls: 'bg-purple-100 text-purple-700' },
+                            uso_general:          { label: isEs ? 'Reserva general' : 'General reserve', cls: 'bg-amber-100 text-amber-700' },
+                          }
+                          const c = cfg[tipo] || cfg.uso_directo
+                          return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.cls}`}>{c.label}</span>
+                        })()}
+                      </td>
                       {puedeEditar && (
                         <td className="px-4 py-3">
                           <TBtn danger onClick={() => delSalida(s)}>
@@ -689,10 +733,26 @@ export default function Inventario() {
 
           <Field label={t('inv_form_project')}>
             <select className={selectCls} value={form.proyecto_id||''} onChange={set('proyecto_id')}>
-              <option value="">{t('lbl_select')}</option>
+              <option value="">{isEs ? '— Sin proyecto (compra general / reserva) —' : '— No project (general purchase / reserve) —'}</option>
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
             </select>
+            {!form.proyecto_id && (
+              <p className="text-xs text-amber-600 mt-1">
+                {isEs ? '⚠ Sin proyecto: se registrará como compra general disponible para cualquier proyecto.' : '⚠ No project: will be recorded as general stock available for any project.'}
+              </p>
+            )}
           </Field>
+
+          {/* Tipo de entrada — solo visible si hay proyecto seleccionado */}
+          {form.proyecto_id && (
+            <Field label={isEs ? 'Tipo de entrada' : 'Entry type'}>
+              <select className={selectCls} value={form.tipo_entrada||'compra_proyecto'} onChange={set('tipo_entrada')}>
+                <option value="compra_proyecto">{isEs ? 'Compra para este proyecto (OC)' : 'Purchase for this project (PO)'}</option>
+                <option value="sobrante_proyecto">{isEs ? 'Sobrante de otro proyecto' : 'Surplus from another project'}</option>
+                <option value="devolucion">{isEs ? 'Devolución desde campo' : 'Return from field'}</option>
+              </select>
+            </Field>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('inv_form_qty')} required>
@@ -741,6 +801,34 @@ export default function Inventario() {
               {activos.map(m => <option key={m.id} value={m.id}>{m.codigo} — {m.descripcion} (stock: {fmtNum(m.stock_actual)} {m.unidad})</option>)}
             </select>
           </Field>
+
+          {/* Tipo de salida */}
+          <Field label={isEs ? 'Tipo de salida' : 'Exit type'}>
+            <select className={selectCls} value={form.tipo_salida||'uso_directo'} onChange={set('tipo_salida')}>
+              <option value="uso_directo">{isEs ? 'Uso directo en proyecto (costo normal)' : 'Direct use in project (normal cost)'}</option>
+              <option value="sobrante_transferido">{isEs ? 'Sobrante de otro proyecto (sin costo)' : 'Surplus from another project (no cost)'}</option>
+              <option value="uso_general">{isEs ? 'Uso de reserva general (sin costo)' : 'Use from general reserve (no cost)'}</option>
+            </select>
+          </Field>
+
+          {/* Proyecto origen — solo si es sobrante transferido */}
+          {form.tipo_salida === 'sobrante_transferido' && (
+            <Field label={isEs ? 'Proyecto origen del sobrante' : 'Source project of surplus'}>
+              <select className={selectCls} value={form.origen_proyecto_id||''} onChange={set('origen_proyecto_id')}>
+                <option value="">{t('lbl_select')}</option>
+                {proyectos.filter(p => p.id !== form.proyecto_id).map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
+              </select>
+              <p className="text-xs text-blue-600 mt-1">
+                {isEs ? 'ℹ El costo permanece en el proyecto origen. Este proyecto no será cargado.' : 'ℹ Cost stays in the source project. This project will not be charged.'}
+              </p>
+            </Field>
+          )}
+
+          {form.tipo_salida === 'uso_general' && (
+            <p className="text-xs text-blue-600 px-1">
+              {isEs ? 'ℹ Material proveniente de reserva general. No se cargará costo a este proyecto.' : 'ℹ Material from general reserve. No cost will be charged to this project.'}
+            </p>
+          )}
           <Field label={t('inv_form_exit_qty')} required>
             <input type="number" className={inputCls} value={form.cantidad||''} onChange={set('cantidad')} placeholder="0.00" min="0" step="0.01" />
             {stockAlerta && <p className="text-xs text-red-500 mt-1">⚠ {t('inv_stock_warning', { n: fmtNum(stockDisp) })}</p>}
@@ -755,5 +843,7 @@ export default function Inventario() {
     </div>
   )
 }
+
+
 
 
