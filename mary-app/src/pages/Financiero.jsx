@@ -100,7 +100,14 @@ export default function Financiero() {
 
   const totalDir = directs.reduce((s,c) => s+(parseFloat(c.monto)||0), 0)
   const totalNom = noms.reduce((s,n) => s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0), 0)
-  const totalSub = subs.reduce((s,sc) => s+(parseFloat(sc.monto_pagado)||0), 0)
+  // totalSub: suma de avalúos APROBADOS del nuevo sistema de subcontratos
+  const scContratosDelProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
+  const scContratosIds     = scContratosDelProy.map(sc => sc.id)
+  const totalSub = subcontratos_avaluos
+    .filter(a => scContratosIds.includes(a.subcontrato_id) && a.estado === 'aprobado')
+    .reduce((s,a) => s + (parseFloat(a.monto_total)||0), 0)
+    // Fallback: si no hay nuevo sistema, usar el campo monto_pagado del sistema anterior
+    + subs.reduce((s,sc) => s+(parseFloat(sc.monto_pagado)||0), 0)
   const totalEq  = eqs.reduce((s,e) => s+(parseFloat(e.costo_total)||0), 0)
   const totalInd = inds.reduce((s,c) => s+(parseFloat(c.monto)||0), 0)
   const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => {
@@ -341,6 +348,7 @@ export default function Financiero() {
             subcontratos_items={subcontratos_items}
             subcontratos_avaluos={subcontratos_avaluos}
             subcontratos_avaluo_items={subcontratos_avaluo_items}
+            subcontratos_retenciones={state.subcontratos_retenciones||[]}
             dispatch={dispatch} fmt2={fmt2} fmt={fmt}
             t={t}
           />}
@@ -633,6 +641,7 @@ function SubcontratosModule({
   scForm, setScForm, setScF, avForm, setAvForm, setAvF,
   subcontratos_contratos, subcontratos_items,
   subcontratos_avaluos, subcontratos_avaluo_items,
+  subcontratos_retenciones,
   dispatch, fmt2, fmt, t,
 }) {
   const BRAND = '#1B3A6B'
@@ -666,12 +675,16 @@ function SubcontratosModule({
       return s + parseFloat(avItem?.cantidad_actual||0)
     }, 0)
 
-  const avSubtotal = avItems.reduce((s,it) => {
+  const avSubtotal    = avItems.reduce((s,it) => {
     const scIt = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
     return s + parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0)
   }, 0)
-  const avImpMonto = avSubtotal * (parseFloat(scSelected?.impuesto_pct||0)/100)
-  const avTotal    = avSubtotal + avImpMonto
+  const avImpMonto    = avSubtotal * (parseFloat(scSelected?.impuesto_pct||0)/100)
+  const avTotal       = avSubtotal + avImpMonto
+  // Retención: porcentaje definido en el contrato, aplicado sobre el total del avalúo
+  const avRetencionPct   = parseFloat(scSelected?.retencion_pct ?? 0)
+  const avRetencionMonto = avTotal * (avRetencionPct / 100)
+  const avMontoAPagar    = avTotal - avRetencionMonto
 
   const numAvaluo = scSelected
     ? subcontratos_avaluos.filter(a => a.subcontrato_id === scSelected.id).length + 1
@@ -684,21 +697,23 @@ function SubcontratosModule({
       type: 'ADD_SC_CONTRATO',
       payload: {
         contrato: {
-          proyecto_id:   proyId,
-          subcontratista: scForm.subcontratista,
-          descripcion:   scForm.descripcion || '',
-          fecha_contrato: scForm.fecha_contrato || null,
-          fecha_inicio:  scForm.fecha_inicio || null,
-          fecha_fin:     scForm.fecha_fin || null,
+          proyecto_id:          proyId,
+          subcontratista:       scForm.subcontratista,
+          descripcion:          scForm.descripcion || '',
+          fecha_contrato:       scForm.fecha_contrato || null,
+          fecha_inicio:         scForm.fecha_inicio || null,
+          fecha_fin:            scForm.fecha_fin || null,
           moneda,
-          impuesto_pct:  parseFloat(scForm.impuesto_pct||0),
-          subtotal:      scSubtotal,
-          impuesto_monto: scImpMonto,
-          monto_total:   scTotal,
-          monto_pagado:  0,
-          avance_pct:    0,
-          estado:        'activo',
-          notas:         scForm.notas || '',
+          impuesto_pct:         parseFloat(scForm.impuesto_pct||0),
+          subtotal:             scSubtotal,
+          impuesto_monto:       scImpMonto,
+          monto_total:          scTotal,
+          monto_pagado:         0,
+          avance_pct:           0,
+          estado:               'activo',
+          notas:                scForm.notas || '',
+          retencion_pct:        parseFloat(scForm.retencion_pct ?? 10),
+          plazo_garantia_meses: parseInt(scForm.plazo_garantia_meses ?? 6),
         },
         items: scItems.map(it => ({
           actividad_id:      it.actividad_id || null,
@@ -727,6 +742,9 @@ function SubcontratosModule({
       subtotal:          avSubtotal,
       impuesto_monto:    avImpMonto,
       monto_total:       avTotal,
+      retencion_pct:     avRetencionPct,
+      retencion_monto:   avRetencionMonto,
+      monto_a_pagar:     avMontoAPagar,
       estado:            'borrador',
       notas:             avForm.notas || '',
     }
@@ -868,6 +886,28 @@ function SubcontratosModule({
           <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Descripción' : 'Description'}</label>
           <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
             rows={2} value={scForm.descripcion||''} onChange={setScF('descripcion')} />
+        </div>
+
+        {/* Retención de garantía */}
+        <div className="grid grid-cols-2 gap-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
+          <div>
+            <label className="text-xs font-medium text-amber-700 block mb-1">
+              {isEs ? '🔒 Retención garantía (%)' : '🔒 Retention (%)'}
+            </label>
+            <input type="number" className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-white"
+              value={scForm.retencion_pct ?? 10} onChange={setScF('retencion_pct')}
+              placeholder="10" min="0" max="50" step="0.5" />
+            <p className="text-xs text-amber-600 mt-1">{isEs ? 'Se deduce de cada avalúo aprobado' : 'Deducted from each approved valuation'}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-amber-700 block mb-1">
+              {isEs ? '📅 Plazo de garantía (meses)' : '📅 Warranty period (months)'}
+            </label>
+            <input type="number" className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-white"
+              value={scForm.plazo_garantia_meses ?? 6} onChange={setScF('plazo_garantia_meses')}
+              placeholder="6" min="1" max="60" step="1" />
+            <p className="text-xs text-amber-600 mt-1">{isEs ? 'Meses antes de devolver la retención' : 'Months before returning retention'}</p>
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
@@ -1021,10 +1061,25 @@ function SubcontratosModule({
                 periodo_fin: '',
                 fecha_elaboracion: new Date().toISOString().split('T')[0],
               })
-              setAvItems(itemsContrato.map(it => ({
-                subcontrato_item_id: it.id,
-                cantidad_actual: '',
-              })))
+              setAvItems(itemsContrato.map(it => {
+                const acumuladoPrevio = subcontratos_avaluos
+                  .filter(a => a.subcontrato_id === scSelected.id && a.estado === 'aprobado')
+                  .reduce((s, a) => {
+                    const avi = subcontratos_avaluo_items.find(
+                      x => x.avaluo_id === a.id && x.subcontrato_item_id === it.id
+                    )
+                    return s + parseFloat(avi?.cantidad_actual || 0)
+                  }, 0)
+                return {
+                  subcontrato_item_id: it.id,
+                  descripcion:         it.descripcion       || '',
+                  unidad:              it.unidad             || 'und',
+                  cantidad_contrato:   parseFloat(it.cantidad_contrato || 0),
+                  costo_unitario:      parseFloat(it.costo_unitario    || 0),
+                  cantidad_acumulada:  acumuladoPrevio,
+                  cantidad_actual:     '',
+                }
+              }))
               setScView('avaluo')
             }}
               className="text-sm font-medium px-4 py-2 rounded-lg text-white"
@@ -1047,6 +1102,88 @@ function SubcontratosModule({
             </div>
           ))}
         </div>
+
+        {/* Panel de retenciones */}
+        {(() => {
+          const retencionTotal = avaluosSc
+            .filter(a => a.estado === 'aprobado' && (a.retencion_monto||0) > 0)
+            .reduce((s,a) => s + parseFloat(a.retencion_monto||0), 0)
+          const retenciones = (subcontratos_retenciones||[])
+            .filter(r => r.subcontrato_id === scSelected.id)
+          const retencionDevuelta = retenciones
+            .filter(r => r.estado === 'devuelta')
+            .reduce((s,r) => s + parseFloat(r.monto_devuelto||0), 0)
+          const retencionPendiente = retencionTotal - retencionDevuelta
+          if (retencionTotal === 0) return null
+          return (
+            <div className="mb-5 p-4 bg-amber-50 rounded-xl border border-amber-100">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+                  🔒 {isEs ? 'Retenciones de Garantía' : 'Retention Bonds'}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div>
+                  <p className="text-xs text-amber-600">{isEs ? 'Total retenido' : 'Total retained'}</p>
+                  <p className="text-base font-bold font-mono text-amber-700">{fmt(retencionTotal, moneda)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-green-600">{isEs ? 'Devuelto' : 'Released'}</p>
+                  <p className="text-base font-bold font-mono text-green-600">{fmt(retencionDevuelta, moneda)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-amber-600">{isEs ? 'Pendiente devolución' : 'Pending release'}</p>
+                  <p className="text-base font-bold font-mono text-amber-700">{fmt(retencionPendiente, moneda)}</p>
+                </div>
+              </div>
+              {/* Tabla de retenciones por avalúo */}
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-amber-200">
+                  {['Avalúo', isEs?'Retenido':'Retained', isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status', ''].map((h,i) =>
+                    <th key={i} className="px-2 py-1 text-left text-amber-600 font-medium">{h}</th>
+                  )}
+                </tr></thead>
+                <tbody>
+                  {avaluosSc.filter(a=>a.estado==='aprobado'&&(a.retencion_monto||0)>0).map(av => {
+                    const ret = retenciones.find(r => r.avaluo_id === av.id)
+                    const devuelta = ret?.estado === 'devuelta'
+                    const fechaEst = ret?.fecha_devolucion_est
+                    const vencida  = fechaEst && new Date(fechaEst) <= new Date() && !devuelta
+                    return (
+                      <tr key={av.id} className="border-b border-amber-100">
+                        <td className="px-2 py-1.5 font-medium">#{av.numero}</td>
+                        <td className="px-2 py-1.5 font-mono">{fmt(av.retencion_monto, moneda)}</td>
+                        <td className={`px-2 py-1.5 font-mono ${vencida ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                          {fechaEst || '—'}{vencida ? ' ⚠' : ''}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${
+                            devuelta ? 'bg-green-100 text-green-700' :
+                            vencida  ? 'bg-red-100 text-red-600' :
+                            'bg-amber-100 text-amber-700'}`}>
+                            {devuelta ? (isEs?'Devuelta':'Released') :
+                             vencida  ? (isEs?'Vencida':'Overdue') :
+                             (isEs?'Retenida':'Retained')}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {!devuelta && ret && puedeEditar && (
+                            <button
+                              onClick={() => dispatch({ type:'DEVOLVER_RETENCION', payload:{ retencion: ret, contrato: scSelected } })}
+                              className="text-xs px-2 py-0.5 rounded-lg text-white font-medium"
+                              style={{ background: '#1D9E75' }}>
+                              {isEs ? 'Devolver' : 'Release'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
 
         {/* Items del contrato */}
         <div className="bg-white border border-gray-100 rounded-xl overflow-hidden mb-5">
@@ -1259,6 +1396,25 @@ function SubcontratosModule({
               <span>{isEs ? 'Total Avalúo' : 'Valuation Total'}</span>
               <span style={{ color: BRAND }}>{fmt(avTotal, moneda)}</span>
             </div>
+            {avRetencionPct > 0 && (
+              <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <div className="flex justify-between text-sm py-0.5">
+                  <span className="text-amber-700 font-medium">
+                    🔒 {isEs ? `Retención garantía (${avRetencionPct}%)` : `Retention (${avRetencionPct}%)`}
+                  </span>
+                  <span className="font-mono text-amber-700 font-bold">-{fmt2(avRetencionMonto)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold pt-2 border-t border-amber-200 mt-1">
+                  <span className="text-gray-800">{isEs ? 'Monto a pagar' : 'Amount to pay'}</span>
+                  <span style={{ color: '#1D9E75' }}>{fmt(avMontoAPagar, moneda)}</span>
+                </div>
+                <p className="text-xs text-amber-600 mt-1.5">
+                  {isEs
+                    ? `Esta retención se liberará en ${scSelected.plazo_garantia_meses || 6} meses de garantía.`
+                    : `This retention will be released after ${scSelected.plazo_garantia_meses || 6} months warranty.`}
+                </p>
+              </div>
+            )}
           </div>
 
           <div>

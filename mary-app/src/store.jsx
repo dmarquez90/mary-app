@@ -12,6 +12,9 @@ const INIT = {
   solicitudes_eliminacion: [],
   subcontratos_contratos: [], subcontratos_items: [],
   subcontratos_avaluos: [], subcontratos_avaluo_items: [],
+  subcontratos_retenciones: [],
+  ordenes_cambio: [], ordenes_cambio_items: [],
+  avaluos_cliente: [], avaluos_cliente_items: [],
   loaded: false
 }
 
@@ -150,9 +153,48 @@ function reducer(state, action) {
         a.id === action.payload.avaluo.id ? { ...a, estado: 'aprobado' } : a),
       subcontratos_contratos: (state.subcontratos_contratos||[]).map(sc =>
         sc.id === action.payload.avaluo.subcontrato_id
-          ? { ...sc, monto_pagado: (parseFloat(sc.monto_pagado||0) + parseFloat(action.payload.avaluo.monto_total||0)) }
+          ? { ...sc, monto_pagado: (parseFloat(sc.monto_pagado||0) + parseFloat(action.payload.avaluo.monto_a_pagar||action.payload.avaluo.monto_total||0)) }
           : sc),
-      costos_directos: [...state.costos_directos, action.payload.costo],
+      subcontratos_retenciones: action.payload.retencion
+        ? [...(state.subcontratos_retenciones||[]), action.payload.retencion]
+        : (state.subcontratos_retenciones||[]),
+    }
+    case 'DEVOLVER_RETENCION': return {
+      ...state,
+      subcontratos_retenciones: (state.subcontratos_retenciones||[]).map(r =>
+        r.id === action.payload.id
+          ? { ...r, estado: 'devuelta', fecha_devolucion_real: action.payload.fecha, monto_devuelto: r.monto_retenido }
+          : r
+      ),
+    }
+
+    case 'ADD_OC': return {
+      ...state,
+      ordenes_cambio: [...(state.ordenes_cambio||[]), action.payload.oc],
+      ordenes_cambio_items: [...(state.ordenes_cambio_items||[]), ...action.payload.items],
+    }
+    case 'UPD_OC_ESTADO': return {
+      ...state,
+      ordenes_cambio: (state.ordenes_cambio||[]).map(o => o.id === action.payload.id ? { ...o, estado: action.payload.estado } : o),
+    }
+    case 'DEL_OC': return {
+      ...state,
+      ordenes_cambio: (state.ordenes_cambio||[]).filter(o => o.id !== action.payload),
+      ordenes_cambio_items: (state.ordenes_cambio_items||[]).filter(i => i.oc_id !== action.payload),
+    }
+    case 'ADD_AVALUO_CLIENTE': return {
+      ...state,
+      avaluos_cliente: [...(state.avaluos_cliente||[]), action.payload.avaluo],
+      avaluos_cliente_items: [...(state.avaluos_cliente_items||[]), ...action.payload.items],
+    }
+    case 'UPD_AVALUO_CLIENTE_ESTADO': return {
+      ...state,
+      avaluos_cliente: (state.avaluos_cliente||[]).map(a => a.id === action.payload.id ? { ...a, estado: action.payload.estado } : a),
+    }
+    case 'DEL_AVALUO_CLIENTE': return {
+      ...state,
+      avaluos_cliente: (state.avaluos_cliente||[]).filter(a => a.id !== action.payload),
+      avaluos_cliente_items: (state.avaluos_cliente_items||[]).filter(i => i.avaluo_id !== action.payload),
     }
 
     case 'ADD_SUBCONTRATO':     return { ...state, subcontratos: [...state.subcontratos, action.payload] }
@@ -195,6 +237,9 @@ export function StoreProvider({ children, tenantId }) {
         'materiales_presupuestados','solicitudes_eliminacion',
         'subcontratos_contratos','subcontratos_items',
         'subcontratos_avaluos','subcontratos_avaluo_items',
+        'subcontratos_retenciones',
+        'ordenes_cambio','ordenes_cambio_items',
+        'avaluos_cliente','avaluos_cliente_items',
       ]
 
       const tenantResults = await Promise.all(
@@ -695,10 +740,47 @@ export function StoreProvider({ children, tenantId }) {
       }
 
       case 'ADD_SC_CONTRATO': {
-        const sc = { ...action.payload.contrato, id: uuid(), created_at: today(), tenant_id: tenantId }
-        const items = action.payload.items.map(it => ({ ...it, id: uuid(), subcontrato_id: sc.id, created_at: today(), tenant_id: tenantId }))
-        await supabase.from('subcontratos_contratos').insert(sc)
-        if (items.length) await supabase.from('subcontratos_items').insert(items)
+        const sc = {
+          id:              uuid(),
+          created_at:      today(),
+          tenant_id:       tenantId,
+          proyecto_id:     action.payload.contrato.proyecto_id     || null,
+          subcontratista:  action.payload.contrato.subcontratista  || '',
+          descripcion:     action.payload.contrato.descripcion     || '',
+          fecha_contrato:  action.payload.contrato.fecha_contrato  || null,
+          fecha_inicio:    action.payload.contrato.fecha_inicio    || null,
+          fecha_fin:       action.payload.contrato.fecha_fin       || null,
+          moneda:          action.payload.contrato.moneda          || 'USD',
+          impuesto_pct:    parseFloat(action.payload.contrato.impuesto_pct)  || 0,
+          subtotal:        parseFloat(action.payload.contrato.subtotal)       || 0,
+          impuesto_monto:  parseFloat(action.payload.contrato.impuesto_monto) || 0,
+          monto_total:     parseFloat(action.payload.contrato.monto_total)    || 0,
+          monto_pagado:    parseFloat(action.payload.contrato.monto_pagado)   || 0,
+          avance_pct:      parseFloat(action.payload.contrato.avance_pct)     || 0,
+          estado:          action.payload.contrato.estado          || 'activo',
+          notas:           action.payload.contrato.notas           || '',
+        }
+        const items = action.payload.items.map(it => ({
+          id:                uuid(),
+          subcontrato_id:    sc.id,
+          created_at:        today(),
+          tenant_id:         tenantId,
+          actividad_id:      it.actividad_id     || null,
+          descripcion:       it.descripcion       || '',
+          unidad:            it.unidad             || 'und',
+          cantidad_contrato: parseFloat(it.cantidad_contrato || it.cantidad || 0),
+          costo_unitario:    parseFloat(it.costo_unitario    || it.precio_unitario || 0),
+          costo_total:       parseFloat(it.costo_total       || 0) ||
+                             parseFloat(it.cantidad_contrato || it.cantidad || 0) *
+                             parseFloat(it.costo_unitario    || it.precio_unitario || 0),
+          cantidad_acumulada: 0,
+        }))
+        const { error: eSC } = await supabase.from('subcontratos_contratos').insert(sc)
+        if (eSC) { console.error('ADD_SC_CONTRATO:', JSON.stringify(eSC)); break }
+        if (items.length) {
+          const { error: eSCI } = await supabase.from('subcontratos_items').insert(items)
+          if (eSCI) console.error('ADD_SC_CONTRATO items:', JSON.stringify(eSCI))
+        }
         dispatch({ type: 'ADD_SC_CONTRATO', payload: { contrato: sc, items } })
         break
       }
@@ -713,10 +795,39 @@ export function StoreProvider({ children, tenantId }) {
         break
       }
       case 'ADD_SC_AVALUO': {
-        const av  = { ...action.payload.avaluo, id: uuid(), created_at: today(), tenant_id: tenantId }
-        const avi = action.payload.items.map(it => ({ ...it, id: uuid(), avaluo_id: av.id, created_at: today(), tenant_id: tenantId }))
-        await supabase.from('subcontratos_avaluos').insert(av)
-        if (avi.length) await supabase.from('subcontratos_avaluo_items').insert(avi)
+        const av = {
+          id:               uuid(),
+          created_at:       today(),
+          tenant_id:        tenantId,
+          subcontrato_id:   action.payload.avaluo.subcontrato_id    || null,
+          numero:           parseInt(action.payload.avaluo.numero)   || 1,
+          periodo_inicio:   action.payload.avaluo.fecha_inicio       || action.payload.avaluo.periodo_inicio  || null,
+          periodo_fin:      action.payload.avaluo.fecha_fin          || action.payload.avaluo.periodo_fin     || null,
+          fecha_elaboracion:action.payload.avaluo.fecha_elaboracion  || today(),
+          subtotal:         parseFloat(action.payload.avaluo.subtotal)     || 0,
+          impuesto_monto:   parseFloat(action.payload.avaluo.impuesto_monto)|| 0,
+          monto_total:      parseFloat(action.payload.avaluo.monto_total)  || 0,
+          estado:           action.payload.avaluo.estado             || 'pendiente',
+          notas:            action.payload.avaluo.notas              || '',
+        }
+        const avi = action.payload.items.map(it => ({
+          id:                  uuid(),
+          avaluo_id:           av.id,
+          created_at:          today(),
+          tenant_id:           tenantId,
+          subcontrato_item_id: it.subcontrato_item_id || it.item_id || null,
+          cantidad_anterior:   parseFloat(it.cantidad_acumulada || 0),
+          cantidad_actual:     parseFloat(it.cantidad_periodo   || it.cantidad_actual || 0),
+          cantidad_acumulada:  parseFloat(it.cantidad_acumulada || 0) + parseFloat(it.cantidad_periodo || it.cantidad_actual || 0),
+          costo_unitario:      parseFloat(it.precio_unitario    || it.costo_unitario  || 0),
+          monto_actual:        parseFloat(it.monto_periodo      || it.monto_actual    || 0),
+        }))
+        const { error: eAV } = await supabase.from('subcontratos_avaluos').insert(av)
+        if (eAV) { console.error('ADD_SC_AVALUO:', JSON.stringify(eAV)); break }
+        if (avi.length) {
+          const { error: eAVI } = await supabase.from('subcontratos_avaluo_items').insert(avi)
+          if (eAVI) console.error('ADD_SC_AVALUO items:', JSON.stringify(eAVI))
+        }
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
         break
       }
@@ -724,23 +835,153 @@ export function StoreProvider({ children, tenantId }) {
         const av       = action.payload.avaluo
         const contrato = action.payload.contrato
         await supabase.from('subcontratos_avaluos').update({ estado: 'aprobado' }).eq('id', av.id)
-        const nuevoPagado = (parseFloat(contrato.monto_pagado||0) + parseFloat(av.monto_total||0))
+        const montoAPagar  = parseFloat(av.monto_a_pagar || av.monto_total || 0)
+        const nuevoPagado  = (parseFloat(contrato.monto_pagado||0) + montoAPagar)
         await supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id)
-        // Registrar automáticamente en costos_directos
-        const costo = {
-          id:          uuid(),
-          proyecto_id: contrato.proyecto_id,
-          categoria:   'Subcontratos',
-          descripcion: `Avalúo #${av.numero} — ${contrato.subcontratista}`,
-          proveedor:   contrato.subcontratista,
-          monto:       parseFloat(av.monto_total||0),
-          fecha:       av.fecha_elaboracion || today(),
-          referencia:  `SC-AV-${av.numero}`,
-          created_at:  today(),
-          tenant_id:   tenantId,
+        // Crear registro de retención si aplica
+        let retencion = null
+        if ((av.retencion_monto||0) > 0) {
+          const fechaRet = av.fecha_elaboracion || today()
+          const meses    = parseInt(contrato.plazo_garantia_meses || 6)
+          const fechaDev = new Date(fechaRet)
+          fechaDev.setMonth(fechaDev.getMonth() + meses)
+          const fechaDevStr = fechaDev.toISOString().split('T')[0]
+          retencion = {
+            id:                   uuid(),
+            tenant_id:            tenantId,
+            subcontrato_id:       contrato.id,
+            avaluo_id:            av.id,
+            proyecto_id:          contrato.proyecto_id,
+            subcontratista:       contrato.subcontratista,
+            monto_retenido:       parseFloat(av.retencion_monto),
+            retencion_pct:        parseFloat(av.retencion_pct || contrato.retencion_pct || 10),
+            fecha_retencion:      fechaRet,
+            plazo_garantia_meses: meses,
+            fecha_devolucion_est: fechaDevStr,
+            estado:               'retenida',
+            monto_devuelto:       0,
+            created_at:           today(),
+          }
+          const { error: eRet } = await supabase.from('subcontratos_retenciones').insert(retencion)
+          if (eRet) console.error('APROBAR_SC_AVALUO — retencion:', JSON.stringify(eRet))
         }
-        await supabase.from('costos_directos').insert(costo)
-        dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
+        dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, retencion } })
+        break
+      }
+      case 'DEVOLVER_RETENCION': {
+        const ret      = action.payload.retencion
+        const fechaHoy = today()
+        await supabase.from('subcontratos_retenciones').update({
+          estado:               'devuelta',
+          fecha_devolucion_real: fechaHoy,
+          monto_devuelto:       ret.monto_retenido,
+        }).eq('id', ret.id)
+        dispatch({ type: 'DEVOLVER_RETENCION', payload: { id: ret.id, fecha: fechaHoy } })
+        break
+      }
+
+      case 'ADD_OC': {
+        const oc = {
+          id: uuid(), created_at: today(), tenant_id: tenantId,
+          proyecto_id:  action.payload.oc.proyecto_id,
+          numero:       action.payload.oc.numero       || 'OC-001',
+          fecha:        action.payload.oc.fecha        || today(),
+          presentado_a: action.payload.oc.presentado_a || '',
+          motivo:       action.payload.oc.motivo       || '',
+          estado:       'borrador',
+          total_oc:     parseFloat(action.payload.oc.total_oc || 0),
+          notas:        action.payload.oc.notas        || '',
+        }
+        const items = action.payload.items.map(it => ({
+          id: uuid(), created_at: today(), tenant_id: tenantId,
+          oc_id:              oc.id,
+          tipo:               it.tipo             || 'existente',
+          actividad_id:       it.actividad_id     || null,
+          descripcion:        it.descripcion      || '',
+          unidad:             it.unidad           || 'und',
+          cantidad_original:  parseFloat(it.cantidad_original  || 0),
+          cantidad_nueva:     parseFloat(it.cantidad_nueva     || 0),
+          diferencia:         parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
+          precio_unitario:    parseFloat(it.precio_unitario    || 0),
+          monto_cambio:       (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0),
+        }))
+        const { error: eOC } = await supabase.from('ordenes_cambio').insert(oc)
+        if (eOC) { console.error('ADD_OC:', JSON.stringify(eOC)); break }
+        if (items.length) {
+          const { error: eOCI } = await supabase.from('ordenes_cambio_items').insert(items)
+          if (eOCI) console.error('ADD_OC items:', JSON.stringify(eOCI))
+        }
+        dispatch({ type: 'ADD_OC', payload: { oc, items } })
+        break
+      }
+      case 'UPD_OC_ESTADO': {
+        await supabase.from('ordenes_cambio').update({ estado: action.payload.estado }).eq('id', action.payload.id)
+        dispatch({ type: 'UPD_OC_ESTADO', payload: action.payload })
+        break
+      }
+      case 'DEL_OC': {
+        await supabase.from('ordenes_cambio_items').delete().eq('oc_id', action.payload)
+        await supabase.from('ordenes_cambio').delete().eq('id', action.payload)
+        dispatch({ type: 'DEL_OC', payload: action.payload })
+        break
+      }
+      case 'ADD_AVALUO_CLIENTE': {
+        const av = {
+          id: uuid(), created_at: today(), tenant_id: tenantId,
+          proyecto_id:             action.payload.avaluo.proyecto_id,
+          numero:                  parseInt(action.payload.avaluo.numero || 1),
+          periodo_inicio:          action.payload.avaluo.periodo_inicio  || null,
+          periodo_fin:             action.payload.avaluo.periodo_fin     || null,
+          fecha_elaboracion:       action.payload.avaluo.fecha_elaboracion || today(),
+          presentado_a:            action.payload.avaluo.presentado_a    || '',
+          mostrar_solo_con_avance: action.payload.avaluo.mostrar_solo_con_avance || false,
+          impuesto_pct:            parseFloat(action.payload.avaluo.impuesto_pct    || 0),
+          impuesto_descripcion:    action.payload.avaluo.impuesto_descripcion || '',
+          impuesto_monto:          parseFloat(action.payload.avaluo.impuesto_monto  || 0),
+          subtotal:                parseFloat(action.payload.avaluo.subtotal        || 0),
+          total:                   parseFloat(action.payload.avaluo.total           || 0),
+          estado:                  'borrador',
+          notas:                   action.payload.avaluo.notas || '',
+        }
+        const items = action.payload.items.map(it => ({
+          id: uuid(), created_at: today(), tenant_id: tenantId,
+          avaluo_id:          av.id,
+          actividad_id:       it.actividad_id    || null,
+          oc_item_id:         it.oc_item_id      || null,
+          es_oc:              it.es_oc           || false,
+          descripcion:        it.descripcion     || '',
+          unidad:             it.unidad          || 'und',
+          cantidad_total:     parseFloat(it.cantidad_total    || 0),
+          precio_unitario:    parseFloat(it.precio_unitario   || 0),
+          monto_contrato:     parseFloat(it.monto_contrato    || 0),
+          cantidad_anterior:  parseFloat(it.cantidad_anterior || 0),
+          cantidad_periodo:   parseFloat(it.cantidad_periodo  || 0),
+          cantidad_acumulada: parseFloat(it.cantidad_acumulada|| 0),
+          cantidad_saldo:     parseFloat(it.cantidad_saldo    || 0),
+          pct_fisico:         parseFloat(it.pct_fisico        || 0),
+          monto_anterior:     parseFloat(it.monto_anterior    || 0),
+          monto_periodo:      parseFloat(it.monto_periodo     || 0),
+          monto_acumulado:    parseFloat(it.monto_acumulado   || 0),
+          monto_saldo:        parseFloat(it.monto_saldo       || 0),
+        }))
+        const { error: eAV } = await supabase.from('avaluos_cliente').insert(av)
+        if (eAV) { console.error('ADD_AVALUO_CLIENTE:', JSON.stringify(eAV)); break }
+        if (items.length) {
+          const { error: eAVI } = await supabase.from('avaluos_cliente_items').insert(items)
+          if (eAVI) console.error('ADD_AVALUO_CLIENTE items:', JSON.stringify(eAVI))
+        }
+        dispatch({ type: 'ADD_AVALUO_CLIENTE', payload: { avaluo: av, items } })
+        break
+      }
+      case 'UPD_AVALUO_CLIENTE_ESTADO': {
+        await supabase.from('avaluos_cliente').update({ estado: action.payload.estado }).eq('id', action.payload.id)
+        dispatch({ type: 'UPD_AVALUO_CLIENTE_ESTADO', payload: action.payload })
+        break
+      }
+      case 'DEL_AVALUO_CLIENTE': {
+        await supabase.from('avaluos_cliente_items').delete().eq('avaluo_id', action.payload)
+        await supabase.from('avaluos_cliente').delete().eq('id', action.payload)
+        dispatch({ type: 'DEL_AVALUO_CLIENTE', payload: action.payload })
         break
       }
 

@@ -411,7 +411,8 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
 
 // ── EXPORT RESUMEN GENERAL ────────────────────────────────
 async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
-  subcontratos, equipos, costos_indirectos, salidas, entradas, budget, moneda }) {
+  subcontratos, subcontratos_contratos = [], subcontratos_avaluos = [],
+  equipos, costos_indirectos, salidas, entradas, budget, moneda }) {
 
   const wb       = new ExcelJS.Workbook()
   wb.creator     = 'MARY ERP'
@@ -431,7 +432,12 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   const inds     = costos_indirectos.filter(c=>c.proyecto_id===proyId)
   const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
-  const totalSub = subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
+  // totalSub: avalúos aprobados del nuevo sistema + fallback al sistema anterior
+  const scIdsRes = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
+  const totalSub = subcontratos_avaluos
+    .filter(a=>scIdsRes.includes(a.subcontrato_id)&&a.estado==='aprobado')
+    .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
+    + subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
   const totalEq  = eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
   const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
@@ -651,7 +657,8 @@ export default function Reportes() {
   const isEs = lang === 'ES'
   const {
     proyectos, presupuesto, materiales, entradas, salidas,
-    costos_directos, nominas, subcontratos, equipos, costos_indirectos
+    costos_directos, nominas, subcontratos, equipos, costos_indirectos,
+    subcontratos_contratos = [], subcontratos_avaluos = []
   } = state
 
   const [reportType, setReportType] = useState('financiero')
@@ -681,17 +688,31 @@ export default function Reportes() {
     },0)
     const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
-    const totalSub = subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
+    // totalSub: avalúos aprobados del nuevo sistema + monto_pagado del sistema anterior
+    const scIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
+    const totalSubNuevo = subcontratos_avaluos
+      .filter(a=>scIds.includes(a.subcontrato_id) && a.estado==='aprobado' &&
+        filtro(a.periodo_inicio || a.fecha_elaboracion || a.created_at?.slice(0,10)))
+      .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
+    const totalSubAntiguo = subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
+    const totalSub = totalSubNuevo + totalSubAntiguo
     const totalEq  = eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
     const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
 
     const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
       const pres=(act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0))
+      // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
+      const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)
+      const realScNuevo = subcontratos_avaluos
+        .filter(a=>scActIds.includes(a.subcontrato_id)&&a.estado==='aprobado')
+        .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
+      const realScAntiguo = subcontratos.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
+        .reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
       const real=salidas.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
         .reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+(parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0)},0)
         +costos_directos.filter(c=>c.proyecto_id===proyId&&c.actividad_id===act.id).reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
-        +subcontratos.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id).reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
+        +realScNuevo+realScAntiguo
       const dev=real-pres
       return {code:act.code,descripcion:act.descripcion,pres,real,dev,devPct:pres>0?(dev/pres)*100:0}
     }).filter(a=>a.pres>0||a.real>0)
@@ -707,7 +728,7 @@ export default function Reportes() {
       ],
       actividades, totalReal, dirs, noms, subs, eqs, inds
     }
-  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos, t])
+  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -724,7 +745,8 @@ export default function Reportes() {
         await buildInventario({ data:datosInventario, materiales, proyectos, presupuesto, desde, hasta })
       } else if (reportType==='general' && proyId) {
         await buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
-          subcontratos, equipos, costos_indirectos, salidas, entradas, budget, moneda })
+          subcontratos, subcontratos_contratos, subcontratos_avaluos,
+          equipos, costos_indirectos, salidas, entradas, budget, moneda })
       }
     } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
     setLoading(false)
@@ -800,6 +822,8 @@ export default function Reportes() {
         <VistaGeneral proy={proy} presupuesto={presupuesto} costos_directos={costos_directos}
           nominas={nominas} subcontratos={subcontratos} equipos={equipos}
           costos_indirectos={costos_indirectos} salidas={salidas} entradas={entradas}
+          subcontratos_contratos={subcontratos_contratos}
+          subcontratos_avaluos={subcontratos_avaluos}
           budget={budget} moneda={moneda} fmt={fmt} fmtNum={fmtNum} />
       )}
     </div>
@@ -906,7 +930,7 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
   )
 }
 
-function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, budget, moneda, fmt, fmtNum }) {
+function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, subcontratos_contratos = [], subcontratos_avaluos = [], budget, moneda, fmt, fmtNum }) {
   const { lang, t } = useContext(LangContext)
   const isEs = lang === 'ES'
   const proyId=proy?.id
@@ -921,7 +945,13 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
   const inds=costos_indirectos.filter(c=>c.proyecto_id===proyId)
   const totalDir=dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalNom=noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
-  const totalSub=subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
+  // totalSub: avalúos aprobados del nuevo sistema + fallback sistema anterior
+  const scIdsVG = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
+  const totalSubNuevo = subcontratos_avaluos
+    .filter(a=>scIdsVG.includes(a.subcontrato_id)&&a.estado==='aprobado')
+    .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
+  const totalSubAntiguo = subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
+  const totalSub = totalSubNuevo + totalSubAntiguo
   const totalEq=eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
   const totalInd=inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalReal=totalMat+totalDir+totalNom+totalSub+totalEq+totalInd

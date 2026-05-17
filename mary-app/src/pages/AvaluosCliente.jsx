@@ -1,0 +1,664 @@
+import { useState, useContext, useMemo } from 'react'
+import { useStore } from '../store'
+import { LangContext } from '../i18n'
+import { usePermissions } from '../usePermissions'
+import { today, fmt, fmtNum, calcGrandTotal } from '../utils'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+
+const BRAND = '#1B3A6B'
+
+const ESTADO_AV = {
+  borrador:   { label: 'Borrador',   labelEn: 'Draft',      cls: 'bg-gray-100 text-gray-600'   },
+  presentado: { label: 'Presentado', labelEn: 'Submitted',  cls: 'bg-blue-100 text-blue-700'   },
+  aprobado:   { label: 'Aprobado',   labelEn: 'Approved',   cls: 'bg-green-100 text-green-700' },
+}
+
+function EstadoBadge({ estado, isEs }) {
+  const cfg = ESTADO_AV[estado] || ESTADO_AV.borrador
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>{isEs ? cfg.label : cfg.labelEn}</span>
+}
+
+export default function AvaluosCliente() {
+  const { state, dispatch } = useStore()
+  const { t, lang } = useContext(LangContext)
+  const { can } = usePermissions()
+  const isEs = lang === 'ES'
+
+  const {
+    proyectos, presupuesto,
+    ordenes_cambio = [], ordenes_cambio_items = [],
+    avaluos_cliente = [], avaluos_cliente_items = [],
+  } = state
+
+  const puedeEditar = can('financiero_editar')
+
+  const [proyId, setProyId]       = useState(proyectos[0]?.id || '')
+  const [vista, setVista]         = useState('lista')      // 'lista' | 'nuevo' | 'detalle'
+  const [detailId, setDetailId]   = useState(null)
+  const [avForm, setAvForm]       = useState({})
+  const [avItems, setAvItems]     = useState([])
+  const [mostrarTodas, setMostrarTodas] = useState(false)
+
+  const proy   = proyectos.find(p => p.id === proyId)
+  const moneda = proy?.moneda || 'USD'
+  const setAvF = k => e => setAvForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Actividades del presupuesto
+  const actividades = useMemo(() =>
+    presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad'),
+    [presupuesto, proyId]
+  )
+
+  // OC aprobadas del proyecto
+  const ocAprobadas = useMemo(() =>
+    ordenes_cambio.filter(o => o.proyecto_id === proyId && o.estado === 'aprobada'),
+    [ordenes_cambio, proyId]
+  )
+  const ocItemsAprobados = useMemo(() =>
+    ordenes_cambio_items.filter(i => ocAprobadas.some(o => o.id === i.oc_id)),
+    [ordenes_cambio_items, ocAprobadas]
+  )
+
+  // Presupuesto original + OC aprobadas
+  const presupuestoOriginal = useMemo(() => calcGrandTotal(actividades), [actividades])
+  const totalOCAprobadas    = useMemo(() => ocAprobadas.reduce((s,o) => s + parseFloat(o.total_oc||0), 0), [ocAprobadas])
+  const presupuestoEfectivo = presupuestoOriginal + totalOCAprobadas
+
+  // Avalúos del proyecto
+  const avs = useMemo(() =>
+    avaluos_cliente.filter(a => a.proyecto_id === proyId)
+      .sort((a,b) => (b.numero||0) - (a.numero||0)),
+    [avaluos_cliente, proyId]
+  )
+
+  // Número del próximo avalúo
+  const numAvaluo = avs.length + 1
+
+  // Calcular acumulado previo para una actividad
+  const acumuladoPrevio = (actividadId) => {
+    const avAprobados = avaluos_cliente.filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
+    return avAprobados.reduce((s, av) => {
+      const item = avaluos_cliente_items.find(i => i.avaluo_id === av.id && i.actividad_id === actividadId)
+      return s + parseFloat(item?.cantidad_periodo || 0)
+    }, 0)
+  }
+
+  // Cantidad total de una actividad (incluyendo OC aprobadas)
+  const cantidadTotal = (act) => {
+    const base = parseFloat(act.cantidad || 0)
+    const ocExtra = ocItemsAprobados
+      .filter(i => i.actividad_id === act.id)
+      .reduce((s,i) => s + parseFloat(i.diferencia || 0), 0)
+    return base + ocExtra
+  }
+
+  // P.U. de una actividad
+  const precioUnitario = (act) =>
+    (parseFloat(act.costo_mo||0) + parseFloat(act.costo_materiales||0) + parseFloat(act.costo_equipos||0))
+
+  // Abrir nuevo avalúo
+  const openNuevo = () => {
+    const hoy = today()
+    setAvForm({
+      numero:             numAvaluo,
+      periodo_inicio:     '',
+      periodo_fin:        '',
+      fecha_elaboracion:  hoy,
+      presentado_a:       '',
+      impuesto_pct:       '',
+      impuesto_descripcion: '',
+      notas:              '',
+    })
+    // Inicializar items desde actividades + OC nuevas
+    const itemsBase = actividades.map(act => {
+      const ant    = acumuladoPrevio(act.id)
+      const total  = cantidadTotal(act)
+      const pu     = precioUnitario(act)
+      return {
+        actividad_id:      act.id,
+        descripcion:       act.descripcion,
+        unidad:            act.unidad || 'und',
+        cantidad_total:    total,
+        precio_unitario:   pu,
+        monto_contrato:    total * pu,
+        cantidad_anterior: ant,
+        cantidad_periodo:  '',
+        es_oc:             false,
+        oc_item_id:        null,
+      }
+    })
+    // Agregar actividades nuevas de OC (tipo 'nueva')
+    const itemsNuevos = ocItemsAprobados
+      .filter(i => i.tipo === 'nueva')
+      .map(i => {
+        const ant = 0 // actividad nueva, sin acumulado previo
+        return {
+          actividad_id:      null,
+          oc_item_id:        i.id,
+          descripcion:       i.descripcion,
+          unidad:            i.unidad || 'und',
+          cantidad_total:    parseFloat(i.cantidad_nueva || 0),
+          precio_unitario:   parseFloat(i.precio_unitario || 0),
+          monto_contrato:    parseFloat(i.cantidad_nueva || 0) * parseFloat(i.precio_unitario || 0),
+          cantidad_anterior: ant,
+          cantidad_periodo:  '',
+          es_oc:             true,
+          oc_item_id:        i.id,
+        }
+      })
+    setAvItems([...itemsBase, ...itemsNuevos])
+    setVista('nuevo')
+  }
+
+  // Calcular totales del avalúo
+  const avSubtotal = useMemo(() =>
+    avItems.reduce((s,it) => s + parseFloat(it.cantidad_periodo||0) * parseFloat(it.precio_unitario||0), 0),
+    [avItems]
+  )
+  const avImpPct   = parseFloat(avForm.impuesto_pct || 0)
+  const avImpMonto = avSubtotal * (avImpPct / 100)
+  const avTotal    = avSubtotal + avImpMonto
+
+  const setItemPeriodo = (idx, v) => {
+    const cant = parseFloat(v || 0)
+    setAvItems(prev => prev.map((it,i) => {
+      if (i !== idx) return it
+      const acum  = parseFloat(it.cantidad_anterior||0) + cant
+      const saldo = parseFloat(it.cantidad_total||0) - acum
+      const pct   = it.cantidad_total > 0 ? (acum / it.cantidad_total) * 100 : 0
+      const mp    = cant * parseFloat(it.precio_unitario||0)
+      const ma    = parseFloat(it.cantidad_anterior||0) * parseFloat(it.precio_unitario||0)
+      return {
+        ...it,
+        cantidad_periodo:  v,
+        cantidad_acumulada: acum,
+        cantidad_saldo:     saldo,
+        pct_fisico:         pct,
+        monto_periodo:      mp,
+        monto_anterior:     ma,
+        monto_acumulado:    ma + mp,
+        monto_saldo:        saldo * parseFloat(it.precio_unitario||0),
+      }
+    }))
+  }
+
+  // Guardar avalúo
+  const saveAvaluo = () => {
+    const itemsConAvance = avItems.filter(it => parseFloat(it.cantidad_periodo||0) > 0)
+    if (!proyId || itemsConAvance.length === 0) return
+    dispatch({
+      type: 'ADD_AVALUO_CLIENTE',
+      payload: {
+        avaluo: {
+          ...avForm,
+          proyecto_id:   proyId,
+          impuesto_monto: avImpMonto,
+          subtotal:       avSubtotal,
+          total:          avTotal,
+        },
+        items: avItems.map(it => ({
+          ...it,
+          cantidad_periodo:  parseFloat(it.cantidad_periodo  || 0),
+          cantidad_acumulada:parseFloat(it.cantidad_acumulada|| 0),
+          cantidad_saldo:    parseFloat(it.cantidad_saldo    || 0),
+          pct_fisico:        parseFloat(it.pct_fisico        || 0),
+          monto_periodo:     parseFloat(it.monto_periodo     || 0),
+          monto_anterior:    parseFloat(it.monto_anterior    || 0),
+          monto_acumulado:   parseFloat(it.monto_acumulado   || 0),
+          monto_saldo:       parseFloat(it.monto_saldo       || 0),
+        })),
+      }
+    })
+    setVista('lista')
+  }
+
+  // KPIs de la lista
+  const totalCobrado    = avs.filter(a=>a.estado==='aprobado').reduce((s,a)=>s+(parseFloat(a.total)||0),0)
+  const saldoPorCobrar  = presupuestoEfectivo - totalCobrado
+  const pctEjecucion    = presupuestoEfectivo > 0 ? (totalCobrado/presupuestoEfectivo)*100 : 0
+
+  const thCls = 'px-3 py-2.5 text-left text-xs text-gray-500 font-medium whitespace-nowrap'
+  const tdCls = 'px-3 py-2.5 text-sm text-gray-700'
+  const excede = (it) => parseFloat(it.cantidad_acumulada||0) > parseFloat(it.cantidad_total||0)
+
+  // Items a mostrar en el formulario
+  const itemsVisibles = mostrarTodas ? avItems : avItems.filter(it => parseFloat(it.cantidad_periodo||0) > 0 || it.cantidad_total > 0)
+
+  // Detalle
+  const avDetalle      = avaluos_cliente.find(a => a.id === detailId)
+  const itemsDetalle   = avaluos_cliente_items.filter(i => i.avaluo_id === detailId)
+
+  if (vista === 'nuevo') {
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-800">
+              {isEs ? `Avalúo #${numAvaluo}` : `Valuation #${numAvaluo}`} — {proy?.project_code}
+            </h1>
+            <p className="text-sm text-gray-400">{proy?.nombre}</p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4">
+          {/* Cabecera */}
+          <div className="grid grid-cols-3 gap-4">
+            <Field label={isEs ? 'Período inicio' : 'Period start'}>
+              <input type="date" className={inputCls} value={avForm.periodo_inicio||''} onChange={setAvF('periodo_inicio')} />
+            </Field>
+            <Field label={isEs ? 'Período fin' : 'Period end'}>
+              <input type="date" className={inputCls} value={avForm.periodo_fin||''} onChange={setAvF('periodo_fin')} />
+            </Field>
+            <Field label={isEs ? 'Fecha elaboración' : 'Prepared date'}>
+              <input type="date" className={inputCls} value={avForm.fecha_elaboracion||''} onChange={setAvF('fecha_elaboracion')} />
+            </Field>
+          </div>
+          <Field label={isEs ? 'Presentado a' : 'Submitted to'}>
+            <input className={inputCls} value={avForm.presentado_a||''} onChange={setAvF('presentado_a')}
+              placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
+          </Field>
+
+          {/* Presupuesto efectivo info */}
+          {totalOCAprobadas !== 0 && (
+            <div className="grid grid-cols-3 gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
+              <div>
+                <p className="text-blue-500">{isEs ? 'Presupuesto original' : 'Original budget'}</p>
+                <p className="font-bold font-mono text-blue-700">{fmt(presupuestoOriginal, moneda)}</p>
+              </div>
+              <div>
+                <p className="text-blue-500">{isEs ? 'OC aprobadas' : 'Approved COs'}</p>
+                <p className="font-bold font-mono text-blue-700">{totalOCAprobadas >= 0 ? '+' : ''}{fmt(totalOCAprobadas, moneda)}</p>
+              </div>
+              <div>
+                <p className="text-blue-500">{isEs ? 'Presupuesto efectivo' : 'Effective budget'}</p>
+                <p className="font-bold font-mono text-blue-800">{fmt(presupuestoEfectivo, moneda)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Toggle mostrar todas */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {isEs ? 'Avance físico por actividad' : 'Physical progress by activity'}
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className="text-xs text-gray-500">{isEs ? 'Mostrar todas las actividades' : 'Show all activities'}</span>
+              <div onClick={() => setMostrarTodas(v => !v)}
+                className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${mostrarTodas ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                <div className={`w-4 h-4 bg-white rounded-full m-0.5 transition-transform ${mostrarTodas ? 'translate-x-5' : ''}`} />
+              </div>
+            </label>
+          </div>
+
+          {/* Tabla de avance */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  {[
+                    isEs?'Descripción':'Description',
+                    isEs?'Unidad':'Unit',
+                    isEs?'Cant. Total':'Total Qty',
+                    isEs?'P.U.':'Unit Price',
+                    isEs?'Monto Contrato':'Contract Amount',
+                    isEs?'Ant.':'Prev.',
+                    isEs?'Este Período *':'This Period *',
+                    isEs?'Acumulado':'Accumulated',
+                    isEs?'Saldo':'Balance',
+                    isEs?'% Fís.':'% Phys.',
+                    isEs?'Monto Período':'Period Amount',
+                  ].map((h,i) => <th key={i} className="px-2 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {avItems.map((it, idx) => {
+                  const cant    = parseFloat(it.cantidad_periodo||0)
+                  const acum    = parseFloat(it.cantidad_anterior||0) + cant
+                  const saldo   = parseFloat(it.cantidad_total||0) - acum
+                  const pct     = it.cantidad_total > 0 ? Math.min(100, (acum/it.cantidad_total)*100) : 0
+                  const mp      = cant * parseFloat(it.precio_unitario||0)
+                  const sobrepa = acum > parseFloat(it.cantidad_total||0)
+                  if (!mostrarTodas && !it.cantidad_total) return null
+                  return (
+                    <tr key={idx} className={`border-b border-gray-50 ${sobrepa ? 'bg-red-50/30' : ''}`}>
+                      <td className="px-2 py-2 text-gray-700">
+                        {it.descripcion}
+                        {it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}
+                      </td>
+                      <td className="px-2 py-2 text-gray-400">{it.unidad}</td>
+                      <td className="px-2 py-2 font-mono">{fmtNum(it.cantidad_total)}</td>
+                      <td className="px-2 py-2 font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
+                      <td className="px-2 py-2 font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
+                      <td className="px-2 py-2 font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
+                      <td className="px-2 py-2">
+                        <input type="number"
+                          className={`w-24 border rounded-lg px-2 py-1 text-xs focus:outline-none ${
+                            sobrepa ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-[#1B3A6B]'}`}
+                          value={it.cantidad_periodo}
+                          placeholder="0"
+                          min="0" step="0.01"
+                          onChange={e => setItemPeriodo(idx, e.target.value)} />
+                        {sobrepa && <p className="text-xs text-red-500 mt-0.5">⚠ {isEs?'Excede':'Exceeds'}</p>}
+                      </td>
+                      <td className="px-2 py-2 font-mono" style={{color: sobrepa?'#ef4444':'#1D9E75'}}>
+                        {fmtNum(acum)}
+                      </td>
+                      <td className="px-2 py-2 font-mono text-gray-500">{fmtNum(saldo)}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{
+                              width: `${Math.min(100,pct)}%`,
+                              background: sobrepa ? '#ef4444' : pct >= 100 ? '#1D9E75' : BRAND,
+                            }} />
+                          </div>
+                          <span className="font-mono" style={{color: sobrepa?'#ef4444':BRAND}}>
+                            {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 font-mono font-medium" style={{color:'#1D9E75'}}>
+                        {mp > 0 ? fmt(mp, moneda) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Avance global */}
+          {avSubtotal > 0 && (
+            <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-blue-600 font-medium">{isEs?'Avance financiero global':'Global financial progress'}</span>
+                <span className="text-xs font-mono text-blue-700">
+                  {fmt(totalCobrado + avSubtotal, moneda)} / {fmt(presupuestoEfectivo, moneda)}
+                </span>
+              </div>
+              <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-blue-600"
+                  style={{width:`${Math.min(100,((totalCobrado+avSubtotal)/presupuestoEfectivo)*100)}%`}} />
+              </div>
+            </div>
+          )}
+
+          {/* Totales */}
+          <div className="border-t border-gray-100 pt-3">
+            {[
+              [isEs?'Subtotal período':'Period subtotal', fmt(avSubtotal, moneda)],
+            ].map(([k,v]) => (
+              <div key={k} className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">{k}</span>
+                <span className="font-mono text-gray-700">{v}</span>
+              </div>
+            ))}
+            {/* Impuesto — campo libre */}
+            <div className="flex items-center gap-3 py-2 border-t border-gray-50">
+              <span className="text-sm text-gray-500 flex-shrink-0">{isEs?'Impuesto / Tax:':'Tax:'}</span>
+              <input type="number" className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-[#1B3A6B]"
+                value={avForm.impuesto_pct||''} onChange={setAvF('impuesto_pct')} placeholder="0" min="0" step="0.01" />
+              <span className="text-sm text-gray-400">%</span>
+              <input className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-[#1B3A6B]"
+                value={avForm.impuesto_descripcion||''} onChange={setAvF('impuesto_descripcion')}
+                placeholder={isEs?'Ej: IR 1%, Sales tax CA 9.5%, N/A':'E.g.: IR 1%, Sales tax CA 9.5%, N/A'} />
+              <span className="font-mono text-sm text-gray-600 flex-shrink-0">{fmt(avImpMonto, moneda)}</span>
+            </div>
+            <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-100">
+              <span>{isEs?'Total a cobrar':'Total to bill'}</span>
+              <span style={{color:BRAND}}>{fmt(avTotal, moneda)}</span>
+            </div>
+          </div>
+
+          <Field label={isEs?'Notas':'Notes'}>
+            <textarea className={inputCls} rows={2} value={avForm.notas||''} onChange={setAvF('notas')} />
+          </Field>
+
+          <div className="flex gap-2 pt-2">
+            <SecondaryBtn onClick={() => setVista('lista')} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
+            <PrimaryBtn onClick={saveAvaluo}
+              disabled={avSubtotal === 0}
+              className="flex-1">
+              {isEs ? 'Guardar avalúo (borrador)' : 'Save valuation (draft)'}
+            </PrimaryBtn>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (vista === 'detalle' && avDetalle) {
+    const avTotal2    = parseFloat(avDetalle.total || 0)
+    const avSubtotal2 = parseFloat(avDetalle.subtotal || 0)
+    const avImp2      = parseFloat(avDetalle.impuesto_monto || 0)
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800">
+                {isEs ? `Avalúo #${avDetalle.numero}` : `Valuation #${avDetalle.numero}`}
+              </h1>
+              <p className="text-sm text-gray-400">{proy?.project_code} — {proy?.nombre}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <EstadoBadge estado={avDetalle.estado} isEs={isEs} />
+            {puedeEditar && avDetalle.estado === 'borrador' && (
+              <button onClick={() => dispatch({ type:'UPD_AVALUO_CLIENTE_ESTADO', payload:{ id:avDetalle.id, estado:'presentado' } })}
+                className="text-xs px-3 py-1.5 rounded-lg text-white font-medium"
+                style={{ background: '#185FA5' }}>
+                {isEs ? 'Presentar al cliente' : 'Submit to client'}
+              </button>
+            )}
+            {puedeEditar && avDetalle.estado === 'presentado' && (
+              <button onClick={() => dispatch({ type:'UPD_AVALUO_CLIENTE_ESTADO', payload:{ id:avDetalle.id, estado:'aprobado' } })}
+                className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-green-600">
+                {isEs ? 'Marcar aprobado' : 'Mark approved'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-5">
+          {/* Info */}
+          <div className="bg-white border border-gray-100 rounded-xl p-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              {[
+                [isEs?'Período':'Period', avDetalle.periodo_inicio && avDetalle.periodo_fin
+                  ? `${avDetalle.periodo_inicio} → ${avDetalle.periodo_fin}` : '—'],
+                [isEs?'Elaborado':'Prepared', avDetalle.fecha_elaboracion || '—'],
+                [isEs?'Presentado a':'Submitted to', avDetalle.presentado_a || '—'],
+                [isEs?'Estado':'Status', <EstadoBadge key="s" estado={avDetalle.estado} isEs={isEs} />],
+              ].map(([k,v]) => (
+                <div key={k} className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-400 mb-0.5">{k}</p>
+                  <div className="font-medium text-gray-700">{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tabla detalle */}
+          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                {isEs ? 'Detalle de avance' : 'Progress detail'}
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-gray-100">
+                  {[
+                    isEs?'Descripción':'Description',
+                    isEs?'Unidad':'Unit',
+                    isEs?'Total':'Total',
+                    isEs?'P.U.':'U.P.',
+                    isEs?'Anterior':'Previous',
+                    isEs?'Este Período':'This Period',
+                    isEs?'Acumulado':'Accumulated',
+                    isEs?'Saldo':'Balance',
+                    isEs?'% Fís.':'% Phys.',
+                    isEs?'Monto Período':'Period Amt',
+                  ].map((h,i) => <th key={i} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {itemsDetalle.filter(it => parseFloat(it.cantidad_periodo||0) > 0).map(it => (
+                    <tr key={it.id} className="border-b border-gray-50">
+                      <td className="px-3 py-2 text-gray-700">
+                        {it.descripcion}
+                        {it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}
+                      </td>
+                      <td className="px-3 py-2 text-gray-400">{it.unidad}</td>
+                      <td className="px-3 py-2 font-mono">{fmtNum(it.cantidad_total)}</td>
+                      <td className="px-3 py-2 font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
+                      <td className="px-3 py-2 font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
+                      <td className="px-3 py-2 font-mono font-bold" style={{color:BRAND}}>{fmtNum(it.cantidad_periodo)}</td>
+                      <td className="px-3 py-2 font-mono text-green-600">{fmtNum(it.cantidad_acumulada)}</td>
+                      <td className="px-3 py-2 font-mono text-gray-500">{fmtNum(it.cantidad_saldo)}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{
+                              width:`${Math.min(100,parseFloat(it.pct_fisico||0))}%`,
+                              background: BRAND,
+                            }} />
+                          </div>
+                          <span className="font-mono" style={{color:BRAND}}>
+                            {parseFloat(it.pct_fisico||0).toFixed(1)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 font-mono font-bold text-green-600">{fmt(it.monto_periodo, moneda)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Totales */}
+            <div className="px-4 py-4 border-t border-gray-100 flex flex-col gap-1.5">
+              {[
+                [isEs?'Subtotal período':'Period subtotal', fmt(avSubtotal2, moneda)],
+                [avDetalle.impuesto_descripcion || (isEs?'Impuesto':'Tax'), fmt(avImp2, moneda)],
+              ].map(([k,v]) => (
+                <div key={k} className="flex justify-between text-sm">
+                  <span className="text-gray-500">{k}</span>
+                  <span className="font-mono text-gray-700">{v}</span>
+                </div>
+              ))}
+              <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
+                <span>{isEs?'Total cobrado':'Total billed'}</span>
+                <span style={{color:'#1D9E75'}}>{fmt(avTotal2, moneda)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── LISTA DE AVALÚOS ──
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">
+            {isEs ? 'Avalúos al Cliente' : 'Client Valuations'}
+          </h1>
+          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+            value={proyId} onChange={e => setProyId(e.target.value)}>
+            <option value="">{t('lbl_select')}</option>
+            {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
+          </select>
+          {proyId && puedeEditar && (
+            <PrimaryBtn onClick={openNuevo}>
+              + {isEs ? 'Nuevo Avalúo' : 'New Valuation'}
+            </PrimaryBtn>
+          )}
+        </div>
+      </div>
+
+      {!proyId ? (
+        <EmptyState icon={Icons.budget} title={isEs ? 'Selecciona un proyecto' : 'Select a project'} />
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+            {[
+              { label: isEs?'Presupuesto efectivo':'Effective budget',     value: fmt(presupuestoEfectivo, moneda), color: BRAND },
+              { label: isEs?'Total cobrado (aprobado)':'Billed (approved)', value: fmt(totalCobrado, moneda),       color: '#1D9E75' },
+              { label: isEs?'Saldo por cobrar':'Balance to bill',           value: fmt(saldoPorCobrar, moneda),     color: '#D97706' },
+              { label: isEs?'% Ejecución financiera':'% Financial execution',value: `${pctEjecucion.toFixed(1)}%`, color: BRAND },
+            ].map(k => (
+              <div key={k.label} className="bg-white border border-gray-100 rounded-xl p-4">
+                <p className="text-xs text-gray-400 mb-1">{k.label}</p>
+                <p className="text-xl font-bold font-mono" style={{ color: k.color }}>{k.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabla */}
+          {avs.length === 0 ? (
+            <div className="bg-white border border-gray-100 rounded-xl py-16">
+              <EmptyState icon={Icons.budget}
+                title={isEs ? 'No hay avalúos registrados' : 'No valuations registered'}
+                subtitle={isEs ? 'Crea el primer avalúo para cobrar al cliente' : 'Create the first valuation to bill the client'}
+                action={puedeEditar ? (isEs ? '+ Nuevo Avalúo' : '+ New Valuation') : null}
+                onAction={puedeEditar ? openNuevo : null} />
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-100 rounded-xl overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {['#', isEs?'Período':'Period', isEs?'Fecha':'Date',
+                      isEs?'Presentado a':'Submitted to',
+                      isEs?'Subtotal':'Subtotal',
+                      isEs?'Impuesto':'Tax',
+                      isEs?'Total':'Total',
+                      isEs?'Estado':'Status', ''].map((h,i) =>
+                      <th key={i} className={thCls}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {avs.map(av => (
+                    <tr key={av.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className={tdCls + ' font-bold font-mono'} style={{color:BRAND}}>#{av.numero}</td>
+                      <td className={tdCls + ' text-xs text-gray-400'}>
+                        {av.periodo_inicio && av.periodo_fin ? `${av.periodo_inicio} → ${av.periodo_fin}` : '—'}
+                      </td>
+                      <td className={tdCls + ' text-xs text-gray-400'}>{av.fecha_elaboracion || '—'}</td>
+                      <td className={tdCls + ' text-xs'}>{av.presentado_a || '—'}</td>
+                      <td className={tdCls + ' font-mono'}>{fmt(av.subtotal, moneda)}</td>
+                      <td className={tdCls + ' font-mono text-gray-500'}>
+                        {parseFloat(av.impuesto_monto||0) > 0 ? fmt(av.impuesto_monto, moneda) : '—'}
+                      </td>
+                      <td className={tdCls + ' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(av.total, moneda)}</td>
+                      <td className={tdCls}><EstadoBadge estado={av.estado} isEs={isEs} /></td>
+                      <td className={tdCls}>
+                        <div className="flex gap-1">
+                          <TBtn onClick={() => { setDetailId(av.id); setVista('detalle') }}>{t('btn_view')}</TBtn>
+                          {puedeEditar && av.estado === 'borrador' && (
+                            <TBtn danger onClick={() => dispatch({ type:'DEL_AVALUO_CLIENTE', payload:av.id })}>
+                              {t('btn_delete')}
+                            </TBtn>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
