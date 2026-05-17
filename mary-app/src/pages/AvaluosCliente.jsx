@@ -134,7 +134,6 @@ export default function AvaluosCliente() {
         const ant = 0 // actividad nueva, sin acumulado previo
         return {
           actividad_id:      null,
-          oc_item_id:        i.id,
           descripcion:       i.descripcion,
           unidad:            i.unidad || 'und',
           cantidad_total:    parseFloat(i.cantidad_nueva || 0),
