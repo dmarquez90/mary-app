@@ -39,11 +39,9 @@ const selectCls = inputCls
 export default function Admin() {
   const { perfil, logout } = useAuth()
 
-  // Idioma desde localStorage (igual que la app principal)
   const [lang, setLangState] = useState(() => localStorage.getItem('mary_lang') || 'ES')
   const isEs = lang === 'ES'
 
-  // Escuchar cambios de idioma en tiempo real
   useEffect(() => {
     const handler = () => setLangState(localStorage.getItem('mary_lang') || 'ES')
     window.addEventListener('storage', handler)
@@ -56,7 +54,6 @@ export default function Admin() {
     setLangState(next)
   }
 
-  // Diccionario de textos
   const T = {
     title:            isEs ? 'Panel de Administración' : 'Administration Panel',
     subtitle:         isEs ? 'Super Admin · MPS' : 'Super Admin · MPS',
@@ -73,7 +70,6 @@ export default function Admin() {
     activeU:          isEs ? 'activos' : 'active',
     activeLabel:      isEs ? 'Activo' : 'Active',
     inactiveLabel:    isEs ? 'Inactivo' : 'Inactive',
-    // Tabla empresas
     company:          isEs ? 'Empresa' : 'Company',
     planCol:          isEs ? 'Plan' : 'Plan',
     usersCol:         isEs ? 'Usuarios' : 'Users',
@@ -81,23 +77,24 @@ export default function Admin() {
     statusCol:        isEs ? 'Estado' : 'Status',
     createdCol:       isEs ? 'Creada' : 'Created',
     actionsCol:       isEs ? 'Acciones' : 'Actions',
-    // Tabla usuarios
     nameCol:          isEs ? 'Nombre' : 'Name',
     emailCol:         'Email',
     companyCol:       isEs ? 'Empresa' : 'Company',
     roleCol:          isEs ? 'Rol' : 'Role',
     lastAccess:       isEs ? 'Último acceso' : 'Last access',
-    // Botones
     edit:             isEs ? 'Editar' : 'Edit',
     deactivate:       isEs ? 'Desactivar' : 'Deactivate',
     activate:         isEs ? 'Activar' : 'Activate',
+    delete:           isEs ? 'Eliminar' : 'Delete',
     cancel:           isEs ? 'Cancelar' : 'Cancel',
     save:             isEs ? 'Guardar' : 'Save',
     saving:           isEs ? 'Guardando...' : 'Saving...',
+    deleting:         isEs ? 'Eliminando...' : 'Deleting...',
     loading:          isEs ? 'Cargando...' : 'Loading...',
     confirm:          isEs ? 'Confirmar' : 'Confirm',
     confirmTitle:     isEs ? '¿Confirmar acción?' : 'Confirm action?',
-    // Drawer empresa
+    confirmDelCompany:isEs ? 'Eliminar empresa permanentemente' : 'Permanently delete company',
+    confirmDelUser:   isEs ? 'Eliminar usuario permanentemente' : 'Permanently delete user',
     newCompanyTitle:  isEs ? 'Nueva empresa' : 'New company',
     editCompanyTitle: isEs ? 'Editar empresa' : 'Edit company',
     companyName:      isEs ? 'Nombre de la empresa' : 'Company name',
@@ -107,7 +104,6 @@ export default function Admin() {
     usersLimit:       isEs ? 'usuarios' : 'users',
     projectsLimit:    isEs ? 'proyectos' : 'projects',
     stateLabel:       isEs ? 'Estado' : 'Status',
-    // Drawer usuario
     newUserTitle:     isEs ? 'Nuevo usuario' : 'New user',
     editUserTitle:    isEs ? 'Editar usuario' : 'Edit user',
     fullName:         isEs ? 'Nombre completo' : 'Full name',
@@ -116,7 +112,6 @@ export default function Admin() {
     selectCompany:    isEs ? '— Seleccionar empresa —' : '— Select company —',
     selectRole:       isEs ? '— Seleccionar rol —' : '— Select role —',
     emailLocked:      isEs ? 'El email no se puede modificar.' : 'Email cannot be modified.',
-    // Roles
     role_client_admin: isEs ? 'Administrador' : 'Administrator',
     role_coordinador:  isEs ? 'Coordinador' : 'Coordinator',
     role_gerente:      isEs ? 'Gerente' : 'Manager',
@@ -125,7 +120,6 @@ export default function Admin() {
     role_contador:     isEs ? 'Contador' : 'Accountant',
     role_lectura:      isEs ? 'Solo Lectura' : 'Read Only',
     role_super_admin:  'Super Admin',
-    // Planes
     plan_starter:     'Starter',
     plan_pro:         'Pro',
     plan_enterprise:  'Enterprise',
@@ -140,9 +134,10 @@ export default function Admin() {
   const [drawer, setDrawer]     = useState(null)
   const [form, setForm]         = useState({})
   const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState('')
-  const [confirmDel, setConfirmDel] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null) // { msg, action, isDangerous }
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -198,6 +193,100 @@ export default function Admin() {
     await loadAll()
   }
 
+  // ── ELIMINAR EMPRESA Y TODOS SUS DATOS ───────────────────────────────────
+  const deleteTenant = async (tenantId) => {
+    setDeleting(true)
+    try {
+      // 1. Obtener todos los proyectos del tenant
+      const { data: proyectos } = await supabase.from('proyectos').select('id').eq('tenant_id', tenantId)
+      const pids = (proyectos || []).map(p => p.id)
+
+      if (pids.length > 0) {
+        // 2. Eliminar árbol completo de cada proyecto
+        for (const pid of pids) {
+          // Subcontratos
+          const { data: scs } = await supabase.from('subcontratos_contratos').select('id').eq('proyecto_id', pid)
+          if (scs?.length) {
+            const scIds = scs.map(s => s.id)
+            const { data: avs } = await supabase.from('subcontratos_avaluos').select('id').in('subcontrato_id', scIds)
+            if (avs?.length) await supabase.from('subcontratos_avaluo_items').delete().in('avaluo_id', avs.map(a => a.id))
+            await supabase.from('subcontratos_avaluos').delete().in('subcontrato_id', scIds)
+            await supabase.from('subcontratos_items').delete().in('subcontrato_id', scIds)
+            await supabase.from('subcontratos_contratos').delete().eq('proyecto_id', pid)
+          }
+          // Avalúos cliente
+          const { data: avsCli } = await supabase.from('avaluos_cliente').select('id').eq('proyecto_id', pid)
+          if (avsCli?.length) {
+            await supabase.from('avaluos_cliente_items').delete().in('avaluo_id', avsCli.map(a => a.id))
+            await supabase.from('avaluos_cliente').delete().eq('proyecto_id', pid)
+          }
+          // Órdenes de cambio
+          const { data: ocsC } = await supabase.from('ordenes_cambio').select('id').eq('proyecto_id', pid)
+          if (ocsC?.length) {
+            await supabase.from('ordenes_cambio_items').delete().in('oc_id', ocsC.map(o => o.id))
+            await supabase.from('ordenes_cambio').delete().eq('proyecto_id', pid)
+          }
+          // Órdenes de compra
+          const { data: ocs } = await supabase.from('ordenes_compra').select('id').eq('proyecto_id', pid)
+          if (ocs?.length) {
+            await supabase.from('ordenes_compra_items').delete().in('oc_id', ocs.map(o => o.id))
+            await supabase.from('ordenes_compra').delete().eq('proyecto_id', pid)
+          }
+          // Solicitudes
+          const { data: sols } = await supabase.from('solicitudes').select('id').eq('proyecto_id', pid)
+          if (sols?.length) {
+            await supabase.from('solicitud_items').delete().in('solicitud_id', sols.map(s => s.id))
+            await supabase.from('solicitudes').delete().eq('proyecto_id', pid)
+          }
+          // Resto
+          await supabase.from('materiales_presupuestados').delete().eq('proyecto_id', pid)
+          await supabase.from('costos_directos').delete().eq('proyecto_id', pid)
+          await supabase.from('costos_indirectos').delete().eq('proyecto_id', pid)
+          await supabase.from('nominas').delete().eq('proyecto_id', pid)
+          await supabase.from('equipos').delete().eq('proyecto_id', pid)
+          await supabase.from('subcontratos').delete().eq('proyecto_id', pid)
+          await supabase.from('salidas').delete().eq('proyecto_id', pid)
+          await supabase.from('entradas').delete().eq('proyecto_id', pid)
+          await supabase.from('presupuesto').delete().eq('proyecto_id', pid)
+          await supabase.from('fases').delete().eq('proyecto_id', pid)
+        }
+        // 3. Eliminar proyectos
+        await supabase.from('proyectos').delete().eq('tenant_id', tenantId)
+      }
+
+      // 4. Eliminar materiales del tenant
+      await supabase.from('materiales').delete().eq('tenant_id', tenantId)
+
+      // 5. Eliminar solicitudes de eliminación
+      await supabase.from('solicitudes_eliminacion').delete().eq('tenant_id', tenantId)
+
+      // 6. Eliminar usuarios del tenant
+      await supabase.from('usuarios').delete().eq('tenant_id', tenantId)
+
+      // 7. Eliminar tenant
+      await supabase.from('tenants').delete().eq('id', tenantId)
+
+      showSuccess(isEs ? 'Empresa eliminada permanentemente.' : 'Company permanently deleted.')
+      await loadAll()
+    } catch (e) {
+      setError(e.message)
+    }
+    setDeleting(false)
+  }
+
+  // ── ELIMINAR USUARIO ──────────────────────────────────────────────────────
+  const deleteUsuario = async (userId) => {
+    setDeleting(true)
+    try {
+      await supabase.from('usuarios').delete().eq('id', userId)
+      showSuccess(isEs ? 'Usuario eliminado.' : 'User deleted.')
+      await loadAll()
+    } catch (e) {
+      setError(e.message)
+    }
+    setDeleting(false)
+  }
+
   const saveUsuario = async () => {
     if (!form.email || !form.nombre || !form.rol || !form.tenant_id) return
     setSaving(true); setError('')
@@ -209,25 +298,25 @@ export default function Admin() {
         showSuccess(isEs ? 'Usuario actualizado.' : 'User updated.')
       } else {
         const res = await fetch(
-  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
-  {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({
-      email: form.email,
-      password: form.password && form.password.length >= 6 ? form.password : Math.random().toString(36).slice(-10) + 'A1!',
-      nombre: form.nombre,
-      rol: form.rol,
-      tenant_id: form.tenant_id
-    })
-  }
-)
-const result = await res.json()
-if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              email: form.email,
+              password: form.password && form.password.length >= 6 ? form.password : Math.random().toString(36).slice(-10) + 'A1!',
+              nombre: form.nombre,
+              rol: form.rol,
+              tenant_id: form.tenant_id
+            })
+          }
+        )
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
         showSuccess(isEs ? `Usuario ${form.nombre} creado.` : `User ${form.nombre} created.`)
       }
       await loadAll(); setDrawer(null)
@@ -252,22 +341,36 @@ if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
       {/* SUCCESS TOAST */}
       {success && (
         <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-xl shadow-lg text-sm font-medium">
-          {success}
+          ✓ {success}
         </div>
       )}
 
-      {/* CONFIRM */}
+      {/* CONFIRM MODAL */}
       {confirmDel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <p className="text-sm font-semibold text-gray-800 mb-1">{T.confirmTitle}</p>
-            <p className="text-sm text-gray-500 mb-5">{confirmDel.msg}</p>
-            <div className="flex justify-end gap-2">
+            <div className="flex items-center gap-3 mb-3">
+              {confirmDel.isDangerous && (
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg flex-shrink-0">⚠</div>
+              )}
+              <p className="text-sm font-semibold text-gray-800">{T.confirmTitle}</p>
+            </div>
+            <p className="text-sm text-gray-500 mb-2">{confirmDel.msg}</p>
+            {confirmDel.isDangerous && (
+              <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700 mb-4">
+                {isEs
+                  ? '⚠ Esta acción es irreversible. Se eliminarán todos los proyectos, presupuestos, materiales, órdenes de compra y demás datos asociados.'
+                  : '⚠ This action is irreversible. All projects, budgets, materials, purchase orders and associated data will be deleted.'}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setConfirmDel(null)}
-                className="px-4 py-2 text-sm border border-gray-200 rounded-lg">{T.cancel}</button>
-              <button onClick={async () => { await confirmDel.action(); setConfirmDel(null) }}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
-                {T.confirm}
+                className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{T.cancel}</button>
+              <button
+                onClick={async () => { await confirmDel.action(); setConfirmDel(null) }}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-60">
+                {deleting ? T.deleting : (confirmDel.isDangerous ? T.delete : T.confirm)}
               </button>
             </div>
           </div>
@@ -426,10 +529,10 @@ if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
 
         {/* TABS */}
         <div className="flex border-b border-gray-200 mb-6">
-          {[[' tenants', T.companies], ['usuarios', T.users]].map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id.trim())}
+          {[['tenants', T.companies], ['usuarios', T.users]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
               className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
-                ${tab===id.trim() ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                ${tab===id ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
               {label}
             </button>
           ))}
@@ -492,10 +595,22 @@ if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
                               className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">{T.edit}</button>
                             <button onClick={() => setConfirmDel({
                               msg: `¿${t.activo ? T.deactivate : T.activate} "${t.nombre_empresa}"?`,
-                              action: () => toggleTenant(t)
+                              action: () => toggleTenant(t),
+                              isDangerous: false,
                             })}
                               className={`text-xs px-2 py-1 rounded-lg border ${t.activo ? 'border-red-200 text-red-500 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                               {t.activo ? T.deactivate : T.activate}
+                            </button>
+                            {/* ── BOTÓN ELIMINAR EMPRESA ── */}
+                            <button onClick={() => setConfirmDel({
+                              msg: isEs
+                                ? `¿Eliminar permanentemente la empresa "${t.nombre_empresa}" y todos sus datos?`
+                                : `Permanently delete company "${t.nombre_empresa}" and all its data?`,
+                              action: () => deleteTenant(t.id),
+                              isDangerous: true,
+                            })}
+                              className="text-xs px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium">
+                              🗑 {T.delete}
                             </button>
                           </div>
                         </td>
@@ -546,10 +661,22 @@ if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
                             className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">{T.edit}</button>
                           <button onClick={() => setConfirmDel({
                             msg: `¿${u.activo ? T.deactivate : T.activate} "${u.nombre}"?`,
-                            action: () => toggleUsuario(u)
+                            action: () => toggleUsuario(u),
+                            isDangerous: false,
                           })}
                             className={`text-xs px-2 py-1 rounded-lg border ${u.activo ? 'border-red-200 text-red-500 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                             {u.activo ? T.deactivate : T.activate}
+                          </button>
+                          {/* ── BOTÓN ELIMINAR USUARIO ── */}
+                          <button onClick={() => setConfirmDel({
+                            msg: isEs
+                              ? `¿Eliminar permanentemente al usuario "${u.nombre}" (${u.email})?`
+                              : `Permanently delete user "${u.nombre}" (${u.email})?`,
+                            action: () => deleteUsuario(u.id),
+                            isDangerous: true,
+                          })}
+                            className="text-xs px-2 py-1 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium">
+                            🗑 {T.delete}
                           </button>
                         </div>
                       </td>
@@ -564,5 +691,3 @@ if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
     </div>
   )
 }
-
-
