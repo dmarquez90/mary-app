@@ -4,6 +4,7 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { fmtNum, fmt } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import ImportarMatPresupuestados from './ImportarMatPresupuestados'
 
 const emptyForm = () => ({
   proyecto_id: '', nombre_libre: '', unidad_libre: 'und',
@@ -149,6 +150,7 @@ export default function MatPresupuestados() {
         <EmptyState icon={Icons.budget} title={t('mp_no_project')} />
       ) : (
         <>
+          {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             {[
               { label: t('mp_kpi_materials'), value: matsPres.length, color: '#1B3A6B' },
@@ -163,8 +165,13 @@ export default function MatPresupuestados() {
             ))}
           </div>
 
+          {/* ── IMPORTAR DESDE EXCEL ── */}
+          {proyId && puedeEditar && (
+            <ImportarMatPresupuestados proyId={proyId} onDone={() => setSearch('')} />
+          )}
+
           {matsPres.length > 0 && (
-            <div className="flex gap-3 mb-4 flex-wrap">
+            <div className="flex gap-3 mb-4 flex-wrap mt-4">
               <input className={inputCls + ' flex-1 min-w-[200px]'}
                 placeholder={t('mp_search_placeholder')}
                 value={search} onChange={e => setSearch(e.target.value)} />

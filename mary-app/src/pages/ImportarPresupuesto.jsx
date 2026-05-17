@@ -1,422 +1,325 @@
 import { useState, useRef, useContext } from 'react'
 import * as XLSX from 'xlsx'
 import { useStore } from '../store'
-import { useAuth } from '../auth'
 import { LangContext } from '../i18n'
-import { usePermissions } from '../usePermissions'
-import { SecondaryBtn, PrimaryBtn } from '../components'
-import { UNIDADES, uuid, genBudgetCode, today } from '../utils'
-import { supabase } from '../supabase'
 
-function parseTipo(raw) {
-  if (!raw) return null
-  const s = raw.toString().trim().toLowerCase().replace(/\s+/g, ' ')
-  if (s.startsWith('etapa'))     return 'etapa'
-  if (s.startsWith('sub'))       return 'sub_etapa'
-  if (s.startsWith('actividad')) return 'actividad'
-  return null
-}
+// Categorías válidas del dropdown de la plantilla
+const CATEGORIAS_ES = ['Etapa', 'Sub-etapa', 'Actividad']
+const CATEGORIAS_EN = ['Stage', 'Sub-stage', 'Activity']
 
-function mapUnidad(raw) {
-  if (!raw) return 'm²'
-  const u = raw.toString().trim()
-  return UNIDADES.find(v => v.toLowerCase() === u.toLowerCase()) || u || 'm²'
-}
+export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
+  const { dispatch } = useStore()
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
 
-const fmtC = (n, moneda = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: moneda, minimumFractionDigits: 0 }).format(n || 0)
-
-export default function ImportarPresupuesto({ proyId, moneda = 'USD', onDone }) {
-  const { dispatch }        = useStore()
-  const { tenantId }        = useAuth()          // ← viene directo del AuthContext, sin query extra
-  const { t }               = useContext(LangContext)
-  const { can }             = usePermissions()
-  const fileRef             = useRef(null)
-
-  const [step, setStep]         = useState('idle')
-  const [rows, setRows]         = useState([])
-  const [errMsg, setErrMsg]     = useState('')
+  const fileRef  = useRef(null)
+  const [rows, setRows]     = useState([])
+  const [errors, setErrors] = useState([])
+  const [step, setStep]     = useState('idle') // idle | preview | importing | done | error
   const [progress, setProgress] = useState(0)
 
-  const puedeEditar = can('presupuesto_editar')
-  if (!puedeEditar) return null
+  const reset = () => { setRows([]); setErrors([]); setStep('idle'); setProgress(0) }
 
-  // ── LEER EXCEL ────────────────────────────────────────────────────────────
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setErrMsg(''); setStep('idle'); setRows([])
-
-    try {
-      const buf       = await file.arrayBuffer()
-      const wb        = XLSX.read(buf, { type: 'array' })
-      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'presupuesto')
-      if (!sheetName) throw new Error('No se encontró la hoja "Presupuesto". Verifica que el archivo sea la plantilla MARY.')
-
-      const ws     = wb.Sheets[sheetName]
-      const parsed = []
-
-      for (let r = 8; r <= 500; r++) {
-        const catRaw = ws[`A${r}`]?.v
-        const desc   = ws[`B${r}`]?.v?.toString().trim() || ''
-        const tipo   = parseTipo(catRaw)
-
-        if (!catRaw && !desc) {
-          const n1 = ws[`A${r+1}`]?.v || ws[`B${r+1}`]?.v
-          const n2 = ws[`A${r+2}`]?.v || ws[`B${r+2}`]?.v
-          if (!n1 && !n2) break
-          continue
-        }
-
-        if (!tipo || !desc) continue
-
-        parsed.push({
-          tipo,
-          descripcion:      desc,
-          unidad:           mapUnidad(ws[`C${r}`]?.v),
-          cantidad:         parseFloat(ws[`D${r}`]?.v) || 0,
-          costo_mo:         parseFloat(ws[`E${r}`]?.v) || 0,
-          costo_materiales: parseFloat(ws[`F${r}`]?.v) || 0,
-          costo_equipos:    parseFloat(ws[`G${r}`]?.v) || 0,
-        })
-      }
-
-      if (parsed.length === 0)
-        throw new Error('No se encontraron filas. Verifica que la columna A tenga Etapa, Sub Etapa o Actividad desde la fila 8.')
-      if (!parsed.some(r => r.tipo === 'etapa'))
-        throw new Error('No se encontró ninguna Etapa. Al menos una fila debe tener "Etapa" en la columna A.')
-
-      setRows(parsed)
-      setStep('preview')
-    } catch (err) {
-      setErrMsg(err.message)
-      setStep('error')
-    } finally {
-      if (fileRef.current) fileRef.current.value = ''
-    }
+  const descargarPlantilla = () => {
+    const lang_code = isEs ? 'ES' : 'EN'
+    const a = document.createElement('a')
+    a.href = `/templates/MARY_Plantilla_Presupuesto_${lang_code}.xlsx`
+    a.download = `MARY_Plantilla_Presupuesto_${lang_code}.xlsx`
+    a.click()
   }
 
-  // ── GUARDAR EN SUPABASE ───────────────────────────────────────────────────
-  const guardar = async () => {
-    if (!proyId)   { setErrMsg('Selecciona un proyecto antes de importar.'); setStep('error'); return }
-    if (!tenantId) { setErrMsg('No se pudo obtener tenant_id. Verifica que estés autenticado.'); setStep('error'); return }
+  const parseFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const wb   = XLSX.read(e.target.result, { type: 'array' })
+        const ws   = wb.Sheets[wb.SheetNames[0]]
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-    setStep('saving'); setProgress(0)
-
-    try {
-      // Cargar presupuesto existente para generar códigos correlativos correctos
-      const { data: existentes } = await supabase
-        .from('presupuesto').select('*').eq('proyecto_id', proyId).eq('tenant_id', tenantId)
-      let byProject = existentes || []
-
-      const etapaMap  = {}  // descripcion → id
-      const subEtaMap = {}  // `${etapa}||${sub}` → id
-      let curEtapaId     = null
-      let curEtapaNombre = null
-      let done = 0
-
-      for (const row of rows) {
-
-        // ── ETAPA ─────────────────────────────────────────────────────────
-        if (row.tipo === 'etapa') {
-          if (!etapaMap[row.descripcion]) {
-            const id   = uuid()
-            const code = genBudgetCode(byProject, 'etapa', null)
-            const item = {
-              id, code, proyecto_id: proyId, tipo: 'etapa', parent_id: null,
-              descripcion: row.descripcion, unidad: null,
-              cantidad: 0, costo_mo: 0, costo_materiales: 0, costo_equipos: 0,
-              created_at: today(), tenant_id: tenantId,
-            }
-            const { error } = await supabase.from('presupuesto').insert(item)
-            if (error) throw new Error(`Error creando etapa "${row.descripcion}": ${error.message}`)
-            dispatch({ type: 'ADD_BUDGET', payload: item })
-            byProject = [...byProject, item]
-            etapaMap[row.descripcion] = id
+        // Buscar fila de encabezados (contiene "Categoria" o "Category")
+        let headerRow = -1
+        for (let i = 0; i < Math.min(data.length, 10); i++) {
+          const row = data[i].map(c => String(c).toLowerCase())
+          if (row.some(c => c.includes('catego') || c.includes('descrip'))) {
+            headerRow = i
+            break
           }
-          curEtapaId     = etapaMap[row.descripcion]
-          curEtapaNombre = row.descripcion
-          done++; setProgress(Math.round((done / rows.length) * 100))
-          continue
+        }
+        if (headerRow === -1) {
+          setErrors([isEs ? 'No se encontró la fila de encabezados en el archivo.' : 'Header row not found in file.'])
+          setStep('error')
+          return
         }
 
-        // ── SUB ETAPA ─────────────────────────────────────────────────────
-        if (row.tipo === 'sub_etapa') {
-          if (!curEtapaId) {
-            // Sin etapa padre → crear etapa "General" automáticamente
-            curEtapaNombre = 'General'
-            if (!etapaMap['General']) {
-              const id   = uuid()
-              const code = genBudgetCode(byProject, 'etapa', null)
-              const item = {
-                id, code, proyecto_id: proyId, tipo: 'etapa', parent_id: null,
-                descripcion: 'General', unidad: null,
-                cantidad: 0, costo_mo: 0, costo_materiales: 0, costo_equipos: 0,
-                created_at: today(), tenant_id: tenantId,
-              }
-              await supabase.from('presupuesto').insert(item)
-              dispatch({ type: 'ADD_BUDGET', payload: item })
-              byProject = [...byProject, item]
-              etapaMap['General'] = id
-            }
-            curEtapaId = etapaMap['General']
+        const headers = data[headerRow].map(c => String(c).trim().toLowerCase())
+        const colIdx  = (names) => {
+          for (const n of names) {
+            const i = headers.findIndex(h => h.includes(n))
+            if (i !== -1) return i
           }
-
-          const key = `${curEtapaNombre}||${row.descripcion}`
-          if (!subEtaMap[key]) {
-            const id   = uuid()
-            const code = genBudgetCode(byProject, 'sub_etapa', curEtapaId)
-            const item = {
-              id, code, proyecto_id: proyId, tipo: 'sub_etapa', parent_id: curEtapaId,
-              descripcion: row.descripcion, unidad: null,
-              cantidad: 0, costo_mo: 0, costo_materiales: 0, costo_equipos: 0,
-              created_at: today(), tenant_id: tenantId,
-            }
-            const { error } = await supabase.from('presupuesto').insert(item)
-            if (error) throw new Error(`Error creando sub-etapa "${row.descripcion}": ${error.message}`)
-            dispatch({ type: 'ADD_BUDGET', payload: item })
-            byProject = [...byProject, item]
-            subEtaMap[key] = id
-          }
-          done++; setProgress(Math.round((done / rows.length) * 100))
-          continue
+          return -1
         }
 
-        // ── ACTIVIDAD ─────────────────────────────────────────────────────
-        // Regla: actividad puede ir directo bajo etapa (sin sub-etapa obligatoria)
-        if (row.tipo === 'actividad') {
-          let parentId = null
+        const iCat  = colIdx(['categor'])
+        const iDesc = colIdx(['descrip'])
+        const iUnit = colIdx(['unidad', 'unit'])
+        const iQty  = colIdx(['cantidad', 'quantity', 'qty'])
+        const iMO   = colIdx(['mano', 'labor'])
+        const iMat  = colIdx(['material'])
+        const iEq   = colIdx(['transport', 'equip'])
 
-          // Buscar la última sub-etapa de la etapa actual
-          const keysDeEtapa = Object.keys(subEtaMap).filter(k => k.startsWith(`${curEtapaNombre}||`))
-          if (keysDeEtapa.length > 0) {
-            // Hay sub-etapa → usar la última
-            parentId = subEtaMap[keysDeEtapa[keysDeEtapa.length - 1]]
-          } else if (curEtapaId) {
-            // No hay sub-etapa → crear una sub-etapa implícita con el mismo nombre de la etapa
-            // Esto mantiene compatibilidad con el store que requiere parent = sub_etapa
-            const autoKey = `${curEtapaNombre}||__auto__`
-            if (!subEtaMap[autoKey]) {
-              const id   = uuid()
-              const code = genBudgetCode(byProject, 'sub_etapa', curEtapaId)
-              const item = {
-                id, code, proyecto_id: proyId, tipo: 'sub_etapa', parent_id: curEtapaId,
-                descripcion: curEtapaNombre, unidad: null,
-                cantidad: 0, costo_mo: 0, costo_materiales: 0, costo_equipos: 0,
-                created_at: today(), tenant_id: tenantId,
-              }
-              await supabase.from('presupuesto').insert(item)
-              dispatch({ type: 'ADD_BUDGET', payload: item })
-              byProject = [...byProject, item]
-              subEtaMap[autoKey] = id
-            }
-            parentId = subEtaMap[autoKey]
-          } else {
-            // Sin contexto → saltar actividad
-            done++; setProgress(Math.round((done / rows.length) * 100))
+        if (iCat === -1 || iDesc === -1) {
+          setErrors([isEs ? 'Columnas requeridas no encontradas. Usa la plantilla oficial.' : 'Required columns not found. Use the official template.'])
+          setStep('error')
+          return
+        }
+
+        const VALID_CATS = isEs ? CATEGORIAS_ES : CATEGORIAS_EN
+        const parsed = []
+        const errs   = []
+
+        for (let r = headerRow + 1; r < data.length; r++) {
+          const row = data[r]
+          const cat  = String(row[iCat]  || '').trim()
+          const desc = String(row[iDesc] || '').trim()
+          if (!cat && !desc) continue // fila vacía
+
+          const qty  = parseFloat(row[iQty]  || 0) || 0
+          const mo   = parseFloat(row[iMO]   || 0) || 0
+          const mat  = parseFloat(row[iMat]  || 0) || 0
+          const eq   = parseFloat(row[iEq]   || 0) || 0
+          const unit = String(row[iUnit] || 'und').trim() || 'und'
+
+          // Validaciones
+          if (!desc) { errs.push(`Fila ${r + 1}: descripción vacía`); continue }
+          if (cat && !VALID_CATS.includes(cat)) {
+            errs.push(`Fila ${r + 1}: categoría "${cat}" no válida. Usa: ${VALID_CATS.join(', ')}`)
             continue
           }
 
-          const id   = uuid()
-          const code = genBudgetCode(byProject, 'actividad', parentId)
-          const item = {
-            id, code, proyecto_id: proyId, tipo: 'actividad', parent_id: parentId,
-            descripcion:      row.descripcion,
-            unidad:           row.unidad,
-            cantidad:         row.cantidad,
-            costo_mo:         row.costo_mo,
-            costo_materiales: row.costo_materiales,
-            costo_equipos:    row.costo_equipos,
-            created_at:       today(),
-            tenant_id:        tenantId,
-          }
-          const { error } = await supabase.from('presupuesto').insert(item)
-          if (error) throw new Error(`Error creando actividad "${row.descripcion}": ${error.message}`)
-          dispatch({ type: 'ADD_BUDGET', payload: item })
-          byProject = [...byProject, item]
+          // Inferir tipo desde categoría
+          let tipo = 'actividad'
+          if (cat === 'Etapa'    || cat === 'Stage')     tipo = 'etapa'
+          if (cat === 'Sub-etapa'|| cat === 'Sub-stage') tipo = 'sub_etapa'
+
+          parsed.push({ tipo, desc, unit, qty, mo, mat, eq, rowNum: r + 1 })
         }
 
-        done++
-        setProgress(Math.round((done / rows.length) * 100))
+        if (parsed.length === 0) {
+          setErrors(errs.length ? errs : [isEs ? 'No se encontraron filas con datos válidos.' : 'No valid data rows found.'])
+          setStep('error')
+          return
+        }
+
+        setRows(parsed)
+        setErrors(errs)
+        setStep('preview')
+      } catch (err) {
+        setErrors([isEs ? `Error al leer el archivo: ${err.message}` : `Error reading file: ${err.message}`])
+        setStep('error')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  const importar = async () => {
+    setStep('importing')
+    setProgress(0)
+
+    // Construir árbol de parent_ids en tiempo real
+    let lastEtapaId   = null
+    let lastSubEtapaId = null
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      setProgress(Math.round(((i + 1) / rows.length) * 100))
+
+      const payload = {
+        proyectoId:        proyId,
+        tipo:              row.tipo,
+        descripcion:       row.desc,
+        unidad:            row.unit,
+        cantidad:          row.qty,
+        costo_mo:          row.mo,
+        costo_materiales:  row.mat,
+        costo_equipos:     row.eq,
+        parent_id:         null,
       }
 
-      setStep('done')
-      setTimeout(() => onDone?.(), 1500)
+      if (row.tipo === 'etapa') {
+        payload.parent_id = null
+      } else if (row.tipo === 'sub_etapa') {
+        payload.parent_id = lastEtapaId
+      } else {
+        // actividad — parent es sub-etapa si existe, si no la etapa
+        payload.parent_id = lastSubEtapaId || lastEtapaId
+      }
 
-    } catch (err) {
-      console.error('Error importando:', err)
-      setErrMsg(err.message || 'Error inesperado. Revisa la consola (F12).')
-      setStep('error')
+      // ADD_BUDGET retorna el item creado con su id real en el store
+      // Necesitamos capturar el id generado — usamos un dispatch wrapeado
+      await new Promise((resolve) => {
+        // Pequeño delay para no saturar Supabase
+        setTimeout(async () => {
+          await dispatch({
+            type: 'ADD_BUDGET',
+            payload,
+            _onCreated: (item) => {
+              if (row.tipo === 'etapa')     { lastEtapaId = item.id; lastSubEtapaId = null }
+              if (row.tipo === 'sub_etapa') { lastSubEtapaId = item.id }
+            }
+          })
+          resolve()
+        }, 80)
+      })
     }
+
+    setStep('done')
+    if (onDone) onDone()
   }
 
-  const reset = () => { setStep('idle'); setRows([]); setErrMsg(''); setProgress(0) }
-
-  const etapasCount      = rows.filter(r => r.tipo === 'etapa').length
-  const subEtapasCount   = rows.filter(r => r.tipo === 'sub_etapa').length
-  const actividadesCount = rows.filter(r => r.tipo === 'actividad').length
-  const totalEstimado    = rows
-    .filter(r => r.tipo === 'actividad')
-    .reduce((s, r) => s + r.cantidad * (r.costo_mo + r.costo_materiales + r.costo_equipos), 0)
-
-  const tipoBadge = {
-    etapa:     'bg-green-100 text-green-700',
-    sub_etapa: 'bg-blue-100 text-blue-700',
-    actividad: 'bg-gray-100 text-gray-500',
+  const tipoColor = (tipo) => {
+    if (tipo === 'etapa')     return 'bg-green-100 text-green-700'
+    if (tipo === 'sub_etapa') return 'bg-blue-100 text-blue-700'
+    return 'bg-gray-100 text-gray-600'
   }
-  const tipoLabel = { etapa: 'Etapa', sub_etapa: 'Sub Etapa', actividad: 'Actividad' }
-  const tipoColor = { etapa: '#1D9E75', sub_etapa: '#185FA5', actividad: '#374151' }
-  const tipoPL    = { etapa: 12, sub_etapa: 20, actividad: 28 }
+  const tipoLabel = (tipo) => {
+    if (!isEs) {
+      if (tipo === 'etapa')     return 'Stage'
+      if (tipo === 'sub_etapa') return 'Sub-stage'
+      return 'Activity'
+    }
+    if (tipo === 'etapa')     return 'Etapa'
+    if (tipo === 'sub_etapa') return 'Sub-etapa'
+    return 'Actividad'
+  }
 
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/40 p-5">
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-          </svg>
-          <span className="text-sm font-semibold text-gray-700">Importar desde Excel</span>
-        </div>
-        <a href="/templates/Presupuesto_MARY_Template.xlsx"
-          download="Presupuesto_MARY_Template.xlsx"
-          className="text-xs flex items-center gap-1 text-[#185FA5] hover:underline">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          Descargar plantilla
-        </a>
-      </div>
-
-      {/* IDLE */}
+    <div className="bg-white border border-gray-100 rounded-xl rounded-t-none border-t-0 px-4 py-3">
       {step === 'idle' && (
-        <div
-          role="button" tabIndex={0}
-          onClick={() => fileRef.current?.click()}
-          onKeyDown={e => e.key === 'Enter' && fileRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => {
-            e.preventDefault()
-            const f = e.dataTransfer.files[0]
-            if (f) { fileRef.current.files = e.dataTransfer.files; handleFile({ target: fileRef.current }) }
-          }}
-          className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center cursor-pointer
-                     hover:border-[#1D9E75] hover:bg-green-50/20 transition-all">
-          <svg className="w-9 h-9 text-gray-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          <p className="text-sm text-gray-500">Haz clic o arrastra tu archivo <span className="font-semibold text-gray-700">.xlsx</span></p>
-          <p className="text-xs text-gray-400 mt-1">Columna A: Etapa / Sub Etapa / Actividad</p>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile}/>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+            {isEs ? 'Importar desde Excel' : 'Import from Excel'}
+          </span>
+          <label className="flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-[#1B3A6B] hover:text-[#1B3A6B] cursor-pointer transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            {isEs ? 'Seleccionar archivo .xlsx' : 'Select .xlsx file'}
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden"
+              onChange={e => parseFile(e.target.files[0])} />
+          </label>
+          <button onClick={descargarPlantilla}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#1B3A6B] hover:underline">
+            ↓ {isEs ? 'Descargar plantilla' : 'Download template'}
+          </button>
         </div>
       )}
 
-      {/* ERROR */}
-      {step === 'error' && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm font-semibold text-red-700 mb-1">Error al procesar</p>
-          <p className="text-xs text-red-600 leading-relaxed">{errMsg}</p>
-          <button onClick={reset} className="mt-3 text-xs text-red-500 hover:underline font-medium">← Intentar de nuevo</button>
-        </div>
-      )}
-
-      {/* PREVIEW */}
       {step === 'preview' && (
-        <div>
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {[
-              { label: 'Etapas',      value: etapasCount,      color: '#1D9E75' },
-              { label: 'Sub-Etapas',  value: subEtapasCount,   color: '#185FA5' },
-              { label: 'Actividades', value: actividadesCount, color: '#374151' },
-              { label: 'Total',       value: fmtC(totalEstimado, moneda), color: '#1D9E75' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="bg-white border border-gray-100 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-400 mb-1">{label}</p>
-                <p className="text-sm font-bold" style={{ color }}>{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-lg border border-gray-100 overflow-hidden mb-4">
-            <div className="overflow-x-auto max-h-72 overflow-y-auto">
-              <table className="w-full min-w-[700px] text-xs">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    {['Tipo','Descripción','Unidad','Cant','M.O.','Materiales','Equipos','Total'].map(h => (
-                      <th key={h} className="px-3 py-2.5 text-left text-gray-500 font-medium border-b border-gray-100 whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => {
-                    const tc       = r.cantidad * (r.costo_mo + r.costo_materiales + r.costo_equipos)
-                    const isHeader = r.tipo !== 'actividad'
-                    return (
-                      <tr key={i} className={`border-b border-gray-50 ${isHeader ? 'bg-gray-50/60' : ''}`}>
-                        <td className="px-3 py-2">
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${tipoBadge[r.tipo]}`}>
-                            {tipoLabel[r.tipo]}
-                          </span>
-                        </td>
-                        <td className={`py-2 ${isHeader ? 'font-semibold' : 'text-gray-600'}`}
-                          style={{ color: isHeader ? tipoColor[r.tipo] : undefined, paddingLeft: tipoPL[r.tipo] }}>
-                          {r.descripcion}
-                        </td>
-                        <td className="px-3 py-2 text-gray-500">{isHeader ? '—' : r.unidad}</td>
-                        <td className="px-3 py-2 text-right font-mono">{isHeader ? '—' : r.cantidad}</td>
-                        <td className="px-3 py-2 text-right font-mono text-gray-500">{isHeader ? '—' : fmtC(r.costo_mo, moneda)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-gray-500">{isHeader ? '—' : fmtC(r.costo_materiales, moneda)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-gray-500">{isHeader ? '—' : fmtC(r.costo_equipos, moneda)}</td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold"
-                          style={{ color: isHeader ? tipoColor[r.tipo] : '#374151' }}>
-                          {isHeader ? '—' : fmtC(tc, moneda)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-gray-700">
+                {isEs ? `${rows.length} filas listas para importar` : `${rows.length} rows ready to import`}
+              </span>
+              {errors.length > 0 && (
+                <span className="text-xs text-amber-600">
+                  ({errors.length} {isEs ? 'advertencias' : 'warnings'})
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={reset} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">
+                {isEs ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button onClick={importar}
+                className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg"
+                style={{ background: '#1B3A6B' }}>
+                {isEs ? 'Importar ahora' : 'Import now'}
+              </button>
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end">
-            <SecondaryBtn onClick={reset}>Cancelar</SecondaryBtn>
-            <PrimaryBtn onClick={guardar} disabled={!proyId}>
-              Importar {rows.length} filas
-            </PrimaryBtn>
+          {errors.length > 0 && (
+            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700">
+              <p className="font-medium mb-1">{isEs ? 'Filas con advertencias (serán omitidas):' : 'Rows with warnings (will be skipped):'}</p>
+              {errors.map((e, i) => <p key={i}>• {e}</p>)}
+            </div>
+          )}
+
+          <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  {[isEs?'Tipo':'Type', isEs?'Descripción':'Description', isEs?'Unidad':'Unit',
+                    isEs?'Cantidad':'Qty', 'M.O.', isEs?'Mat.':'Mat.', isEs?'Equip.':'Equip.'].map((h,i) => (
+                    <th key={i} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className={`border-b border-gray-50 ${r.tipo === 'etapa' ? 'bg-green-50/40' : r.tipo === 'sub_etapa' ? 'bg-blue-50/30' : ''}`}>
+                    <td className="px-2 py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${tipoColor(r.tipo)}`}>
+                        {tipoLabel(r.tipo)}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-700" style={{ paddingLeft: r.tipo === 'actividad' ? 20 : r.tipo === 'sub_etapa' ? 12 : 8 }}>
+                      {r.desc}
+                    </td>
+                    <td className="px-2 py-1.5 text-gray-500">{r.tipo === 'actividad' ? r.unit : '—'}</td>
+                    <td className="px-2 py-1.5 font-mono">{r.tipo === 'actividad' ? r.qty : '—'}</td>
+                    <td className="px-2 py-1.5 font-mono text-gray-500">{r.tipo === 'actividad' ? r.mo : '—'}</td>
+                    <td className="px-2 py-1.5 font-mono text-gray-500">{r.tipo === 'actividad' ? r.mat : '—'}</td>
+                    <td className="px-2 py-1.5 font-mono text-gray-500">{r.tipo === 'actividad' ? r.eq : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* SAVING */}
-      {step === 'saving' && (
-        <div className="py-8 text-center">
-          <div className="w-full bg-gray-100 rounded-full h-2 mb-4 overflow-hidden">
-            <div className="h-2 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: '#1D9E75' }}/>
+      {step === 'importing' && (
+        <div className="flex flex-col gap-2 py-2">
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>{isEs ? 'Importando...' : 'Importing...'}</span>
+            <span className="font-mono">{progress}%</span>
           </div>
-          <p className="text-sm text-gray-600 font-medium">Guardando en Supabase... {progress}%</p>
-          <p className="text-xs text-gray-400 mt-1">No cierres esta ventana</p>
-        </div>
-      )}
-
-      {/* DONE */}
-      {step === 'done' && (
-        <div className="py-8 text-center">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
-            style={{ background: '#1D9E75' }}>
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
-            </svg>
+          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${progress}%`, background: '#1B3A6B' }} />
           </div>
-          <p className="text-sm font-semibold text-gray-700">¡Importación completada!</p>
-          <p className="text-xs text-gray-400 mt-1">
-            {etapasCount} etapas · {subEtapasCount} sub-etapas · {actividadesCount} actividades guardadas
+          <p className="text-xs text-gray-400">
+            {isEs ? 'No cierres esta ventana.' : 'Do not close this window.'}
           </p>
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="flex items-center gap-3 py-1">
+          <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm">✓</div>
+          <span className="text-sm text-green-700 font-medium">
+            {isEs ? `${rows.length} ítems importados correctamente.` : `${rows.length} items imported successfully.`}
+          </span>
+          <button onClick={reset} className="ml-auto text-xs text-gray-400 hover:text-gray-600">
+            {isEs ? 'Importar otro' : 'Import another'}
+          </button>
+        </div>
+      )}
+
+      {step === 'error' && (
+        <div className="flex flex-col gap-2">
+          <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+            <p className="font-medium mb-1">{isEs ? 'Error al procesar el archivo:' : 'Error processing file:'}</p>
+            {errors.map((e, i) => <p key={i}>• {e}</p>)}
+          </div>
+          <button onClick={reset} className="text-xs text-gray-500 hover:text-gray-700 self-start">
+            ← {isEs ? 'Intentar de nuevo' : 'Try again'}
+          </button>
         </div>
       )}
     </div>
