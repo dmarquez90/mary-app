@@ -93,7 +93,11 @@ export const genProjectCode = (proyectos) => {
 
 export const genOCCode = (ocs) => {
   const year = new Date().getFullYear()
-  const n = (ocs || []).length + 1
+  const nums = (ocs || []).map(o => {
+    const m = (o.oc_number || '').match(/(\d+)$/)
+    return m ? parseInt(m[1]) : 0
+  })
+  const n = nums.length > 0 ? Math.max(...nums) + 1 : 1
   return `OC-${year}-${String(n).padStart(3,'0')}`
 }
 
