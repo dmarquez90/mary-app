@@ -15,11 +15,19 @@ const CATEGORIAS = [
   { es: 'Otros',        en: 'Other',      key: 'otros'        },
 ]
 
+// Normaliza texto eliminando acentos para comparacion robusta
+const normalize = (str) =>
+  String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+
 const normalizarCategoria = (raw) => {
-  const lower = String(raw || '').toLowerCase().trim()
+  const lower = normalize(raw)
   const match = CATEGORIAS.find(c =>
-    c.es.toLowerCase() === lower ||
-    c.en.toLowerCase() === lower ||
+    normalize(c.es) === lower ||
+    normalize(c.en) === lower ||
     c.key === lower
   )
   return match ? match.key : 'otros'
@@ -55,19 +63,25 @@ export default function ImportarCatalogo({ onDone }) {
         const ws   = wb.Sheets[wb.SheetNames[0]]
         const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
+        // Buscar fila de headers — normalize() elimina acentos para matchear
+        // "Codigo", "Código", "Code", "CODIGO" — todos funcionan
         let headerRow = -1
-        for (let i = 0; i < Math.min(data.length, 10); i++) {
-          const row = data[i].map(c => String(c).toLowerCase())
-          if (row.some(c => c.includes('codigo') || c.includes('code') || c.includes('digo'))) {
+        for (let i = 0; i < Math.min(data.length, 15); i++) {
+          const row = data[i].map(c => normalize(c))
+          if (row.some(c => c === 'codigo' || c === 'code' || c.startsWith('cod'))) {
             headerRow = i; break
           }
         }
         if (headerRow === -1) {
-          setErrors([isEs ? 'No se encontro la fila de encabezados.' : 'Header row not found.'])
+          setErrors([isEs
+            ? 'No se encontro la fila de encabezados. Verifica que la columna "Codigo" exista.'
+            : 'Header row not found. Make sure a "Code" column exists.'])
           setStep('error'); return
         }
 
-        const headers = data[headerRow].map(c => String(c).trim().toLowerCase())
+        // Normalizar headers para busqueda robusta
+        const headers = data[headerRow].map(c => normalize(c))
+
         const col = (names) => {
           for (const n of names) {
             const i = headers.findIndex(h => h.includes(n))
@@ -76,27 +90,27 @@ export default function ImportarCatalogo({ onDone }) {
           return -1
         }
 
-        const iCod  = col(['digo', 'code'])
-        const iDesc = col(['descrip'])
-        const iCat  = col(['categor'])
+        const iCod  = col(['codigo', 'code'])
+        const iDesc = col(['descripcion', 'description', 'descrip'])
+        const iCat  = col(['categoria', 'category', 'categor'])
         const iUnit = col(['unidad', 'unit'])
-        const iStock= col(['stock ini', 'initial', 'stock_ini'])
-        const iMin  = col(['min'])
-        const iPU   = col(['precio', 'price'])
+        const iStock= col(['stock ini', 'initial', 'stock_ini', 'stock i'])
+        const iMin  = col(['stock min', 'min'])
+        const iPU   = col(['precio', 'price', 'unit price', 'p.u'])
         const iUbic = col(['ubic', 'locat'])
         const iAct  = col(['activo', 'active'])
 
         if (iCod === -1 || iDesc === -1) {
           setErrors([isEs
-            ? 'Columnas "Codigo" y "Descripcion" son requeridas.'
-            : '"Code" and "Description" columns are required.'])
+            ? `No se encontraron las columnas requeridas. Encontradas: [${headers.filter(Boolean).join(', ')}]. Se necesitan "Codigo" y "Descripcion".`
+            : `Required columns not found. Found: [${headers.filter(Boolean).join(', ')}]. Need "Code" and "Description".`])
           setStep('error'); return
         }
 
         const parsed = []
         const errs   = []
         const codigosExistentes = new Set(
-          (state.materiales || []).map(m => m.codigo?.toLowerCase())
+          (state.materiales || []).map(m => normalize(m.codigo))
         )
 
         for (let r = headerRow + 1; r < data.length; r++) {
@@ -108,25 +122,24 @@ export default function ImportarCatalogo({ onDone }) {
           if (!cod)  { errs.push(`${isEs ? 'Fila' : 'Row'} ${r+1}: ${isEs ? 'codigo vacio' : 'empty code'}`); continue }
           if (!desc) { errs.push(`${isEs ? 'Fila' : 'Row'} ${r+1}: ${isEs ? 'descripcion vacia' : 'empty description'}`); continue }
 
-          if (codigosExistentes.has(cod.toLowerCase())) {
+          if (codigosExistentes.has(normalize(cod))) {
             errs.push(`${isEs ? 'Fila' : 'Row'} ${r+1}: ${isEs ? `codigo "${cod}" ya existe` : `code "${cod}" already exists`}`)
             continue
           }
 
-          const cat    = normalizarCategoria(iCat !== -1 ? row[iCat] : '')
+          const cat    = normalizarCategoria(iCat  !== -1 ? row[iCat]  : '')
           const unit   = String(iUnit !== -1 ? (row[iUnit] || 'und') : 'und').trim() || 'und'
           const stock  = parseFloat(iStock !== -1 ? (row[iStock] || 0) : 0) || 0
           const minSt  = parseFloat(iMin   !== -1 ? (row[iMin]   || 0) : 0) || 0
           const pu     = parseFloat(iPU    !== -1 ? (row[iPU]    || 0) : 0) || 0
           const ubic   = String(iUbic !== -1 ? (row[iUbic] || '') : '').trim()
-          const actRaw = String(iAct  !== -1 ? (row[iAct]  || 'SI') : 'SI').trim().toLowerCase()
+          const actRaw = normalize(iAct !== -1 ? (row[iAct] || 'si') : 'si')
           const activo = actRaw !== 'no' && actRaw !== 'false' && actRaw !== '0'
 
           parsed.push({
             codigo: cod, descripcion: desc, categoria: cat, unidad: unit,
             stock_actual: stock, stock_minimo: minSt,
             precio_unitario: pu, ubicacion_bodega: ubic, activo,
-            rowNum: r + 1,
           })
         }
 
@@ -184,7 +197,7 @@ export default function ImportarCatalogo({ onDone }) {
               onChange={e => parseFile(e.target.files[0])} />
           </label>
           <button onClick={descargarPlantilla} className="text-xs text-[#1B3A6B] hover:underline">
-            {isEs ? '\u2193 Descargar plantilla' : '\u2193 Download template'}
+            {isEs ? '↓ Descargar plantilla' : '↓ Download template'}
           </button>
         </div>
       )}
@@ -220,7 +233,7 @@ export default function ImportarCatalogo({ onDone }) {
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   {['Codigo', isEs ? 'Descripcion' : 'Description', isEs ? 'Categoria' : 'Category',
-                    isEs ? 'Unidad' : 'Unit', 'Stock', isEs ? 'Min.' : 'Min.', isEs ? 'P.U.' : 'U.P.'].map((h,i) => (
+                    isEs ? 'Unidad' : 'Unit', 'Stock', 'Min.', isEs ? 'P.U.' : 'U.P.'].map((h,i) => (
                     <th key={i} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -258,7 +271,7 @@ export default function ImportarCatalogo({ onDone }) {
 
       {step === 'done' && (
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600">ok</div>
+          <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm">ok</div>
           <span className="text-sm text-green-700 font-medium">
             {isEs ? `${rows.length} materiales importados.` : `${rows.length} materials imported.`}
           </span>
