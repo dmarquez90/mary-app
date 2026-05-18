@@ -1,21 +1,22 @@
 import { useState, useRef, useContext } from 'react'
 import * as XLSX from 'xlsx'
+import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
+import { uuid, genBudgetCode, today } from '../utils'
 
-// Categorías válidas del dropdown de la plantilla
 const CATEGORIAS_ES = ['Etapa', 'Sub-etapa', 'Actividad']
 const CATEGORIAS_EN = ['Stage', 'Sub-stage', 'Activity']
 
 export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
   const { lang } = useContext(LangContext)
   const isEs = lang === 'ES'
 
-  const fileRef  = useRef(null)
-  const [rows, setRows]     = useState([])
-  const [errors, setErrors] = useState([])
-  const [step, setStep]     = useState('idle') // idle | preview | importing | done | error
+  const fileRef = useRef(null)
+  const [rows, setRows]         = useState([])
+  const [errors, setErrors]     = useState([])
+  const [step, setStep]         = useState('idle')
   const [progress, setProgress] = useState(0)
 
   const reset = () => { setRows([]); setErrors([]); setStep('idle'); setProgress(0) }
@@ -37,19 +38,16 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
         const ws   = wb.Sheets[wb.SheetNames[0]]
         const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-        // Buscar fila de encabezados (contiene "Categoria" o "Category")
         let headerRow = -1
         for (let i = 0; i < Math.min(data.length, 10); i++) {
           const row = data[i].map(c => String(c).toLowerCase())
           if (row.some(c => c.includes('catego') || c.includes('descrip'))) {
-            headerRow = i
-            break
+            headerRow = i; break
           }
         }
         if (headerRow === -1) {
           setErrors([isEs ? 'No se encontró la fila de encabezados en el archivo.' : 'Header row not found in file.'])
-          setStep('error')
-          return
+          setStep('error'); return
         }
 
         const headers = data[headerRow].map(c => String(c).trim().toLowerCase())
@@ -71,8 +69,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
 
         if (iCat === -1 || iDesc === -1) {
           setErrors([isEs ? 'Columnas requeridas no encontradas. Usa la plantilla oficial.' : 'Required columns not found. Use the official template.'])
-          setStep('error')
-          return
+          setStep('error'); return
         }
 
         const VALID_CATS = isEs ? CATEGORIAS_ES : CATEGORIAS_EN
@@ -80,36 +77,33 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
         const errs   = []
 
         for (let r = headerRow + 1; r < data.length; r++) {
-          const row = data[r]
+          const row  = data[r]
           const cat  = String(row[iCat]  || '').trim()
           const desc = String(row[iDesc] || '').trim()
-          if (!cat && !desc) continue // fila vacía
+          if (!cat && !desc) continue
 
-          const qty  = parseFloat(row[iQty]  || 0) || 0
-          const mo   = parseFloat(row[iMO]   || 0) || 0
-          const mat  = parseFloat(row[iMat]  || 0) || 0
-          const eq   = parseFloat(row[iEq]   || 0) || 0
+          const qty  = parseFloat(row[iQty] || 0) || 0
+          const mo   = parseFloat(row[iMO]  || 0) || 0
+          const mat  = parseFloat(row[iMat] || 0) || 0
+          const eq   = parseFloat(row[iEq]  || 0) || 0
           const unit = String(row[iUnit] || 'und').trim() || 'und'
 
-          // Validaciones
           if (!desc) { errs.push(`Fila ${r + 1}: descripción vacía`); continue }
           if (cat && !VALID_CATS.includes(cat)) {
             errs.push(`Fila ${r + 1}: categoría "${cat}" no válida. Usa: ${VALID_CATS.join(', ')}`)
             continue
           }
 
-          // Inferir tipo desde categoría
           let tipo = 'actividad'
-          if (cat === 'Etapa'    || cat === 'Stage')     tipo = 'etapa'
-          if (cat === 'Sub-etapa'|| cat === 'Sub-stage') tipo = 'sub_etapa'
+          if (cat === 'Etapa'     || cat === 'Stage')     tipo = 'etapa'
+          if (cat === 'Sub-etapa' || cat === 'Sub-stage') tipo = 'sub_etapa'
 
           parsed.push({ tipo, desc, unit, qty, mo, mat, eq, rowNum: r + 1 })
         }
 
         if (parsed.length === 0) {
           setErrors(errs.length ? errs : [isEs ? 'No se encontraron filas con datos válidos.' : 'No valid data rows found.'])
-          setStep('error')
-          return
+          setStep('error'); return
         }
 
         setRows(parsed)
@@ -127,54 +121,75 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
     setStep('importing')
     setProgress(0)
 
-    // Construir árbol de parent_ids en tiempo real
-    let lastEtapaId   = null
+    const tenantId = state.proyectos.find(p => p.id === proyId)?.tenant_id
+
+    // Rastrear IDs en tiempo real — generamos el UUID ANTES del insert
+    // así sabemos el id de la etapa/sub-etapa para usarlo como parent_id
+    let lastEtapaId    = null
     let lastSubEtapaId = null
+
+    // Snapshot del presupuesto actual para generar códigos
+    // (usamos array mutable que vamos actualizando a medida que insertamos)
+    const presupuestoLocal = [...state.presupuesto.filter(b => b.proyecto_id === proyId)]
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
       setProgress(Math.round(((i + 1) / rows.length) * 100))
 
-      const payload = {
-        proyectoId:        proyId,
-        tipo:              row.tipo,
-        descripcion:       row.desc,
-        unidad:            row.unit,
-        cantidad:          row.qty,
-        costo_mo:          row.mo,
-        costo_materiales:  row.mat,
-        costo_equipos:     row.eq,
-        parent_id:         null,
-      }
-
+      // Determinar parent_id
+      let parent_id = null
       if (row.tipo === 'etapa') {
-        payload.parent_id = null
+        parent_id      = null
+        lastSubEtapaId = null
       } else if (row.tipo === 'sub_etapa') {
-        payload.parent_id = lastEtapaId
+        parent_id = lastEtapaId
       } else {
-        // actividad — parent es sub-etapa si existe, si no la etapa
-        payload.parent_id = lastSubEtapaId || lastEtapaId
+        parent_id = lastSubEtapaId || lastEtapaId
       }
 
-      // ADD_BUDGET retorna el item creado con su id real en el store
-      // Necesitamos capturar el id generado — usamos un dispatch wrapeado
-      await new Promise((resolve) => {
-        // Pequeño delay para no saturar Supabase
-        setTimeout(async () => {
-          await dispatch({
-            type: 'ADD_BUDGET',
-            payload,
-            _onCreated: (item) => {
-              if (row.tipo === 'etapa')     { lastEtapaId = item.id; lastSubEtapaId = null }
-              if (row.tipo === 'sub_etapa') { lastSubEtapaId = item.id }
-            }
-          })
-          resolve()
-        }, 80)
-      })
+      // Generar UUID propio — lo conocemos ANTES del insert
+      const newId = uuid()
+      const code  = genBudgetCode(presupuestoLocal, row.tipo, parent_id)
+
+      const item = {
+        id:               newId,
+        proyecto_id:      proyId,
+        tipo:             row.tipo,
+        descripcion:      row.desc,
+        unidad:           row.unit,
+        cantidad:         row.qty,
+        costo_mo:         row.mo,
+        costo_materiales: row.mat,
+        costo_equipos:    row.eq,
+        parent_id,
+        code,
+        created_at:       today(),
+        tenant_id:        tenantId,
+      }
+
+      // Insertar en Supabase directamente
+      const { error } = await supabase.from('presupuesto').insert(item)
+      if (error) {
+        console.error(`ImportarPresupuesto fila ${row.rowNum}:`, error)
+        continue
+      }
+
+      // Actualizar store local
+      dispatch({ type: 'ADD_BUDGET', payload: item })
+
+      // Agregar al snapshot local para que genBudgetCode lo tenga en cuenta
+      presupuestoLocal.push(item)
+
+      // Actualizar referencias de parent
+      if (row.tipo === 'etapa')     { lastEtapaId = newId;    lastSubEtapaId = null }
+      if (row.tipo === 'sub_etapa') { lastSubEtapaId = newId }
+
+      await new Promise(r => setTimeout(r, 50))
     }
 
     setStep('done')
+    // Refrescar desde Supabase para garantizar consistencia
+    dispatch({ type: 'REFRESH_PRESUPUESTO', payload: { proyectoId: proyId } })
     if (onDone) onDone()
   }
 
@@ -194,7 +209,6 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
     return 'Actividad'
   }
 
-  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="bg-white border border-gray-100 rounded-xl rounded-t-none border-t-0 px-4 py-3">
       {step === 'idle' && (
@@ -267,7 +281,8 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
                         {tipoLabel(r.tipo)}
                       </span>
                     </td>
-                    <td className="px-2 py-1.5 text-gray-700" style={{ paddingLeft: r.tipo === 'actividad' ? 20 : r.tipo === 'sub_etapa' ? 12 : 8 }}>
+                    <td className="px-2 py-1.5 text-gray-700"
+                      style={{ paddingLeft: r.tipo === 'actividad' ? 20 : r.tipo === 'sub_etapa' ? 12 : 8 }}>
                       {r.desc}
                     </td>
                     <td className="px-2 py-1.5 text-gray-500">{r.tipo === 'actividad' ? r.unit : '—'}</td>
