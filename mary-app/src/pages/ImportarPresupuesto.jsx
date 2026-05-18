@@ -1,9 +1,7 @@
 import { useState, useRef, useContext } from 'react'
 import * as XLSX from 'xlsx'
-import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { uuid, genBudgetCode, today } from '../utils'
 
 const CATEGORIAS_ES = ['Etapa', 'Sub-etapa', 'Actividad']
 const CATEGORIAS_EN = ['Stage', 'Sub-stage', 'Activity']
@@ -98,7 +96,11 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           if (cat === 'Etapa'     || cat === 'Stage')     tipo = 'etapa'
           if (cat === 'Sub-etapa' || cat === 'Sub-stage') tipo = 'sub_etapa'
 
-          parsed.push({ tipo, desc, unit, qty, mo, mat, eq, rowNum: r + 1 })
+          // Pre-generar UUID aquí mismo en el parse
+          // Así sabemos el id ANTES del dispatch y podemos construir el árbol correctamente
+          const id = crypto.randomUUID()
+
+          parsed.push({ id, tipo, desc, unit, qty, mo, mat, eq, rowNum: r + 1 })
         }
 
         if (parsed.length === 0) {
@@ -106,7 +108,29 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           setStep('error'); return
         }
 
-        setRows(parsed)
+        // Construir parent_ids usando los UUIDs pre-generados
+        let lastEtapaId    = null
+        let lastSubEtapaId = null
+
+        const rowsConParent = parsed.map(row => {
+          let parent_id = null
+          if (row.tipo === 'etapa') {
+            parent_id      = null
+            lastSubEtapaId = null
+          } else if (row.tipo === 'sub_etapa') {
+            parent_id = lastEtapaId
+          } else {
+            parent_id = lastSubEtapaId || lastEtapaId
+          }
+
+          // Actualizar referencias DESPUÉS de asignar parent_id
+          if (row.tipo === 'etapa')     { lastEtapaId = row.id;    lastSubEtapaId = null }
+          if (row.tipo === 'sub_etapa') { lastSubEtapaId = row.id }
+
+          return { ...row, parent_id }
+        })
+
+        setRows(rowsConParent)
         setErrors(errs)
         setStep('preview')
       } catch (err) {
@@ -121,75 +145,31 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
     setStep('importing')
     setProgress(0)
 
-    const tenantId = state.proyectos.find(p => p.id === proyId)?.tenant_id
-
-    // Rastrear IDs en tiempo real — generamos el UUID ANTES del insert
-    // así sabemos el id de la etapa/sub-etapa para usarlo como parent_id
-    let lastEtapaId    = null
-    let lastSubEtapaId = null
-
-    // Snapshot del presupuesto actual para generar códigos
-    // (usamos array mutable que vamos actualizando a medida que insertamos)
-    const presupuestoLocal = [...state.presupuesto.filter(b => b.proyecto_id === proyId)]
-
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
       setProgress(Math.round(((i + 1) / rows.length) * 100))
 
-      // Determinar parent_id
-      let parent_id = null
-      if (row.tipo === 'etapa') {
-        parent_id      = null
-        lastSubEtapaId = null
-      } else if (row.tipo === 'sub_etapa') {
-        parent_id = lastEtapaId
-      } else {
-        parent_id = lastSubEtapaId || lastEtapaId
-      }
-
-      // Generar UUID propio — lo conocemos ANTES del insert
-      const newId = uuid()
-      const code  = genBudgetCode(presupuestoLocal, row.tipo, parent_id)
-
-      const item = {
-        id:               newId,
-        proyecto_id:      proyId,
-        tipo:             row.tipo,
-        descripcion:      row.desc,
-        unidad:           row.unit,
-        cantidad:         row.qty,
-        costo_mo:         row.mo,
-        costo_materiales: row.mat,
-        costo_equipos:    row.eq,
-        parent_id,
-        code,
-        created_at:       today(),
-        tenant_id:        tenantId,
-      }
-
-      // Insertar en Supabase directamente
-      const { error } = await supabase.from('presupuesto').insert(item)
-      if (error) {
-        console.error(`ImportarPresupuesto fila ${row.rowNum}:`, error)
-        continue
-      }
-
-      // Actualizar store local
-      dispatch({ type: 'ADD_BUDGET', payload: item })
-
-      // Agregar al snapshot local para que genBudgetCode lo tenga en cuenta
-      presupuestoLocal.push(item)
-
-      // Actualizar referencias de parent
-      if (row.tipo === 'etapa')     { lastEtapaId = newId;    lastSubEtapaId = null }
-      if (row.tipo === 'sub_etapa') { lastSubEtapaId = newId }
-
-      await new Promise(r => setTimeout(r, 50))
+      await new Promise(resolve => setTimeout(async () => {
+        await dispatch({
+          type: 'ADD_BUDGET',
+          payload: {
+            id:               row.id,        // UUID pre-generado
+            proyectoId:       proyId,
+            tipo:             row.tipo,
+            descripcion:      row.desc,
+            unidad:           row.unit,
+            cantidad:         row.qty,
+            costo_mo:         row.mo,
+            costo_materiales: row.mat,
+            costo_equipos:    row.eq,
+            parent_id:        row.parent_id, // parent_id ya calculado
+          }
+        })
+        resolve()
+      }, 80))
     }
 
     setStep('done')
-    // Refrescar desde Supabase para garantizar consistencia
-    dispatch({ type: 'REFRESH_PRESUPUESTO', payload: { proyectoId: proyId } })
     if (onDone) onDone()
   }
 
