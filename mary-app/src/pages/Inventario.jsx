@@ -86,6 +86,7 @@ export default function Inventario() {
   const [editMat, setEditMat]     = useState(null)
   const [catFilter, setCatFilter] = useState('')
   const [search, setSearch]       = useState('')
+  const [searchOut, setSearchOut] = useState('')  // busqueda en drawer de salidas
   const [modalElim, setModalElim] = useState(null)
 
   const esBodeguero  = rol === 'bodeguero'
@@ -94,10 +95,19 @@ export default function Inventario() {
   const TABS = [t('inv_tab_catalog'), t('inv_tab_entries'), t('inv_tab_exits'), t('inv_tab_movements')]
   const set  = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const activos          = materiales.filter(m => m.activo !== false)
+  const activos    = materiales.filter(m => m.activo !== false)
+  const inactivos  = materiales.filter(m => m.activo === false)  // NUEVO: materiales inactivos
+
   const activosFiltrados = activos
     .filter(m => !catFilter || m.categoria === catFilter)
     .filter(m => !search || m.descripcion?.toLowerCase().includes(search.toLowerCase()) || m.codigo?.toLowerCase().includes(search.toLowerCase()))
+
+  // Materiales filtrados para el drawer de salidas
+  const activosFiltradosSalida = activos.filter(m =>
+    !searchOut ||
+    m.descripcion?.toLowerCase().includes(searchOut.toLowerCase()) ||
+    m.codigo?.toLowerCase().includes(searchOut.toLowerCase())
+  )
 
   const criticos    = activos.filter(m => parseFloat(m.stock_actual||0) < parseFloat(m.stock_minimo||0))
   const ocAprobadas = ordenes_compra.filter(oc => oc.estado === 'aprobada' || oc.estado === 'recibida_parcial')
@@ -245,6 +255,7 @@ export default function Inventario() {
       origen_proyecto_id: form.tipo_salida === 'sobrante_transferido' ? (form.origen_proyecto_id || null) : null,
       costo_cargo:        form.tipo_salida === 'uso_directo' ? null : 0,
     }})
+    setSearchOut('')
     setDrawer(null)
   }
 
@@ -271,7 +282,7 @@ export default function Inventario() {
           <div className="flex gap-2">
             {tab === 0 && <PrimaryBtn onClick={() => { setForm(emptyMat()); setEditMat(null); setDrawer('mat') }}>{t('inv_add_material')}</PrimaryBtn>}
             {tab === 1 && <PrimaryBtn onClick={() => { setForm(emptyIn()); setDrawer('in') }}>{t('inv_add_entry')}</PrimaryBtn>}
-            {tab === 2 && <PrimaryBtn onClick={() => { setForm(emptyOut()); setDrawer('out') }}>{t('inv_add_exit')}</PrimaryBtn>}
+            {tab === 2 && <PrimaryBtn onClick={() => { setForm(emptyOut()); setSearchOut(''); setDrawer('out') }}>{t('inv_add_exit')}</PrimaryBtn>}
           </div>
         )}
       </div>
@@ -289,7 +300,6 @@ export default function Inventario() {
       {/* ── CATALOGO ── */}
       {tab === 0 && (
         <div>
-          {/* ImportarCatalogo SIEMPRE visible — independiente de si hay materiales o no */}
           {puedeEditar && <ImportarCatalogo onDone={() => setCatFilter('')} />}
 
           {activos.length === 0 ? (
@@ -414,6 +424,55 @@ export default function Inventario() {
                   </table>
                 </div>
               )}
+
+              {/* ── MATERIALES INACTIVOS ── */}
+              {inactivos.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                    {isEs ? `${inactivos.length} material(es) inactivo(s)` : `${inactivos.length} inactive material(s)`}
+                  </p>
+                  <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto opacity-70">
+                    <table className="w-full">
+                      <tbody>
+                        {inactivos.map(m => {
+                          const cat = CATEGORIAS.find(c => c.key === m.categoria)
+                          return (
+                            <tr key={m.id} className="border-b border-gray-50">
+                              <td className="px-4 py-2 text-xs font-mono text-gray-400">{m.codigo}</td>
+                              <td className="px-4 py-2 text-sm text-gray-400">{m.descripcion}</td>
+                              <td className="px-4 py-2 text-xs text-gray-400">
+                                {cat ? (isEs ? cat.es : cat.en) : '---'}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-400">{m.unidad}</td>
+                              <td className="px-4 py-2 text-xs font-mono text-gray-400">{fmtNum(m.stock_actual)}</td>
+                              <td className="px-4 py-2">
+                                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">
+                                  {isEs ? 'Inactivo' : 'Inactive'}
+                                </span>
+                              </td>
+                              {puedeEditar && (
+                                <td className="px-4 py-2">
+                                  <div className="flex gap-1">
+                                    <TBtn onClick={() => dispatch({ type:'TOGGLE_MATERIAL', payload:m.id })}>
+                                      {isEs ? 'Activar' : 'Activate'}
+                                    </TBtn>
+                                    <TBtn onClick={() => { setForm({...m}); setEditMat(m.id); setDrawer('mat') }}>
+                                      {t('btn_edit')}
+                                    </TBtn>
+                                    <TBtn danger onClick={() => delMat(m)}>
+                                      {isEs ? 'Eliminar' : 'Delete'}
+                                    </TBtn>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -494,7 +553,7 @@ export default function Inventario() {
         salidas.length === 0 ? (
           <EmptyState icon={Icons.inventory} title={t('inv_empty_exits')}
             action={puedeEditar ? t('inv_add_exit') : null}
-            onAction={puedeEditar ? () => { setForm(emptyOut()); setDrawer('out') } : null} />
+            onAction={puedeEditar ? () => { setForm(emptyOut()); setSearchOut(''); setDrawer('out') } : null} />
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
             <table className="w-full">
@@ -761,7 +820,7 @@ export default function Inventario() {
           </div>
         </Drawer>
 
-        <Drawer open={drawer==='out'} onClose={() => setDrawer(null)} title={t('inv_form_exit_title')} width={400}>
+        <Drawer open={drawer==='out'} onClose={() => { setSearchOut(''); setDrawer(null) }} title={t('inv_form_exit_title')} width={400}>
           <Field label={t('inv_form_exit_project')} required>
             <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f => ({...f, proyecto_id:e.target.value, actividad_id:''}))}>
               <option value="">{t('lbl_select')}</option>
@@ -774,12 +833,37 @@ export default function Inventario() {
               {actividades.map(a => <option key={a.id} value={a.id}>{a.code} --- {a.descripcion}</option>)}
             </select>
           </Field>
+
+          {/* ── BUSQUEDA DE MATERIAL EN SALIDAS ── */}
+          <Field label={isEs ? 'Buscar material' : 'Search material'}>
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                className={`${inputCls} pl-8`}
+                placeholder={isEs ? 'Codigo o nombre...' : 'Code or name...'}
+                value={searchOut}
+                onChange={e => { setSearchOut(e.target.value); setForm(f => ({...f, material_id:''})) }}
+              />
+              {searchOut && (
+                <button onClick={() => setSearchOut('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">x</button>
+              )}
+            </div>
+          </Field>
+
           <Field label={t('inv_form_exit_material')} required>
             <select className={selectCls} value={form.material_id||''} onChange={set('material_id')}>
               <option value="">{t('lbl_select')}</option>
-              {activos.map(m => <option key={m.id} value={m.id}>{m.codigo} --- {m.descripcion} (stock: {fmtNum(m.stock_actual)} {m.unidad})</option>)}
+              {activosFiltradosSalida.map(m => (
+                <option key={m.id} value={m.id}>{m.codigo} --- {m.descripcion} (stock: {fmtNum(m.stock_actual)} {m.unidad})</option>
+              ))}
             </select>
+            {searchOut && activosFiltradosSalida.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">{isEs ? 'No se encontraron materiales con ese criterio.' : 'No materials found with that search.'}</p>
+            )}
           </Field>
+
           <Field label={isEs ? 'Tipo de salida' : 'Exit type'}>
             <select className={selectCls} value={form.tipo_salida||'uso_directo'} onChange={set('tipo_salida')}>
               <option value="uso_directo">{isEs ? 'Uso directo en proyecto (costo normal)' : 'Direct use in project (normal cost)'}</option>
@@ -811,7 +895,7 @@ export default function Inventario() {
             <input type="date" className={inputCls} value={form.fecha_salida||today()} onChange={set('fecha_salida')} />
           </Field>
           <div className="flex gap-2 mt-auto pt-2">
-            <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
+            <SecondaryBtn onClick={() => { setSearchOut(''); setDrawer(null) }} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
             <PrimaryBtn onClick={saveOut} disabled={!form.material_id||!form.cantidad||!form.proyecto_id||stockAlerta} className="flex-1">{t('inv_add_exit')}</PrimaryBtn>
           </div>
         </Drawer>
