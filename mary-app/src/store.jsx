@@ -158,7 +158,8 @@ function reducer(state, action) {
 
     case 'ADD_SOL_ELIM': return { ...state, solicitudes_eliminacion: [...state.solicitudes_eliminacion, action.payload] }
     case 'UPD_SOL_ELIM': return { ...state, solicitudes_eliminacion: state.solicitudes_eliminacion.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
-
+case 'LOAD_TABLE':
+  return { ...state, [action.payload.key]: action.payload.data }
     default: return state
   }
 }
@@ -189,7 +190,33 @@ export function StoreProvider({ children, tenantId }) {
     }
     loadAll()
   }, [tenantId])
+// ── REALTIME LISTENERS ──────────────────────────────────────────────
+useEffect(() => {
+  if (!tenantId) return
 
+  const REALTIME_TABLES = [
+    'solicitudes', 'solicitud_items',
+    'ordenes_compra', 'ordenes_compra_items',
+    'presupuesto', 'materiales', 'entradas', 'salidas',
+  ]
+
+  const channels = REALTIME_TABLES.map(table =>
+    supabase
+      .channel(`rt_${table}_${tenantId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table,
+        filter: `tenant_id=eq.${tenantId}`,
+      }, async () => {
+        const { data } = await supabase.from(table).select('*').eq('tenant_id', tenantId)
+        dispatch({ type: 'LOAD_TABLE', payload: { key: table, data: data || [] } })
+      })
+      .subscribe()
+  )
+
+  return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
+}, [tenantId])
   async function dbDispatch(action) {
     switch (action.type) {
 
