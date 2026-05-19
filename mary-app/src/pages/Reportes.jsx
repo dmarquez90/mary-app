@@ -310,6 +310,78 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     data.inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   )
 
+  // ── HOJA 3: Avalúo financiero acumulado ──
+  if (data.avsProy?.length > 0) {
+    const ws3 = wb.addWorksheet('Avalúo Financiero')
+    setCols(ws3, [14, 32, 12, 14, 16, 16, 16, 16])
+    let r3 = addHeaderBlock(ws3, 'Avalúo Financiero Acumulado', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+    ws3.getRow(r3).height = 18
+    ;['Avalúo','Actividad','Unidad','P.U.','Contrato $','Ant. $','Periodo $','Acumulado $'].forEach((h,i) => {
+      const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
+    })
+    r3++
+    let totalAcum = 0
+    data.avsProy.forEach(av => {
+      const avItems = data.avsItems.filter(i => i.avaluo_id === av.id)
+      avItems.forEach((it, idx) => {
+        ws3.getRow(r3).height = 16
+        const even = idx % 2 === 1
+        const vals = [
+          av.numero_avaluo || av.folio || '—',
+          it.descripcion || '—',
+          it.unidad || '—',
+          parseFloat(it.precio_unitario||0),
+          parseFloat(it.monto_contrato||0),
+          parseFloat(it.monto_anterior||0),
+          parseFloat(it.monto_periodo||0),
+          parseFloat(it.monto_acumulado||0),
+        ]
+        vals.forEach((v,ci) => {
+          const c = ws3.getCell(r3,ci+1)
+          const isNum = ci >= 3
+          styleData(c, { even, align:isNum?'right':'left', numFmt:isNum?'"$"#,##0.00':undefined })
+          c.value = v
+        })
+        totalAcum += parseFloat(it.monto_acumulado||0)
+        r3++
+      })
+    })
+    ws3.mergeCells(r3,1,r3,7); const at=ws3.getCell(r3,1); at.value='TOTAL ACUMULADO COBRADO'; styleTotal(at)
+    const av=ws3.getCell(r3,8); av.value=totalAcum; av.numFmt='"$"#,##0.00'; styleTotal(av)
+  }
+
+  // ── HOJA 4: Costos indirectos presupuestados vs ejecutados ──
+  if (data.comparacionInd?.length > 0) {
+    const ws4 = wb.addWorksheet('Indirectos Pres vs Ejec')
+    setCols(ws4, [40, 20, 20, 20, 16])
+    let r4 = addHeaderBlock(ws4, 'Costos Indirectos: Presupuestado vs Ejecutado', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 5)
+    ws4.getRow(r4).height = 18
+    ;['Categoría','Presupuestado','Ejecutado','Diferencia','Estado'].forEach((h,i) => {
+      const c = ws4.getCell(r4,i+1); c.value=h; styleHeader(c)
+    })
+    r4++
+    let totPres=0, totEjec=0
+    data.comparacionInd.forEach((r, idx) => {
+      ws4.getRow(r4).height = 17
+      const even   = idx%2===1
+      const status = r.diferencia < 0 ? 'Sobrecosto' : r.diferencia === 0 ? 'En punto' : 'Ahorro'
+      const clr    = r.diferencia < 0 ? RED_HX : GREEN_HX
+      const c1=ws4.getCell(r4,1); c1.value=r.categoria; styleData(c1,{even})
+      const c2=ws4.getCell(r4,2); c2.value=r.presupuestado; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
+      const c3=ws4.getCell(r4,3); c3.value=r.ejecutado;    styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
+      const c4=ws4.getCell(r4,4); c4.value=r.diferencia;   styleData(c4,{even,numFmt:'"$"#,##0.00',align:'right',color:clr,bold:true})
+      const c5=ws4.getCell(r4,5); c5.value=status;         styleData(c5,{even,color:clr,bold:true})
+      totPres+=r.presupuestado; totEjec+=r.ejecutado
+      r4++
+    })
+    ws4.getRow(r4).height=18
+    const tl=ws4.getCell(r4,1); tl.value='TOTAL'; styleTotal(tl)
+    const tp=ws4.getCell(r4,2); tp.value=totPres; tp.numFmt='"$"#,##0.00'; styleTotal(tp)
+    const te=ws4.getCell(r4,3); te.value=totEjec; te.numFmt='"$"#,##0.00'; styleTotal(te)
+    const td=ws4.getCell(r4,4); td.value=totPres-totEjec; td.numFmt='"$"#,##0.00'; styleTotal(td)
+    ws4.mergeCells(r4,5,r4,5); const ts=ws4.getCell(r4,5); ts.value=''; styleTotal(ts)
+  }
+
   const buf = await wb.xlsx.writeBuffer()
   saveAs(new Blob([buf]), `Reporte_Financiero_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
@@ -658,7 +730,9 @@ export default function Reportes() {
   const {
     proyectos, presupuesto, materiales, entradas, salidas,
     costos_directos, nominas, subcontratos, equipos, costos_indirectos,
-    subcontratos_contratos = [], subcontratos_avaluos = []
+    subcontratos_contratos = [], subcontratos_avaluos = [],
+    presupuesto_indirectos = [],
+    avaluos_cliente = [], avaluos_cliente_items = [],
   } = state
 
   const [reportType, setReportType] = useState('financiero')
@@ -717,6 +791,27 @@ export default function Reportes() {
       return {code:act.code,descripcion:act.descripcion,pres,real,dev,devPct:pres>0?(dev/pres)*100:0}
     }).filter(a=>a.pres>0||a.real>0)
 
+    // Avalúos del proyecto
+    const avsProy  = avaluos_cliente.filter(a => a.proyecto_id === proyId)
+    const avsItems = avaluos_cliente_items.filter(i => avsProy.some(a => a.id === i.avaluo_id))
+
+    // Indirectos presupuestados
+    const indsPres = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
+
+    // Comparación indirectos
+    const CATS_IND = [
+      'Administración de obra',
+      'Instalaciones y servicios generales',
+      'Seguros, fianzas y garantías',
+      'Servicios profesionales y legales',
+    ]
+    const comparacionInd = CATS_IND.map(cat => {
+      const presupuestado = parseFloat(indsPres.find(p => p.categoria === cat)?.monto_presupuestado || 0)
+      const ejecutado     = inds.filter(c => c.categoria === cat || c.categoria?.includes(cat.split(' ')[0]))
+                               .reduce((s,c) => s + parseFloat(c.monto||0), 0)
+      return { categoria: cat, presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
+    }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
+
     return {
       resumen:[
         {categoria: t('rep_cat_materiales'),   real:totalMat},
@@ -726,9 +821,10 @@ export default function Reportes() {
         {categoria: t('rep_cat_equipos'),       real:totalEq},
         {categoria: t('rep_cat_admin'),         real:totalInd},
       ],
-      actividades, totalReal, dirs, noms, subs, eqs, inds
+      actividades, totalReal, dirs, noms, subs, eqs, inds,
+      avsProy, avsItems, indsPres, comparacionInd,
     }
-  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, t])
+  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -740,7 +836,8 @@ export default function Reportes() {
     setLoading(true)
     try {
       if (reportType==='financiero' && datosFinanciero) {
-        await buildFinanciero({ data:datosFinanciero, budget, moneda, proy, desde, hasta, presupuesto })
+        await buildFinanciero({ data:datosFinanciero, budget, moneda, proy, desde, hasta, presupuesto,
+          presupuesto_indirectos, avaluos_cliente, avaluos_cliente_items })
       } else if (reportType==='inventario') {
         await buildInventario({ data:datosInventario, materiales, proyectos, presupuesto, desde, hasta })
       } else if (reportType==='general' && proyId) {
@@ -892,6 +989,67 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+      {data.avsProy?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+            <p className="text-sm font-semibold text-gray-700">{isEs?'Avalúo financiero acumulado':'Accumulated financial progress billing'}</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr style={thS}>
+                {[isEs?'Avalúo':'Billing',isEs?'Actividad':'Activity',isEs?'Contrato $':'Contract $',isEs?'Ant. $':'Prev. $',isEs?'Periodo $':'Period $',isEs?'Acumulado $':'Accum. $',isEs?'Saldo $':'Balance $'].map((h,i)=>(
+                  <th key={i} className={thC+(i>1?' text-right':'')}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {data.avsProy.map(av => {
+                  const avItems = data.avsItems.filter(i => i.avaluo_id === av.id)
+                  return avItems.map((it,idx) => (
+                    <tr key={it.id} className={idx%2===0?'bg-white':'bg-gray-50/50'}>
+                      <td className={tdC+' text-xs font-mono'}>{av.numero_avaluo||av.folio||'—'}</td>
+                      <td className={tdC+' max-w-[160px] truncate'}>{it.descripcion}</td>
+                      <td className={tdC+' text-right font-mono'}>{fmt(it.monto_contrato,moneda)}</td>
+                      <td className={tdC+' text-right font-mono text-gray-400'}>{parseFloat(it.monto_anterior||0)>0?fmt(it.monto_anterior,moneda):'—'}</td>
+                      <td className={tdC+' text-right font-mono font-medium'} style={{color:'#1D9E75'}}>{fmt(it.monto_periodo,moneda)}</td>
+                      <td className={tdC+' text-right font-mono font-bold'} style={{color:BRAND}}>{fmt(it.monto_acumulado,moneda)}</td>
+                      <td className={tdC+' text-right font-mono text-gray-500'}>{fmt(it.monto_saldo,moneda)}</td>
+                    </tr>
+                  ))
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {data.comparacionInd?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+            <p className="text-sm font-semibold text-gray-700">{isEs?'Costos indirectos: presupuestado vs ejecutado':'Indirect costs: budgeted vs executed'}</p>
+          </div>
+          <table className="w-full">
+            <thead><tr style={thS}>
+              {[isEs?'Categoría':'Category',isEs?'Presupuestado':'Budgeted',isEs?'Ejecutado':'Executed',isEs?'Diferencia':'Difference',isEs?'Estado':'Status'].map((h,i)=>(
+                <th key={i} className={thC+(i>0?' text-right':'')}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {data.comparacionInd.map((r,i)=>{
+                const status = r.diferencia < 0 ? (isEs?'Sobrecosto':'Overrun') : r.diferencia===0 ? (isEs?'En punto':'On budget') : (isEs?'Ahorro':'Saving')
+                const clr    = r.diferencia < 0 ? '#ef4444' : '#1D9E75'
+                return (
+                  <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                    <td className={tdC}>{r.categoria}</td>
+                    <td className={tdC+' text-right font-mono'}>{fmt(r.presupuestado,moneda)}</td>
+                    <td className={tdC+' text-right font-mono'}>{fmt(r.ejecutado,moneda)}</td>
+                    <td className={tdC+' text-right font-mono font-bold'} style={{color:clr}}>{r.diferencia>=0?'+':''}{fmt(r.diferencia,moneda)}</td>
+                    <td className={tdC+' text-right'}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${r.diferencia<0?'bg-red-100 text-red-600':r.diferencia===0?'bg-gray-100 text-gray-600':'bg-green-100 text-green-700'}`}>{status}</span></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

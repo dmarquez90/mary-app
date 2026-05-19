@@ -50,7 +50,8 @@ export default function Financiero() {
   const isEs                    = lang === 'ES'
 
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
-    equipos, costos_indirectos, salidas, entradas } = state
+    equipos, costos_indirectos, salidas, entradas,
+    presupuesto_indirectos = [] } = state
 
   const [tab, setTab]       = useState(0)
   const [proyId, setProyId] = useState(proyectos[0]?.id || '')
@@ -110,6 +111,24 @@ export default function Financiero() {
     + subs.reduce((s,sc) => s+(parseFloat(sc.monto_pagado)||0), 0)
   const totalEq  = eqs.reduce((s,e) => s+(parseFloat(e.costo_total)||0), 0)
   const totalInd = inds.reduce((s,c) => s+(parseFloat(c.monto)||0), 0)
+
+  const indsPresDelProy = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
+  const comparacionIndirectos = CAT_KEYS.map(catKey => {
+    const cat           = CATEGORIAS_IND[catKey]
+    const pres          = indsPresDelProy.find(p => p.categoria === catKey)
+    const presupuestado = parseFloat(pres?.monto_presupuestado || 0)
+    const ejecutado     = inds
+      .filter(c => {
+        const ck = CAT_KEYS.find(k =>
+          CATEGORIAS_IND[k].es === c.categoria || CATEGORIAS_IND[k].en === c.categoria || k === c.categoria
+        )
+        return ck === catKey
+      })
+      .reduce((s, c) => s + parseFloat(c.monto || 0), 0)
+    const diferencia = presupuestado - ejecutado
+    return { catKey, label: isEs ? cat.es : cat.en, presupuestado, ejecutado, diferencia }
+  }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
+  const totalIndPres = indsPresDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
   const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => {
     const idx = entradas.find(e=>e.material_id===sa.material_id)
     return s+(parseFloat(sa.cantidad)||0)*(parseFloat(idx?.precio_unitario)||0)

@@ -35,7 +35,8 @@ function generarPeriodosSemanales(fechaInicio, fechaFin) {
 export default function CurvaS() {
   const { state } = useStore()
   const { t } = useContext(LangContext)
-  const { proyectos, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos } = state
+  const { proyectos, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos,
+    avaluos_cliente = [], avaluos_cliente_items = [] } = state
 
   const [proyId, setProyId]           = useState(proyectos[0]?.id || '')
   const [granularity, setGranularity] = useState('mes')
@@ -82,52 +83,89 @@ export default function CurvaS() {
 
     if (periodos.length === 0) return []
 
-    // Presupuesto distribuido uniformemente en todos los períodos
-    const presPorPeriodo = budget / periodos.length
-
-    // Agrupar costos reales por período
     const periodKey = (fecha) => {
       const dt = new Date(fecha + 'T00:00:00')
       if (granularity === 'mes') {
         return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`
       }
-      // Para semanas, encontrar el período más cercano
       const m = String(dt.getMonth()+1).padStart(2,'0')
       const d = String(dt.getDate()).padStart(2,'0')
       return `${dt.getFullYear()}-${m}-${d}`
     }
 
+    const closestPeriod = (fecha) => {
+      const k = periodKey(fecha)
+      if (granularity === 'semana') {
+        return periodos.reduce((prev, cur) =>
+          Math.abs(cur.key.localeCompare(k)) < Math.abs(prev.key.localeCompare(k)) ? cur : prev
+        ).key
+      }
+      return k
+    }
+
+    // ── Distribución del presupuesto por avance físico de avalúos ──────
+    // Usa el % de avance físico de cada avalúo para distribuir el presupuesto
+    // Si no hay avalúos, cae a distribución lineal uniforme
+    const avsDelProy = avaluos_cliente.filter(a => a.proyecto_id === proyId)
+      .sort((a, b) => (a.fecha_elaboracion||a.created_at||'').localeCompare(b.fecha_elaboracion||b.created_at||''))
+
+    const presPorPeriodo = {}
+
+    if (avsDelProy.length > 0) {
+      // Distribuir según pct_fisico acumulado por período de avalúo
+      let pctAcumAnterior = 0
+      avsDelProy.forEach(av => {
+        const fecha    = av.fecha_elaboracion || av.created_at?.slice(0,10)
+        if (!fecha) return
+        const key      = closestPeriod(fecha)
+        const pctAcum  = parseFloat(av.pct_avance_global || 0)
+        const pctPeriodo = Math.max(0, pctAcum - pctAcumAnterior)
+        presPorPeriodo[key] = (presPorPeriodo[key] || 0) + (budget * pctPeriodo / 100)
+        pctAcumAnterior = pctAcum
+      })
+      // Asignar el saldo restante al último período
+      const totalDistribuido = Object.values(presPorPeriodo).reduce((s,v) => s+v, 0)
+      const saldo = budget - totalDistribuido
+      if (saldo > 0 && avsDelProy.length > 0) {
+        const ultimaFecha = avsDelProy[avsDelProy.length-1].fecha_elaboracion || avsDelProy[avsDelProy.length-1].created_at?.slice(0,10)
+        if (ultimaFecha) {
+          const k = closestPeriod(ultimaFecha)
+          presPorPeriodo[k] = (presPorPeriodo[k] || 0) + saldo
+        }
+      }
+    } else {
+      // Fallback: distribución lineal uniforme si no hay avalúos
+      const montoPorPeriodo = budget / periodos.length
+      periodos.forEach(({ key }) => { presPorPeriodo[key] = montoPorPeriodo })
+    }
+
+    // Costos reales por período
     const realPorPeriodo = {}
     allCosts.forEach(c => {
-      const k = periodKey(c.fecha)
-      // Para semanas, asignar al período más cercano
-      if (granularity === 'semana') {
-        const closest = periodos.reduce((prev, cur) =>
-          Math.abs(cur.key.localeCompare(k)) < Math.abs(prev.key.localeCompare(k)) ? cur : prev
-        )
-        realPorPeriodo[closest.key] = (realPorPeriodo[closest.key] || 0) + c.monto
-      } else {
-        realPorPeriodo[k] = (realPorPeriodo[k] || 0) + c.monto
-      }
+      const k = closestPeriod(c.fecha)
+      realPorPeriodo[k] = (realPorPeriodo[k] || 0) + c.monto
     })
 
     let presAcum = 0
     let realAcum = 0
 
     return periodos.map(({ key, label }) => {
-      presAcum += presPorPeriodo
+      const montoPres = presPorPeriodo[key] || 0
+      presAcum += montoPres
       realAcum += (realPorPeriodo[key] || 0)
       return {
         periodo:      label,
-        pres_periodo: Math.round(presPorPeriodo * 100) / 100,
+        pres_periodo: Math.round(montoPres * 100) / 100,
         real_periodo: Math.round((realPorPeriodo[key] || 0) * 100) / 100,
         presAcum:     Math.round(Math.min(presAcum, budget) * 100) / 100,
         realAcum:     Math.round(realAcum * 100) / 100,
       }
     })
-  }, [allCosts, budget, granularity, proy])
+  }, [allCosts, budget, granularity, proy, avaluos_cliente, proyId])
 
   const totalReal  = allCosts.reduce((s,c) => s + c.monto, 0)
+  const isEs       = useContext(LangContext).lang === 'ES'
+  const avsDelProy = avaluos_cliente.filter(a => a.proyecto_id === proyId)
   const desviacion = totalReal - budget
 
   const actDeviations = useMemo(() => {
@@ -217,7 +255,18 @@ export default function CurvaS() {
               <h2 className="text-sm font-semibold text-gray-700 mb-4">
                 {t('curva_chart_title')} ({moneda})
               </h2>
-              <ResponsiveContainer width="100%" height={320}>
+              {avsDelProy?.length > 0 ? (
+              <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+                <span>📊</span>
+                {isEs ? 'Distribución del presupuesto basada en avance físico de avalúos registrados.' : 'Budget distribution based on physical progress from registered billings.'}
+              </p>
+            ) : (
+              <p className="text-xs text-amber-600 mb-3 flex items-center gap-1">
+                <span>⚠</span>
+                {isEs ? 'Sin avalúos registrados — distribución lineal uniforme.' : 'No billings registered — uniform linear distribution.'}
+              </p>
+            )}
+            <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={chartData} margin={{ top:5, right:20, left:10, bottom:5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
