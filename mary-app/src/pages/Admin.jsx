@@ -260,11 +260,35 @@ export default function Admin() {
       // 5. Eliminar solicitudes de eliminación
       await supabase.from('solicitudes_eliminacion').delete().eq('tenant_id', tenantId)
 
-      // 6. Eliminar usuarios del tenant
+      // 6. Eliminar usuarios del tenant — primero obtener sus IDs para borrar de auth
+      const { data: usuariosTenant } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('tenant_id', tenantId)
+
       await supabase.from('usuarios').delete().eq('tenant_id', tenantId)
 
       // 7. Eliminar tenant
       await supabase.from('tenants').delete().eq('id', tenantId)
+
+      // 8. Borrar cada usuario de auth.users via Edge Function
+      if (usuariosTenant?.length) {
+        const session = (await supabase.auth.getSession()).data.session
+        for (const u of usuariosTenant) {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-auth-user`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session?.access_token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({ userId: u.id })
+            }
+          )
+        }
+      }
 
       showSuccess(isEs ? 'Empresa eliminada permanentemente.' : 'Company permanently deleted.')
       await loadAll()
@@ -279,6 +303,22 @@ export default function Admin() {
     setDeleting(true)
     try {
       await supabase.from('usuarios').delete().eq('id', userId)
+
+      // Borrar también de auth.users
+      const session = (await supabase.auth.getSession()).data.session
+      await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-auth-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ userId })
+        }
+      )
+
       showSuccess(isEs ? 'Usuario eliminado.' : 'User deleted.')
       await loadAll()
     } catch (e) {
