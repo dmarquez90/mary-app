@@ -12,6 +12,8 @@ const INIT = {
   solicitudes_eliminacion: [],
   subcontratos_contratos: [], subcontratos_items: [],
   subcontratos_avaluos: [], subcontratos_avaluo_items: [],
+  ordenes_cambio: [], ordenes_cambio_items: [],
+  avaluos_cliente: [], avaluos_cliente_items: [],
   loaded: false
 }
 
@@ -156,6 +158,38 @@ function reducer(state, action) {
     case 'UPD_MAT_PRES': return { ...state, materiales_presupuestados: state.materiales_presupuestados.map(m => m.id === action.payload.id ? { ...m, ...action.payload } : m) }
     case 'DEL_MAT_PRES': return { ...state, materiales_presupuestados: state.materiales_presupuestados.filter(m => m.id !== action.payload) }
 
+    case 'ADD_ORDEN_CAMBIO': return {
+      ...state,
+      ordenes_cambio:       [...(state.ordenes_cambio||[]),       action.payload.orden],
+      ordenes_cambio_items: [...(state.ordenes_cambio_items||[]), ...action.payload.items],
+    }
+    case 'UPD_ORDEN_CAMBIO_ESTADO': return {
+      ...state,
+      ordenes_cambio: (state.ordenes_cambio||[]).map(o =>
+        o.id === action.payload.id ? { ...o, estado: action.payload.estado } : o)
+    }
+    case 'DEL_ORDEN_CAMBIO': return {
+      ...state,
+      ordenes_cambio:       (state.ordenes_cambio||[]).filter(o => o.id !== action.payload),
+      ordenes_cambio_items: (state.ordenes_cambio_items||[]).filter(i => i.oc_id !== action.payload),
+    }
+
+    case 'ADD_AVALUO_CLIENTE': return {
+      ...state,
+      avaluos_cliente:       [...(state.avaluos_cliente||[]),       action.payload.avaluo],
+      avaluos_cliente_items: [...(state.avaluos_cliente_items||[]), ...action.payload.items],
+    }
+    case 'UPD_AVALUO_CLIENTE_ESTADO': return {
+      ...state,
+      avaluos_cliente: (state.avaluos_cliente||[]).map(a =>
+        a.id === action.payload.id ? { ...a, estado: action.payload.estado } : a)
+    }
+    case 'DEL_AVALUO_CLIENTE': return {
+      ...state,
+      avaluos_cliente:       (state.avaluos_cliente||[]).filter(a => a.id !== action.payload),
+      avaluos_cliente_items: (state.avaluos_cliente_items||[]).filter(i => i.avaluo_id !== action.payload),
+    }
+
     case 'ADD_SOL_ELIM': return { ...state, solicitudes_eliminacion: [...state.solicitudes_eliminacion, action.payload] }
     case 'UPD_SOL_ELIM': return { ...state, solicitudes_eliminacion: state.solicitudes_eliminacion.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
 case 'LOAD_TABLE':
@@ -180,6 +214,8 @@ export function StoreProvider({ children, tenantId }) {
         'materiales_presupuestados','solicitudes_eliminacion',
         'subcontratos_contratos','subcontratos_items',
         'subcontratos_avaluos','subcontratos_avaluo_items',
+        'ordenes_cambio','ordenes_cambio_items',
+        'avaluos_cliente','avaluos_cliente_items',
       ]
       const tenantResults = await Promise.all(
         tablasTenant.map(t => supabase.from(t).select('*').eq('tenant_id', tenantId))
@@ -197,6 +233,8 @@ useEffect(() => {
   const REALTIME_TABLES = [
     'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
+    'ordenes_cambio', 'ordenes_cambio_items',
+    'avaluos_cliente', 'avaluos_cliente_items',
     'presupuesto', 'materiales', 'entradas', 'salidas',
   ]
 
@@ -836,6 +874,46 @@ useEffect(() => {
       }
       case 'DEL_MAT_PRES': {
         await supabase.from('materiales_presupuestados').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
+      case 'ADD_ORDEN_CAMBIO': {
+        const orden = { ...action.payload.orden, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
+        const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
+        await supabase.from('ordenes_cambio').insert(orden)
+        if (items.length) await supabase.from('ordenes_cambio_items').insert(items)
+        dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items } })
+        break
+      }
+      case 'UPD_ORDEN_CAMBIO_ESTADO': {
+        await supabase.from('ordenes_cambio').update({ estado: action.payload.estado }).eq('id', action.payload.id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_ORDEN_CAMBIO': {
+        await supabase.from('ordenes_cambio_items').delete().eq('oc_id', action.payload)
+        await supabase.from('ordenes_cambio').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
+      case 'ADD_AVALUO_CLIENTE': {
+        const av  = { ...action.payload.avaluo, id: uuid(), estado: 'borrador', created_at: today(), tenant_id: tenantId }
+        const avi = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), avaluo_id: av.id, created_at: today(), tenant_id: tenantId }))
+        await supabase.from('avaluos_cliente').insert(av)
+        if (avi.length) await supabase.from('avaluos_cliente_items').insert(avi)
+        dispatch({ type: 'ADD_AVALUO_CLIENTE', payload: { avaluo: av, items: avi } })
+        break
+      }
+      case 'UPD_AVALUO_CLIENTE_ESTADO': {
+        await supabase.from('avaluos_cliente').update({ estado: action.payload.estado }).eq('id', action.payload.id)
+        dispatch(action)
+        break
+      }
+      case 'DEL_AVALUO_CLIENTE': {
+        await supabase.from('avaluos_cliente_items').delete().eq('avaluo_id', action.payload)
+        await supabase.from('avaluos_cliente').delete().eq('id', action.payload)
         dispatch(action)
         break
       }
