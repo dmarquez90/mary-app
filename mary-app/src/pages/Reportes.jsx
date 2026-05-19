@@ -219,23 +219,25 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   // Presupuesto vs Real por actividad
   row = addSectionTitle(ws1, row, 'PRESUPUESTO VS REAL POR ACTIVIDAD', COLS)
   ws1.getRow(row).height = 18
-  ;['Código','Actividad','Presupuestado','Real','Desviación $','Desv. %','Estado'].forEach((h,i) => {
+  ;['Código','Actividad','Presupuestado','Real','Saldo en Presupuesto $','S.%','Estado'].forEach((h,i) => {
     const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
   })
   row++
 
   data.actividades.forEach((a, i) => {
     ws1.getRow(row).height = 17
-    const even   = i % 2 === 1
-    const devClr = a.dev > 0 ? RED_HX : GREEN_HX
-    const status = Math.abs(a.devPct)<5?'✓ OK':Math.abs(a.devPct)<15?'⚠ Alerta':'⚠ Crítico'
+    const even     = i % 2 === 1
+    const saldo    = a.pres - a.real
+    const devClr   = saldo >= 0 ? GREEN_HX : RED_HX
+    const pctUsado = a.pres > 0 ? (a.real / a.pres) * 100 : 0
+    const status   = pctUsado <= 100 ? '✓ OK' : pctUsado <= 115 ? '⚠ Alerta' : '⚠ Crítico'
     const c1 = ws1.getCell(row,1); c1.value=a.code;        styleData(c1,{even})
     const c2 = ws1.getCell(row,2); c2.value=a.descripcion; styleData(c2,{even})
     const c3 = ws1.getCell(row,3); c3.value=a.pres;        styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
     const c4 = ws1.getCell(row,4); c4.value=a.real;        styleData(c4,{even,numFmt:'"$"#,##0.00',align:'right'})
-    const c5 = ws1.getCell(row,5); c5.value=a.dev;         styleData(c5,{even,numFmt:'"$"#,##0.00',align:'right',color:devClr,bold:true})
-    const c6 = ws1.getCell(row,6); c6.value=a.pres>0?a.dev/a.pres:0; styleData(c6,{even,numFmt:'0.0%',align:'right',color:devClr})
-    const c7 = ws1.getCell(row,7); c7.value=status;        styleData(c7,{even,color:Math.abs(a.devPct)<5?GREEN_HX:RED_HX,bold:true})
+    const c5 = ws1.getCell(row,5); c5.value=saldo;         styleData(c5,{even,numFmt:'"$"#,##0.00',align:'right',color:devClr,bold:true})
+    const c6 = ws1.getCell(row,6); c6.value=a.pres>0?saldo/a.pres:0; styleData(c6,{even,numFmt:'0.0%',align:'right',color:devClr})
+    const c7 = ws1.getCell(row,7); c7.value=status;        styleData(c7,{even,color:pctUsado<=100?GREEN_HX:RED_HX,bold:true})
     row++
   })
 
@@ -972,17 +974,23 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
           <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">Presupuesto vs Real por actividad</p></div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr style={thS}>{['Código','Actividad','Presupuestado','Real','Desviación $','Desv. %','Estado'].map((h,i)=><th key={i} className={thC+(i>1?' text-right':'')}>{h}</th>)}</tr></thead>
+              <thead><tr style={thS}>{[isEs?'Código':'Code',isEs?'Actividad':'Activity',isEs?'Presupuestado':'Budgeted',isEs?'Real':'Real',isEs?'Saldo en Presupuesto $':'Budget Balance $',isEs?'S.%':'B.%',isEs?'Estado':'Status'].map((h,i)=><th key={i} className={thC+(i>1?' text-right':'')}>{h}</th>)}</tr></thead>
               <tbody>
                 {actividades.map((a,i)=>{
-                  const status=Math.abs(a.devPct)<5?'ok':Math.abs(a.devPct)<15?'alerta':'critico'
+                  // Saldo = presupuestado - real (positivo = queda presupuesto, negativo = sobrecosto)
+                  const saldo = a.pres - a.real
+                  const saldoPct = a.pres > 0 ? (saldo / a.pres) * 100 : 0
+                  const saldoColor = saldo >= 0 ? '#1D9E75' : '#ef4444'
+                  // Estado basado en si el real supera el presupuesto
+                  const pctUsado = a.pres > 0 ? (a.real / a.pres) * 100 : 0
+                  const status = pctUsado <= 100 ? 'ok' : pctUsado <= 115 ? 'alerta' : 'critico'
                   return(<tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
                     <td className={tdC+' font-mono text-xs'}>{a.code}</td>
                     <td className={tdC+' max-w-[160px] truncate'}>{a.descripcion}</td>
                     <td className={tdC+' text-right font-mono'}>{fmt(a.pres,moneda)}</td>
                     <td className={tdC+' text-right font-mono'}>{fmt(a.real,moneda)}</td>
-                    <td className={tdC+' text-right font-mono font-medium'} style={{color:a.dev>0?'#ef4444':'#1D9E75'}}>{a.dev>=0?'+':''}{fmt(a.dev,moneda)}</td>
-                    <td className={tdC+' text-right'} style={{color:a.dev>0?'#ef4444':'#1D9E75'}}>{a.dev>=0?'+':''}{a.devPct.toFixed(1)}%</td>
+                    <td className={tdC+' text-right font-mono font-medium'} style={{color:saldoColor}}>{saldo>=0?'+':''}{fmt(saldo,moneda)}</td>
+                    <td className={tdC+' text-right'} style={{color:saldoColor}}>{saldoPct>=0?'+':''}{saldoPct.toFixed(1)}%</td>
                     <td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status==='ok'?'bg-green-100 text-green-700':status==='alerta'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600'}`}>{status==='ok'?'✓ OK':status==='alerta'?'⚠ Alerta':'⚠ Crítico'}</span></td>
                   </tr>)
                 })}

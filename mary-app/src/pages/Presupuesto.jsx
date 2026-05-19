@@ -29,10 +29,10 @@ export default function Presupuesto() {
   const setIndF = k => e => setIndForm(f => ({ ...f, [k]: e.target.value }))
 
   const CATS_IND = [
-    { key: 'Administración de obra',              label: isEs ? 'Administración de obra'          : 'Project Administration' },
-    { key: 'Instalaciones y servicios generales', label: isEs ? 'Instalaciones y servicios gral.' : 'Facilities & General Services' },
-    { key: 'Seguros, fianzas y garantías',        label: isEs ? 'Seguros, fianzas y garantías'    : 'Insurance, Bonds & Guarantees' },
-    { key: 'Servicios profesionales y legales',   label: isEs ? 'Servicios profesionales y legales': 'Professional & Legal Services' },
+    { key: 'Administración de obra',              label: t('pres_cat_admin') },
+    { key: 'Instalaciones y servicios generales', label: t('pres_cat_facilities') },
+    { key: 'Seguros, fianzas y garantías',        label: t('pres_cat_insurance') },
+    { key: 'Servicios profesionales y legales',   label: t('pres_cat_professional') },
   ]
 
   // Auto-sync desde Supabase al seleccionar un proyecto
@@ -158,7 +158,7 @@ export default function Presupuesto() {
           <button
             onClick={() => syncPresupuesto(proyId)}
             disabled={!proyId || syncing}
-            title={isEs ? 'Recargar desde servidor' : 'Reload from server'}
+            title={t('pres_reload_server')}
             className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-40 transition-colors text-sm">
             {syncing ? '⟳' : '↺'}
           </button>
@@ -285,18 +285,18 @@ export default function Presupuesto() {
       {proyId && (
         <div className="mt-6 bg-white border border-gray-100 rounded-xl overflow-hidden">
           <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Costos indirectos presupuestados' : 'Budgeted indirect costs'}</p>
+            <p className="text-sm font-semibold text-gray-700">{t('pres_indirect_title')}</p>
           </div>
           <div className="p-4">
             {puedeEditar && !closed && (
               <div className="flex gap-2 mb-4 flex-wrap">
                 <select className={selectCls + ' flex-1 min-w-[220px]'}
                   value={indForm.categoria} onChange={setIndF('categoria')}>
-                  <option value="">{isEs ? '— Selecciona categoría —' : '— Select category —'}</option>
+                  <option value="">{t('pres_indirect_select_cat')}</option>
                   {CATS_IND.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
                 <input type="number" className={inputCls + ' w-36'}
-                  placeholder={isEs ? 'Monto presup.' : 'Budget amount'}
+                  placeholder={t('pres_indirect_budget_ph')}
                   value={indForm.monto_presupuestado} onChange={setIndF('monto_presupuestado')}
                   min="0" step="0.01" />
                 <PrimaryBtn onClick={saveInd} disabled={!indForm.categoria || !indForm.monto_presupuestado}>
@@ -310,12 +310,12 @@ export default function Presupuesto() {
               </div>
             )}
             {indsDelProy.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2 text-center">{isEs ? 'Sin costos indirectos presupuestados' : 'No budgeted indirect costs'}</p>
+              <p className="text-xs text-gray-400 py-2 text-center">{t('pres_indirect_empty')}</p>
             ) : (
               <table className="w-full">
                 <thead><tr className="border-b border-gray-100">
-                  <th className="text-left text-xs text-gray-500 px-2 py-2">{isEs ? 'Categoría' : 'Category'}</th>
-                  <th className="text-right text-xs text-gray-500 px-2 py-2">{isEs ? 'Monto presupuestado' : 'Budget amount'}</th>
+                  <th className="text-left text-xs text-gray-500 px-2 py-2">{t('pres_indirect_col_cat')}</th>
+                  <th className="text-right text-xs text-gray-500 px-2 py-2">{t('pres_indirect_col_amount')}</th>
                   {puedeEditar && <th className="px-2 py-2"></th>}
                 </tr></thead>
                 <tbody>
@@ -334,7 +334,7 @@ export default function Presupuesto() {
                     </tr>
                   ))}
                   <tr className="bg-gray-50">
-                    <td className="px-2 py-2 text-xs font-semibold text-gray-500 text-right">{isEs ? 'Total indirecto' : 'Total indirect'}</td>
+                    <td className="px-2 py-2 text-xs font-semibold text-gray-500 text-right">{t('pres_indirect_total')}</td>
                     <td className="px-2 py-2 text-sm font-mono font-bold text-right" style={{color:'#1B3A6B'}}>{fmt(totalIndirecto, moneda)}</td>
                     {puedeEditar && <td/>}
                   </tr>
@@ -349,12 +349,12 @@ export default function Presupuesto() {
       {proyId && (
         <div className="mt-4 bg-white border border-gray-100 rounded-xl overflow-hidden">
           <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
-            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Resumen del presupuesto' : 'Budget summary'}</p>
+            <p className="text-sm font-semibold text-gray-700">{t('pres_summary_title')}</p>
           </div>
           <div className="p-4 flex flex-col gap-1.5">
             {[
-              [isEs ? 'Costo directo (actividades)' : 'Direct cost (activities)', grandTotal, '#374151'],
-              [isEs ? 'Costo indirecto' : 'Indirect cost', totalIndirecto, '#374151'],
+              [t('pres_summary_direct'), grandTotal, '#374151'],
+              [t('pres_summary_indirect'), totalIndirecto, '#374151'],
             ].map(([label, val, color]) => (
               <div key={label} className="flex justify-between text-sm py-1 border-b border-gray-50">
                 <span className="text-gray-500">{label}</span>
@@ -362,7 +362,7 @@ export default function Presupuesto() {
               </div>
             ))}
             <div className="flex justify-between text-sm py-1 border-b border-gray-100">
-              <span className="text-gray-600 font-medium">{isEs ? 'Subtotal' : 'Subtotal'}</span>
+              <span className="text-gray-600 font-medium">{t('pres_summary_subtotal')}</span>
               <span className="font-mono font-medium text-gray-700">{fmt(subtotalPres, moneda)}</span>
             </div>
             <div className="flex justify-between text-sm py-1 border-b border-gray-50">
@@ -370,7 +370,7 @@ export default function Presupuesto() {
               <span className="font-mono text-gray-600">{fmt(utilidadMonto, moneda)}</span>
             </div>
             <div className="flex justify-between text-base font-bold py-2 border-b border-gray-200">
-              <span className="text-gray-800">{isEs ? 'Gran total' : 'Grand total'}</span>
+              <span className="text-gray-800">{t('pres_summary_grand_total')}</span>
               <span className="font-mono" style={{color:'#1D9E75'}}>{fmt(granTotal, moneda)}</span>
             </div>
             <div className="flex justify-between text-sm py-1">
@@ -378,12 +378,12 @@ export default function Presupuesto() {
               <span className="font-mono text-gray-600">{fmt(impuestoMonto, moneda)}</span>
             </div>
             <div className="flex justify-between text-base font-bold py-2 bg-blue-50 rounded-lg px-3 mt-1">
-              <span style={{color:'#1B3A6B'}}>{isEs ? 'Total con impuestos' : 'Total with taxes'}</span>
+              <span style={{color:'#1B3A6B'}}>{t('pres_summary_with_tax')}</span>
               <span className="font-mono" style={{color:'#1B3A6B'}}>{fmt(totalConImp, moneda)}</span>
             </div>
             {(!proy?.utilidad_pct && !proy?.impuesto_pct) && (
               <p className="text-xs text-amber-600 mt-2">
-                {isEs ? '* Define el % de utilidad e impuesto en la configuración del proyecto.' : '* Set profit % and tax % in the project settings.'}
+                {t('pres_summary_tax_hint')}
               </p>
             )}
           </div>
@@ -429,7 +429,7 @@ export default function Presupuesto() {
                     {UNIDADES.map(u => (
                       <option key={u} value={u}>
                         {u === 'LF'
-                          ? (isEs ? 'LF — Pie lineal' : 'LF — Linear Foot')
+                          ? t('lbl_lf')
                           : u}
                       </option>
                     ))}

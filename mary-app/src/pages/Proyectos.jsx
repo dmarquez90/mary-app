@@ -147,10 +147,10 @@ export default function Proyectos({ onNavigate }) {
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 text-lg flex-shrink-0">🚫</div>
               <div>
                 <p className="font-semibold text-gray-800 text-sm">
-                  {isEs ? 'No se puede eliminar este proyecto' : 'This project cannot be deleted'}
+                  {t('proy_cant_delete')}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {isEs ? 'Tiene información registrada en los siguientes módulos:' : 'It has registered data in the following modules:'}
+                  {t('proy_cant_delete_body')}
                 </p>
               </div>
             </div>
@@ -164,15 +164,13 @@ export default function Proyectos({ onNavigate }) {
             </ul>
 
             <p className="text-xs text-gray-500 mb-4">
-              {isEs
-                ? 'Elimina primero esos registros o cambia el estado del proyecto a "Cancelado" para archivarlo.'
-                : 'Delete those records first or change the project status to "Cancelled" to archive it.'}
+              {t('proy_cant_delete_hint')}
             </p>
 
             <div className="flex gap-2">
               <button onClick={() => setDelError(null)}
                 className="flex-1 py-2.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
-                {isEs ? 'Cerrar' : 'Close'}
+                {t('btn_close')}
               </button>
               <button onClick={() => {
                 const proy = proyectos.find(p => p.id === delError.proyId)
@@ -181,7 +179,7 @@ export default function Proyectos({ onNavigate }) {
               }}
                 className="flex-1 py-2.5 text-sm font-semibold text-white rounded-lg"
                 style={{ background: '#1B3A6B' }}>
-                {isEs ? 'Cambiar a Cancelado' : 'Set as Cancelled'}
+                {t('proy_set_cancelled')}
               </button>
             </div>
           </div>
@@ -258,11 +256,11 @@ export default function Proyectos({ onNavigate }) {
                   [t('proy_form_city'),    proyecto.ciudad || '—'],
                   [t('proy_form_start'),   proyecto.fecha_inicio],
                   [t('proy_form_end'),     proyecto.fecha_fin_estimada || '—'],
-                  [isEs ? 'País' : 'Country', proyecto.pais || '—'],
-                  ...(proyecto.estado_usa ? [[isEs ? 'Estado (EE.UU.)' : 'State (USA)', proyecto.estado_usa]] : []),
+                  [t('proy_form_country'), proyecto.pais || '—'],
+                  ...(proyecto.estado_usa ? [[t('proy_state_usa'), proyecto.estado_usa]] : []),
                   [t('proy_budget_label'), new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
-                  ...(proyecto.utilidad_pct ? [[isEs ? 'Utilidad' : 'Profit margin', `${proyecto.utilidad_pct}%`]] : []),
-                  ...(proyecto.impuesto_pct ? [[isEs ? 'Impuesto' : 'Tax', `${proyecto.impuesto_pct}% ${proyecto.impuesto_descripcion||''}`]] : []),
+                  ...(proyecto.utilidad_pct ? [[t('proy_profit'), `${proyecto.utilidad_pct}%`]] : []),
+                  ...(proyecto.impuesto_pct ? [[t('proy_tax'), `${proyecto.impuesto_pct}% ${proyecto.impuesto_descripcion||''}`]] : []),
                 ].map(([k,v]) => (
                   <div key={k}>
                     <p className="text-xs text-gray-400">{k}</p>
@@ -359,7 +357,7 @@ export default function Proyectos({ onNavigate }) {
           </Field>
         </div>
         {form.pais === 'United States' && (
-          <Field label={isEs ? 'Estado (EE.UU.)' : 'State (USA)'}>
+          <Field label={t('proy_state_usa')}>
             <select className={selectCls} value={form.estado_usa||''} onChange={set('estado_usa')}>
               <option value="">— {t('lbl_select')} —</option>
               {ESTADOS_USA.map(s => <option key={s} value={s}>{s}</option>)}
@@ -392,21 +390,21 @@ export default function Proyectos({ onNavigate }) {
         </div>
         <div className="border-t border-gray-100 pt-3">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            {isEs ? 'Utilidad e impuestos' : 'Profit & taxes'}
+            {t('proy_profit_tax_section')}
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={isEs ? 'Utilidad (%)' : 'Profit margin (%)'}>
+            <Field label={t('proy_profit_pct')}>
               <input type="number" className={inputCls} value={form.utilidad_pct||''} onChange={set('utilidad_pct')}
                 placeholder="0.00" min="0" max="100" step="0.01" />
             </Field>
-            <Field label={isEs ? 'Impuesto (%)' : 'Tax (%)'}>
+            <Field label={t('proy_tax_pct')}>
               <input type="number" className={inputCls} value={form.impuesto_pct||''} onChange={set('impuesto_pct')}
                 placeholder="0.00" min="0" max="100" step="0.01" />
             </Field>
           </div>
-          <Field label={isEs ? 'Descripción del impuesto' : 'Tax description'}>
+          <Field label={t('proy_tax_desc')}>
             <input className={inputCls} value={form.impuesto_descripcion||''} onChange={set('impuesto_descripcion')}
-              placeholder={isEs ? 'Ej: Sales Tax CA 9.5%, IR 1%' : 'E.g.: Sales Tax CA 9.5%, IR 1%'} />
+              placeholder={t('proy_tax_desc_ph')} />
           </Field>
         </div>
         <div className="flex gap-2 mt-auto pt-2">

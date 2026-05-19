@@ -172,10 +172,10 @@ export default function MatPresupuestados() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             {[
               { label: t('mp_kpi_materials'), value: matsPres.length, color: '#1B3A6B' },
-              { label: isEs ? 'Adicionales' : 'Additional', value: totalAdicionales, color: totalAdicionales > 0 ? '#e0982c' : '#6b7280' },
+              { label: t('mp_kpi_additional'), value: totalAdicionales, color: totalAdicionales > 0 ? '#e0982c' : '#6b7280' },
               { label: t('mp_kpi_activities'), value: totalActividades, color: '#1B3A6B' },
               { label: t('mp_kpi_budget_value'), value: fmt(totalPresupuestado, moneda), color: '#1D9E75' },
-              { label: isEs ? 'Costo consumido' : 'Consumed cost', value: fmt(totalConsumido, moneda), color: totalConsumido > totalPresupuestado ? '#ef4444' : '#1D9E75' },
+              { label: t('mp_kpi_consumed_cost'), value: fmt(totalConsumido, moneda), color: totalConsumido > totalPresupuestado ? '#ef4444' : '#1D9E75' },
             ].map((k, i) => (
               <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -197,7 +197,7 @@ export default function MatPresupuestados() {
               {etapas.length > 0 && (
                 <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
                   value={filterEtapa} onChange={e => setFilterEtapa(e.target.value)}>
-                  <option value="">{isEs ? 'Todas las etapas' : 'All stages'}</option>
+                  <option value="">{t('mp_filter_all_stages')}</option>
                   {etapas.map(e => <option key={e.id} value={e.id}>{e.code} — {e.descripcion}</option>)}
                 </select>
               )}
@@ -218,17 +218,17 @@ export default function MatPresupuestados() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {[
-                      isEs ? 'Material' : 'Material',
-                      isEs ? 'Unidad' : 'Unit',
-                      isEs ? 'Qty pres.' : 'Qty budg.',
-                      isEs ? 'Costo pres.' : 'Budget cost',
-                      isEs ? 'Qty solicit.' : 'Qty req.',
-                      isEs ? 'Qty consumi.' : 'Qty consumed',
-                      isEs ? 'Costo consum.' : 'Consumed cost',
-                      isEs ? 'Dif. qty' : 'Diff. qty',
-                      isEs ? 'Dif. $' : 'Diff. $',
-                      isEs ? 'Actividad' : 'Activity',
-                      isEs ? 'Estado' : 'Status',
+                      t('mp_col_material'),
+                      t('mp_col_unit'),
+                      t('mp_col_qty_budgeted'),
+                      t('mp_col_budget_cost'),
+                      t('mp_col_qty_requested'),
+                      t('mp_col_qty_consumed'),
+                      t('mp_col_consumed_cost'),
+                      t('mp_col_diff_qty'),
+                      t('mp_col_diff_money'),
+                      t('mp_col_activity'),
+                      t('mp_col_status'),
                       puedeEditar ? '' : null,
                     ].filter(h => h !== null).map((h, i) => (
                       <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
@@ -251,12 +251,12 @@ export default function MatPresupuestados() {
                             <span className="text-sm text-gray-800">{getNombre(mp)}</span>
                             {mp.es_adicional && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
-                                {isEs ? 'Adicional' : 'Additional'}
+                                {t('mp_tag_additional')}
                               </span>
                             )}
                             {mp.material_id && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                                {isEs ? 'Vinculado' : 'Linked'}
+                                {t('mp_tag_linked')}
                               </span>
                             )}
                           </div>
@@ -322,13 +322,13 @@ export default function MatPresupuestados() {
             </select>
           </Field>
 
-          <Field label={isEs ? 'Nombre del material' : 'Material name'} required>
+          <Field label={t('mp_form_name')} required>
             <input className={inputCls} value={form.nombre_libre || ''} onChange={set('nombre_libre')}
-              placeholder={isEs ? 'Ej: Cemento Holcim 45kg' : 'E.g.: Portland Cement 50lb'} />
+              placeholder={t('mp_form_name_ph')} />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label={isEs ? 'Unidad' : 'Unit'}>
+            <Field label={t('mp_col_unit')}>
               <select className={selectCls} value={form.unidad_libre || 'und'} onChange={set('unidad_libre')}>
                 {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
@@ -341,17 +341,17 @@ export default function MatPresupuestados() {
 
           <div className="border border-gray-100 rounded-xl p-3 bg-gray-50/50">
             <p className="text-xs font-medium text-gray-500 mb-2">
-              {isEs ? 'Vincular con catalogo de inventario (opcional)' : 'Link to inventory catalog (optional)'}
+              {t('mp_form_link_catalog')}
             </p>
             <select className={selectCls} value={form.material_id || ''} onChange={set('material_id')}>
-              <option value="">{isEs ? 'Sin vincular' : 'Not linked'}</option>
+              <option value="">{t('mp_form_not_linked')}</option>
               {materiales.filter(m => m.activo !== false).map(m => (
                 <option key={m.id} value={m.id}>{m.codigo} {m.descripcion}</option>
               ))}
             </select>
             {form.material_id && (
               <p className="text-xs text-gray-400 mt-1.5">
-                {isEs ? 'Stock actual:' : 'Current stock:'} <span className="font-mono font-medium text-gray-600">
+                {t('mp_form_current_stock')} <span className="font-mono font-medium text-gray-600">
                   {fmtNum(materiales.find(m => m.id === form.material_id)?.stock_actual || 0)} {materiales.find(m => m.id === form.material_id)?.unidad}
                 </span>
               </p>
@@ -360,23 +360,23 @@ export default function MatPresupuestados() {
 
           {form.proyecto_id && etapas.length > 0 && (
             <>
-              <Field label={isEs ? 'Etapa (opcional)' : 'Stage (optional)'}>
+              <Field label={t('mp_form_stage')}>
                 <select className={selectCls} value={form.etapa_id || ''} onChange={e => setForm(f => ({ ...f, etapa_id: e.target.value, sub_etapa_id: '', actividad_id: '' }))}>
-                  <option value="">{isEs ? 'Sin asignar' : 'Unassigned'}</option>
+                  <option value="">{t('mp_form_unassigned')}</option>
                   {etapas.map(e => <option key={e.id} value={e.id}>{e.code} {e.descripcion}</option>)}
                 </select>
               </Field>
               {form.etapa_id && subEtapasFiltradas.length > 0 && (
-                <Field label={isEs ? 'Sub-etapa (opcional)' : 'Sub-stage (optional)'}>
+                <Field label={t('mp_form_substage')}>
                   <select className={selectCls} value={form.sub_etapa_id || ''} onChange={e => setForm(f => ({ ...f, sub_etapa_id: e.target.value, actividad_id: '' }))}>
-                    <option value="">{isEs ? 'Sin asignar' : 'Unassigned'}</option>
+                    <option value="">{t('mp_form_unassigned')}</option>
                     {subEtapasFiltradas.map(s => <option key={s.id} value={s.id}>{s.code} {s.descripcion}</option>)}
                   </select>
                 </Field>
               )}
               <Field label={t('mp_form_activity')}>
                 <select className={selectCls} value={form.actividad_id || ''} onChange={set('actividad_id')}>
-                  <option value="">{isEs ? 'Sin asignar' : 'Unassigned'}</option>
+                  <option value="">{t('mp_form_unassigned')}</option>
                   {actividadesFiltradas.map(a => <option key={a.id} value={a.id}>{a.code} {a.descripcion}</option>)}
                 </select>
               </Field>
@@ -388,7 +388,7 @@ export default function MatPresupuestados() {
               checked={form.es_adicional || false}
               onChange={e => setForm(f => ({ ...f, es_adicional: e.target.checked }))} />
             <span className="text-sm text-gray-600">
-              {isEs ? 'Material adicional (no estaba en el presupuesto original)' : 'Additional material (not in original budget)'}
+              {t('mp_form_is_additional')}
             </span>
           </label>
 

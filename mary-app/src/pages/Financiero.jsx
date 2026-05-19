@@ -81,11 +81,11 @@ export default function Financiero() {
 
   // Tabs: Imprevistos | Nómina | Subcontratos | Equipos | Administración
   const TABS = [
-    isEs ? 'Imprevistos'    : 'Contingencies',
+    t('rep_cat_imprevistos'),
     t('fin_tab_payroll'),
     t('fin_tab_subcontracts'),
     t('fin_tab_equipment'),
-    isEs ? 'Administración' : 'Administration',
+    t('rep_cat_admin'),
   ]
 
   const proy   = proyectos.find(p => p.id === proyId)
@@ -183,7 +183,7 @@ export default function Financiero() {
   const DEL_TYPES = ['DEL_COSTO_DIRECTO','DEL_NOMINA','DEL_SUBCONTRATO','DEL_EQUIPO','DEL_COSTO_INDIRECTO']
 
   const del = (id) => {
-    if (!window.confirm(isEs ? '¿Eliminar este registro? Esta acción no se puede deshacer.' : 'Delete this record? This action cannot be undone.')) return
+    if (!window.confirm(t('fin_delete_confirm'))) return
     dispatch({ type: DEL_TYPES[tab], payload: id })
   }
 
@@ -416,7 +416,7 @@ export default function Financiero() {
               {comparacionIndirectos.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-100 mb-4 overflow-hidden">
                   <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
-                    <p className="text-sm font-semibold text-gray-700">{isEs ? 'Presupuestado vs ejecutado' : 'Budgeted vs executed'}</p>
+                    <p className="text-sm font-semibold text-gray-700">{t('fin_budgeted_vs_executed')}</p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -446,7 +446,7 @@ export default function Financiero() {
                                     status === 'sobrecosto' ? 'bg-red-100 text-red-600' :
                                     'bg-gray-100 text-gray-600'
                                   }`}>
-                                    {status === 'ahorro' ? (isEs ? 'Ahorro' : 'Saving') : status === 'sobrecosto' ? (isEs ? 'Sobrecosto' : 'Overrun') : (isEs ? 'En punto' : 'On budget')}
+                                    {status === 'ahorro' ? (t('fin_saving')) : status === 'sobrecosto' ? (t('fin_overrun')) : (t('fin_on_budget'))}
                                   </span>
                                   <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div className="h-full rounded-full" style={{
@@ -460,7 +460,7 @@ export default function Financiero() {
                           )
                         })}
                         <tr className="bg-gray-50">
-                          <td className={tdCls + ' font-semibold text-gray-600'}>{isEs ? 'Total' : 'Total'}</td>
+                          <td className={tdCls + ' font-semibold text-gray-600'}>{t('fin_row_total')}</td>
                           <td className={tdCls + ' font-mono font-bold'} style={{color:'#1B3A6B'}}>{fmt(totalIndPres, moneda)}</td>
                           <td className={tdCls + ' font-mono font-bold'} style={{color:'#1B3A6B'}}>{fmt(totalInd, moneda)}</td>
                           <td className={tdCls + ' font-mono font-bold'} style={{color: totalIndPres - totalInd < 0 ? '#ef4444' : '#1D9E75'}}>
@@ -856,32 +856,32 @@ function SubcontratosModule({
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
-          {contratosProy.length} {isEs ? 'subcontrato(s)' : 'subcontract(s)'}
+          {contratosProy.length}} {t('fin_subcontracts_count', { n: '' }).replace(' ', '')}{/* fix */}
         </p>
         {puedeEditar && !closed && (
           <button onClick={() => { setScForm({ impuesto_pct: '0' }); setScItems([]); setScView('nuevo') }}
             className="text-sm font-medium px-4 py-2 rounded-lg text-white"
             style={{ background: BRAND }}>
-            + {isEs ? 'Nuevo subcontrato' : 'New subcontract'}
+            {t('fin_new_subcontract')}
           </button>
         )}
       </div>
 
       {contratosProy.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <p className="text-gray-400 text-sm">{isEs ? 'No hay subcontratos registrados' : 'No subcontracts registered'}</p>
+          <p className="text-gray-400 text-sm">{t('fin_empty_subcontracts')}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
           <table className="w-full">
             <thead><tr className="bg-gray-50 border-b border-gray-100">
               {[
-                isEs ? 'Subcontratista' : 'Subcontractor',
-                isEs ? 'Descripción' : 'Description',
-                isEs ? 'Monto Contrato' : 'Contract Amount',
-                isEs ? 'Monto Pagado' : 'Amount Paid',
-                isEs ? '% Avance' : '% Progress',
-                isEs ? 'Estado' : 'Status',
+                t('fin_sc_col_subcontractor'),
+                t('fin_sc_col_desc'),
+                t('fin_sc_col_contract'),
+                t('fin_sc_col_paid'),
+                t('fin_sc_col_progress'),
+                t('fin_sc_col_status'),
                 '',
               ].map((h,i) => <th key={i} className={thCls}>{h}</th>)}
             </tr></thead>
@@ -912,8 +912,8 @@ function SubcontratosModule({
                         sc.estado === 'activo' ? 'bg-green-100 text-green-700' :
                         sc.estado === 'completado' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-500'}`}>
-                        {sc.estado === 'activo' ? (isEs ? 'Activo' : 'Active') :
-                         sc.estado === 'completado' ? (isEs ? 'Completado' : 'Completed') :
+                        {sc.estado === 'activo' ? t('fin_sc_status_active') :
+                         sc.estado === 'completado' ? t('fin_sc_status_completed') :
                          sc.estado}
                       </span>
                     </td>
@@ -921,12 +921,12 @@ function SubcontratosModule({
                       <div className="flex gap-1">
                         <button onClick={() => { setScSelected(sc); setScView('detail') }}
                           className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">
-                          {isEs ? 'Ver' : 'View'}
+                          {t('btn_view')}
                         </button>
                         {puedeEditar && (
                           <button onClick={() => dispatch({ type: 'DEL_SC_CONTRATO', payload: sc.id })}
                             className="text-xs px-2 py-1 border border-red-200 text-red-500 rounded-lg hover:bg-red-50">
-                            {isEs ? 'Eliminar' : 'Delete'}
+                            {t('btn_delete')}
                           </button>
                         )}
                       </div>
@@ -946,25 +946,25 @@ function SubcontratosModule({
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => setScView('list')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
-        <h2 className="text-base font-semibold text-gray-800">{isEs ? 'Nuevo Subcontrato' : 'New Subcontract'}</h2>
+        <h2 className="text-base font-semibold text-gray-800">{t('fin_sc_form_title')}</h2>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
         {/* Datos generales */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Subcontratista *' : 'Subcontractor *'}</label>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_contractor')}</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
-              value={scForm.subcontratista||''} onChange={setScF('subcontratista')} placeholder={isEs ? 'Nombre de la empresa' : 'Company name'} />
+              value={scForm.subcontratista||''} onChange={setScF('subcontratista')} placeholder={t('fin_sc_form_contractor_ph')} />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Impuesto (%)' : 'Tax (%)'}</label>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_tax')}</label>
             <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
               value={scForm.impuesto_pct||''} onChange={setScF('impuesto_pct')} placeholder="0" min="0" max="100" step="0.01" />
           </div>
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Descripción' : 'Description'}</label>
+          <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_col_desc')}</label>
           <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
             rows={2} value={scForm.descripcion||''} onChange={setScF('descripcion')} />
         </div>
@@ -973,36 +973,36 @@ function SubcontratosModule({
         <div className="grid grid-cols-2 gap-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
           <div>
             <label className="text-xs font-medium text-amber-700 block mb-1">
-              {isEs ? '🔒 Retención garantía (%)' : '🔒 Retention (%)'}
+              {t('fin_sc_form_retention')}
             </label>
             <input type="number" className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-white"
               value={scForm.retencion_pct ?? 10} onChange={setScF('retencion_pct')}
               placeholder="10" min="0" max="50" step="0.5" />
-            <p className="text-xs text-amber-600 mt-1">{isEs ? 'Se deduce de cada avalúo aprobado' : 'Deducted from each approved valuation'}</p>
+            <p className="text-xs text-amber-600 mt-1">{t('fin_sc_form_retention_hint')}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-amber-700 block mb-1">
-              {isEs ? '📅 Plazo de garantía (meses)' : '📅 Warranty period (months)'}
+              {t('fin_sc_form_warranty')}
             </label>
             <input type="number" className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-white"
               value={scForm.plazo_garantia_meses ?? 6} onChange={setScF('plazo_garantia_meses')}
               placeholder="6" min="1" max="60" step="1" />
-            <p className="text-xs text-amber-600 mt-1">{isEs ? 'Meses antes de devolver la retención' : 'Months before returning retention'}</p>
+            <p className="text-xs text-amber-600 mt-1">{t('fin_sc_form_warranty_hint')}</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha contrato' : 'Contract date'}</label>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_contract_date')}</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
               value={scForm.fecha_contrato||''} onChange={setScF('fecha_contrato')} />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha inicio' : 'Start date'}</label>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_start_date')}</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
               value={scForm.fecha_inicio||''} onChange={setScF('fecha_inicio')} />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha fin estimada' : 'Est. end date'}</label>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_end_date')}</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
               value={scForm.fecha_fin||''} onChange={setScF('fecha_fin')} />
           </div>
@@ -1012,18 +1012,18 @@ function SubcontratosModule({
         <div className="border-t border-gray-100 pt-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {isEs ? 'Actividades a subcontratar *' : 'Activities to subcontract *'}
+              {t('fin_sc_form_activities')}
             </p>
             <button onClick={() => setScItems(i => [...i, { actividad_id:'', descripcion:'', unidad:'und', cantidad_contrato:'', costo_unitario:'' }])}
               className="text-xs font-medium px-3 py-1 rounded-lg"
               style={{ color: BRAND, background: '#EEF2F7' }}>
-              + {isEs ? 'Agregar' : 'Add'}
+              {t('fin_sc_form_add')}
             </button>
           </div>
 
           {scItems.length === 0 && (
             <p className="text-xs text-gray-400 text-center py-4">
-              {isEs ? 'Agrega al menos una actividad' : 'Add at least one activity'}
+              {t('fin_sc_form_no_activities')}
             </p>
           )}
 
@@ -1038,36 +1038,36 @@ function SubcontratosModule({
                       className="text-xs text-red-400 hover:text-red-600">✕</button>
                   </div>
                   <div className="mb-2">
-                    <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Actividad del presupuesto' : 'Budget activity'}</label>
+                    <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_budget_activity')}</label>
                     <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#1B3A6B]"
                       value={it.actividad_id||''} onChange={e => {
                         const act = acts.find(a => a.id === e.target.value)
                         setScItem(idx, 'actividad_id', e.target.value)
                         if (act) { setScItem(idx, 'descripcion', act.descripcion); setScItem(idx, 'unidad', act.unidad || 'und'); setScItem(idx, 'cantidad_contrato', act.cantidad ? String(act.cantidad) : '') }
                       }}>
-                      <option value="">— {isEs ? 'Seleccionar (opcional)' : 'Select (optional)'} —</option>
+                      <option value="">— {t('fin_sc_form_select_optional').replace(' —', '')} —</option>
                       {acts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
                     </select>
                   </div>
                   <div className="mb-2">
-                    <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Descripción *' : 'Description *'}</label>
+                    <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_desc')}</label>
                     <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                       value={it.descripcion||''} onChange={e => setScItem(idx,'descripcion',e.target.value)}
-                      placeholder={isEs ? 'Descripción del trabajo' : 'Work description'} />
+                      placeholder={t('fin_sc_form_act_desc_ph')} />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
+                      <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_unit')}</label>
                       <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                         value={it.unidad||'und'} onChange={e => setScItem(idx,'unidad',e.target.value)} />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Cantidad *' : 'Quantity *'}</label>
+                      <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_qty')}</label>
                       <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                         value={it.cantidad_contrato||''} onChange={e => setScItem(idx,'cantidad_contrato',e.target.value)} placeholder="0" min="0" step="0.01" />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">{isEs ? 'Costo unitario *' : 'Unit cost *'}</label>
+                      <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_unit_cost')}</label>
                       <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                         value={it.costo_unitario||''} onChange={e => setScItem(idx,'costo_unitario',e.target.value)} placeholder="0.00" min="0" step="0.01" />
                     </div>
@@ -1087,8 +1087,8 @@ function SubcontratosModule({
         {scItems.length > 0 && (
           <div className="border-t border-gray-100 pt-3">
             {[
-              [isEs ? 'Subtotal' : 'Subtotal', fmt2(scSubtotal)],
-              [`${isEs ? 'Impuesto' : 'Tax'} (${scImpPct}%)`, fmt2(scImpMonto)],
+              [t('fin_sc_form_subtotal'), fmt2(scSubtotal)],
+              [t('fin_sc_form_tax_row', { pct: scImpPct }), fmt2(scImpMonto)],
             ].map(([label, val]) => (
               <div key={label} className="flex justify-between text-sm py-1">
                 <span className="text-gray-500">{label}</span>
@@ -1096,7 +1096,7 @@ function SubcontratosModule({
               </div>
             ))}
             <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-100">
-              <span>{isEs ? 'Gran Total' : 'Grand Total'}</span>
+              <span>{t('fin_sc_form_grand_total')}</span>
               <span style={{ color: BRAND }}>{fmt2(scTotal)}</span>
             </div>
           </div>
@@ -1105,13 +1105,13 @@ function SubcontratosModule({
         <div className="flex gap-2 pt-2">
           <button onClick={() => setScView('list')}
             className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-            {isEs ? 'Cancelar' : 'Cancel'}
+            {t('btn_cancel')}
           </button>
           <button onClick={saveContrato}
             disabled={!scForm.subcontratista || scItems.length === 0}
             className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
             style={{ background: BRAND }}>
-            {isEs ? 'Guardar subcontrato' : 'Save subcontract'}
+            {t('fin_sc_form_save')}
           </button>
         </div>
       </div>
@@ -1165,7 +1165,7 @@ function SubcontratosModule({
             }}
               className="text-sm font-medium px-4 py-2 rounded-lg text-white"
               style={{ background: BRAND }}>
-              + {isEs ? 'Nuevo avalúo' : 'New valuation'}
+              {t('fin_sc_new_valuation')}
             </button>
           )}
         </div>
@@ -1173,9 +1173,9 @@ function SubcontratosModule({
         {/* Resumen financiero */}
         <div className="grid grid-cols-3 gap-4 mb-5">
           {[
-            [isEs ? 'Monto Contrato' : 'Contract Amount', fmt(scSelected.monto_total, moneda), '#1B3A6B'],
-            [isEs ? 'Avaluado (aprobado)' : 'Valued (approved)', fmt(totalPagado, moneda), '#1D9E75'],
-            [isEs ? 'Saldo' : 'Balance', fmt(parseFloat(scSelected.monto_total||0) - totalPagado, moneda), '#D97706'],
+            [t('fin_sc_col_contract'), fmt(scSelected.monto_total, moneda), '#1B3A6B'],
+            [t('fin_sc_valued'), fmt(totalPagado, moneda), '#1D9E75'],
+            [t('fin_sc_balance'), fmt(parseFloat(scSelected.monto_total||0) - totalPagado, moneda), '#D97706'],
           ].map(([label, val, color]) => (
             <div key={label} className="bg-white border border-gray-100 rounded-xl p-4">
               <p className="text-xs text-gray-400 mb-1">{label}</p>
@@ -1200,20 +1200,20 @@ function SubcontratosModule({
             <div className="mb-5 p-4 bg-amber-50 rounded-xl border border-amber-100">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
-                  🔒 {isEs ? 'Retenciones de Garantía' : 'Retention Bonds'}
+                  {t('fin_sc_retention_title')}
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-3 mb-3">
                 <div>
-                  <p className="text-xs text-amber-600">{isEs ? 'Total retenido' : 'Total retained'}</p>
+                  <p className="text-xs text-amber-600">{t('fin_sc_retained')}</p>
                   <p className="text-base font-bold font-mono text-amber-700">{fmt(retencionTotal, moneda)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-green-600">{isEs ? 'Devuelto' : 'Released'}</p>
+                  <p className="text-xs text-green-600">{t('fin_sc_released')}</p>
                   <p className="text-base font-bold font-mono text-green-600">{fmt(retencionDevuelta, moneda)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-amber-600">{isEs ? 'Pendiente devolución' : 'Pending release'}</p>
+                  <p className="text-xs text-amber-600">{t('fin_sc_pending_release')}</p>
                   <p className="text-base font-bold font-mono text-amber-700">{fmt(retencionPendiente, moneda)}</p>
                 </div>
               </div>
@@ -1253,7 +1253,7 @@ function SubcontratosModule({
                               onClick={() => dispatch({ type:'DEVOLVER_RETENCION', payload:{ retencion: ret, contrato: scSelected } })}
                               className="text-xs px-2 py-0.5 rounded-lg text-white font-medium"
                               style={{ background: '#1D9E75' }}>
-                              {isEs ? 'Devolver' : 'Release'}
+                              {t('fin_sc_release_btn')}
                             </button>
                           )}
                         </td>
@@ -1270,7 +1270,7 @@ function SubcontratosModule({
         <div className="bg-white border border-gray-100 rounded-xl overflow-hidden mb-5">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {isEs ? 'Actividades del contrato' : 'Contract activities'}
+              {t('fin_sc_contract_activities')}
             </p>
           </div>
           <table className="w-full">
@@ -1311,12 +1311,12 @@ function SubcontratosModule({
         <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {isEs ? 'Avalúos' : 'Valuations'}
+              {t('fin_sc_valuations_title')}
             </p>
           </div>
           {avaluosSc.length === 0 ? (
             <p className="text-center text-sm text-gray-400 py-8">
-              {isEs ? 'No hay avalúos registrados' : 'No valuations registered'}
+              {t('fin_sc_no_valuations')}
             </p>
           ) : (
             <table className="w-full">
@@ -1348,8 +1348,8 @@ function SubcontratosModule({
                         av.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
                         av.estado === 'borrador' ? 'bg-gray-100 text-gray-500' :
                         'bg-amber-100 text-amber-700'}`}>
-                        {av.estado === 'aprobado' ? (isEs ? 'Aprobado' : 'Approved') :
-                         av.estado === 'borrador' ? (isEs ? 'Borrador' : 'Draft') :
+                        {av.estado === 'aprobado' ? t('fin_sc_status_approved') :
+                         av.estado === 'borrador' ? t('fin_sc_status_draft') :
                          av.estado}
                       </span>
                     </td>
@@ -1358,7 +1358,7 @@ function SubcontratosModule({
                         <button onClick={() => aprobarAvaluo(av)}
                           className="text-xs px-3 py-1 rounded-lg text-white font-medium"
                           style={{ background: '#1D9E75' }}>
-                          {isEs ? 'Aprobar' : 'Approve'}
+                          {t('fin_sc_approve_btn')}
                         </button>
                       )}
                     </td>
@@ -1388,17 +1388,17 @@ function SubcontratosModule({
           {/* Cabecera */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Período inicio' : 'Period start'}</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_period_start')}</label>
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                 value={avForm.periodo_inicio||''} onChange={setAvF('periodo_inicio')} />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Período fin' : 'Period end'}</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_period_end')}</label>
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                 value={avForm.periodo_fin||''} onChange={setAvF('periodo_fin')} />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Fecha elaboración' : 'Prepared date'}</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_prepared_date')}</label>
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
                 value={avForm.fecha_elaboracion||''} onChange={setAvF('fecha_elaboracion')} />
             </div>
@@ -1450,7 +1450,7 @@ function SubcontratosModule({
                             })
                           }}
                         />
-                        {excede && <p className="text-xs text-red-500 mt-0.5">{isEs ? '⚠ Excede contrato' : '⚠ Exceeds contract'}</p>}
+                        {excede && <p className="text-xs text-red-500 mt-0.5">{t('fin_av_exceeds')}</p>}
                       </td>
                       <td className="px-3 py-2 text-sm font-mono" style={{ color: excede ? '#ef4444' : '#1D9E75' }}>{fmt2(cantAcum)}</td>
                       <td className="px-3 py-2 text-sm font-mono text-gray-500">{fmt2(cantSaldo)}</td>
@@ -1465,8 +1465,8 @@ function SubcontratosModule({
           {/* Totales */}
           <div className="border-t border-gray-100 pt-3">
             {[
-              [isEs ? 'Subtotal período actual' : 'Current period subtotal', fmt2(avSubtotal)],
-              [`${isEs ? 'Impuesto' : 'Tax'} (${scSelected.impuesto_pct||0}%)`, fmt2(avImpMonto)],
+              [t('fin_av_subtotal'), fmt2(avSubtotal)],
+              [t('fin_av_tax_row', { pct: scSelected.impuesto_pct||0 }), fmt2(avImpMonto)],
             ].map(([label, val]) => (
               <div key={label} className="flex justify-between text-sm py-1">
                 <span className="text-gray-500">{label}</span>
@@ -1474,7 +1474,7 @@ function SubcontratosModule({
               </div>
             ))}
             <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-100">
-              <span>{isEs ? 'Total Avalúo' : 'Valuation Total'}</span>
+              <span>{t('fin_av_total')}</span>
               <span style={{ color: BRAND }}>{fmt(avTotal, moneda)}</span>
             </div>
             {avRetencionPct > 0 && (
@@ -1486,7 +1486,7 @@ function SubcontratosModule({
                   <span className="font-mono text-amber-700 font-bold">-{fmt2(avRetencionMonto)}</span>
                 </div>
                 <div className="flex justify-between text-base font-bold pt-2 border-t border-amber-200 mt-1">
-                  <span className="text-gray-800">{isEs ? 'Monto a pagar' : 'Amount to pay'}</span>
+                  <span className="text-gray-800">{t('fin_av_amount_to_pay')}</span>
                   <span style={{ color: '#1D9E75' }}>{fmt(avMontoAPagar, moneda)}</span>
                 </div>
                 <p className="text-xs text-amber-600 mt-1.5">
@@ -1499,7 +1499,7 @@ function SubcontratosModule({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Notas' : 'Notes'}</label>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{t('lbl_notes')}</label>
             <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
               rows={2} value={avForm.notas||''} onChange={setAvF('notas')} />
           </div>
@@ -1507,13 +1507,13 @@ function SubcontratosModule({
           <div className="flex gap-2 pt-2">
             <button onClick={() => setScView('detail')}
               className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-              {isEs ? 'Cancelar' : 'Cancel'}
+              {t('btn_cancel')}
             </button>
             <button onClick={saveAvaluo}
               disabled={avItems.every(i => !i.cantidad_actual || parseFloat(i.cantidad_actual)===0)}
               className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
               style={{ background: BRAND }}>
-              {isEs ? 'Guardar avalúo (borrador)' : 'Save valuation (draft)'}
+              {t('fin_av_save')}
             </button>
           </div>
         </div>
