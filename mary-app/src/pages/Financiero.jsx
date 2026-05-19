@@ -393,51 +393,113 @@ export default function Financiero() {
 
           {/* ── TAB 4: ADMINISTRACIÓN ─────────────────────────────────── */}
           {tab === 4 && (
-            inds.length === 0 ? (
-              <EmptyState icon={Icons.financial}
-                title={t('fin_empty_indirect')}
-                action={puedeEditar&&!closed ? `+ ${TABS[4]}` : null}
-                onAction={puedeEditar&&!closed ? openDrawer : null} />
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_form_date'),
-                      isEs?'Categoría':'Category',
-                      isEs?'Subcategoría':'Subcategory',
-                      t('fin_form_desc'),
-                      t('fin_form_amount'),
-                      puedeEditar?'':null].filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {inds.map(c => {
-                      const catKey = CAT_KEYS.find(k =>
-                        CATEGORIAS_IND[k].es === c.categoria || CATEGORIAS_IND[k].en === c.categoria || k === c.categoria
-                      )
-                      const catLabel = catKey ? (isEs ? CATEGORIAS_IND[catKey].es : CATEGORIAS_IND[catKey].en) : c.categoria
-                      return (
-                        <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className={tdCls+' text-xs text-gray-400'}>{c.fecha||c.created_at?.slice(0,10)}</td>
-                          <td className={tdCls}><span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{catLabel}</span></td>
-                          <td className={tdCls+' text-xs text-gray-500'}>{c.subcategoria||'—'}</td>
-                          <td className={tdCls}>{c.descripcion||'—'}</td>
-                          <td className={tdCls+' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(c.monto,moneda)}</td>
-                          {puedeEditar && <td className={tdCls}><div className="flex gap-1">
-                            <TBtn onClick={()=>openEdit(c)}>{isEs?'Modificar':'Edit'}</TBtn>
-                            <TBtn danger onClick={()=>del(c.id)}>{isEs?'Eliminar':'Delete'}</TBtn>
-                          </div></td>}
+            <>
+              {comparacionIndirectos.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 mb-4 overflow-hidden">
+                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-700">{isEs ? 'Presupuestado vs ejecutado' : 'Budgeted vs executed'}</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead><tr className="border-b border-gray-100">
+                        {[isEs?'Categoría':'Category', isEs?'Presupuestado':'Budgeted', isEs?'Ejecutado':'Executed', isEs?'Diferencia':'Difference', isEs?'Estado':'Status'].map((h,i) => (
+                          <th key={i} className={thCls}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {comparacionIndirectos.map(r => {
+                          const pct    = r.presupuestado > 0 ? (r.ejecutado / r.presupuestado) * 100 : 0
+                          const status = r.diferencia < 0 ? 'sobrecosto' : r.diferencia === 0 ? 'justo' : 'ahorro'
+                          return (
+                            <tr key={r.catKey} className="border-b border-gray-50 hover:bg-gray-50/50">
+                              <td className={tdCls}>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{r.label}</span>
+                              </td>
+                              <td className={tdCls + ' font-mono'}>{fmt(r.presupuestado, moneda)}</td>
+                              <td className={tdCls + ' font-mono'}>{fmt(r.ejecutado, moneda)}</td>
+                              <td className={tdCls + ' font-mono font-bold'} style={{color: status==='sobrecosto' ? '#ef4444' : '#1D9E75'}}>
+                                {r.diferencia >= 0 ? '+' : ''}{fmt(r.diferencia, moneda)}
+                              </td>
+                              <td className={tdCls}>
+                                <div className="flex flex-col gap-1">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit ${
+                                    status === 'ahorro'     ? 'bg-green-100 text-green-700' :
+                                    status === 'sobrecosto' ? 'bg-red-100 text-red-600' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {status === 'ahorro' ? (isEs ? 'Ahorro' : 'Saving') : status === 'sobrecosto' ? (isEs ? 'Sobrecosto' : 'Overrun') : (isEs ? 'En punto' : 'On budget')}
+                                  </span>
+                                  <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full" style={{
+                                      width: `${Math.min(100, pct)}%`,
+                                      background: pct > 100 ? '#ef4444' : pct > 80 ? '#e0982c' : '#1D9E75'
+                                    }} />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        <tr className="bg-gray-50">
+                          <td className={tdCls + ' font-semibold text-gray-600'}>{isEs ? 'Total' : 'Total'}</td>
+                          <td className={tdCls + ' font-mono font-bold'} style={{color:'#1B3A6B'}}>{fmt(totalIndPres, moneda)}</td>
+                          <td className={tdCls + ' font-mono font-bold'} style={{color:'#1B3A6B'}}>{fmt(totalInd, moneda)}</td>
+                          <td className={tdCls + ' font-mono font-bold'} style={{color: totalIndPres - totalInd < 0 ? '#ef4444' : '#1D9E75'}}>
+                            {totalIndPres - totalInd >= 0 ? '+' : ''}{fmt(totalIndPres - totalInd, moneda)}
+                          </td>
+                          <td/>
                         </tr>
-                      )
-                    })}
-                    <tr className="bg-gray-50">
-                      <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
-                      <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalInd,moneda)}</td>
-                      {puedeEditar&&<td/>}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {inds.length === 0 ? (
+                <EmptyState icon={Icons.financial}
+                  title={t('fin_empty_indirect')}
+                  action={puedeEditar&&!closed ? `+ ${TABS[4]}` : null}
+                  onAction={puedeEditar&&!closed ? openDrawer : null} />
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+                  <table className="w-full">
+                    <thead><tr className="bg-gray-50 border-b border-gray-100">
+                      {[t('fin_form_date'),
+                        isEs?'Categoría':'Category',
+                        isEs?'Subcategoría':'Subcategory',
+                        t('fin_form_desc'),
+                        t('fin_form_amount'),
+                        puedeEditar?'':null].filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {inds.map(c => {
+                        const catKey = CAT_KEYS.find(k =>
+                          CATEGORIAS_IND[k].es === c.categoria || CATEGORIAS_IND[k].en === c.categoria || k === c.categoria
+                        )
+                        const catLabel = catKey ? (isEs ? CATEGORIAS_IND[catKey].es : CATEGORIAS_IND[catKey].en) : c.categoria
+                        return (
+                          <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <td className={tdCls+' text-xs text-gray-400'}>{c.fecha||c.created_at?.slice(0,10)}</td>
+                            <td className={tdCls}><span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{catLabel}</span></td>
+                            <td className={tdCls+' text-xs text-gray-500'}>{c.subcategoria||'—'}</td>
+                            <td className={tdCls}>{c.descripcion||'—'}</td>
+                            <td className={tdCls+' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(c.monto,moneda)}</td>
+                            {puedeEditar && <td className={tdCls}><div className="flex gap-1">
+                              <TBtn onClick={()=>openEdit(c)}>{isEs?'Modificar':'Edit'}</TBtn>
+                              <TBtn danger onClick={()=>del(c.id)}>{isEs?'Eliminar':'Delete'}</TBtn>
+                            </div></td>}
+                          </tr>
+                        )
+                      })}
+                      <tr className="bg-gray-50">
+                        <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
+                        <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalInd,moneda)}</td>
+                        {puedeEditar&&<td/>}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

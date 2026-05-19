@@ -12,7 +12,7 @@ export default function Presupuesto() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
   const { can } = usePermissions()
-  const { proyectos, presupuesto } = state
+  const { proyectos, presupuesto, presupuesto_indirectos = [] } = state
 
   const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer]         = useState(false)
@@ -23,6 +23,17 @@ export default function Presupuesto() {
 
   const isEs = lang === 'ES'
   const puedeEditar = can('presupuesto_editar')
+
+  const [indForm, setIndForm]   = useState({ categoria: '', monto_presupuestado: '' })
+  const [indEdit, setIndEdit]   = useState(null)
+  const setIndF = k => e => setIndForm(f => ({ ...f, [k]: e.target.value }))
+
+  const CATS_IND = [
+    { key: 'Administración de obra',              label: isEs ? 'Administración de obra'          : 'Project Administration' },
+    { key: 'Instalaciones y servicios generales', label: isEs ? 'Instalaciones y servicios gral.' : 'Facilities & General Services' },
+    { key: 'Seguros, fianzas y garantías',        label: isEs ? 'Seguros, fianzas y garantías'    : 'Insurance, Bonds & Guarantees' },
+    { key: 'Servicios profesionales y legales',   label: isEs ? 'Servicios profesionales y legales': 'Professional & Legal Services' },
+  ]
 
   // Auto-sync desde Supabase al seleccionar un proyecto
   // Evita mostrar datos desincronizados del store local
@@ -109,6 +120,27 @@ export default function Presupuesto() {
   }
 
   const moneda   = proy?.moneda || 'USD'
+
+  const indsDelProy   = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
+  const totalIndirecto = indsDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+  const subtotalPres   = grandTotal + totalIndirecto
+  const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
+  const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
+  const utilidadMonto  = subtotalPres * (utilidadPct / 100)
+  const granTotal      = subtotalPres + utilidadMonto
+  const impuestoMonto  = granTotal * (impuestoPct / 100)
+  const totalConImp    = granTotal + impuestoMonto
+
+  const saveInd = () => {
+    if (!indForm.categoria || !indForm.monto_presupuestado) return
+    if (indEdit) {
+      dispatch({ type: 'UPD_PRES_IND', payload: { ...indForm, id: indEdit, proyecto_id: proyId } })
+    } else {
+      dispatch({ type: 'ADD_PRES_IND', payload: { ...indForm, proyecto_id: proyId } })
+    }
+    setIndForm({ categoria: '', monto_presupuestado: '' })
+    setIndEdit(null)
+  }
   const tipoLabel = (tipo) => {
     if (tipo==='etapa')     return t('pres_form_stage')
     if (tipo==='sub_etapa') return t('pres_form_substage')
@@ -247,6 +279,115 @@ export default function Presupuesto() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── SECCIÓN COSTOS INDIRECTOS PRESUPUESTADOS ── */}
+      {proyId && (
+        <div className="mt-6 bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Costos indirectos presupuestados' : 'Budgeted indirect costs'}</p>
+          </div>
+          <div className="p-4">
+            {puedeEditar && !closed && (
+              <div className="flex gap-2 mb-4 flex-wrap">
+                <select className={selectCls + ' flex-1 min-w-[220px]'}
+                  value={indForm.categoria} onChange={setIndF('categoria')}>
+                  <option value="">{isEs ? '— Selecciona categoría —' : '— Select category —'}</option>
+                  {CATS_IND.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+                <input type="number" className={inputCls + ' w-36'}
+                  placeholder={isEs ? 'Monto presup.' : 'Budget amount'}
+                  value={indForm.monto_presupuestado} onChange={setIndF('monto_presupuestado')}
+                  min="0" step="0.01" />
+                <PrimaryBtn onClick={saveInd} disabled={!indForm.categoria || !indForm.monto_presupuestado}>
+                  {indEdit ? t('btn_save') : t('btn_add')}
+                </PrimaryBtn>
+                {indEdit && (
+                  <SecondaryBtn onClick={() => { setIndForm({ categoria: '', monto_presupuestado: '' }); setIndEdit(null) }}>
+                    {t('btn_cancel')}
+                  </SecondaryBtn>
+                )}
+              </div>
+            )}
+            {indsDelProy.length === 0 ? (
+              <p className="text-xs text-gray-400 py-2 text-center">{isEs ? 'Sin costos indirectos presupuestados' : 'No budgeted indirect costs'}</p>
+            ) : (
+              <table className="w-full">
+                <thead><tr className="border-b border-gray-100">
+                  <th className="text-left text-xs text-gray-500 px-2 py-2">{isEs ? 'Categoría' : 'Category'}</th>
+                  <th className="text-right text-xs text-gray-500 px-2 py-2">{isEs ? 'Monto presupuestado' : 'Budget amount'}</th>
+                  {puedeEditar && <th className="px-2 py-2"></th>}
+                </tr></thead>
+                <tbody>
+                  {indsDelProy.map(ind => (
+                    <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-2 py-2 text-sm text-gray-700">{ind.categoria}</td>
+                      <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{color:'#1B3A6B'}}>{fmt(ind.monto_presupuestado, moneda)}</td>
+                      {puedeEditar && (
+                        <td className="px-2 py-2">
+                          <div className="flex gap-1">
+                            <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
+                            <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: ind.id })}>{t('btn_delete')}</TBtn>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-50">
+                    <td className="px-2 py-2 text-xs font-semibold text-gray-500 text-right">{isEs ? 'Total indirecto' : 'Total indirect'}</td>
+                    <td className="px-2 py-2 text-sm font-mono font-bold text-right" style={{color:'#1B3A6B'}}>{fmt(totalIndirecto, moneda)}</td>
+                    {puedeEditar && <td/>}
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── RESUMEN FINANCIERO COMPLETO ── */}
+      {proyId && (
+        <div className="mt-4 bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Resumen del presupuesto' : 'Budget summary'}</p>
+          </div>
+          <div className="p-4 flex flex-col gap-1.5">
+            {[
+              [isEs ? 'Costo directo (actividades)' : 'Direct cost (activities)', grandTotal, '#374151'],
+              [isEs ? 'Costo indirecto' : 'Indirect cost', totalIndirecto, '#374151'],
+            ].map(([label, val, color]) => (
+              <div key={label} className="flex justify-between text-sm py-1 border-b border-gray-50">
+                <span className="text-gray-500">{label}</span>
+                <span className="font-mono" style={{color}}>{fmt(val, moneda)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-sm py-1 border-b border-gray-100">
+              <span className="text-gray-600 font-medium">{isEs ? 'Subtotal' : 'Subtotal'}</span>
+              <span className="font-mono font-medium text-gray-700">{fmt(subtotalPres, moneda)}</span>
+            </div>
+            <div className="flex justify-between text-sm py-1 border-b border-gray-50">
+              <span className="text-gray-500">{isEs ? `Utilidad (${utilidadPct}%)` : `Profit (${utilidadPct}%)`}</span>
+              <span className="font-mono text-gray-600">{fmt(utilidadMonto, moneda)}</span>
+            </div>
+            <div className="flex justify-between text-base font-bold py-2 border-b border-gray-200">
+              <span className="text-gray-800">{isEs ? 'Gran total' : 'Grand total'}</span>
+              <span className="font-mono" style={{color:'#1D9E75'}}>{fmt(granTotal, moneda)}</span>
+            </div>
+            <div className="flex justify-between text-sm py-1">
+              <span className="text-gray-500">{proy?.impuesto_descripcion || (isEs ? `Impuesto (${impuestoPct}%)` : `Tax (${impuestoPct})`)}</span>
+              <span className="font-mono text-gray-600">{fmt(impuestoMonto, moneda)}</span>
+            </div>
+            <div className="flex justify-between text-base font-bold py-2 bg-blue-50 rounded-lg px-3 mt-1">
+              <span style={{color:'#1B3A6B'}}>{isEs ? 'Total con impuestos' : 'Total with taxes'}</span>
+              <span className="font-mono" style={{color:'#1B3A6B'}}>{fmt(totalConImp, moneda)}</span>
+            </div>
+            {(!proy?.utilidad_pct && !proy?.impuesto_pct) && (
+              <p className="text-xs text-amber-600 mt-2">
+                {isEs ? '* Define el % de utilidad e impuesto en la configuración del proyecto.' : '* Set profit % and tax % in the project settings.'}
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       {puedeEditar && (

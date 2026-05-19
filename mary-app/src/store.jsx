@@ -13,6 +13,7 @@ const INIT = {
   subcontratos_contratos: [], subcontratos_items: [],
   subcontratos_avaluos: [], subcontratos_avaluo_items: [],
   ordenes_cambio: [], ordenes_cambio_items: [],
+  presupuesto_indirectos: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
   loaded: false
 }
@@ -200,6 +201,11 @@ function reducer(state, action) {
 
     case 'ADD_SOL_ELIM': return { ...state, solicitudes_eliminacion: [...state.solicitudes_eliminacion, action.payload] }
     case 'UPD_SOL_ELIM': return { ...state, solicitudes_eliminacion: state.solicitudes_eliminacion.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
+
+    case 'ADD_PRES_IND': return { ...state, presupuesto_indirectos: [...(state.presupuesto_indirectos||[]), action.payload] }
+    case 'UPD_PRES_IND': return { ...state, presupuesto_indirectos: (state.presupuesto_indirectos||[]).map(p => p.id === action.payload.id ? { ...p, ...action.payload } : p) }
+    case 'DEL_PRES_IND': return { ...state, presupuesto_indirectos: (state.presupuesto_indirectos||[]).filter(p => p.id !== action.payload) }
+    case 'REFRESH_PRES_IND': return { ...state, presupuesto_indirectos: action.payload }
 case 'LOAD_TABLE':
   return { ...state, [action.payload.key]: action.payload.data }
     default: return state
@@ -224,6 +230,7 @@ export function StoreProvider({ children, tenantId }) {
         'subcontratos_avaluos','subcontratos_avaluo_items',
         'ordenes_cambio','ordenes_cambio_items',
         'avaluos_cliente','avaluos_cliente_items',
+        'presupuesto_indirectos',
       ]
       const tenantResults = await Promise.all(
         tablasTenant.map(t => supabase.from(t).select('*').eq('tenant_id', tenantId))
@@ -266,6 +273,29 @@ useEffect(() => {
   async function dbDispatch(action) {
     switch (action.type) {
 
+      case 'ADD_PRES_IND': {
+        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
+        await supabase.from('presupuesto_indirectos').insert(item)
+        dispatch({ type: 'ADD_PRES_IND', payload: item })
+        break
+      }
+      case 'UPD_PRES_IND': {
+        const { id, ...fields } = action.payload
+        await supabase.from('presupuesto_indirectos').update(fields).eq('id', id)
+        dispatch({ type: 'UPD_PRES_IND', payload: action.payload })
+        break
+      }
+      case 'DEL_PRES_IND': {
+        await supabase.from('presupuesto_indirectos').delete().eq('id', action.payload)
+        dispatch({ type: 'DEL_PRES_IND', payload: action.payload })
+        break
+      }
+      case 'REFRESH_PRES_IND': {
+        const { data } = await supabase.from('presupuesto_indirectos').select('*').eq('proyecto_id', action.payload).eq('tenant_id', tenantId)
+        dispatch({ type: 'REFRESH_PRES_IND', payload: data || [] })
+        break
+      }
+
       case 'ADD_PROYECTO': {
         const code = genProjectCode(state.proyectos)
         const item = { ...action.payload, id: uuid(), project_code: code, created_at: today(), tenant_id: tenantId }
@@ -281,6 +311,7 @@ useEffect(() => {
       case 'DEL_PROYECTO': {
         const pid = action.payload
         await supabase.from('presupuesto').delete().eq('proyecto_id', pid)
+        await supabase.from('presupuesto_indirectos').delete().eq('proyecto_id', pid)
         await supabase.from('fases').delete().eq('proyecto_id', pid)
         await supabase.from('materiales_presupuestados').delete().eq('proyecto_id', pid)
         await supabase.from('salidas').delete().eq('proyecto_id', pid)

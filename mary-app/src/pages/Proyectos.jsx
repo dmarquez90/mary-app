@@ -24,7 +24,7 @@ const ESTADOS_USA = [
   'South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
   'Virginia','Washington','West Virginia','Wisconsin','Wyoming'
 ]
-const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', pais:'', estado_usa:'', moneda:'USD', fecha_inicio:today(), fecha_fin_estimada:'', estado:'planificacion' })
+const empty = () => ({ nombre:'', cliente_externo:'', direccion:'', ciudad:'', pais:'', estado_usa:'', moneda:'USD', fecha_inicio:today(), fecha_fin_estimada:'', estado:'planificacion', utilidad_pct:'', impuesto_pct:'', impuesto_descripcion:'' })
 
 export default function Proyectos({ onNavigate }) {
   const { state, dispatch } = useStore()
@@ -261,6 +261,8 @@ export default function Proyectos({ onNavigate }) {
                   [isEs ? 'País' : 'Country', proyecto.pais || '—'],
                   ...(proyecto.estado_usa ? [[isEs ? 'Estado (EE.UU.)' : 'State (USA)', proyecto.estado_usa]] : []),
                   [t('proy_budget_label'), new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
+                  ...(proyecto.utilidad_pct ? [[isEs ? 'Utilidad' : 'Profit margin', `${proyecto.utilidad_pct}%`]] : []),
+                  ...(proyecto.impuesto_pct ? [[isEs ? 'Impuesto' : 'Tax', `${proyecto.impuesto_pct}% ${proyecto.impuesto_descripcion||''}`]] : []),
                 ].map(([k,v]) => (
                   <div key={k}>
                     <p className="text-xs text-gray-400">{k}</p>
@@ -386,6 +388,25 @@ export default function Proyectos({ onNavigate }) {
           </Field>
           <Field label={t('proy_form_end')}>
             <input type="date" className={inputCls} value={form.fecha_fin_estimada} onChange={set('fecha_fin_estimada')} />
+          </Field>
+        </div>
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            {isEs ? 'Utilidad e impuestos' : 'Profit & taxes'}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={isEs ? 'Utilidad (%)' : 'Profit margin (%)'}>
+              <input type="number" className={inputCls} value={form.utilidad_pct||''} onChange={set('utilidad_pct')}
+                placeholder="0.00" min="0" max="100" step="0.01" />
+            </Field>
+            <Field label={isEs ? 'Impuesto (%)' : 'Tax (%)'}>
+              <input type="number" className={inputCls} value={form.impuesto_pct||''} onChange={set('impuesto_pct')}
+                placeholder="0.00" min="0" max="100" step="0.01" />
+            </Field>
+          </div>
+          <Field label={isEs ? 'Descripción del impuesto' : 'Tax description'}>
+            <input className={inputCls} value={form.impuesto_descripcion||''} onChange={set('impuesto_descripcion')}
+              placeholder={isEs ? 'Ej: Sales Tax CA 9.5%, IR 1%' : 'E.g.: Sales Tax CA 9.5%, IR 1%'} />
           </Field>
         </div>
         <div className="flex gap-2 mt-auto pt-2">
