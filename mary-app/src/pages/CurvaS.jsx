@@ -146,26 +146,43 @@ export default function CurvaS() {
       realPorPeriodo[k] = (realPorPeriodo[k] || 0) + c.monto
     })
 
-    let presAcum = 0
-    let realAcum = 0
+    // Ingresos cobrados — avalúos aprobados agrupados por periodo_fin
+    const ingresoPorPeriodo = {}
+    avaluos_cliente
+      .filter(a => a.proyecto_id === proyId && a.estado === 'aprobado' && a.periodo_fin)
+      .forEach(a => {
+        const k = closestPeriod(a.periodo_fin)
+        ingresoPorPeriodo[k] = (ingresoPorPeriodo[k] || 0) + parseFloat(a.total || a.monto_total || 0)
+      })
+
+    let presAcum    = 0
+    let realAcum    = 0
+    let ingresoAcum = 0
 
     return periodos.map(({ key, label }) => {
       const montoPres = presPorPeriodo[key] || 0
-      presAcum += montoPres
-      realAcum += (realPorPeriodo[key] || 0)
+      presAcum    += montoPres
+      realAcum    += (realPorPeriodo[key] || 0)
+      ingresoAcum += (ingresoPorPeriodo[key] || 0)
       return {
-        periodo:      label,
-        pres_periodo: Math.round(montoPres * 100) / 100,
-        real_periodo: Math.round((realPorPeriodo[key] || 0) * 100) / 100,
-        presAcum:     Math.round(Math.min(presAcum, budget) * 100) / 100,
-        realAcum:     Math.round(realAcum * 100) / 100,
+        periodo:        label,
+        pres_periodo:   Math.round(montoPres * 100) / 100,
+        real_periodo:   Math.round((realPorPeriodo[key] || 0) * 100) / 100,
+        ingreso_periodo:Math.round((ingresoPorPeriodo[key] || 0) * 100) / 100,
+        presAcum:       Math.round(Math.min(presAcum, budget) * 100) / 100,
+        realAcum:       Math.round(realAcum * 100) / 100,
+        ingresoAcum:    Math.round(ingresoAcum * 100) / 100,
       }
     })
   }, [allCosts, budget, granularity, proy, avaluos_cliente, proyId])
 
-  const totalReal  = allCosts.reduce((s,c) => s + c.monto, 0)
-  const isEs       = useContext(LangContext).lang === 'ES'
-  const avsDelProy = avaluos_cliente.filter(a => a.proyecto_id === proyId)
+  const totalReal      = allCosts.reduce((s,c) => s + c.monto, 0)
+  const isEs           = useContext(LangContext).lang === 'ES'
+  const avsDelProy     = avaluos_cliente.filter(a => a.proyecto_id === proyId)
+  const totalIngresado = avaluos_cliente
+    .filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
+    .reduce((s,a) => s + parseFloat(a.total || a.monto_total || 0), 0)
+  const flujo          = totalIngresado - totalReal
   const desviacion = totalReal - budget
 
   const actDeviations = useMemo(() => {
@@ -228,7 +245,7 @@ export default function CurvaS() {
         <EmptyState icon={Icons.curvas} title={t('curva_no_data')} subtitle={t('curva_no_data_sub')} />
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             <StatCard label={t('curva_kpi_budget')} value={fmt(budget, moneda)} />
             <StatCard label={t('curva_kpi_real')}   value={fmt(totalReal, moneda)} />
             <StatCard
@@ -241,6 +258,17 @@ export default function CurvaS() {
               label={t('curva_kpi_execution')}
               value={budget > 0 ? `${((totalReal/budget)*100).toFixed(1)}%` : '0%'}
               sub={t('curva_kpi_execution_sub')}
+            />
+            <StatCard
+              label={isEs ? 'Cobrado (aprobado)' : 'Billed (approved)'}
+              value={fmt(totalIngresado, moneda)}
+              color='#7C3AED'
+            />
+            <StatCard
+              label={isEs ? 'Flujo (cobrado - gasto)' : 'Cash flow (billed - cost)'}
+              value={`${flujo>=0?'+':''}${fmt(flujo,moneda)}`}
+              color={flujo >= 0 ? '#1D9E75' : '#ef4444'}
+              sub={flujo >= 0 ? (isEs?'Flujo positivo':'Positive flow') : (isEs?'Flujo negativo':'Negative flow')}
             />
           </div>
 
@@ -299,6 +327,16 @@ export default function CurvaS() {
                     name={t('curva_line_real')}
                     stroke="#1D9E75"
                     strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r:5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ingresoAcum"
+                    name={isEs ? 'Cobrado acumulado' : 'Accumulated billed'}
+                    stroke="#7C3AED"
+                    strokeWidth={2.5}
+                    strokeDasharray="6 3"
                     dot={false}
                     activeDot={{ r:5 }}
                   />
