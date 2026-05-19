@@ -82,15 +82,33 @@ export default function MatPresupuestados() {
 
   const precioPromedio = (materialId) => {
     if (!materialId) return 0
-    const ents = entradas.filter(e => e.material_id === materialId)
-    const totalCant = ents.reduce((s, e) => s + parseFloat(e.cantidad || 0), 0)
-    const totalVal  = ents.reduce((s, e) => s + parseFloat(e.cantidad || 0) * parseFloat(e.precio_unitario || 0), 0)
+    const ents = entradas.filter(e => e.material_id === materialId && e.proyecto_id === proyId)
+    const entsAll = ents.length > 0 ? ents : entradas.filter(e => e.material_id === materialId)
+    const totalCant = entsAll.reduce((s, e) => s + parseFloat(e.cantidad || 0), 0)
+    const totalVal  = entsAll.reduce((s, e) => s + parseFloat(e.cantidad || 0) * parseFloat(e.precio_unitario || 0), 0)
     return totalCant > 0 ? totalVal / totalCant : 0
   }
 
+  const costoPres = (mp) => {
+    const act = presupuesto.find(b => b.id === mp.actividad_id)
+    if (!act) return 0
+    return parseFloat(mp.cantidad_presupuestada || 0) * parseFloat(act.costo_materiales || 0)
+  }
+
+  const costoConsumido = (mp) => {
+    const qty  = cantConsumida(mp)
+    const prec = precioPromedio(mp.material_id)
+    return qty * prec
+  }
+
   const totalPresupuestado = useMemo(() =>
-    matsPres.reduce((sum, mp) => sum + parseFloat(mp.cantidad_presupuestada || 0) * precioPromedio(mp.material_id), 0),
-    [matsPres, entradas]
+    matsPres.reduce((sum, mp) => sum + costoPres(mp), 0),
+    [matsPres, presupuesto]
+  )
+
+  const totalConsumido = useMemo(() =>
+    matsPres.reduce((sum, mp) => sum + costoConsumido(mp), 0),
+    [matsPres, salidas, entradas]
   )
 
   const totalAdicionales = matsPres.filter(mp => mp.es_adicional).length
@@ -157,6 +175,7 @@ export default function MatPresupuestados() {
               { label: isEs ? 'Adicionales' : 'Additional', value: totalAdicionales, color: totalAdicionales > 0 ? '#e0982c' : '#6b7280' },
               { label: t('mp_kpi_activities'), value: totalActividades, color: '#1B3A6B' },
               { label: t('mp_kpi_budget_value'), value: fmt(totalPresupuestado, moneda), color: '#1D9E75' },
+              { label: isEs ? 'Costo consumido' : 'Consumed cost', value: fmt(totalConsumido, moneda), color: totalConsumido > totalPresupuestado ? '#ef4444' : '#1D9E75' },
             ].map((k, i) => (
               <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -201,10 +220,13 @@ export default function MatPresupuestados() {
                     {[
                       isEs ? 'Material' : 'Material',
                       isEs ? 'Unidad' : 'Unit',
-                      isEs ? 'Presupuestado' : 'Budgeted',
-                      isEs ? 'Solicitado' : 'Requested',
-                      isEs ? 'Consumido' : 'Consumed',
-                      isEs ? 'Diferencia' : 'Difference',
+                      isEs ? 'Qty pres.' : 'Qty budg.',
+                      isEs ? 'Costo pres.' : 'Budget cost',
+                      isEs ? 'Qty solicit.' : 'Qty req.',
+                      isEs ? 'Qty consumi.' : 'Qty consumed',
+                      isEs ? 'Costo consum.' : 'Consumed cost',
+                      isEs ? 'Dif. qty' : 'Diff. qty',
+                      isEs ? 'Dif. $' : 'Diff. $',
                       isEs ? 'Actividad' : 'Activity',
                       isEs ? 'Estado' : 'Status',
                       puedeEditar ? '' : null,
@@ -246,12 +268,17 @@ export default function MatPresupuestados() {
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">{getUnidad(mp)}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-700">{fmtNum(presup)}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(costoPres(mp), moneda)}</td>
                         <td className="px-4 py-3 text-sm font-mono" style={{ color: solicit > presup ? '#ef4444' : '#1B3A6B' }}>
                           {fmtNum(solicit)}{solicit > presup && ' ⚠'}
                         </td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(consumido)}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(costoConsumido(mp), moneda)}</td>
                         <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: dif < 0 ? '#ef4444' : '#1D9E75' }}>
                           {dif >= 0 ? '+' : ''}{fmtNum(dif)}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: costoPres(mp) - costoConsumido(mp) < 0 ? '#ef4444' : '#1D9E75' }}>
+                          {costoPres(mp) - costoConsumido(mp) >= 0 ? '+' : ''}{fmt(costoPres(mp) - costoConsumido(mp), moneda)}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">{getActividad(mp)}</td>
                         <td className="px-4 py-3">

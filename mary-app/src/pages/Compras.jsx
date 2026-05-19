@@ -737,13 +737,11 @@ export default function Compras() {
                   placeholder={t('inv_form_material') + '...'}
                 />
 
-                {/* Campo libre — siempre visible si no hay material del catálogo */}
+             {/* Campo libre — siempre visible si no hay material del catálogo */}
                 {!it.material_id && (
                   <>
                     <input className={inputCls}
-                      placeholder={t('btn_cancel') === 'Cancel'
-                        ? 'Or write description freely (e.g.: Pencil, Cleaning service...)'
-                        : 'O escribe libremente (ej: Lápiz, Servicio de limpieza...)'}
+                      placeholder={t('btn_cancel') === 'Cancel' ? 'Or write description freely...' : 'O escribe libremente (ej: Lapiz...)'}
                       value={it.descripcion_libre||''}
                       onChange={e => setSolItem(idx, 'descripcion_libre', e.target.value)} />
                     {it.descripcion_libre && (
