@@ -19,6 +19,7 @@ import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
 import maryLogo from './assets/mary-logo.png'
+import NotificacionesPanel from './pages/NotificacionesPanel'
 
 
 const BRAND       = '#1B3A6B'
@@ -198,6 +199,8 @@ function Layout() {
                 {new Date().toLocaleDateString(isEs ? 'es' : 'en', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
               </span>
             </div>
+            <div className="w-px h-8 bg-gray-200" />
+            <NotificacionesPanel onNavigate={setPage} />
             <div className="w-px h-8 bg-gray-200" />
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow"

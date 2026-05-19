@@ -15,6 +15,7 @@ const INIT = {
   ordenes_cambio: [], ordenes_cambio_items: [],
   presupuesto_indirectos: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
+  notificaciones: [],
   loaded: false
 }
 
@@ -208,6 +209,13 @@ function reducer(state, action) {
     case 'REFRESH_PRES_IND': return { ...state, presupuesto_indirectos: action.payload }
 case 'LOAD_TABLE':
   return { ...state, [action.payload.key]: action.payload.data }
+
+    // NOTIFICACIONES
+    case 'ADD_NOTIF':   return { ...state, notificaciones: [action.payload, ...(state.notificaciones||[])] }
+    case 'MARK_NOTIF_READ': return { ...state, notificaciones: (state.notificaciones||[]).map(n => n.id === action.payload ? { ...n, leida: true } : n) }
+    case 'MARK_ALL_NOTIF_READ': return { ...state, notificaciones: (state.notificaciones||[]).map(n => ({ ...n, leida: true })) }
+    case 'LOAD_NOTIFS': return { ...state, notificaciones: action.payload }
+
     default: return state
   }
 }
@@ -238,19 +246,37 @@ export function StoreProvider({ children, tenantId }) {
       const payload = {}
       tablasTenant.forEach((t, i) => { payload[t] = tenantResults[i].data || [] })
       dispatch({ type: 'LOAD_ALL', payload })
+
+      // Cargar notificaciones del usuario actual
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: notifs } = await supabase
+          .from('notificaciones')
+          .select('*')
+          .eq('usuario_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        dispatch({ type: 'LOAD_NOTIFS', payload: notifs || [] })
+      }
     }
     loadAll()
   }, [tenantId])
+
 // ── REALTIME LISTENERS ──────────────────────────────────────────────
 useEffect(() => {
   if (!tenantId) return
 
   const REALTIME_TABLES = [
+    'proyectos', 'fases', 'presupuesto', 'presupuesto_indirectos',
+    'materiales', 'entradas', 'salidas',
     'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
+    'costos_directos', 'nominas', 'subcontratos', 'equipos', 'costos_indirectos',
+    'materiales_presupuestados', 'solicitudes_eliminacion',
+    'subcontratos_contratos', 'subcontratos_items',
+    'subcontratos_avaluos', 'subcontratos_avaluo_items',
     'ordenes_cambio', 'ordenes_cambio_items',
     'avaluos_cliente', 'avaluos_cliente_items',
-    'presupuesto', 'materiales', 'entradas', 'salidas',
   ]
 
   const channels = REALTIME_TABLES.map(table =>
@@ -268,9 +294,53 @@ useEffect(() => {
       .subscribe()
   )
 
-  return () => { channels.forEach(ch => supabase.removeChannel(ch)) }
+  // Realtime para notificaciones del usuario actual
+  let notifChannel = null
+  supabase.auth.getUser().then(({ data: { user } }) => {
+    if (!user) return
+    notifChannel = supabase
+      .channel(`rt_notificaciones_${user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notificaciones',
+        filter: `usuario_id=eq.${user.id}`,
+      }, (payload) => {
+        dispatch({ type: 'ADD_NOTIF', payload: payload.new })
+      })
+      .subscribe()
+  })
+
+  return () => {
+    channels.forEach(ch => supabase.removeChannel(ch))
+    if (notifChannel) supabase.removeChannel(notifChannel)
+  }
 }, [tenantId])
   async function dbDispatch(action) {
+
+    // ── Helper: enviar notificación a usuarios del tenant ──────────────
+    async function notify({ tipo, titulo, mensaje, modulo, referencia_id, roles }) {
+      try {
+        // Obtener usuarios del tenant que tengan los roles indicados
+        let query = supabase.from('usuarios').select('id').eq('tenant_id', tenantId).eq('activo', true)
+        if (roles?.length) query = query.in('rol', roles)
+        const { data: usuarios } = await query
+        if (!usuarios?.length) return
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        // No notificar al propio usuario que hace la acción
+        const targets = usuarios.filter(u => u.id !== currentUser?.id)
+        if (!targets.length) return
+        const notifs = targets.map(u => ({
+          tenant_id: tenantId,
+          usuario_id: u.id,
+          tipo, titulo, mensaje, modulo,
+          referencia_id: referencia_id || null,
+          leida: false,
+        }))
+        await supabase.from('notificaciones').insert(notifs)
+      } catch (e) { console.error('notify error:', e) }
+    }
+
     switch (action.type) {
 
       case 'ADD_PRES_IND': {
@@ -635,12 +705,28 @@ useEffect(() => {
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
+        await notify({
+          tipo: 'aprobacion',
+          titulo: '✅ Solicitud de eliminación aprobada',
+          mensaje: `Tu solicitud de eliminar ${sol.tipo === 'entrada' ? 'entrada' : 'salida'} de "${sol.material_desc}" fue aprobada.`,
+          modulo: 'inventario',
+          referencia_id: sol.id,
+          roles: ['bodeguero'],
+        })
         break
       }
       case 'RECHAZAR_SOL_ELIM': {
         const upd = { estado: 'rechazada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', action.payload.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: action.payload.id, ...upd } })
+        await notify({
+          tipo: 'rechazo',
+          titulo: '❌ Solicitud de eliminación rechazada',
+          mensaje: `Tu solicitud de eliminación fue rechazada.`,
+          modulo: 'inventario',
+          referencia_id: action.payload.id,
+          roles: ['bodeguero'],
+        })
         break
       }
 
@@ -654,6 +740,15 @@ useEffect(() => {
           if (itemsError) console.error('Error al insertar solicitud_items:', itemsError, items)
         }
         dispatch({ type: 'ADD_SOLICITUD', payload: { solicitud: sol, items } })
+        // Notificar a gerentes y coordinadores
+        await notify({
+          tipo: 'solicitud',
+          titulo: '📋 Nueva solicitud de compra',
+          mensaje: `Proyecto: ${sol.proyecto_id ? (action.payload.proyecto_nombre || '') : ''}`,
+          modulo: 'compras',
+          referencia_id: sol.id,
+          roles: ['client_admin', 'coordinador', 'gerente'],
+        })
         break
       }
       case 'UPD_SOLICITUD_ESTADO': {
@@ -730,6 +825,27 @@ useEffect(() => {
       case 'UPD_OC_ESTADO': {
         await supabase.from('ordenes_compra').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
+        // Notificar según estado
+        if (action.payload.estado === 'aprobada') {
+          const oc = action.payload
+          await notify({
+            tipo: 'aprobacion',
+            titulo: '✅ Orden de Compra aprobada',
+            mensaje: `La OC ha sido aprobada y está lista para recibir materiales.`,
+            modulo: 'compras',
+            referencia_id: oc.id,
+            roles: ['residente', 'bodeguero', 'coordinador'],
+          })
+        } else if (action.payload.estado === 'rechazada') {
+          await notify({
+            tipo: 'rechazo',
+            titulo: '❌ Orden de Compra rechazada',
+            mensaje: `La OC fue rechazada. Revisa los detalles.`,
+            modulo: 'compras',
+            referencia_id: action.payload.id,
+            roles: ['residente', 'coordinador'],
+          })
+        }
         break
       }
       case 'DEL_OC': {
@@ -818,6 +934,14 @@ useEffect(() => {
         }
         await supabase.from('costos_directos').insert(costo)
         dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
+        await notify({
+          tipo: 'aprobacion',
+          titulo: '✅ Avalúo de subcontrato aprobado',
+          mensaje: `Avalúo #${av.numero} de ${contrato.subcontratista} fue aprobado.`,
+          modulo: 'financiero',
+          referencia_id: av.id,
+          roles: ['client_admin', 'gerente', 'contador'],
+        })
         break
       }
 
@@ -928,6 +1052,34 @@ useEffect(() => {
       case 'UPD_ORDEN_CAMBIO_ESTADO': {
         await supabase.from('ordenes_cambio').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
+        if (action.payload.estado === 'aprobada') {
+          await notify({
+            tipo: 'aprobacion',
+            titulo: '✅ Orden de Cambio aprobada',
+            mensaje: `La orden de cambio fue aprobada.`,
+            modulo: 'ordenes_cambio',
+            referencia_id: action.payload.id,
+            roles: ['residente', 'coordinador', 'contador'],
+          })
+        } else if (action.payload.estado === 'rechazada') {
+          await notify({
+            tipo: 'rechazo',
+            titulo: '❌ Orden de Cambio rechazada',
+            mensaje: `La orden de cambio fue rechazada.`,
+            modulo: 'ordenes_cambio',
+            referencia_id: action.payload.id,
+            roles: ['residente', 'coordinador'],
+          })
+        } else if (action.payload.estado === 'presentada') {
+          await notify({
+            tipo: 'info',
+            titulo: '📤 Orden de Cambio presentada al cliente',
+            mensaje: `Una orden de cambio fue presentada al cliente para aprobación.`,
+            modulo: 'ordenes_cambio',
+            referencia_id: action.payload.id,
+            roles: ['client_admin', 'gerente'],
+          })
+        }
         break
       }
       case 'DEL_ORDEN_CAMBIO': {
@@ -948,11 +1100,42 @@ useEffect(() => {
       case 'UPD_AVALUO_CLIENTE_ESTADO': {
         await supabase.from('avaluos_cliente').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
+        if (action.payload.estado === 'aprobado') {
+          await notify({
+            tipo: 'aprobacion',
+            titulo: '✅ Avalúo aprobado',
+            mensaje: `El avalúo de cliente fue aprobado.`,
+            modulo: 'financiero',
+            referencia_id: action.payload.id,
+            roles: ['residente', 'coordinador', 'contador'],
+          })
+        } else if (action.payload.estado === 'rechazado') {
+          await notify({
+            tipo: 'rechazo',
+            titulo: '❌ Avalúo rechazado',
+            mensaje: `El avalúo fue rechazado. Requiere correcciones.`,
+            modulo: 'financiero',
+            referencia_id: action.payload.id,
+            roles: ['residente', 'coordinador'],
+          })
+        }
         break
       }
       case 'DEL_AVALUO_CLIENTE': {
         await supabase.from('avaluos_cliente_items').delete().eq('avaluo_id', action.payload)
         await supabase.from('avaluos_cliente').delete().eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+
+      case 'MARK_NOTIF_READ': {
+        await supabase.from('notificaciones').update({ leida: true }).eq('id', action.payload)
+        dispatch(action)
+        break
+      }
+      case 'MARK_ALL_NOTIF_READ': {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) await supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', user.id).eq('leida', false)
         dispatch(action)
         break
       }
