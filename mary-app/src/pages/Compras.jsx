@@ -235,10 +235,30 @@ export default function Compras() {
     return `SOL-${new Date().getFullYear()}-${String(n).padStart(3,'0')}`
   }
 
-  const saveSol = () => {
+  const saveSol = async () => {
     if (!form.proyecto_id) return
     const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre || i.mat_pres_id) && i.cantidad)
     if (!validItems.length) return
+
+    const itemsResueltos = await Promise.all(validItems.map(async (it) => {
+      if (!it.material_id && it.crear_en_catalogo && it.descripcion_libre && it.codigo_nuevo) {
+        const nuevoMat = {
+          id: crypto.randomUUID(),
+          codigo: it.codigo_nuevo.trim().toUpperCase(),
+          descripcion: it.descripcion_libre.trim(),
+          unidad: it.unidad || 'und',
+          categoria: 'otros',
+          stock_actual: 0,
+          stock_minimo: 0,
+          precio_unitario: 0,
+          activo: true,
+        }
+        await dispatch({ type: 'ADD_MATERIAL', payload: nuevoMat })
+        return { ...it, material_id: nuevoMat.id }
+      }
+      return it
+    }))
+
     dispatch({ type: 'ADD_SOLICITUD', payload: {
       solicitud: {
         proyecto_id:             form.proyecto_id,
@@ -253,7 +273,7 @@ export default function Compras() {
         prioridad:               form.prioridad || 'normal',
         observaciones_generales: form.observaciones_generales || '',
       },
-      items: validItems.map(it => ({
+      items: itemsResueltos.map(it => ({
         material_id:   it.material_id || null,
         descripcion:   it.descripcion_libre || (activos.find(m=>m.id===it.material_id)?.descripcion) || '',
         cantidad:      parseFloat(it.cantidad || 0),
@@ -719,12 +739,28 @@ export default function Compras() {
 
                 {/* Campo libre — siempre visible si no hay material del catálogo */}
                 {!it.material_id && (
-                  <input className={inputCls}
-                    placeholder={t('btn_cancel') === 'Cancel'
-                      ? 'Or write description freely (e.g.: Pencil, Cleaning service...)'
-                      : 'O escribe libremente (ej: Lápiz, Servicio de limpieza...)'}
-                    value={it.descripcion_libre||''}
-                    onChange={e => setSolItem(idx, 'descripcion_libre', e.target.value)} />
+                  <>
+                    <input className={inputCls}
+                      placeholder={t('btn_cancel') === 'Cancel'
+                        ? 'Or write description freely (e.g.: Pencil, Cleaning service...)'
+                        : 'O escribe libremente (ej: Lápiz, Servicio de limpieza...)'}
+                      value={it.descripcion_libre||''}
+                      onChange={e => setSolItem(idx, 'descripcion_libre', e.target.value)} />
+                    {it.descripcion_libre && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" className="w-3.5 h-3.5 accent-[#1B3A6B]"
+                          checked={it.crear_en_catalogo||false}
+                          onChange={e => setSolItem(idx, 'crear_en_catalogo', e.target.checked)} />
+                        <span className="text-xs text-gray-500">Agregar al catalogo de materiales</span>
+                      </label>
+                    )}
+                    {it.crear_en_catalogo && (
+                      <input className={inputCls}
+                        placeholder="Codigo del material (ej: MAT-001) *"
+                        value={it.codigo_nuevo||''}
+                        onChange={e => setSolItem(idx, 'codigo_nuevo', e.target.value.toUpperCase())} />
+                    )}
+                  </>
                 )}
 
                 <div className="flex gap-2">
