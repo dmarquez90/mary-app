@@ -560,16 +560,11 @@ export default function AvaluosCliente() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetailId(av.id); setVista('detalle') }}>{t('btn_view')}</TBtn>
                           {puedeEditar && av.estado === 'borrador' && (
-                            <>
-                              <button onClick={() => cambiarEstado(av.id, 'presentado')}
-                                className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap"
-                                style={{ background: '#185FA5' }}>
-                                {isEs ? 'Presentar' : 'Submit'}
-                              </button>
-                              <TBtn danger onClick={() => dispatch({ type:'DEL_AVALUO_CLIENTE', payload:av.id })}>
-                                {t('btn_delete')}
-                              </TBtn>
-                            </>
+                            <button onClick={() => cambiarEstado(av.id, 'presentado')}
+                              className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap"
+                              style={{ background: '#185FA5' }}>
+                              {isEs ? 'Presentar' : 'Submit'}
+                            </button>
                           )}
                           {puedeEditar && av.estado === 'presentado' && (
                             <button
@@ -582,6 +577,14 @@ export default function AvaluosCliente() {
                               className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap bg-green-600 hover:bg-green-700">
                               {isEs ? 'Aprobar' : 'Approve'}
                             </button>
+                          )}
+                          {puedeEditar && (
+                            <TBtn danger onClick={() => {
+                              if (window.confirm(isEs
+                                ? `Eliminar avaluo #${av.numero}? Esta accion no se puede deshacer.`
+                                : `Delete valuation #${av.numero}? This action cannot be undone.`))
+                                dispatch({ type:'DEL_AVALUO_CLIENTE', payload:av.id })
+                            }}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
                           )}
                         </div>
                       </td>

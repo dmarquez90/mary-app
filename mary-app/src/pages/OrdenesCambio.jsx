@@ -243,8 +243,13 @@ export default function OrdenesCambio() {
                                 {isEs ? 'Rechazar' : 'Reject'}
                               </TBtn>
                             </>}
-                            {puedeEditar && (oc.estado === 'borrador' || oc.estado === 'rechazada') && (
-                              <TBtn danger onClick={() => eliminarOC(oc.id)}>{t('btn_delete')}</TBtn>
+                            {puedeEditar && (
+                              <TBtn danger onClick={() => {
+                                if (window.confirm(isEs
+                                  ? `Eliminar OC ${oc.numero}? Esta accion no se puede deshacer.`
+                                  : `Delete CO ${oc.numero}? This action cannot be undone.`))
+                                  eliminarOC(oc.id)
+                              }}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
                             )}
                           </div>
                         </td>
