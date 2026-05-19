@@ -55,7 +55,15 @@ function reducer(state, action) {
     case 'TOGGLE_MATERIAL': return { ...state, materiales: state.materiales.map(m => m.id === action.payload ? { ...m, activo: !m.activo } : m) }
     case 'DEL_MATERIAL':    return { ...state, materiales: state.materiales.filter(m => m.id !== action.payload) }
 
-    case 'ADD_ENTRADA': return { ...state, entradas: [...state.entradas, action.payload] }
+    case 'ADD_ENTRADA': return {
+      ...state,
+      entradas: [...state.entradas, action.payload],
+      materiales: state.materiales.map(m =>
+        m.id === action.payload.material_id
+          ? { ...m, stock_actual: (parseFloat(m.stock_actual) || 0) + (parseFloat(action.payload.cantidad) || 0) }
+          : m
+      )
+    }
     case 'UPD_ENTRADA': return { ...state, entradas: state.entradas.map(e => e.id === action.payload.id ? { ...e, ...action.payload } : e) }
     case 'DEL_ENTRADA': return {
       ...state,
