@@ -109,9 +109,9 @@ export default function OrdenesCambio() {
     const validItems = items.filter(it => it.descripcion && it.cantidad_nueva !== '')
     if (!proyId || !form.numero || validItems.length === 0) return
     dispatch({
-      type: 'ADD_OC',
+      type: 'ADD_ORDEN_CAMBIO',
       payload: {
-        oc: { ...form, proyecto_id: proyId, total_oc: totalOC },
+        orden: { ...form, proyecto_id: proyId, total_oc: totalOC },
         items: validItems.map(it => {
           const act = actividades.find(a => a.id === it.actividad_id)
           return {
@@ -128,8 +128,8 @@ export default function OrdenesCambio() {
   }
 
   // Cambiar estado de OC
-  const cambiarEstado = (id, estado) => dispatch({ type: 'UPD_OC_ESTADO', payload: { id, estado } })
-  const eliminarOC    = (id) => dispatch({ type: 'DEL_OC', payload: id })
+  const cambiarEstado = (id, estado) => dispatch({ type: 'UPD_ORDEN_CAMBIO_ESTADO', payload: { id, estado } })
+  const eliminarOC    = (id) => dispatch({ type: 'DEL_ORDEN_CAMBIO', payload: id })
 
   // Detalle
   const ocDetalle    = ordenes_cambio.find(o => o.id === detailId)
