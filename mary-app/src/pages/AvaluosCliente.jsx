@@ -408,8 +408,11 @@ export default function AvaluosCliente() {
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-gray-100">
                   {[isEs?'Descripcion':'Description',isEs?'Unidad':'Unit',isEs?'Total':'Total',isEs?'P.U.':'U.P.',
-                    isEs?'Anterior':'Previous',isEs?'Este Periodo':'This Period',isEs?'Acumulado':'Accumulated',
-                    isEs?'Saldo':'Balance',isEs?'% Fis.':'% Phys.',isEs?'Monto Periodo':'Period Amt',
+                    isEs?'Monto Contrato':'Contract Amt',
+                    isEs?'Ant. Qty':'Prev. Qty',isEs?'Este Periodo':'This Period',isEs?'Acum. Qty':'Accum. Qty',
+                    isEs?'Saldo Qty':'Balance Qty',isEs?'% Fis.':'% Phys.',
+                    isEs?'Monto Ant.':'Prev. Amt',isEs?'Monto Periodo':'Period Amt',
+                    isEs?'Monto Acum.':'Accum. Amt',isEs?'Saldo $':'Balance $',
                   ].map((h,i) => <th key={i} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}
                 </tr></thead>
                 <tbody>
@@ -419,6 +422,7 @@ export default function AvaluosCliente() {
                       <td className="px-3 py-2 text-gray-400">{it.unidad}</td>
                       <td className="px-3 py-2 font-mono">{fmtNum(it.cantidad_total)}</td>
                       <td className="px-3 py-2 font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
+                      <td className="px-3 py-2 font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
                       <td className="px-3 py-2 font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
                       <td className="px-3 py-2 font-mono font-bold" style={{color:BRAND}}>{fmtNum(it.cantidad_periodo)}</td>
                       <td className="px-3 py-2 font-mono text-green-600">{fmtNum(it.cantidad_acumulada)}</td>
@@ -431,7 +435,10 @@ export default function AvaluosCliente() {
                           <span className="font-mono" style={{color:BRAND}}>{parseFloat(it.pct_fisico||0).toFixed(1)}%</span>
                         </div>
                       </td>
+                      <td className="px-3 py-2 font-mono text-gray-400">{parseFloat(it.monto_anterior||0) > 0 ? fmt(it.monto_anterior, moneda) : '—'}</td>
                       <td className="px-3 py-2 font-mono font-bold text-green-600">{fmt(it.monto_periodo, moneda)}</td>
+                      <td className="px-3 py-2 font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(it.monto_acumulado, moneda)}</td>
+                      <td className="px-3 py-2 font-mono text-gray-500">{fmt(it.monto_saldo, moneda)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -522,6 +529,39 @@ export default function AvaluosCliente() {
               </div>
             ))}
           </div>
+
+          {/* ── RESUMEN FINANCIERO ── */}
+          {avs.length > 0 && presupuestoEfectivo > 0 && (
+            <div className="bg-white border border-gray-100 rounded-xl p-5 mb-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                {isEs ? 'Resumen financiero del proyecto' : 'Project financial summary'}
+              </p>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>{isEs ? 'Total cobrado (aprobado)' : 'Total billed (approved)'}</span>
+                    <span className="font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(totalCobrado, moneda)} / {fmt(presupuestoEfectivo, moneda)}</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-green-500" style={{width:`${Math.min(100, pctEjecucion)}%`, transition:'width 0.4s'}} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{pctEjecucion.toFixed(1)}% {isEs ? 'ejecutado financieramente' : 'financially executed'}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-gray-50">
+                  {[
+                    { label: isEs?'Presupuesto original':'Original budget', value: fmt(presupuestoOriginal, moneda), color: BRAND },
+                    { label: isEs?'OC aprobadas':'Approved COs', value: `${totalOCAprobadas >= 0 ? '+' : ''}${fmt(totalOCAprobadas, moneda)}`, color: totalOCAprobadas > 0 ? '#D97706' : '#6b7280' },
+                    { label: isEs?'Saldo por cobrar':'Balance to bill', value: fmt(saldoPorCobrar, moneda), color: saldoPorCobrar > 0 ? '#D97706' : '#1D9E75' },
+                  ].map(k => (
+                    <div key={k.label} className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-400 mb-0.5">{k.label}</p>
+                      <p className="text-sm font-bold font-mono" style={{color: k.color}}>{k.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {avs.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-xl py-16">
