@@ -879,7 +879,7 @@ useEffect(() => {
       }
 
       case 'ADD_ORDEN_CAMBIO': {
-        const orden = { ...action.payload.orden, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
+        const orden = { ...action.payload.orden, id: uuid(), estado: 'borrador', created_at: today(), tenant_id: tenantId }
         const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
         await supabase.from('ordenes_cambio').insert(orden)
         if (items.length) await supabase.from('ordenes_cambio_items').insert(items)

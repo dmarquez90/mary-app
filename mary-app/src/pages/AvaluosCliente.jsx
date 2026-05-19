@@ -570,6 +570,7 @@ export default function AvaluosCliente() {
                                 {t('btn_delete')}
                               </TBtn>
                             </>
+                            
                           )}
                           {puedeEditar && av.estado === 'presentado' && (
                             <button

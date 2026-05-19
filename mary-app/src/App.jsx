@@ -13,13 +13,13 @@ import Presupuesto from './pages/Presupuesto'
 import Inventario from './pages/Inventario'
 import MatPresupuestados from './pages/MatPresupuestados'
 import Compras from './pages/Compras'
-import OrdenesCambio from './pages/OrdenesCambio'
-import AvaluosCliente from './pages/AvaluosCliente'
 import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
 import maryLogo from './assets/mary-logo.png'
-
+// Importaciones 
+import OrdenesCambio from './pages/OrdenesCambio'
+import AvaluosCliente from './pages/AvaluosCliente'
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
@@ -31,10 +31,8 @@ const NAV = [
   { id: 'presupuesto', labelEs: 'Presupuesto',         labelEn: 'Budget',             icon: 'budget'    },
   { id: 'inventario',  labelEs: 'Inventario',          labelEn: 'Inventory',          icon: 'inventory' },
   { id: 'mat_pres',    labelEs: 'Mat. Presupuestados', labelEn: 'Budgeted Materials', icon: 'matpres'   },
-  { id: 'compras',        labelEs: 'Compras / OC',        labelEn: 'Purchases',          icon: 'purchases' },
-  { id: 'ordenes_cambio', labelEs: 'Órdenes de Cambio',  labelEn: 'Change Orders',      icon: 'budget'    },
-  { id: 'avaluos',        labelEs: 'Avalúos',             labelEn: 'Valuations',         icon: 'financial' },
-  { id: 'financiero',     labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
+  { id: 'compras',     labelEs: 'Compras / OC',        labelEn: 'Purchases',          icon: 'purchases' },
+  { id: 'financiero',  labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',      labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
   { id: 'reportes',    labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
 ]
@@ -45,10 +43,8 @@ const PAGES = {
   presupuesto:   Presupuesto,
   inventario:    Inventario,
   mat_pres:      MatPresupuestados,
-  compras:        Compras,
-  ordenes_cambio: OrdenesCambio,
-  avaluos:        AvaluosCliente,
-  financiero:     Financiero,
+  compras:       Compras,
+  financiero:    Financiero,
   curvas:        CurvaS,
   configuracion: Configuracion,
   reportes:      Reportes,
