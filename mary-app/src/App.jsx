@@ -19,6 +19,7 @@ import AvaluosCliente from './pages/AvaluosCliente'
 import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
+import Chat from './pages/Chat'
 import maryLogo from './assets/mary-logo.png'
 import NotificacionesPanel from './pages/NotificacionesPanel'
 
@@ -39,6 +40,7 @@ const NAV = [
   { id: 'financiero',     labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',      labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
   { id: 'reportes',    labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
+  { id: 'chat',        labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]
 
 const PAGES = {
@@ -54,6 +56,7 @@ const PAGES = {
   curvas:        CurvaS,
   configuracion: Configuracion,
   reportes:      Reportes,
+  chat:          Chat,
 }
 
 function Layout() {
