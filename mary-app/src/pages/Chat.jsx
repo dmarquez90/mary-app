@@ -208,7 +208,7 @@ function ModalNuevoCanal({ open, onClose, onCrear, usuarios, proyectos, tenantId
 }
 
 // ── CHAT PRINCIPAL ────────────────────────────────────────
-export default function Chat() {
+export default function Chat({ onNavigate }) {
   const { perfil }     = useAuth()
   const { lang }       = useContext(LangContext)
   const isEs           = lang === 'ES'
@@ -273,12 +273,29 @@ export default function Chat() {
 
     // Canales donde participa el usuario
     const { data: parts } = await supabase.from('chat_participantes')
-      .select('canal_id').eq('usuario_id', usuarioId)
+      .select('canal_id, ultimo_leido').eq('usuario_id', usuarioId)
     const canalIds = parts?.map(p => p.canal_id) || []
 
     const { data: cans } = await supabase.from('chat_canales')
       .select('*').in('id', canalIds).order('created_at')
     setCanales(cans || [])
+
+    // Calcular no leídos por canal
+    if (canalIds.length) {
+      const noLeidosInit = {}
+      await Promise.all(canalIds.map(async (cid) => {
+        const part = parts.find(p => p.canal_id === cid)
+        const ultimoLeido = part?.ultimo_leido || '1970-01-01'
+        const { count } = await supabase
+          .from('chat_mensajes')
+          .select('id', { count: 'exact', head: true })
+          .eq('canal_id', cid)
+          .neq('usuario_id', usuarioId)
+          .gt('created_at', ultimoLeido)
+        noLeidosInit[cid] = count || 0
+      }))
+      setNoLeidos(noLeidosInit)
+    }
 
     // Activar canal general primero
     if (general) setCanalActivo(general)
@@ -464,6 +481,8 @@ export default function Chat() {
     ? usuarios.filter(u => u.nombre?.toLowerCase().includes(mencionQuery.toLowerCase()) && u.id !== usuarioId)
     : []
 
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
   // ── Online count ──────────────────────────────────────
   const onlineCount = presencia.filter(p => p.en_linea).length
 
@@ -511,6 +530,7 @@ export default function Chat() {
       )}
 
       {/* ── SIDEBAR ── */}
+      {sidebarOpen && (
       <div className="w-64 flex-shrink-0 flex flex-col overflow-hidden" style={{ background: BRAND_DARK }}>
 
         {/* Header sidebar */}
@@ -522,13 +542,22 @@ export default function Chat() {
               {onlineCount} {isEs ? 'en línea' : 'online'}
             </p>
           </div>
-          <button onClick={() => setModalCanal(true)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/20"
-            style={{ color: '#7FA8D4' }} title={isEs ? 'Nuevo canal' : 'New channel'}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setModalCanal(true)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/20"
+              style={{ color: '#7FA8D4' }} title={isEs ? 'Nuevo canal' : 'New channel'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <button onClick={() => setSidebarOpen(false)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/20"
+              style={{ color: '#7FA8D4' }} title={isEs ? 'Ocultar panel' : 'Hide panel'}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Canales */}
@@ -579,6 +608,20 @@ export default function Chat() {
           </div>
         </div>
       </div>
+      )} {/* fin sidebarOpen */}
+
+      {/* Botón reabrir sidebar */}
+      {!sidebarOpen && (
+        <div className="flex flex-col items-center py-4 flex-shrink-0" style={{ background: BRAND_DARK, width: 40 }}>
+          <button onClick={() => setSidebarOpen(true)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors"
+            style={{ color: '#7FA8D4' }} title={isEs ? 'Mostrar canales' : 'Show channels'}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* ── AREA DE CHAT ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -604,12 +647,23 @@ export default function Chat() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 {/* Avatares de participantes online */}
                 {presencia.filter(p => p.en_linea).slice(0, 5).map(p => {
                   const u = usuarios.find(u => u.id === p.usuario_id)
                   return u ? <Avatar key={u.id} nombre={u.nombre} size={7} online={true} /> : null
                 })}
+                {/* Botón cerrar chat */}
+                <button
+                  onClick={() => onNavigate?.('dashboard')}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors ml-2"
+                  style={{ color: '#9CA3AF' }}
+                  title={isEs ? 'Cerrar chat' : 'Close chat'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
               </div>
             </div>
 
