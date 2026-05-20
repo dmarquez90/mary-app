@@ -24,14 +24,14 @@ const MATRIX = {
 }
 
 export const NAV_PERMISOS = {
-  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','financiero','curvas','reportes'],
-  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','financiero','curvas','reportes'],
-  coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','reportes'],
-  gerente:      ['dashboard','proyectos','presupuesto','compras','financiero','curvas','reportes'],
-  residente:    ['dashboard','compras','financiero'],
-  bodeguero:    ['dashboard','inventario','compras'],
-  contador:     ['dashboard','proyectos','presupuesto','financiero','curvas','reportes'],
-  lectura:      ['dashboard','proyectos','presupuesto','inventario','compras','financiero','curvas'],
+  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','financiero','curvas','reportes','chat'],
+  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','financiero','curvas','reportes','chat'],
+  coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','reportes','chat'],
+  gerente:      ['dashboard','proyectos','presupuesto','compras','financiero','curvas','reportes','chat'],
+  residente:    ['dashboard','compras','financiero','chat'],
+  bodeguero:    ['dashboard','inventario','compras','chat'],
+  contador:     ['dashboard','proyectos','presupuesto','financiero','curvas','reportes','chat'],
+  lectura:      ['dashboard','proyectos','presupuesto','inventario','compras','financiero','curvas','chat'],
 }
 
 export const MODULOS_PERMISOS = [
