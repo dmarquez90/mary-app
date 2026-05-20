@@ -20,7 +20,7 @@ import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
 import Chat from './pages/Chat'
-import maryLogo from './assets/mary-logo.png'
+
 import NotificacionesPanel from './pages/NotificacionesPanel'
 
 
@@ -141,7 +141,7 @@ function Layout() {
         <div className={`flex items-center px-4 py-4 border-b flex-shrink-0 ${sideOpen ? 'justify-start' : 'justify-center'}`}
           style={{ borderColor: BRAND, minHeight: 64 }}>
           {sideOpen ? (
-            <img src={maryLogo} alt="MARY" className="h-9 w-auto object-contain" />
+            <svg viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg" style={{ height: "36px", width: "auto" }} aria-label="MARY"><g transform="translate(4,3)"><rect x="14" y="29" width="8" height="16" rx="1.5" fill="#7a8fa6" opacity="0.75"/><rect x="24" y="23" width="8" height="22" rx="1.5" fill="#a0b4c8" opacity="0.75"/><rect x="34" y="17" width="8" height="28" rx="1.5" fill="#c0d0e0" opacity="0.75"/><ellipse cx="29" cy="33" rx="18" ry="5.5" fill="none" stroke="#3a8adc" strokeWidth="1.5" opacity="0.85"/><rect x="26" y="17" width="10" height="10" rx="2" fill="#3bb876" opacity="0.95"/><rect x="36" y="11" width="8" height="8" rx="2" fill="#26d4ff" opacity="0.9"/><line x1="36" y1="20" x2="48" y2="6" stroke="#3bb876" strokeWidth="1.8" opacity="0.9"/><polygon points="48,3 51,9 45,9" fill="#3bb876" opacity="0.9"/></g><text x="62" y="37" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="32" fill="#ffffff" letterSpacing="1">MARY</text></svg>
           ) : (
             <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm"
               style={{ background: BRAND_LIGHT }}>M</div>

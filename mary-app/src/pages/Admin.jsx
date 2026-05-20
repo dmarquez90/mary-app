@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useAuth } from '../auth'
-import maryLogo from '../assets/mary-logo.png'
+
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
@@ -525,7 +525,7 @@ export default function Admin() {
       {/* HEADER */}
       <header className="flex items-center justify-between px-8 py-4 bg-white shadow-sm">
         <div className="flex items-center gap-4">
-          <img src={maryLogo} alt="MARY" className="h-8 w-auto object-contain" />
+          <svg viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg" style={{ height: "32px", width: "auto" }} aria-label="MARY"><g transform="translate(4,3)"><rect x="14" y="29" width="8" height="16" rx="1.5" fill="#7a8fa6" opacity="0.75"/><rect x="24" y="23" width="8" height="22" rx="1.5" fill="#a0b4c8" opacity="0.75"/><rect x="34" y="17" width="8" height="28" rx="1.5" fill="#c0d0e0" opacity="0.75"/><ellipse cx="29" cy="33" rx="18" ry="5.5" fill="none" stroke="#3a8adc" strokeWidth="1.5" opacity="0.85"/><rect x="26" y="17" width="10" height="10" rx="2" fill="#3bb876" opacity="0.95"/><rect x="36" y="11" width="8" height="8" rx="2" fill="#26d4ff" opacity="0.9"/><line x1="36" y1="20" x2="48" y2="6" stroke="#3bb876" strokeWidth="1.8" opacity="0.9"/><polygon points="48,3 51,9 45,9" fill="#3bb876" opacity="0.9"/></g><text x="62" y="37" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="32" fill="#ffffff" letterSpacing="1">MARY</text></svg>
           <div className="w-px h-6 bg-gray-200" />
           <div>
             <p className="font-bold text-gray-900 text-sm leading-none">{T.title}</p>

@@ -47,11 +47,12 @@ const T = {
     forgot_loading:    'Enviando...',
     forgot_sent:       '✓ Revisa tu correo. Si existe una cuenta con ese email, recibirás el enlace.',
     forgot_back:       '← Volver al inicio de sesión',
-    // Documentos legales
     tos_title:         'Términos de Servicio',
     pp_title:          'Política de Privacidad',
     close:             'Cerrar',
     last_updated:      'Última actualización: Mayo 2026',
+    show_pass:         'Mostrar contraseña',
+    hide_pass:         'Ocultar contraseña',
   },
   EN: {
     tagline:           'MANAGEMENT & RESOURCES YIELD',
@@ -95,11 +96,119 @@ const T = {
     pp_title:          'Privacy Policy',
     close:             'Close',
     last_updated:      'Last updated: May 2026',
+    show_pass:         'Show password',
+    hide_pass:         'Hide password',
   }
 }
 
-const inputCls       = 'w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-12 pr-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm'
-const inputClsNoIcon = 'w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm'
+// ── ESTILOS COMPARTIDOS ───────────────────────────────────────────────────
+const BG = { background: '#000000' }
+const BG_RADIAL = {
+  background: 'radial-gradient(ellipse at 70% 20%, rgba(26,94,180,0.10) 0%, transparent 55%), radial-gradient(ellipse at 20% 80%, rgba(36,185,100,0.07) 0%, transparent 50%), #000000'
+}
+
+const inputBase = {
+  width: '100%',
+  boxSizing: 'border-box',
+  background: 'rgba(255,255,255,0.04)',
+  border: '0.5px solid rgba(150,180,220,0.18)',
+  borderRadius: '10px',
+  padding: '13px 14px 13px 42px',
+  fontFamily: 'inherit',
+  fontSize: '14px',
+  color: '#ffffff',
+  outline: 'none',
+}
+
+const inputBaseNoIcon = {
+  ...inputBase,
+  padding: '13px 14px',
+}
+
+const inputBaseWithEye = {
+  ...inputBase,
+  paddingRight: '42px',
+}
+
+const btnPrimary = {
+  width: '100%',
+  padding: '14px',
+  borderRadius: '10px',
+  border: 'none',
+  background: '#1a5eb4',
+  color: '#ffffff',
+  fontFamily: 'inherit',
+  fontSize: '15px',
+  fontWeight: '700',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  cursor: 'pointer',
+  boxShadow: '0 0 0 1px rgba(80,150,255,0.3), 0 4px 20px rgba(26,94,180,0.4)',
+}
+
+// ── LOGO SVG ──────────────────────────────────────────────────────────────
+const MaryLogoSVG = () => (
+  <svg
+    viewBox="0 0 320 90"
+    xmlns="http://www.w3.org/2000/svg"
+    style={{ width: '380px', height: 'auto', display: 'block', margin: '0 auto', filter: 'drop-shadow(0 2px 20px rgba(26,94,180,0.35))' }}
+    aria-label="MARY"
+  >
+    <g transform="translate(10,5)">
+      <rect x="28" y="48" width="14" height="26" rx="2" fill="#7a8fa6" opacity="0.7"/>
+      <rect x="44" y="38" width="14" height="36" rx="2" fill="#a0b4c8" opacity="0.7"/>
+      <rect x="60" y="28" width="14" height="46" rx="2" fill="#c0d0e0" opacity="0.7"/>
+      <ellipse cx="51" cy="54" rx="30" ry="9" fill="none" stroke="#3a8adc" strokeWidth="2.5" opacity="0.8"/>
+      <ellipse cx="51" cy="54" rx="24" ry="7" fill="none" stroke="#2a6ab8" strokeWidth="1.5" opacity="0.5"/>
+      <rect x="46" y="28" width="16" height="16" rx="3" fill="#3bb876" opacity="0.95"/>
+      <rect x="62" y="18" width="13" height="13" rx="3" fill="#26d4ff" opacity="0.85"/>
+      <line x1="62" y1="32" x2="80" y2="10" stroke="#3bb876" strokeWidth="2.5" opacity="0.9"/>
+      <polygon points="80,5 85,14 75,14" fill="#3bb876" opacity="0.9"/>
+    </g>
+    <text x="110" y="60" fontFamily="'Arial Black', Arial, sans-serif" fontWeight="900" fontSize="52" fill="#ffffff" letterSpacing="2">MARY</text>
+    <text x="110" y="78" fontFamily="Arial, sans-serif" fontWeight="500" fontSize="11" fill="rgba(180,210,255,0.45)" letterSpacing="4">MANAGEMENT &amp; RESOURCES YIELD</text>
+  </svg>
+)
+
+// ── LOGO + ACENTO ─────────────────────────────────────────────────────────
+const Logo = () => (
+  <div style={{ textAlign: 'center', marginBottom: '1.25rem', marginTop: '-1.5rem' }}>
+    <MaryLogoSVG />
+    <div style={{ width: '40px', height: '3px', background: 'linear-gradient(90deg, #1a9e5c, #1a5eb4)', borderRadius: '2px', margin: '0.5rem auto 0' }} />
+  </div>
+)
+
+// ── TOGGLE IDIOMA ─────────────────────────────────────────────────────────
+const LangToggle = ({ lang, setLang }) => (
+  <button
+    onClick={() => setLang(l => l === 'ES' ? 'EN' : 'ES')}
+    style={{
+      position: 'absolute', top: '1rem', right: '1rem',
+      fontSize: '11px', fontWeight: '600',
+      color: 'rgba(200,220,255,0.7)',
+      background: 'rgba(255,255,255,0.05)',
+      border: '0.5px solid rgba(200,220,255,0.2)',
+      borderRadius: '6px', padding: '5px 10px',
+      cursor: 'pointer', letterSpacing: '0.05em',
+    }}
+  >
+    🌐 {lang === 'ES' ? 'EN' : 'ES'}
+  </button>
+)
+
+// ── ICONO OJO ─────────────────────────────────────────────────────────────
+const EyeIcon = ({ visible }) => visible ? (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+    <line x1="1" y1="1" x2="23" y2="23"/>
+  </svg>
+) : (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+)
 
 // ── MODAL LEGAL ───────────────────────────────────────────────────────────
 function LegalModal({ type, lang, onClose }) {
@@ -356,99 +465,64 @@ www.marquezprojectsolutions.com
 California, United States
 `
 
-  const content = type === 'tos'
-    ? (isEs ? TOS_ES : TOS_EN)
-    : (isEs ? PP_ES  : PP_EN)
-
-  const title = type === 'tos' ? t.tos_title : t.pp_title
+  const content = type === 'tos' ? (isEs ? TOS_ES : TOS_EN) : (isEs ? PP_ES : PP_EN)
+  const title   = type === 'tos' ? t.tos_title : t.pp_title
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.80)' }}>
+      <div style={{ width: '100%', maxWidth: '640px', background: '#0d0d0d', border: '0.5px solid rgba(150,180,220,0.15)', borderRadius: '16px', boxShadow: '0 20px 60px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderBottom: '0.5px solid rgba(150,180,220,0.1)' }}>
           <div>
-            <p className="text-white font-bold text-base">{title}</p>
-            <p className="text-slate-500 text-xs mt-0.5">{t.last_updated} · Marquez Project Solutions LLC</p>
+            <p style={{ color: '#ffffff', fontWeight: '700', fontSize: '15px', margin: 0 }}>{title}</p>
+            <p style={{ color: 'rgba(150,180,220,0.4)', fontSize: '11px', margin: '2px 0 0' }}>{t.last_updated} · Marquez Project Solutions LLC</p>
           </div>
-          <button onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-800">
-            ✕
-          </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(150,180,220,0.6)', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '4px 8px' }}>✕</button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem' }}>
           {content.trim().split('\n').map((line, i) => {
             const trimmed = line.trim()
-            if (!trimmed) return <div key={i} className="h-2" />
-            if (/^\d+\./.test(trimmed) && trimmed.length < 60) {
-              return <p key={i} className="text-blue-400 font-bold text-sm mt-4 mb-1">{trimmed}</p>
-            }
-            if (trimmed.startsWith('TÉRMINOS') || trimmed.startsWith('POLÍTICA') || trimmed.startsWith('TERMS') || trimmed.startsWith('PRIVACY')) {
-              return <p key={i} className="text-white font-black text-base mb-0">{trimmed}</p>
-            }
-            if (trimmed.startsWith('Marquez Project') && i < 5) {
-              return <p key={i} className="text-slate-400 text-xs mb-0">{trimmed}</p>
-            }
-            if (trimmed.startsWith('Última actualización') || trimmed.startsWith('Last updated')) {
-              return <p key={i} className="text-slate-500 text-xs mb-3">{trimmed}</p>
-            }
-            if (trimmed.startsWith('-')) {
-              return <p key={i} className="text-slate-300 text-sm pl-4 mb-1">• {trimmed.slice(1).trim()}</p>
-            }
-            return <p key={i} className="text-slate-300 text-sm leading-relaxed mb-2">{trimmed}</p>
+            if (!trimmed) return <div key={i} style={{ height: '8px' }} />
+            if (/^\d+\./.test(trimmed) && trimmed.length < 60)
+              return <p key={i} style={{ color: '#6fa8e0', fontWeight: '700', fontSize: '13px', marginTop: '16px', marginBottom: '4px' }}>{trimmed}</p>
+            if (trimmed.startsWith('TÉRMINOS') || trimmed.startsWith('POLÍTICA') || trimmed.startsWith('TERMS') || trimmed.startsWith('PRIVACY'))
+              return <p key={i} style={{ color: '#ffffff', fontWeight: '900', fontSize: '15px', margin: 0 }}>{trimmed}</p>
+            if (trimmed.startsWith('Marquez Project') && i < 5)
+              return <p key={i} style={{ color: 'rgba(150,180,220,0.5)', fontSize: '11px', margin: 0 }}>{trimmed}</p>
+            if (trimmed.startsWith('Última actualización') || trimmed.startsWith('Last updated'))
+              return <p key={i} style={{ color: 'rgba(150,180,220,0.35)', fontSize: '11px', marginBottom: '12px' }}>{trimmed}</p>
+            if (trimmed.startsWith('-'))
+              return <p key={i} style={{ color: 'rgba(200,220,255,0.75)', fontSize: '13px', paddingLeft: '16px', marginBottom: '4px' }}>• {trimmed.slice(1).trim()}</p>
+            return <p key={i} style={{ color: 'rgba(200,220,255,0.75)', fontSize: '13px', lineHeight: '1.7', marginBottom: '8px' }}>{trimmed}</p>
           })}
         </div>
-        <div className="px-6 py-4 border-t border-slate-700">
-          <button onClick={onClose}
-            className="w-full py-3 rounded-xl text-white font-semibold text-sm"
-            style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
-            {t.close}
-          </button>
+        <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid rgba(150,180,220,0.1)' }}>
+          <button onClick={onClose} style={{ ...btnPrimary, fontSize: '14px', padding: '12px' }}>{t.close}</button>
         </div>
       </div>
     </div>
   )
 }
 
-// ── COMPONENTES BASE ──────────────────────────────────────────────────────
-const Logo = ({ lang }) => (
-  <div className="text-center mb-8">
-    <div className="flex justify-center mb-4">
-      <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-900/30 rotate-3">
-        <span className="text-white text-2xl font-black -rotate-3">M</span>
-      </div>
-    </div>
-    <h1 className="text-white text-3xl font-black tracking-tighter">
-      MARY<span className="text-blue-500">.</span>
-    </h1>
-    <p className="text-slate-500 text-[9px] uppercase tracking-[0.3em] mt-1 font-bold">{T[lang].tagline}</p>
-  </div>
-)
-
-const LangToggle = ({ lang, setLang }) => (
-  <button onClick={() => setLang(l => l === 'ES' ? 'EN' : 'ES')}
-    className="absolute top-4 right-4 text-xs font-bold text-slate-400 hover:text-white bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors">
-    🌐 {lang === 'ES' ? 'EN' : 'ES'}
-  </button>
-)
-
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────
 export default function Login({ onNavigate }) {
-  const { login }               = useAuth()
-  const [lang, setLang]         = useState('ES')
-  const [view, setView]         = useState('login')
-  const [legalModal, setLegalModal] = useState(null) // 'tos' | 'pp' | null
+  const { login }                   = useAuth()
+  const [lang, setLang]             = useState('ES')
+  const [view, setView]             = useState('login')
+  const [legalModal, setLegalModal] = useState(null)
   const t = T[lang]
 
   // Login
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
   // Register
-  const [reg, setReg]           = useState({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
+  const [reg, setReg]               = useState({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
+  const [showRegPass, setShowRegPass] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
-  const [regError, setRegError] = useState('')
+  const [regError, setRegError]     = useState('')
   const [regSuccess, setRegSuccess] = useState(false)
   const [regLoading, setRegLoading] = useState(false)
   const setR = k => e => setReg(f => ({ ...f, [k]: e.target.value }))
@@ -484,7 +558,6 @@ export default function Login({ onNavigate }) {
     }
     setRegLoading(true)
     try {
-      // Crear tenant y usuario via Edge Function segura
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-trial`,
         {
@@ -496,10 +569,9 @@ export default function Login({ onNavigate }) {
       const result = await res.json()
       if (!res.ok) {
         if (result.error === 'company_taken') { setRegError(t.err_company_taken); setRegLoading(false); return }
-        if (result.error === 'email_taken') { setRegError(t.err_email_taken); setRegLoading(false); return }
+        if (result.error === 'email_taken')   { setRegError(t.err_email_taken);   setRegLoading(false); return }
         throw new Error(result.error || 'Error al crear la cuenta.')
       }
-
       setRegSuccess(true)
       setReg({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
       setTermsAccepted(false)
@@ -521,142 +593,247 @@ export default function Login({ onNavigate }) {
     setForgotLoading(false)
   }
 
+  // ── Estilos inline reutilizables ────────────────────────────────────────
+  const screenWrap = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '1rem',
+    position: 'relative',
+    ...BG_RADIAL,
+  }
+
+  const fieldIconStyle = {
+    position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
+    color: 'rgba(150,180,220,0.45)', pointerEvents: 'none', display: 'flex', alignItems: 'center',
+  }
+
+  const eyeBtnStyle = {
+    position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'rgba(150,180,220,0.5)', display: 'flex', alignItems: 'center', padding: 0,
+  }
+
+  const labelStyle = { fontSize: '12px', color: 'rgba(180,200,240,0.6)', display: 'block', marginBottom: '4px' }
+
+  const inputNoIconStyle = {
+    ...inputBaseNoIcon,
+    border: '0.5px solid rgba(150,180,220,0.18)',
+  }
+
+  const selectStyle = {
+    ...inputBaseNoIcon,
+    border: '0.5px solid rgba(150,180,220,0.18)',
+    cursor: 'pointer',
+  }
+
+  const footerStyle = {
+    marginTop: '2rem', textAlign: 'center',
+    borderTop: '0.5px solid rgba(150,180,220,0.07)', paddingTop: '1rem',
+  }
+
+  const footerTextStyle = {
+    fontSize: '10px', fontWeight: '600', letterSpacing: '0.25em',
+    color: 'rgba(150,180,220,0.28)', textTransform: 'uppercase', margin: 0,
+  }
+
   return (
     <>
-      {/* Modal legal */}
       {legalModal && (
         <LegalModal type={legalModal} lang={lang} onClose={() => setLegalModal(null)} />
       )}
 
-      {/* ── LOGIN ─────────────────────────────────────────────────────── */}
+      {/* ── LOGIN ─────────────────────────────────────────────────────────── */}
       {view === 'login' && (
-        <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: '#0f172a' }}>
+        <div style={screenWrap}>
           <LangToggle lang={lang} setLang={setLang} />
-          <div className="w-full max-w-sm">
-            <Logo lang={lang} />
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+          <div style={{ width: '100%', maxWidth: '380px' }}>
+            <Logo />
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+              {/* Email */}
+              <div style={{ position: 'relative' }}>
+                <span style={fieldIconStyle}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                   </svg>
                 </span>
-                <input type="email" placeholder={t.email} className={inputCls}
-                  value={email} onChange={e => setEmail(e.target.value)} required />
+                <input
+                  type="email"
+                  placeholder={t.email}
+                  style={inputBase}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
               </div>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+
+              {/* Password con ojo */}
+              <div style={{ position: 'relative' }}>
+                <span style={fieldIconStyle}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
                 </span>
-                <input type="password" placeholder={t.password} className={inputCls}
-                  value={password} onChange={e => setPassword(e.target.value)} required />
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  placeholder={t.password}
+                  style={inputBaseWithEye}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  style={eyeBtnStyle}
+                  onClick={() => setShowPass(v => !v)}
+                  aria-label={showPass ? t.hide_pass : t.show_pass}
+                >
+                  <EyeIcon visible={showPass} />
+                </button>
               </div>
+
               {error && (
-                <div className="text-red-400 text-xs text-center font-medium bg-red-400/10 py-2 rounded-lg border border-red-400/20">{error}</div>
+                <div style={{ background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,80,80,0.25)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#f08080', textAlign: 'center' }}>
+                  {error}
+                </div>
               )}
-              <button type="submit" disabled={loading}
-                className="w-full py-4 rounded-xl text-white font-bold text-base hover:brightness-110 active:scale-[0.98] transition-all shadow-lg disabled:opacity-60"
-                style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ ...btnPrimary, marginTop: '4px', opacity: loading ? 0.6 : 1 }}
+              >
                 {loading ? t.loading : t.enter}
               </button>
             </form>
-            <div className="text-center mt-6 flex flex-col gap-3">
-              <button onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail('') }}
-                className="text-slate-400 text-sm hover:text-white transition-colors">{t.forgot}</button>
-              <div className="border-t border-slate-800 pt-4">
-                <button onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false) }}
-                  className="w-full py-3.5 rounded-xl text-sm font-semibold border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 transition-all">
+
+            <div style={{ textAlign: 'center', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail('') }}
+                style={{ background: 'none', border: 'none', fontSize: '13px', fontWeight: '500', color: 'rgba(200,220,255,0.75)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'rgba(200,220,255,0.25)' }}
+              >
+                {t.forgot}
+              </button>
+              <div style={{ borderTop: '0.5px solid rgba(150,180,220,0.1)', paddingTop: '12px' }}>
+                <button
+                  onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false) }}
+                  style={{ width: '100%', padding: '13px', borderRadius: '10px', border: '1px solid rgba(80,150,255,0.55)', background: 'rgba(26,94,180,0.12)', color: '#a8ccf8', fontSize: '14px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.01em' }}
+                >
                   ✨ {t.try}
                 </button>
               </div>
             </div>
-            <footer className="mt-10 text-center border-t border-slate-800 pt-6">
-              <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold">{t.footer}</p>
+
+            <footer style={footerStyle}>
+              <p style={footerTextStyle}>{t.footer}</p>
             </footer>
           </div>
         </div>
       )}
 
-      {/* ── REGISTRO ──────────────────────────────────────────────────── */}
+      {/* ── REGISTRO ──────────────────────────────────────────────────────── */}
       {view === 'register' && (
-        <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: '#0f172a' }}>
+        <div style={screenWrap}>
           <LangToggle lang={lang} setLang={setLang} />
-          <div className="w-full max-w-md">
-            <Logo lang={lang} />
-            <div className="text-center mb-6">
-              <h2 className="text-white text-xl font-bold">{t.reg_title}</h2>
-              <p className="text-slate-400 text-sm mt-1">{t.reg_sub}</p>
-              <div className="flex justify-center gap-2 mt-3 flex-wrap">
+          <div style={{ width: '100%', maxWidth: '460px' }}>
+            <Logo />
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{t.reg_title}</h2>
+              <p style={{ color: 'rgba(180,200,240,0.6)', fontSize: '13px', margin: '0 0 12px' }}>{t.reg_sub}</p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 {(lang === 'ES'
-                  ? ['✓ 60 días gratis','✓ Plan Pro','✓ Sin tarjeta']
-                  : ['✓ 60 days free','✓ Pro plan','✓ No credit card']
-                ).map((b,i) => (
-                  <span key={i} className="text-xs text-blue-400 bg-blue-400/10 border border-blue-400/20 px-2 py-0.5 rounded-full">{b}</span>
+                  ? ['✓ 60 días gratis', '✓ Plan Pro', '✓ Sin tarjeta']
+                  : ['✓ 60 days free',  '✓ Pro plan',  '✓ No credit card']
+                ).map((b, i) => (
+                  <span key={i} style={{ fontSize: '11px', color: '#6fa8e0', background: 'rgba(56,125,220,0.1)', border: '0.5px solid rgba(56,125,220,0.3)', padding: '3px 10px', borderRadius: '20px' }}>{b}</span>
                 ))}
               </div>
             </div>
 
             {regSuccess ? (
-              <div className="bg-green-400/10 border border-green-400/20 rounded-xl p-6 text-center">
-                <div className="text-4xl mb-3">🎉</div>
-                <p className="text-green-400 font-semibold text-sm">{t.reg_success}</p>
+              <div style={{ background: 'rgba(36,185,100,0.08)', border: '0.5px solid rgba(36,185,100,0.25)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🎉</div>
+                <p style={{ color: '#3bb876', fontWeight: '600', fontSize: '14px', margin: '0 0 12px' }}>{t.reg_success}</p>
                 <button onClick={() => { setView('login'); setRegSuccess(false) }}
-                  className="mt-4 text-blue-400 text-sm hover:text-white transition-colors">{t.reg_back}</button>
+                  style={{ background: 'none', border: 'none', color: '#6fa8e0', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
+                  {t.reg_back}
+                </button>
               </div>
             ) : (
-              <form onSubmit={handleRegister} className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">{t.reg_name} *</label>
-                    <input className={inputClsNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
+                    <label style={labelStyle}>{t.reg_name} *</label>
+                    <input style={inputNoIconStyle} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">{t.reg_company} *</label>
-                    <input className={inputClsNoIcon} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
+                    <label style={labelStyle}>{t.reg_company} *</label>
+                    <input style={inputNoIconStyle} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">{t.reg_phone} *</label>
-                    <input className={inputClsNoIcon} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
+                    <label style={labelStyle}>{t.reg_phone} *</label>
+                    <input style={inputNoIconStyle} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">{t.reg_country} *</label>
-                    <select className={inputClsNoIcon + ' cursor-pointer'} value={reg.pais} onChange={setR('pais')}>
+                    <label style={labelStyle}>{t.reg_country} *</label>
+                    <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
                       <option value="">{t.reg_select}</option>
                       {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
                 </div>
+
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">{t.reg_email} *</label>
-                  <input type="email" className={inputClsNoIcon} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">{t.reg_password} *</label>
-                  <input type="password" className={inputClsNoIcon} value={reg.password} onChange={setR('password')} placeholder="••••••••" />
+                  <label style={labelStyle}>{t.reg_email} *</label>
+                  <input type="email" style={inputNoIconStyle} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
                 </div>
 
-                {/* CHECKBOX TÉRMINOS */}
-                <div className="flex items-start gap-3 pt-1">
+                {/* Password con ojo */}
+                <div>
+                  <label style={labelStyle}>{t.reg_password} *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showRegPass ? 'text' : 'password'}
+                      style={{ ...inputNoIconStyle, paddingRight: '42px' }}
+                      value={reg.password}
+                      onChange={setR('password')}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      style={eyeBtnStyle}
+                      onClick={() => setShowRegPass(v => !v)}
+                      aria-label={showRegPass ? t.hide_pass : t.show_pass}
+                    >
+                      <EyeIcon visible={showRegPass} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Términos */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', paddingTop: '4px' }}>
                   <input
                     type="checkbox"
                     id="terms"
                     checked={termsAccepted}
                     onChange={e => setTermsAccepted(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 cursor-pointer flex-shrink-0"
+                    style={{ marginTop: '2px', width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
                   />
-                  <label htmlFor="terms" className="text-xs text-slate-400 leading-relaxed cursor-pointer">
+                  <label htmlFor="terms" style={{ fontSize: '12px', color: 'rgba(180,200,240,0.6)', lineHeight: '1.5', cursor: 'pointer' }}>
                     {t.reg_terms}{' '}
                     <button type="button" onClick={() => setLegalModal('tos')}
-                      className="text-blue-400 hover:text-blue-300 underline font-medium">
+                      style={{ background: 'none', border: 'none', color: '#6fa8e0', cursor: 'pointer', textDecoration: 'underline', fontSize: '12px', padding: 0 }}>
                       {t.reg_terms_link}
                     </button>
                     {' '}{t.reg_and}{' '}
                     <button type="button" onClick={() => setLegalModal('pp')}
-                      className="text-blue-400 hover:text-blue-300 underline font-medium">
+                      style={{ background: 'none', border: 'none', color: '#6fa8e0', cursor: 'pointer', textDecoration: 'underline', fontSize: '12px', padding: 0 }}>
                       {t.reg_privacy_link}
                     </button>
                     {' '}de MARY.
@@ -664,69 +841,76 @@ export default function Login({ onNavigate }) {
                 </div>
 
                 {regError && (
-                  <div className="text-red-400 text-xs text-center bg-red-400/10 py-2 rounded-lg border border-red-400/20">{regError}</div>
+                  <div style={{ background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,80,80,0.25)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#f08080', textAlign: 'center' }}>
+                    {regError}
+                  </div>
                 )}
 
-                <button type="submit" disabled={regLoading}
-                  className="w-full py-4 rounded-xl text-white font-bold text-base hover:brightness-110 active:scale-[0.98] transition-all shadow-lg disabled:opacity-60 mt-2"
-                  style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
+                <button type="submit" disabled={regLoading} style={{ ...btnPrimary, marginTop: '4px', opacity: regLoading ? 0.6 : 1 }}>
                   {regLoading ? t.reg_loading : t.reg_btn}
                 </button>
 
                 <button type="button" onClick={() => setView('login')}
-                  className="w-full text-center text-slate-400 text-sm hover:text-white transition-colors py-2">
+                  style={{ background: 'none', border: 'none', color: 'rgba(200,220,255,0.75)', fontSize: '13px', cursor: 'pointer', padding: '8px', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'rgba(200,220,255,0.25)' }}>
                   {t.reg_back}
                 </button>
               </form>
             )}
 
-            <footer className="mt-6 text-center border-t border-slate-800 pt-4">
-              <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold">{t.footer}</p>
+            <footer style={footerStyle}>
+              <p style={footerTextStyle}>{t.footer}</p>
             </footer>
           </div>
         </div>
       )}
 
-      {/* ── FORGOT PASSWORD ────────────────────────────────────────────── */}
+      {/* ── FORGOT PASSWORD ───────────────────────────────────────────────── */}
       {view === 'forgot' && (
-        <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: '#0f172a' }}>
+        <div style={screenWrap}>
           <LangToggle lang={lang} setLang={setLang} />
-          <div className="w-full max-w-sm">
-            <Logo lang={lang} />
-            <div className="text-center mb-6">
-              <h2 className="text-white text-xl font-bold">{t.forgot_title}</h2>
-              <p className="text-slate-400 text-sm mt-1">{t.forgot_sub}</p>
+          <div style={{ width: '100%', maxWidth: '380px' }}>
+            <Logo />
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{t.forgot_title}</h2>
+              <p style={{ color: 'rgba(180,200,240,0.6)', fontSize: '13px', margin: 0 }}>{t.forgot_sub}</p>
             </div>
+
             {forgotSent ? (
-              <div className="bg-green-400/10 border border-green-400/20 rounded-xl p-6 text-center">
-                <div className="text-4xl mb-3">📧</div>
-                <p className="text-green-400 font-semibold text-sm">{t.forgot_sent}</p>
+              <div style={{ background: 'rgba(36,185,100,0.08)', border: '0.5px solid rgba(36,185,100,0.25)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📧</div>
+                <p style={{ color: '#3bb876', fontWeight: '600', fontSize: '13px', margin: 0 }}>{t.forgot_sent}</p>
               </div>
             ) : (
-              <form onSubmit={handleForgot} className="space-y-4">
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+              <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ position: 'relative' }}>
+                  <span style={fieldIconStyle}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                       <polyline points="22,6 12,13 2,6"/>
                     </svg>
                   </span>
-                  <input type="email" placeholder={t.email} className={inputCls}
-                    value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required />
+                  <input
+                    type="email"
+                    placeholder={t.email}
+                    style={inputBase}
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    required
+                  />
                 </div>
-                <button type="submit" disabled={forgotLoading}
-                  className="w-full py-4 rounded-xl text-white font-bold text-base hover:brightness-110 transition-all shadow-lg disabled:opacity-60"
-                  style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
+                <button type="submit" disabled={forgotLoading} style={{ ...btnPrimary, opacity: forgotLoading ? 0.6 : 1 }}>
                   {forgotLoading ? t.forgot_loading : t.forgot_btn}
                 </button>
               </form>
             )}
+
             <button onClick={() => setView('login')}
-              className="w-full text-center text-slate-400 text-sm hover:text-white transition-colors py-3 mt-4">
+              style={{ display: 'block', width: '100%', textAlign: 'center', background: 'none', border: 'none', color: 'rgba(200,220,255,0.75)', fontSize: '13px', cursor: 'pointer', padding: '12px', marginTop: '8px', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'rgba(200,220,255,0.25)' }}>
               {t.forgot_back}
             </button>
-            <footer className="mt-8 text-center border-t border-slate-800 pt-6">
-              <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold">{t.footer}</p>
+
+            <footer style={footerStyle}>
+              <p style={footerTextStyle}>{t.footer}</p>
             </footer>
           </div>
         </div>
