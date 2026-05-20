@@ -321,7 +321,9 @@ export default function Presupuesto() {
                 <tbody>
                   {indsDelProy.map(ind => (
                     <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-2 py-2 text-sm text-gray-700">{ind.categoria}</td>
+                      <td className="px-2 py-2 text-sm text-gray-700">
+                        {CATS_IND.find(c => c.key === ind.categoria)?.label ?? ind.categoria}
+                      </td>
                       <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{color:'#1B3A6B'}}>{fmt(ind.monto_presupuestado, moneda)}</td>
                       {puedeEditar && (
                         <td className="px-2 py-2">

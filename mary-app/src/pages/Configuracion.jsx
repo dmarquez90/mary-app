@@ -45,6 +45,16 @@ export default function Configuracion() {
   const [modalSol, setModalSol] = useState(null) // { sol, accion }
   const [comentarioAdmin, setComentarioAdmin] = useState('')
 
+  // Cambio de contraseña
+  const [pwForm, setPwForm]     = useState({ actual: '', nueva: '', confirmar: '' })
+  const [pwError, setPwError]   = useState('')
+  const [pwSuccess, setPwSuccess] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMode, setPwMode]     = useState('cambio') // 'cambio' | 'olvide'
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetSent, setResetSent]   = useState(false)
+  const [resetSaving, setResetSaving] = useState(false)
+
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   const solicitudesPendientes = (state.solicitudes_eliminacion || []).filter(s => s.estado === 'pendiente')
@@ -164,6 +174,37 @@ export default function Configuracion() {
 
   const toggleProy = (id) => {
     setPermProys(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const cambiarPassword = async () => {
+    setPwError(''); setPwSuccess('')
+    const { actual, nueva, confirmar } = pwForm
+    if (!actual || !nueva || !confirmar) { setPwError(isEs ? 'Completa todos los campos.' : 'Fill in all fields.'); return }
+    if (nueva.length < 6) { setPwError(isEs ? 'La nueva contraseña debe tener mínimo 6 caracteres.' : 'New password must be at least 6 characters.'); return }
+    if (nueva !== confirmar) { setPwError(isEs ? 'Las contraseñas no coinciden.' : 'Passwords do not match.'); return }
+    setPwSaving(true)
+    try {
+      const email = perfil?.email
+      const { error: signErr } = await supabase.auth.signInWithPassword({ email, password: actual })
+      if (signErr) { setPwError(isEs ? 'La contraseña actual es incorrecta.' : 'Current password is incorrect.'); setPwSaving(false); return }
+      const { error: updErr } = await supabase.auth.updateUser({ password: nueva })
+      if (updErr) throw updErr
+      setPwSuccess(isEs ? '✓ Contraseña actualizada correctamente.' : '✓ Password updated successfully.')
+      setPwForm({ actual: '', nueva: '', confirmar: '' })
+    } catch (e) { setPwError(e.message) }
+    setPwSaving(false)
+  }
+
+  const enviarResetEmail = async () => {
+    setPwError(''); setResetSent(false)
+    if (!resetEmail) { setPwError(isEs ? 'Escribe tu correo.' : 'Enter your email.'); return }
+    setResetSaving(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`
+    })
+    setResetSaving(false)
+    if (error) { setPwError(error.message); return }
+    setResetSent(true)
   }
 
   return (
@@ -367,6 +408,7 @@ export default function Configuracion() {
         {[
           { id:'usuarios',    label: t('cfg_users_sub') },
           { id:'solicitudes', label: `Solicitudes de eliminación${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
+          { id:'micuenta',    label: isEs ? 'Mi cuenta' : 'My account' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
@@ -506,7 +548,137 @@ export default function Configuracion() {
       )}
     </div>
 
-    {/* ── DRAWER PERMISOS ───────────────────────────────────────── */}
+    {/* ── TAB MI CUENTA ────────────────────────────────────────────────── */}
+      {activeTab === 'micuenta' && (
+        <div className="max-w-md">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">
+            {isEs ? 'Cambiar contraseña' : 'Change password'}
+          </h2>
+
+          {/* Selector modo */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-5 w-fit">
+            <button
+              onClick={() => { setPwMode('cambio'); setPwError(''); setPwSuccess(''); setResetSent(false) }}
+              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${pwMode === 'cambio' ? 'bg-white text-[#1B3A6B] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {isEs ? 'Cambiar contraseña' : 'Change password'}
+            </button>
+            <button
+              onClick={() => { setPwMode('olvide'); setPwError(''); setPwSuccess(''); setResetSent(false); setResetEmail(perfil?.email || '') }}
+              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${pwMode === 'olvide' ? 'bg-white text-[#1B3A6B] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {isEs ? 'Olvidé mi contraseña' : 'Forgot password'}
+            </button>
+          </div>
+
+          {/* MODO CAMBIO NORMAL */}
+          {pwMode === 'cambio' && (
+            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">
+                  {isEs ? 'Contraseña actual' : 'Current password'} *
+                </label>
+                <input
+                  type="password"
+                  className={inputCls}
+                  value={pwForm.actual}
+                  onChange={e => setPwForm(f => ({ ...f, actual: e.target.value }))}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">
+                  {isEs ? 'Nueva contraseña' : 'New password'} *
+                </label>
+                <input
+                  type="password"
+                  className={inputCls}
+                  value={pwForm.nueva}
+                  onChange={e => setPwForm(f => ({ ...f, nueva: e.target.value }))}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+                <p className="text-xs text-gray-400 mt-1">{isEs ? 'Mínimo 6 caracteres.' : 'At least 6 characters.'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">
+                  {isEs ? 'Confirmar nueva contraseña' : 'Confirm new password'} *
+                </label>
+                <input
+                  type="password"
+                  className={inputCls}
+                  value={pwForm.confirmar}
+                  onChange={e => setPwForm(f => ({ ...f, confirmar: e.target.value }))}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </div>
+              {pwError   && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{pwError}</div>}
+              {pwSuccess && <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">{pwSuccess}</div>}
+              <button
+                onClick={cambiarPassword}
+                disabled={pwSaving}
+                className="w-full px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-60 mt-1"
+                style={{ background: BRAND }}>
+                {pwSaving ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Actualizar contraseña' : 'Update password')}
+              </button>
+            </div>
+          )}
+
+          {/* MODO OLVIDÉ MI CONTRASEÑA */}
+          {pwMode === 'olvide' && (
+            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+              {!resetSent ? (
+                <>
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-3 text-xs text-blue-700">
+                    {isEs
+                      ? 'Te enviaremos un correo con un enlace para restablecer tu contraseña. Revisa también tu carpeta de spam.'
+                      : 'We will send you an email with a link to reset your password. Check your spam folder too.'}
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 block mb-1">
+                      {isEs ? 'Correo electrónico' : 'Email address'} *
+                    </label>
+                    <input
+                      type="email"
+                      className={inputCls}
+                      value={resetEmail}
+                      onChange={e => setResetEmail(e.target.value)}
+                      placeholder="tu@correo.com"
+                    />
+                  </div>
+                  {pwError && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{pwError}</div>}
+                  <button
+                    onClick={enviarResetEmail}
+                    disabled={resetSaving}
+                    className="w-full px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-60"
+                    style={{ background: BRAND }}>
+                    {resetSaving ? (isEs ? 'Enviando...' : 'Sending...') : (isEs ? 'Enviar correo de recuperación' : 'Send recovery email')}
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-2xl">✓</div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {isEs ? '¡Correo enviado!' : 'Email sent!'}
+                  </p>
+                  <p className="text-xs text-gray-500 max-w-xs">
+                    {isEs
+                      ? `Revisa tu bandeja de entrada en ${resetEmail}. El enlace expira en 1 hora.`
+                      : `Check your inbox at ${resetEmail}. The link expires in 1 hour.`}
+                  </p>
+                  <button
+                    onClick={() => { setResetSent(false); setPwMode('cambio') }}
+                    className="text-xs text-[#1B3A6B] underline mt-2">
+                    {isEs ? 'Volver' : 'Go back'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+    
     {permDrawer && (
       <div className="fixed inset-0 z-50 flex">
         <div className="flex-1 bg-black/30" onClick={() => setPermDrawer(null)} />

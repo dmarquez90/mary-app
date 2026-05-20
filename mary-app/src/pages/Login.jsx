@@ -19,8 +19,10 @@ const T = {
     try:               '¿No tienes cuenta? Prueba MARY gratis',
     footer:            'MARQUEZ PROJECT SOLUTIONS LLC · 2026',
     err_credentials:   'Credenciales incorrectas. Verifica tu email y contraseña.',
-    reg_title:         'Prueba MARY por 60 días',
-    reg_sub:           'Plan Pro gratis. Sin tarjeta de crédito.',
+    reg_title:         'Prueba MARY gratis por 7 días',
+    reg_sub:           'Sin tarjeta de crédito. Elige tu plan:',
+    reg_plan:          'Selecciona un plan',
+    err_plan:          'Por favor selecciona un plan.',
     reg_name:          'Nombre completo',
     reg_company:       'Nombre de la empresa',
     reg_phone:         'Teléfono',
@@ -64,8 +66,10 @@ const T = {
     try:               "Don't have an account? Try MARY free",
     footer:            'MARQUEZ PROJECT SOLUTIONS LLC · 2026',
     err_credentials:   'Incorrect credentials. Check your email and password.',
-    reg_title:         'Try MARY for 60 days',
-    reg_sub:           'Pro plan free. No credit card required.',
+    reg_title:         'Try MARY free for 7 days',
+    reg_sub:           'No credit card required. Choose your plan:',
+    reg_plan:          'Select a plan',
+    err_plan:          'Please select a plan.',
     reg_name:          'Full name',
     reg_company:       'Company name',
     reg_phone:         'Phone number',
@@ -525,6 +529,7 @@ export default function Login({ onNavigate }) {
   const [regError, setRegError]     = useState('')
   const [regSuccess, setRegSuccess] = useState(false)
   const [regLoading, setRegLoading] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState('')
   const setR = k => e => setReg(f => ({ ...f, [k]: e.target.value }))
 
   // Forgot
@@ -553,6 +558,9 @@ export default function Login({ onNavigate }) {
     if (reg.password.length < 8) {
       setRegError(t.err_password); return
     }
+    if (!selectedPlan) {
+      setRegError(t.err_plan); return
+    }
     if (!termsAccepted) {
       setRegError(t.reg_terms_required); return
     }
@@ -563,7 +571,7 @@ export default function Login({ onNavigate }) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
-          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais })
+          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan })
         }
       )
       const result = await res.json()
@@ -574,6 +582,7 @@ export default function Login({ onNavigate }) {
       }
       setRegSuccess(true)
       setReg({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
+      setSelectedPlan('')
       setTermsAccepted(false)
     } catch (err) {
       setRegError(err.message || 'Error al crear la cuenta.')
@@ -718,7 +727,7 @@ export default function Login({ onNavigate }) {
               </button>
               <div style={{ borderTop: '0.5px solid rgba(150,180,220,0.1)', paddingTop: '12px' }}>
                 <button
-                  onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false) }}
+                  onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false); setSelectedPlan('') }}
                   style={{ width: '100%', padding: '13px', borderRadius: '10px', border: '1px solid rgba(80,150,255,0.55)', background: 'rgba(26,94,180,0.12)', color: '#a8ccf8', fontSize: '14px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.01em' }}
                 >
                   ✨ {t.try}
@@ -741,14 +750,42 @@ export default function Login({ onNavigate }) {
             <Logo />
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{t.reg_title}</h2>
-              <p style={{ color: 'rgba(180,200,240,0.6)', fontSize: '13px', margin: '0 0 12px' }}>{t.reg_sub}</p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {(lang === 'ES'
-                  ? ['✓ 60 días gratis', '✓ Plan Pro', '✓ Sin tarjeta']
-                  : ['✓ 60 days free',  '✓ Pro plan',  '✓ No credit card']
-                ).map((b, i) => (
-                  <span key={i} style={{ fontSize: '11px', color: '#6fa8e0', background: 'rgba(56,125,220,0.1)', border: '0.5px solid rgba(56,125,220,0.3)', padding: '3px 10px', borderRadius: '20px' }}>{b}</span>
-                ))}
+              <p style={{ color: 'rgba(180,200,240,0.6)', fontSize: '13px', margin: '0 0 16px' }}>{t.reg_sub}</p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'starter',    labelEs: 'Starter',    labelEn: 'Starter',    users: 1, projects: 2,  price: '$29.99/m' },
+                  { id: 'pro',        labelEs: 'Pro',        labelEn: 'Pro',        users: 3, projects: 5,  price: '$49.99/m' },
+                  { id: 'enterprise', labelEs: 'Enterprise', labelEn: 'Enterprise', users: 5, projects: 10, price: '$69.99/m' },
+                ].map(plan => {
+                  const active = selectedPlan === plan.id
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => setSelectedPlan(plan.id)}
+                      style={{
+                        flex: 1, minWidth: '120px',
+                        padding: '10px 8px',
+                        borderRadius: '10px',
+                        border: active ? '1.5px solid #3a8adc' : '0.5px solid rgba(150,180,220,0.2)',
+                        background: active ? 'rgba(26,94,180,0.22)' : 'rgba(255,255,255,0.03)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <p style={{ color: active ? '#ffffff' : 'rgba(200,220,255,0.75)', fontWeight: '700', fontSize: '13px', margin: '0 0 4px' }}>
+                        {lang === 'ES' ? plan.labelEs : plan.labelEn}
+                      </p>
+                      <p style={{ color: active ? 'rgba(180,210,255,0.8)' : 'rgba(150,180,220,0.5)', fontSize: '11px', margin: '0 0 2px' }}>
+                        {lang === 'ES' ? `${plan.users} usuario${plan.users > 1 ? 's' : ''} · ${plan.projects} proyectos` : `${plan.users} user${plan.users > 1 ? 's' : ''} · ${plan.projects} projects`}
+                      </p>
+                      <p style={{ color: active ? '#6fa8e0' : 'rgba(100,150,200,0.45)', fontSize: '11px', margin: 0 }}>
+                        {plan.price}
+                      </p>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

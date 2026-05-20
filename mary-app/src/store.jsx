@@ -294,10 +294,13 @@ useEffect(() => {
       .subscribe()
   )
 
-  // Realtime para notificaciones del usuario actual
+  // Realtime notificaciones: .on() SIEMPRE antes de .subscribe()
+  // La variable cancelled evita condicion de carrera en StrictMode/hot-reload
   let notifChannel = null
+  let cancelled = false
+
   supabase.auth.getUser().then(({ data: { user } }) => {
-    if (!user) return
+    if (!user || cancelled) return
     notifChannel = supabase
       .channel(`rt_notificaciones_${user.id}`)
       .on('postgres_changes', {
@@ -312,6 +315,7 @@ useEffect(() => {
   })
 
   return () => {
+    cancelled = true
     channels.forEach(ch => supabase.removeChannel(ch))
     if (notifChannel) supabase.removeChannel(notifChannel)
   }
