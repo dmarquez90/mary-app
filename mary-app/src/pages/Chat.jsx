@@ -229,10 +229,12 @@ export default function Chat() {
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [showMenciones, setShowMenciones] = useState(false)
   const [mencionQuery, setMencionQuery]   = useState('')
+  const [confirmDelCanal, setConfirmDelCanal] = useState(null)
 
-  const messagesEndRef = useRef(null)
-  const inputRef       = useRef(null)
-  const escribiendoRef = useRef(null)
+  const messagesEndRef  = useRef(null)
+  const inputRef        = useRef(null)
+  const escribiendoRef  = useRef(null)
+  const canalActivoRef  = useRef(null)
 
   // ── Cargar datos iniciales ────────────────────────────
   useEffect(() => {
@@ -249,21 +251,25 @@ export default function Chat() {
     const { data: proys } = await supabase.from('proyectos').select('id, project_code, nombre').eq('tenant_id', tenantId)
     setProyectos(proys || [])
 
-    // Canal general — crear si no existe
-    let { data: general } = await supabase.from('chat_canales')
-      .select('*').eq('tenant_id', tenantId).eq('tipo', 'general').single()
+    // Canal general — obtener el primero existente o crear uno solo
+    const { data: generales } = await supabase.from('chat_canales')
+      .select('*').eq('tenant_id', tenantId).eq('tipo', 'general').order('created_at').limit(1)
+    
+    let general = generales?.[0] || null
 
     if (!general) {
       const { data: nuevo } = await supabase.from('chat_canales').insert({
-        tenant_id: tenantId, nombre: isEs ? 'General' : 'General', tipo: 'general',
+        tenant_id: tenantId, nombre: 'General', tipo: 'general',
       }).select().single()
       general = nuevo
     }
 
     // Asegurar que el usuario esté en canal general
-    await supabase.from('chat_participantes').upsert({
-      canal_id: general.id, usuario_id: usuarioId, tenant_id: tenantId,
-    }, { onConflict: 'canal_id,usuario_id' })
+    if (general) {
+      await supabase.from('chat_participantes').upsert({
+        canal_id: general.id, usuario_id: usuarioId, tenant_id: tenantId,
+      }, { onConflict: 'canal_id,usuario_id' })
+    }
 
     // Canales donde participa el usuario
     const { data: parts } = await supabase.from('chat_participantes')
@@ -309,6 +315,9 @@ export default function Chat() {
     return () => clearInterval(interval)
   }, [usuarioId])
 
+  // ── Sync ref con state ───────────────────────────────
+  useEffect(() => { canalActivoRef.current = canalActivo }, [canalActivo])
+
   // ── Cargar mensajes del canal activo ──────────────────
   useEffect(() => {
     if (!canalActivo) return
@@ -347,7 +356,7 @@ export default function Chat() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensajes',
         filter: `tenant_id=eq.${tenantId}` }, (payload) => {
         const msg = payload.new
-        if (msg.canal_id === canalActivo?.id) {
+        if (msg.canal_id === canalActivoRef.current?.id) {
           setMensajes(prev => [...prev, msg])
           // Actualizar ultimo_leido
           supabase.from('chat_participantes')
@@ -387,6 +396,20 @@ export default function Chat() {
       supabase.removeChannel(canalChannel)
     }
   }, [tenantId, usuarioId, canalActivo?.id])
+
+  // ── Borrar canal ─────────────────────────────────────
+  const borrarCanal = async (canal) => {
+    if (canal.tipo === 'general') return // No borrar general
+    await supabase.from('chat_mensajes').delete().eq('canal_id', canal.id)
+    await supabase.from('chat_participantes').delete().eq('canal_id', canal.id)
+    await supabase.from('chat_canales').delete().eq('id', canal.id)
+    setCanales(prev => prev.filter(c => c.id !== canal.id))
+    if (canalActivo?.id === canal.id) {
+      const general = canales.find(c => c.tipo === 'general')
+      setCanalActivo(general || null)
+    }
+    setConfirmDelCanal(null)
+  }
 
   // ── Enviar mensaje ────────────────────────────────────
   const enviar = async () => {
@@ -459,6 +482,34 @@ export default function Chat() {
   return (
     <div className="flex h-full overflow-hidden" style={{ background: '#F0F4F8' }}>
 
+      {/* Modal confirmar borrar canal */}
+      {confirmDelCanal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg">🗑</div>
+              <div>
+                <p className="font-semibold text-gray-800">{isEs ? 'Eliminar canal' : 'Delete channel'}</p>
+                <p className="text-xs text-gray-400">#{confirmDelCanal.nombre}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              {isEs ? 'Se eliminarán todos los mensajes de este canal. Esta acción no se puede deshacer.' : 'All messages in this channel will be deleted. This cannot be undone.'}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDelCanal(null)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                {isEs ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button onClick={() => borrarCanal(confirmDelCanal)}
+                className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-red-500 hover:bg-red-600">
+                {isEs ? 'Eliminar' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── SIDEBAR ── */}
       <div className="w-64 flex-shrink-0 flex flex-col overflow-hidden" style={{ background: BRAND_DARK }}>
 
@@ -486,8 +537,24 @@ export default function Chat() {
             {isEs ? 'Canales' : 'Channels'}
           </p>
           {canales.map(c => (
-            <CanalItem key={c.id} canal={c} activo={canalActivo?.id === c.id}
-              onClick={() => setCanalActivo(c)} noLeidos={noLeidos[c.id] || 0} isEs={isEs} />
+            <div key={c.id} className="flex items-center gap-1 group/canal">
+              <div className="flex-1">
+                <CanalItem canal={c} activo={canalActivo?.id === c.id}
+                  onClick={() => setCanalActivo(c)} noLeidos={noLeidos[c.id] || 0} isEs={isEs} />
+              </div>
+              {c.tipo !== 'general' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelCanal(c) }}
+                  className="opacity-0 group-hover/canal:opacity-100 transition-opacity w-6 h-6 rounded flex items-center justify-center hover:bg-red-500/20 flex-shrink-0"
+                  style={{ color: '#ef4444' }}
+                  title={isEs ? 'Eliminar canal' : 'Delete channel'}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           ))}
         </div>
 
