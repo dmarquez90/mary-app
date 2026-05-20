@@ -635,6 +635,8 @@ export default function Login({ onNavigate }) {
     ...inputBaseNoIcon,
     border: '0.5px solid rgba(150,180,220,0.18)',
     cursor: 'pointer',
+    color: '#ffffff',
+    backgroundColor: '#0d1117',
   }
 
   const footerStyle = {
@@ -820,8 +822,10 @@ export default function Login({ onNavigate }) {
                   <div>
                     <label style={labelStyle}>{t.reg_country} *</label>
                     <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
-                      <option value="">{t.reg_select}</option>
-                      {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
+                      <option value="" style={{ backgroundColor: '#0d1117', color: '#ffffff' }}>{t.reg_select}</option>
+                      {PAISES.map(p => (
+                        <option key={p} value={p} style={{ backgroundColor: '#0d1117', color: '#ffffff' }}>{p}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

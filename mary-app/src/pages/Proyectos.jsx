@@ -2,7 +2,7 @@ import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal, PAIS_MONEDA } from '../utils'
+import { today, MONEDAS, ESTADO_LABELS, calcGrandTotal, PAIS_MONEDA, MONEDA_SIMBOLO } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls } from '../components'
 
 const ESTADOS_PROYECTO = ['planificacion','en_ejecucion','pausado','completado','cancelado']
@@ -219,7 +219,7 @@ export default function Proyectos({ onNavigate }) {
                 </div>
                 <div className="text-xs text-gray-500 mb-4">
                   <span className="font-medium text-gray-700">{t('proy_budget_label')}: </span>
-                  <span className="font-mono">{new Intl.NumberFormat('es',{style:'currency',currency:p.moneda,minimumFractionDigits:2}).format(b)}</span>
+                  <span className="font-mono">{`${MONEDA_SIMBOLO[p.moneda] || p.moneda} ${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(b)}`}</span>
                 </div>
                 <div className="flex gap-2 pt-3 border-t border-gray-50">
                   <button onClick={() => setDetail(p.id)} className="flex-1 text-xs font-medium hover:underline text-left" style={{color:'#1B3A6B'}}>{t('proy_detail')} →</button>
@@ -258,7 +258,7 @@ export default function Proyectos({ onNavigate }) {
                   [t('proy_form_end'),     proyecto.fecha_fin_estimada || '—'],
                   [t('proy_form_country'), proyecto.pais || '—'],
                   ...(proyecto.estado_usa ? [[t('proy_state_usa'), proyecto.estado_usa]] : []),
-                  [t('proy_budget_label'), new Intl.NumberFormat('es',{style:'currency',currency:proyecto.moneda,minimumFractionDigits:2}).format(budget)],
+                  [t('proy_budget_label'), `${MONEDA_SIMBOLO[proyecto.moneda] || proyecto.moneda} ${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(budget)}`],
                   ...(proyecto.utilidad_pct ? [[t('proy_profit'), `${proyecto.utilidad_pct}%`]] : []),
                   ...(proyecto.impuesto_pct ? [[t('proy_tax'), `${proyecto.impuesto_pct}% ${proyecto.impuesto_descripcion||''}`]] : []),
                 ].map(([k,v]) => (
@@ -370,7 +370,7 @@ export default function Proyectos({ onNavigate }) {
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('proy_form_currency')} required>
             <select className={selectCls} value={form.moneda} onChange={set('moneda')} disabled={!!editing}>
-              {MONEDAS.map(m => <option key={m}>{m}</option>)}
+            {MONEDAS.map(m => <option key={m} value={m}>{MONEDA_SIMBOLO[m] ? `${MONEDA_SIMBOLO[m]} ${m}` : m}</option>)}
             </select>
             {editing && <p className="text-xs text-amber-600 mt-1">{t('lbl_currency')}</p>}
           </Field>

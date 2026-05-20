@@ -55,7 +55,6 @@ export const MONEDA_SIMBOLO = {
   HTG: 'G',
   JMD: 'J$',
   TTD: 'TT$',
-  GYD: '$',
 }
 
 // Monedas soportadas por Intl.NumberFormat
@@ -65,15 +64,15 @@ const MONEDAS_INTL = [
   'CUP','GYD','HTG','JMD','TTD',
 ]
 
-// Formato de moneda: $1,200.00
+// Formato de moneda: C$1,200.00 — usa el símbolo del mapa MONEDA_SIMBOLO
 export const fmt = (n, moneda = 'USD') => {
   const currency = MONEDAS_INTL.includes(moneda) ? moneda : 'USD'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
+  const simbolo = MONEDA_SIMBOLO[currency] || currency
+  const numero = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n || 0)
+  return `${simbolo} ${numero}`
 }
 
 // Formato de número: 1,200.00
