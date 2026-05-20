@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { StoreProvider } from './store'
 import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
 import { Icons } from './components'
+import { supabase } from './supabase'
 import AuthRouter from './pages/AuthRouter'
 import Admin from './pages/Admin'
 import Configuracion from './pages/Configuracion'
@@ -18,7 +19,6 @@ import AvaluosCliente from './pages/AvaluosCliente'
 import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
-import Chat from './pages/Chat'
 import maryLogo from './assets/mary-logo.png'
 import NotificacionesPanel from './pages/NotificacionesPanel'
 
@@ -39,7 +39,6 @@ const NAV = [
   { id: 'financiero',     labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',      labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
   { id: 'reportes',    labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
-  { id: 'chat',        labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]
 
 const PAGES = {
@@ -55,7 +54,6 @@ const PAGES = {
   curvas:        CurvaS,
   configuracion: Configuracion,
   reportes:      Reportes,
-  chat:          Chat,
 }
 
 function Layout() {
@@ -68,7 +66,60 @@ function Layout() {
 
   const [page, setPage]         = useState(defaultPage)
   const [sideOpen, setSideOpen] = useState(true)
+  const [chatUnread, setChatUnread] = useState(0)
   const isEs = lang === 'ES'
+
+  // ── Badge de mensajes no leídos en nav ───────────────
+  useEffect(() => {
+    if (!perfil?.id || !perfil?.tenant_id) return
+
+    async function loadChatUnread() {
+      // Obtener canales donde participa el usuario
+      const { data: parts } = await supabase
+        .from('chat_participantes')
+        .select('canal_id, ultimo_leido')
+        .eq('usuario_id', perfil.id)
+      if (!parts?.length) return
+
+      let total = 0
+      await Promise.all(parts.map(async (p) => {
+        const { count } = await supabase
+          .from('chat_mensajes')
+          .select('id', { count: 'exact', head: true })
+          .eq('canal_id', p.canal_id)
+          .neq('usuario_id', perfil.id)
+          .gt('created_at', p.ultimo_leido || '1970-01-01')
+        total += count || 0
+      }))
+      setChatUnread(total)
+    }
+
+    loadChatUnread()
+
+    // Escuchar nuevos mensajes en tiempo real
+    const channel = supabase
+      .channel(`nav_chat_${perfil.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_mensajes',
+        filter: `tenant_id=eq.${perfil.tenant_id}`,
+      }, (payload) => {
+        if (payload.new.usuario_id !== perfil.id) {
+          if (page !== 'chat') {
+            setChatUnread(prev => prev + 1)
+          }
+        }
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [perfil?.id, perfil?.tenant_id])
+
+  // Limpiar badge al entrar al chat
+  useEffect(() => {
+    if (page === 'chat') setChatUnread(0)
+  }, [page])
 
   const Page = PAGES[page] || Dashboard
   const currentNav = NAV.find(n => n.id === page)
@@ -113,8 +164,24 @@ function Layout() {
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
                 title={!sideOpen ? (isEs ? item.labelEs : item.labelEn) : ''}>
                 {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: '#7FB3E8' }} />}
-                <span className="w-4 h-4 flex-shrink-0">{Icons[item.icon]}</span>
-                {sideOpen && <span className="text-sm font-medium truncate">{isEs ? item.labelEs : item.labelEn}</span>}
+                <span className="w-4 h-4 flex-shrink-0 relative">
+                  {Icons[item.icon]}
+                  {item.id === 'chat' && chatUnread > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5 leading-none">
+                      {chatUnread > 99 ? '99+' : chatUnread}
+                    </span>
+                  )}
+                </span>
+                {sideOpen && (
+                  <span className="text-sm font-medium truncate flex-1 flex items-center justify-between">
+                    {isEs ? item.labelEs : item.labelEn}
+                    {item.id === 'chat' && chatUnread > 0 && sideOpen && (
+                      <span className="min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 ml-1">
+                        {chatUnread > 99 ? '99+' : chatUnread}
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             )
           })}
