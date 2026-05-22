@@ -750,6 +750,7 @@ export default function Reportes() {
 
   const datosFinanciero = useMemo(() => {
     if (!proyId) return null
+    const isEs  = lang === 'ES'
     const filtro = f => inPeriodo(f, desde, hasta)
 
     const dirs  = costos_directos.filter(c => c.proyecto_id===proyId && filtro(c.fecha||c.created_at?.slice(0,10)))
@@ -801,11 +802,16 @@ export default function Reportes() {
     const indsPres = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
 
     // Comparación indirectos
-    const CATS_IND = [
+    const CATS_IND = isEs ? [
       'Administración de obra',
       'Instalaciones y servicios generales',
       'Seguros, fianzas y garantías',
       'Servicios profesionales y legales',
+    ] : [
+      'Construction Management',
+      'General Installations and Services',
+      'Insurance, Bonds and Guarantees',
+      'Professional and Legal Services',
     ]
     const comparacionInd = CATS_IND.map(cat => {
       const presupuestado = parseFloat(indsPres.find(p => p.categoria === cat)?.monto_presupuestado || 0)
@@ -826,7 +832,7 @@ export default function Reportes() {
       actividades, totalReal, dirs, noms, subs, eqs, inds,
       avsProy, avsItems, indsPres, comparacionInd,
     }
-  }, [proyId, desde, hasta, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -971,7 +977,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
       </div>
       {actividades.length>0&&(
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">Presupuesto vs Real por actividad</p></div>
+          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Presupuesto vs Real por actividad':'Budget vs Actual by activity'}</p></div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr style={thS}>{[isEs?'Código':'Code',isEs?'Actividad':'Activity',isEs?'Presupuestado':'Budgeted',isEs?'Real':'Real',isEs?'Saldo en Presupuesto $':'Budget Balance $',isEs?'S.%':'B.%',isEs?'Estado':'Status'].map((h,i)=><th key={i} className={thC+(i>1?' text-right':'')}>{h}</th>)}</tr></thead>
