@@ -3,6 +3,7 @@ import { StoreProvider } from './store'
 import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
+import { MODULOS_PRO_PLUS, PLAN_INFO } from './plans'
 import { Icons } from './components'
 import { supabase } from './supabase'
 import AuthRouter from './pages/AuthRouter'
@@ -20,48 +21,99 @@ import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
 import Chat from './pages/Chat'
-
 import NotificacionesPanel from './pages/NotificacionesPanel'
-
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
 const BRAND_DARK  = '#122848'
 
 const NAV = [
-  { id: 'dashboard',   labelEs: 'Dashboard',           labelEn: 'Dashboard',          icon: 'dashboard' },
-  { id: 'proyectos',   labelEs: 'Proyectos',           labelEn: 'Projects',           icon: 'projects'  },
-  { id: 'presupuesto', labelEs: 'Presupuesto',         labelEn: 'Budget',             icon: 'budget'    },
-  { id: 'inventario',  labelEs: 'Inventario',          labelEn: 'Inventory',          icon: 'inventory' },
-  { id: 'mat_pres',    labelEs: 'Mat. Presupuestados', labelEn: 'Budgeted Materials', icon: 'matpres'   },
+  { id: 'dashboard',      labelEs: 'Dashboard',           labelEn: 'Dashboard',          icon: 'dashboard' },
+  { id: 'proyectos',      labelEs: 'Proyectos',           labelEn: 'Projects',           icon: 'projects'  },
+  { id: 'presupuesto',    labelEs: 'Presupuesto',         labelEn: 'Budget',             icon: 'budget'    },
+  { id: 'inventario',     labelEs: 'Inventario',          labelEn: 'Inventory',          icon: 'inventory' },
+  { id: 'mat_pres',       labelEs: 'Mat. Presupuestados', labelEn: 'Budgeted Materials', icon: 'matpres'   },
   { id: 'compras',        labelEs: 'Compras / OC',        labelEn: 'Purchases',          icon: 'purchases' },
   { id: 'ordenes_cambio', labelEs: 'Órdenes de Cambio',  labelEn: 'Change Orders',      icon: 'budget'    },
   { id: 'avaluos',        labelEs: 'Avalúos',             labelEn: 'Valuations',         icon: 'financial' },
   { id: 'financiero',     labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
-  { id: 'curvas',      labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
-  { id: 'reportes',    labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
-  { id: 'chat',        labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
+  { id: 'curvas',         labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
+  { id: 'reportes',       labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
+  { id: 'chat',           labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]
 
 const PAGES = {
-  dashboard:     Dashboard,
-  proyectos:     Proyectos,
-  presupuesto:   Presupuesto,
-  inventario:    Inventario,
-  mat_pres:      MatPresupuestados,
+  dashboard:      Dashboard,
+  proyectos:      Proyectos,
+  presupuesto:    Presupuesto,
+  inventario:     Inventario,
+  mat_pres:       MatPresupuestados,
   compras:        Compras,
   ordenes_cambio: OrdenesCambio,
   avaluos:        AvaluosCliente,
   financiero:     Financiero,
-  curvas:        CurvaS,
-  configuracion: Configuracion,
-  reportes:      Reportes,
-  chat:          Chat,
+  curvas:         CurvaS,
+  configuracion:  Configuracion,
+  reportes:       Reportes,
+  chat:           Chat,
+}
+
+// ── Pantalla de upgrade para módulos bloqueados por plan ─────────────
+function PlanUpgradeScreen({ moduloId, isEs }) {
+  const navItem = NAV.find(n => n.id === moduloId)
+  const nombre  = isEs ? navItem?.labelEs : navItem?.labelEn
+
+  return (
+    <div className="flex items-center justify-center min-h-full p-8">
+      <div className="text-center max-w-sm">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: '#EEEDFE' }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-3"
+          style={{ background: '#EEEDFE', color: '#3C3489' }}>
+          <span>Pro+</span>
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          {isEs ? `${nombre} requiere plan Pro o superior` : `${nombre} requires Pro plan or higher`}
+        </h2>
+        <p className="text-sm text-gray-500 mb-6" style={{ lineHeight: 1.6 }}>
+          {isEs
+            ? 'Este módulo no está disponible en el plan Starter. Actualiza tu plan para acceder a Órdenes de Cambio, Avalúos y más.'
+            : 'This module is not available on the Starter plan. Upgrade to access Change Orders, Valuations, and more.'}
+        </p>
+        <div className="rounded-xl border p-4 text-left mb-4"
+          style={{ borderColor: '#AFA9EC', background: '#EEEDFE' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: '#3C3489' }}>
+            {isEs ? 'Plan Pro — $49.99/mes' : 'Pro Plan — $49.99/mo'}
+          </p>
+          {[
+            isEs ? '3 usuarios · 5 proyectos' : '3 users · 5 projects',
+            isEs ? 'Órdenes de Cambio' : 'Change Orders',
+            isEs ? 'Avalúos de clientes' : 'Client Valuations',
+            isEs ? 'Todos los módulos base' : 'All base modules',
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs mb-1" style={{ color: '#534AB7' }}>
+              <span style={{ color: '#0F6E56' }}>✓</span> {item}
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400">
+          {isEs
+            ? 'Contacta a soporte para actualizar tu plan: soporte@appmary.com'
+            : 'Contact support to upgrade: soporte@appmary.com'}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function Layout() {
-  const { perfil, logout, isSuperAdmin, isClientAdmin } = useAuth()
-  const { navVisible } = usePermissions()
+  const { perfil, logout, isSuperAdmin, isClientAdmin, plan } = useAuth()
+  const { navVisible, canUsePlan } = usePermissions()
   const { lang, toggleLang } = useLanguage()
 
   const navFiltrado = NAV.filter(item => navVisible(item.id))
@@ -77,7 +129,6 @@ function Layout() {
     if (!perfil?.id || !perfil?.tenant_id) return
 
     async function loadChatUnread() {
-      // Obtener canales donde participa el usuario
       const { data: parts } = await supabase
         .from('chat_participantes')
         .select('canal_id, ultimo_leido')
@@ -99,7 +150,6 @@ function Layout() {
 
     loadChatUnread()
 
-    // Escuchar nuevos mensajes en tiempo real
     const channel = supabase
       .channel(`nav_chat_${perfil.id}`)
       .on('postgres_changes', {
@@ -109,9 +159,7 @@ function Layout() {
         filter: `tenant_id=eq.${perfil.tenant_id}`,
       }, (payload) => {
         if (payload.new.usuario_id !== perfil.id) {
-          if (page !== 'chat') {
-            setChatUnread(prev => prev + 1)
-          }
+          if (page !== 'chat') setChatUnread(prev => prev + 1)
         }
       })
       .subscribe()
@@ -119,10 +167,12 @@ function Layout() {
     return () => supabase.removeChannel(channel)
   }, [perfil?.id, perfil?.tenant_id])
 
-  // Limpiar badge al entrar al chat
   useEffect(() => {
     if (page === 'chat') setChatUnread(0)
   }, [page])
+
+  // Si el módulo activo está bloqueado por plan, mostrar pantalla upgrade
+  const pageBlockedByPlan = MODULOS_PRO_PLUS.includes(page) && !canUsePlan(page)
 
   const Page = PAGES[page] || Dashboard
   const currentNav = NAV.find(n => n.id === page)
@@ -130,6 +180,9 @@ function Layout() {
   const iniciales = perfil?.nombre
     ? perfil.nombre.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
     : 'U'
+
+  // Badge de plan en sidebar
+  const planInfo = PLAN_INFO[plan] || PLAN_INFO.starter
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#F0F4F8' }}>
@@ -153,22 +206,38 @@ function Layout() {
             <p className="text-xs font-medium truncate" style={{ color: '#7FA8D4' }}>
               {perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'}
             </p>
+            {/* Badge de plan */}
+            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+              style={{ background: planInfo.bg, color: planInfo.color }}>
+              {planInfo.nombre}
+            </div>
           </div>
         )}
 
         <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">
           {navFiltrado.map(item => {
-            const active = page === item.id
+            const active   = page === item.id
+            const bloqueado = MODULOS_PRO_PLUS.includes(item.id) && !canUsePlan(item.id)
+
             return (
               <button key={item.id} onClick={() => setPage(item.id)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150 w-full relative"
-                style={{ background: active ? BRAND_LIGHT : 'transparent', color: active ? '#fff' : '#93B8D8' }}
+                style={{
+                  background: active ? BRAND_LIGHT : 'transparent',
+                  color: active ? '#fff' : bloqueado ? '#5a7a9a' : '#93B8D8',
+                  opacity: bloqueado ? 0.8 : 1,
+                }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.background = `${BRAND}80` }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
                 title={!sideOpen ? (isEs ? item.labelEs : item.labelEn) : ''}>
                 {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: '#7FB3E8' }} />}
                 <span className="w-4 h-4 flex-shrink-0 relative">
-                  {Icons[item.icon]}
+                  {bloqueado ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                  ) : Icons[item.icon]}
                   {item.id === 'chat' && chatUnread > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5 leading-none">
                       {chatUnread > 99 ? '99+' : chatUnread}
@@ -177,12 +246,21 @@ function Layout() {
                 </span>
                 {sideOpen && (
                   <span className="text-sm font-medium truncate flex-1 flex items-center justify-between">
-                    {isEs ? item.labelEs : item.labelEn}
-                    {item.id === 'chat' && chatUnread > 0 && sideOpen && (
-                      <span className="min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 ml-1">
-                        {chatUnread > 99 ? '99+' : chatUnread}
-                      </span>
-                    )}
+                    <span>{isEs ? item.labelEs : item.labelEn}</span>
+                    <span className="flex items-center gap-1">
+                      {/* Badge Pro+ para módulos bloqueados */}
+                      {bloqueado && (
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
+                          style={{ background: '#EEEDFE', color: '#534AB7', fontSize: '9px' }}>
+                          Pro+
+                        </span>
+                      )}
+                      {item.id === 'chat' && chatUnread > 0 && sideOpen && (
+                        <span className="min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 ml-1">
+                          {chatUnread > 99 ? '99+' : chatUnread}
+                        </span>
+                      )}
+                    </span>
                   </span>
                 )}
               </button>
@@ -254,9 +332,18 @@ function Layout() {
           <div className="flex items-center gap-3">
             <div className="w-1 h-8 rounded-full" style={{ background: BRAND }} />
             <div>
-              <p className="font-bold text-gray-900 text-base leading-tight">
-                {isEs ? currentNav?.labelEs : currentNav?.labelEn}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-gray-900 text-base leading-tight">
+                  {isEs ? currentNav?.labelEs : currentNav?.labelEn}
+                </p>
+                {/* Badge Pro+ en el header si el módulo está bloqueado */}
+                {MODULOS_PRO_PLUS.includes(page) && !canUsePlan(page) && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: '#EEEDFE', color: '#3C3489' }}>
+                    Pro+
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-400">Marquez Project Solutions LLC</p>
             </div>
           </div>
@@ -298,7 +385,10 @@ function Layout() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <Page onNavigate={setPage} />
+          {pageBlockedByPlan
+            ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
+            : <Page onNavigate={setPage} />
+          }
         </main>
       </div>
     </div>

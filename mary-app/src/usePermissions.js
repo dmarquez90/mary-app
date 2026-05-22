@@ -1,4 +1,5 @@
 import { useAuth } from './auth'
+import { planTieneModulo } from './plans'
 
 const MATRIX = {
   dashboard:          { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true  },
@@ -21,50 +22,60 @@ const MATRIX = {
   curvas_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
   configuracion:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   reportes_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: false },
+  // Módulos Pro+
+  ordenes_cambio_ver:  { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
+  ordenes_cambio_editar:{ client_admin: true, coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
+  avaluos_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
+  avaluos_editar:      { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
 }
 
 export const NAV_PERMISOS = {
-  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','financiero','curvas','reportes','chat'],
-  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','financiero','curvas','reportes','chat'],
-  coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','reportes','chat'],
-  gerente:      ['dashboard','proyectos','presupuesto','compras','financiero','curvas','reportes','chat'],
-  residente:    ['dashboard','compras','financiero','chat'],
+  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
+  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
+  coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','ordenes_cambio','reportes','chat'],
+  gerente:      ['dashboard','proyectos','presupuesto','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
+  residente:    ['dashboard','compras','avaluos','financiero','chat'],
   bodeguero:    ['dashboard','inventario','compras','chat'],
   contador:     ['dashboard','proyectos','presupuesto','financiero','curvas','reportes','chat'],
   lectura:      ['dashboard','proyectos','presupuesto','inventario','compras','financiero','curvas','chat'],
 }
 
 export const MODULOS_PERMISOS = [
-  { id: 'proyectos',   label_es: 'Proyectos',           label_en: 'Projects',           tieneEditar: true  },
-  { id: 'presupuesto', label_es: 'Presupuesto',         label_en: 'Budget',             tieneEditar: true  },
-  { id: 'inventario',  label_es: 'Inventario',          label_en: 'Inventory',          tieneEditar: true  },
-  { id: 'mat_pres',    label_es: 'Mat. Presupuestados', label_en: 'Budgeted Materials', tieneEditar: true  },
-  { id: 'compras',     label_es: 'Compras / OC',        label_en: 'Purchases / PO',     tieneEditar: true  },
-  { id: 'financiero',  label_es: 'Financiero',          label_en: 'Financial',          tieneEditar: true  },
-  { id: 'curvas',      label_es: 'Curva S',             label_en: 'S Curve',            tieneEditar: false },
-  { id: 'reportes',    label_es: 'Reportes',            label_en: 'Reports',            tieneEditar: false },
+  { id: 'proyectos',      label_es: 'Proyectos',           label_en: 'Projects',           tieneEditar: true  },
+  { id: 'presupuesto',    label_es: 'Presupuesto',         label_en: 'Budget',             tieneEditar: true  },
+  { id: 'inventario',     label_es: 'Inventario',          label_en: 'Inventory',          tieneEditar: true  },
+  { id: 'mat_pres',       label_es: 'Mat. Presupuestados', label_en: 'Budgeted Materials', tieneEditar: true  },
+  { id: 'compras',        label_es: 'Compras / OC',        label_en: 'Purchases / PO',     tieneEditar: true  },
+  { id: 'ordenes_cambio', label_es: 'Órdenes de Cambio',  label_en: 'Change Orders',      tieneEditar: true,  planRequerido: 'pro' },
+  { id: 'avaluos',        label_es: 'Avalúos',             label_en: 'Valuations',         tieneEditar: true,  planRequerido: 'pro' },
+  { id: 'financiero',     label_es: 'Financiero',          label_en: 'Financial',          tieneEditar: true  },
+  { id: 'curvas',         label_es: 'Curva S',             label_en: 'S Curve',            tieneEditar: false },
+  { id: 'reportes',       label_es: 'Reportes',            label_en: 'Reports',            tieneEditar: false },
 ]
 
 const PERMISO_A_MODULO = {
-  proyectos_ver:      ['proyectos','ver'],  proyectos_crear:    ['proyectos','editar'],
-  proyectos_editar:   ['proyectos','editar'], proyectos_eliminar: ['proyectos','editar'],
-  presupuesto_ver:    ['presupuesto','ver'],  presupuesto_editar: ['presupuesto','editar'],
-  inventario_ver:     ['inventario','ver'],   inventario_editar:  ['inventario','editar'],
-  mat_pres_ver:       ['mat_pres','ver'],     mat_pres_editar:    ['mat_pres','editar'],
-  compras_ver:        ['compras','ver'],      solicitud_crear:    ['compras','editar'],
-  oc_crear:           ['compras','editar'],   oc_aprobar:         ['compras','editar'],
-  financiero_ver:     ['financiero','ver'],   financiero_editar:  ['financiero','editar'],
-  curvas_ver:         ['curvas','ver'],
-  reportes_ver:       ['reportes','ver'],
-  configuracion:      ['configuracion','ver'],
+  proyectos_ver:        ['proyectos','ver'],      proyectos_crear:       ['proyectos','editar'],
+  proyectos_editar:     ['proyectos','editar'],   proyectos_eliminar:    ['proyectos','editar'],
+  presupuesto_ver:      ['presupuesto','ver'],    presupuesto_editar:    ['presupuesto','editar'],
+  inventario_ver:       ['inventario','ver'],     inventario_editar:     ['inventario','editar'],
+  mat_pres_ver:         ['mat_pres','ver'],       mat_pres_editar:       ['mat_pres','editar'],
+  compras_ver:          ['compras','ver'],        solicitud_crear:       ['compras','editar'],
+  oc_crear:             ['compras','editar'],     oc_aprobar:            ['compras','editar'],
+  financiero_ver:       ['financiero','ver'],     financiero_editar:     ['financiero','editar'],
+  curvas_ver:           ['curvas','ver'],
+  reportes_ver:         ['reportes','ver'],
+  configuracion:        ['configuracion','ver'],
+  ordenes_cambio_ver:   ['ordenes_cambio','ver'], ordenes_cambio_editar: ['ordenes_cambio','editar'],
+  avaluos_ver:          ['avaluos','ver'],        avaluos_editar:        ['avaluos','editar'],
 }
 
 export function usePermissions() {
-  const { perfil } = useAuth()
+  const { perfil, plan, isSuperAdmin } = useAuth()
   const rol = perfil?.rol || 'lectura'
   const permisosCuston       = perfil?.permisos_custom || null
   const proyectosPermitidos  = perfil?.proyectos_permitidos || null
 
+  // ── Control por ROL ───────────────────────────────────────────────
   const can = (permiso) => {
     if (rol === 'super_admin') return true
     if (permisosCuston) {
@@ -97,6 +108,16 @@ export function usePermissions() {
     return row[rol] === true
   }
 
+  // ── Control por PLAN ──────────────────────────────────────────────
+  // Retorna true si el plan del tenant incluye el módulo
+  const canUsePlan = (moduloId) => {
+    if (isSuperAdmin) return true
+    return planTieneModulo(plan, moduloId)
+  }
+
+  // ── Visibilidad en nav ────────────────────────────────────────────
+  // Los módulos Pro+ siguen apareciendo en el nav aunque el plan no los incluya,
+  // pero con un badge "Pro+" y bloqueados al intentar usarlos.
   const navVisible = (id) => {
     if (rol === 'super_admin') return true
     if (permisosCuston?.[id] !== undefined) return permisosCuston[id].ver === true
@@ -110,5 +131,5 @@ export function usePermissions() {
     return proyectosPermitidos.includes(proyectoId)
   }
 
-  return { can, canView, canEdit, navVisible, canViewProject, rol }
+  return { can, canView, canEdit, canUsePlan, navVisible, canViewProject, rol }
 }

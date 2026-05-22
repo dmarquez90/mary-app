@@ -1,14 +1,15 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { PLAN_LIMITES, planTieneModulo } from './plans'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
 
 // Razones por las que se puede bloquear el acceso
-// null = acceso permitido
-// 'user_inactive'   = usuario desactivado por el admin
-// 'tenant_inactive' = empresa desactivada por Super Admin
-// 'trial_expired'   = período de prueba vencido
+// null               = acceso permitido
+// 'user_inactive'    = usuario desactivado por el admin
+// 'tenant_inactive'  = empresa desactivada por Super Admin
+// 'trial_expired'    = período de prueba vencido
 
 export function AuthProvider({ children }) {
   const [user, setUser]           = useState(null)
@@ -30,7 +31,6 @@ export function AuthProvider({ children }) {
       .single()
 
     if (!data) {
-      // Usuario no existe en la tabla usuarios
       await supabase.auth.signOut()
       setPerfil(null)
       setBlockedReason(null)
@@ -75,10 +75,19 @@ export function AuthProvider({ children }) {
       .eq('usuario_id', authUser.id)
       .maybeSingle()
 
+    // ── Plan del tenant ───────────────────────────────────────────────
+    // Se lee desde tenants.plan (ej: 'starter', 'pro', 'enterprise')
+    // Si no existe el campo, se asume 'starter' como fallback seguro
+    const plan = tenant?.plan || 'starter'
+    const limites = PLAN_LIMITES[plan] || PLAN_LIMITES.starter
+
     const perfilFinal = {
       ...data,
       permisos_custom:      permData?.permisos || null,
       proyectos_permitidos: permData?.todos_proyectos !== false ? null : (permData?.proyectos || null),
+      // Datos de plan expuestos directamente en perfil
+      plan,
+      plan_limites: limites,
     }
 
     setPerfil(perfilFinal)
@@ -119,12 +128,22 @@ export function AuthProvider({ children }) {
   const isClientAdmin = perfil?.rol === 'client_admin' || isSuperAdmin
   const rol           = perfil?.rol || null
   const tenantId      = perfil?.tenant_id || null
+  const plan          = perfil?.plan || 'starter'
+  const planLimites   = perfil?.plan_limites || PLAN_LIMITES.starter
+
+  // Helper: saber si el plan actual tiene acceso a un módulo
+  const planCan = (moduloId) => {
+    if (isSuperAdmin) return true
+    return planTieneModulo(plan, moduloId)
+  }
 
   return (
     <AuthContext.Provider value={{
       user, perfil, loading, login, logout,
       isSuperAdmin, isClientAdmin, rol, tenantId,
-      blockedReason, setBlockedReason
+      blockedReason, setBlockedReason,
+      // Plan
+      plan, planLimites, planCan,
     }}>
       {children}
     </AuthContext.Provider>
