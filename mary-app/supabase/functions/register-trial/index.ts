@@ -6,12 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const PLAN_CONFIG = {
+  starter:    { max_usuarios: 1,  max_proyectos: 2  },
+  pro:        { max_usuarios: 3,  max_proyectos: 3  },
+  enterprise: { max_usuarios: 5,  max_proyectos: 10 },
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const { nombre, empresa, telefono, email, password, pais } = await req.json()
+    const { nombre, empresa, telefono, email, password, pais, plan } = await req.json()
     if (!nombre || !empresa || !email || !password || !pais)
       return new Response(JSON.stringify({ error: 'missing_fields' }), { status: 400, headers: corsHeaders })
+
+    const planKey = PLAN_CONFIG[plan] ? plan : 'starter'
+    const { max_usuarios, max_proyectos } = PLAN_CONFIG[planKey]
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -37,8 +46,8 @@ serve(async (req) => {
 
       const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 7)
       const { data: nuevoTenant, error: tenantError } = await supabase.from('tenants').insert({
-        nombre_empresa: empresa.trim(), pais, telefono, plan: 'pro',
-        max_usuarios: 15, max_proyectos: 10, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
+        nombre_empresa: empresa.trim(), pais, telefono, plan: planKey,
+        max_usuarios, max_proyectos, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
       }).select().single()
       if (tenantError) throw tenantError
 
@@ -52,8 +61,8 @@ serve(async (req) => {
 
     const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 7)
     const { data: tenant, error: tenantError } = await supabase.from('tenants').insert({
-      nombre_empresa: empresa.trim(), pais, telefono, plan: 'pro',
-      max_usuarios: 15, max_proyectos: 10, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
+      nombre_empresa: empresa.trim(), pais, telefono, plan: planKey,
+      max_usuarios, max_proyectos, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
     }).select().single()
     if (tenantError) throw tenantError
 

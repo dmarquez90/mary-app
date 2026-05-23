@@ -756,7 +756,7 @@ export default function Login({ onNavigate }) {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
                   { id: 'starter',    labelEs: 'Starter',    labelEn: 'Starter',    users: 1, projects: 2,  price: '$29.99/m' },
-                  { id: 'pro',        labelEs: 'Pro',        labelEn: 'Pro',        users: 3, projects: 5,  price: '$49.99/m' },
+                  { id: 'pro',        labelEs: 'Pro',        labelEn: 'Pro',        users: 3, projects: 3,  price: '$49.99/m' },
                   { id: 'enterprise', labelEs: 'Enterprise', labelEn: 'Enterprise', users: 5, projects: 10, price: '$69.99/m' },
                 ].map(plan => {
                   const active = selectedPlan === plan.id
