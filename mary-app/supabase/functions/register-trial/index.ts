@@ -1,4 +1,4 @@
-﻿import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -35,7 +35,7 @@ serve(async (req) => {
       await supabase.auth.admin.updateUserById(authUserExistente.id, { password })
       if (perfilExistente) await supabase.from('usuarios').delete().eq('id', authUserExistente.id)
 
-      const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 60)
+      const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 7)
       const { data: nuevoTenant, error: tenantError } = await supabase.from('tenants').insert({
         nombre_empresa: empresa.trim(), pais, telefono, plan: 'pro',
         max_usuarios: 15, max_proyectos: 10, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
@@ -50,7 +50,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, reactivated: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 60)
+    const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 7)
     const { data: tenant, error: tenantError } = await supabase.from('tenants').insert({
       nombre_empresa: empresa.trim(), pais, telefono, plan: 'pro',
       max_usuarios: 15, max_proyectos: 10, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
