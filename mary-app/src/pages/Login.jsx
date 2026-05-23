@@ -570,7 +570,7 @@ export default function Login({ onNavigate }) {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-trial`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+          headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
           body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan })
         }
       )
