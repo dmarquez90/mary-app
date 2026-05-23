@@ -45,6 +45,49 @@ export default function Configuracion() {
   const [modalSol, setModalSol] = useState(null) // { sol, accion }
   const [comentarioAdmin, setComentarioAdmin] = useState('')
 
+  // Suscripcion
+  const [subPlan, setSubPlan]         = useState('pro')
+  const [subPeriodo, setSubPeriodo]   = useState('mensual')
+  const [subLoading, setSubLoading]   = useState(false)
+  const [subError, setSubError]       = useState('')
+
+  const PLANES = {
+    starter:    { mensual: 19.99, anual: 16.99 },
+    pro:        { mensual: 29.99, anual: 24.99 },
+    enterprise: { mensual: 49.99, anual: 41.99 },
+  }
+
+  const iniciarCheckout = async () => {
+    setSubLoading(true); setSubError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            plan:           subPlan,
+            periodo:        subPeriodo,
+            empresa_id:     perfil.tenant_id,
+            email:          perfil.email,
+            empresa_nombre: tenant?.nombre_empresa || '',
+          }),
+        }
+      )
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Error al iniciar pago')
+      window.location.href = result.url
+    } catch (e) {
+      setSubError(e.message)
+      setSubLoading(false)
+    }
+  }
+
   // Cambio de contraseña
   const [pwForm, setPwForm]     = useState({ actual: '', nueva: '', confirmar: '' })
   const [pwError, setPwError]   = useState('')
@@ -408,7 +451,8 @@ export default function Configuracion() {
         {[
           { id:'usuarios',    label: t('cfg_users_sub') },
           { id:'solicitudes', label: `Solicitudes de eliminación${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
-          { id:'micuenta',    label: isEs ? 'Mi cuenta' : 'My account' },
+          { id:'micuenta',      label: isEs ? 'Mi cuenta' : 'My account' },
+          { id:'suscripcion',   label: isEs ? 'Suscripción' : 'Subscription' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
@@ -675,6 +719,189 @@ export default function Configuracion() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── TAB SUSCRIPCION ──────────────────────────────────────────────── */}
+      {activeTab === 'suscripcion' && (
+        <div className="max-w-2xl">
+
+          {/* Plan actual */}
+          <div className="bg-white border border-gray-100 rounded-xl p-5 mb-6">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              {isEs ? 'Plan actual' : 'Current plan'}
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: '#EEF2FF' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-800 capitalize">
+                  {tenant?.plan === 'trial'
+                    ? (isEs ? 'Período de prueba' : 'Trial period')
+                    : `MARY ${tenant?.plan}`}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {tenant?.es_trial
+                    ? (isEs
+                        ? `Trial activo · vence ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('es') : '—'}`
+                        : `Trial active · expires ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('en') : '—'}`)
+                    : (isEs
+                        ? `Activo · ${tenant?.billing_cycle === 'anual' ? 'facturación anual' : 'facturación mensual'}`
+                        : `Active · ${tenant?.billing_cycle === 'anual' ? 'annual billing' : 'monthly billing'}`)}
+                </p>
+              </div>
+              {!tenant?.es_trial && tenant?.plan !== 'trial' && (
+                <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                  {isEs ? 'Activo' : 'Active'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Toggle mensual/anual */}
+          <div className="flex items-center gap-3 mb-5">
+            <p className="text-sm font-semibold text-gray-700">
+              {isEs ? 'Selecciona un plan' : 'Select a plan'}
+            </p>
+            <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {['mensual','anual'].map(p => (
+                <button key={p} onClick={() => setSubPeriodo(p)}
+                  className="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
+                  style={{
+                    background: subPeriodo === p ? '#1B3A6B' : 'transparent',
+                    color:      subPeriodo === p ? '#fff' : '#6B7280',
+                  }}>
+                  {p === 'mensual'
+                    ? (isEs ? 'Mensual' : 'Monthly')
+                    : (isEs ? 'Anual' : 'Annual')}
+                  {p === 'anual' && (
+                    <span className="ml-1 text-xs opacity-80">
+                      {isEs ? '(ahorra 15%)' : '(save 15%)'}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tarjetas de planes */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {[
+              {
+                id: 'starter',
+                nombre: 'Starter',
+                usuarios: isEs ? '2 usuarios' : '2 users',
+                proyectos: isEs ? '2 proyectos' : '2 projects',
+                features: isEs
+                  ? ['Dashboard','Inventario','Compras/OC','Reportes básicos']
+                  : ['Dashboard','Inventory','Purchases/PO','Basic reports'],
+              },
+              {
+                id: 'pro',
+                nombre: 'Pro',
+                usuarios: isEs ? '3 usuarios' : '3 users',
+                proyectos: isEs ? '5 proyectos' : '5 projects',
+                features: isEs
+                  ? ['Todo Starter','Órdenes de Cambio','Avalúos','Curva S']
+                  : ['All Starter','Change Orders','Valuations','S Curve'],
+                destacado: true,
+              },
+              {
+                id: 'enterprise',
+                nombre: 'Enterprise',
+                usuarios: isEs ? '5 usuarios' : '5 users',
+                proyectos: isEs ? 'Ilimitados' : 'Unlimited',
+                features: isEs
+                  ? ['Todo Pro','Financiero avanzado','Soporte prioritario','Usuario adicional $10/m']
+                  : ['All Pro','Advanced financial','Priority support','Additional user $10/m'],
+              },
+            ].map(plan => {
+              const precio = PLANES[plan.id][subPeriodo]
+              const activo = subPlan === plan.id
+              return (
+                <div key={plan.id}
+                  onClick={() => setSubPlan(plan.id)}
+                  className="relative rounded-xl border-2 p-4 cursor-pointer transition-all"
+                  style={{
+                    borderColor:  activo ? '#1B3A6B' : plan.destacado ? '#D6E4F0' : '#E5E7EB',
+                    background:   activo ? '#F0F4F8' : '#fff',
+                    boxShadow:    plan.destacado && !activo ? '0 2px 8px rgba(27,58,107,0.08)' : undefined,
+                  }}>
+                  {plan.destacado && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full text-white"
+                        style={{ background: '#1B3A6B' }}>
+                        {isEs ? 'Popular' : 'Popular'}
+                      </span>
+                    </div>
+                  )}
+                  {activo && (
+                    <div className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: '#1B3A6B' }}>
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  )}
+                  <p className="font-bold text-gray-800 text-sm mb-1">MARY {plan.nombre}</p>
+                  <p className="text-2xl font-bold mb-0.5" style={{ color: '#1B3A6B' }}>
+                    ${precio.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-gray-400 mb-3">
+                    {isEs ? '/mes' : '/mo'}{subPeriodo === 'anual' ? (isEs ? ' · cobro anual' : ' · billed yearly') : ''}
+                  </p>
+                  <div className="border-t border-gray-100 pt-3 flex flex-col gap-1.5">
+                    <p className="text-xs text-gray-500">{plan.usuarios} · {plan.proyectos}</p>
+                    {plan.features.map((f, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <span style={{ color: '#0F6E56' }}>✓</span> {f}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Error */}
+          {subError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 mb-4">
+              {subError}
+            </div>
+          )}
+
+          {/* Botón pago */}
+          <button
+            onClick={iniciarCheckout}
+            disabled={subLoading}
+            className="w-full py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+            style={{ background: '#1B3A6B' }}>
+            {subLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {isEs ? 'Redirigiendo a Stripe...' : 'Redirecting to Stripe...'}
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+                {isEs
+                  ? `Suscribirse a MARY ${subPlan.charAt(0).toUpperCase() + subPlan.slice(1)} · $${PLANES[subPlan][subPeriodo].toFixed(2)}/${subPeriodo === 'mensual' ? 'mes' : 'año'}`
+                  : `Subscribe to MARY ${subPlan.charAt(0).toUpperCase() + subPlan.slice(1)} · $${PLANES[subPlan][subPeriodo].toFixed(2)}/${subPeriodo === 'mensual' ? 'mo' : 'yr'}`}
+              </>
+            )}
+          </button>
+
+          <p className="text-xs text-gray-400 text-center mt-3">
+            {isEs
+              ? 'Pago seguro procesado por Stripe. Puedes cancelar en cualquier momento.'
+              : 'Secure payment processed by Stripe. Cancel anytime.'}
+          </p>
         </div>
       )}
 

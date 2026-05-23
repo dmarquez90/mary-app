@@ -22,6 +22,8 @@ import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
 import Chat from './pages/Chat'
 import NotificacionesPanel from './pages/NotificacionesPanel'
+import PagoExitoso from './pages/PagoExitoso'
+import Planes from './pages/Planes'
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
@@ -409,8 +411,10 @@ function AppContent() {
 
   if (!user) return <AuthRouter />
 
-  const isAdminRoute = window.location.pathname === '/admin'
-  if (isAdminRoute && perfil?.rol === 'super_admin') return <Admin />
+const pathname = window.location.pathname
+if (pathname === '/admin' && perfil?.rol === 'super_admin') return <Admin />
+if (pathname === '/pago-exitoso') return <PagoExitoso />
+if (pathname === '/planes') return <Planes />
 
   return (
     <StoreProvider tenantId={perfil?.tenant_id}>
