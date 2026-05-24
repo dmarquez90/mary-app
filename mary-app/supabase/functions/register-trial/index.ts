@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const PLAN_CONFIG = {
   starter:    { max_usuarios: 1,  max_proyectos: 2  },
-  pro:        { max_usuarios: 3,  max_proyectos: 3  },
+  pro:        { max_usuarios: 3,  max_proyectos: 5  },
   enterprise: { max_usuarios: 5,  max_proyectos: 10 },
 }
 

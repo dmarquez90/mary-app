@@ -804,7 +804,7 @@ export default function Configuracion() {
                 id: 'pro',
                 nombre: 'Pro',
                 usuarios: isEs ? '3 usuarios' : '3 users',
-                proyectos: isEs ? '3 proyectos' : '3 projects',
+                proyectos: isEs ? '5 proyectos' : '3 projects',
                 features: isEs
                   ? ['Todo Starter','Órdenes de Cambio','Avalúos','Curva S']
                   : ['All Starter','Change Orders','Valuations','S Curve'],
