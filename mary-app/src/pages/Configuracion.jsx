@@ -52,9 +52,9 @@ export default function Configuracion() {
   const [subError, setSubError]       = useState('')
 
   const PLANES = {
-    starter:    { mensual: 19.99, anual: 16.99 },
-    pro:        { mensual: 29.99, anual: 24.99 },
-    enterprise: { mensual: 49.99, anual: 41.99 },
+    starter:    { mensual: 29.99, anual: 25.49 },
+    pro:        { mensual: 49.99, anual: 42.49 },
+    enterprise: { mensual: 69.99, anual: 59.49 },
   }
 
   const iniciarCheckout = async () => {
@@ -794,7 +794,7 @@ export default function Configuracion() {
               {
                 id: 'starter',
                 nombre: 'Starter',
-                usuarios: isEs ? '2 usuarios' : '2 users',
+                usuarios: isEs ? '1 usuario' : '1 user',
                 proyectos: isEs ? '2 proyectos' : '2 projects',
                 features: isEs
                   ? ['Dashboard','Inventario','Compras/OC','Reportes básicos']
@@ -804,7 +804,7 @@ export default function Configuracion() {
                 id: 'pro',
                 nombre: 'Pro',
                 usuarios: isEs ? '3 usuarios' : '3 users',
-                proyectos: isEs ? '5 proyectos' : '5 projects',
+                proyectos: isEs ? '3 proyectos' : '3 projects',
                 features: isEs
                   ? ['Todo Starter','Órdenes de Cambio','Avalúos','Curva S']
                   : ['All Starter','Change Orders','Valuations','S Curve'],
@@ -814,7 +814,7 @@ export default function Configuracion() {
                 id: 'enterprise',
                 nombre: 'Enterprise',
                 usuarios: isEs ? '5 usuarios' : '5 users',
-                proyectos: isEs ? 'Ilimitados' : 'Unlimited',
+                proyectos: isEs ? '10 proyectos' : '10 projects',
                 features: isEs
                   ? ['Todo Pro','Financiero avanzado','Soporte prioritario','Usuario adicional $10/m']
                   : ['All Pro','Advanced financial','Priority support','Additional user $10/m'],
