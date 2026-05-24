@@ -92,6 +92,7 @@ export default function Configuracion() {
   const [pwForm, setPwForm]     = useState({ actual: '', nueva: '', confirmar: '' })
   const [pwError, setPwError]   = useState('')
   const [pwSuccess, setPwSuccess] = useState('')
+  const [suscripcion, setSuscripcion] = useState(null)
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMode, setPwMode]     = useState('cambio') // 'cambio' | 'olvide'
   const [resetEmail, setResetEmail] = useState('')
@@ -106,12 +107,14 @@ export default function Configuracion() {
 
   const loadData = async () => {
     setLoading(true)
-    const [{ data: t }, { data: u }] = await Promise.all([
+    const [{ data: t }, { data: u }, { data: s }] = await Promise.all([
       supabase.from('tenants').select('*').eq('id', perfil.tenant_id).single(),
       supabase.from('usuarios').select('*').eq('tenant_id', perfil.tenant_id).order('nombre'),
+      supabase.from('suscripciones').select('*').eq('empresa_id', perfil.tenant_id).eq('status','active').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
     setTenant(t)
     setUsuarios(u || [])
+    setSuscripcion(s)
     setLoading(false)
   }
 
@@ -727,37 +730,42 @@ export default function Configuracion() {
         <div className="max-w-2xl">
 
           {/* Plan actual */}
-          <div className="bg-white border border-gray-100 rounded-xl p-5 mb-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="bg-white border border-gray-100 rounded-xl p-5 mb-6 text-center">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
               {isEs ? 'Plan actual' : 'Current plan'}
             </p>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-1"
                 style={{ background: '#EEF2FF' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" strokeWidth="2">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" strokeWidth="2">
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                 </svg>
               </div>
-              <div>
-                <p className="font-semibold text-gray-800 capitalize">
-                  {tenant?.plan === 'trial'
-                    ? (isEs ? 'Período de prueba' : 'Trial period')
-                    : `MARY ${tenant?.plan}`}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {tenant?.es_trial
-                    ? (isEs
-                        ? `Trial activo · vence ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('es') : '—'}`
-                        : `Trial active · expires ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('en') : '—'}`)
-                    : (isEs
-                        ? `Activo · ${tenant?.billing_cycle === 'anual' ? 'facturación anual' : 'facturación mensual'}`
-                        : `Active · ${tenant?.billing_cycle === 'anual' ? 'annual billing' : 'monthly billing'}`)}
-                </p>
-              </div>
+              <p className="font-bold text-gray-800 text-lg capitalize">
+                {tenant?.plan === 'trial'
+                  ? (isEs ? 'Período de prueba' : 'Trial period')
+                  : `MARY ${tenant?.plan}`}
+              </p>
               {!tenant?.es_trial && tenant?.plan !== 'trial' && (
-                <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
                   {isEs ? 'Activo' : 'Active'}
                 </span>
+              )}
+              <p className="text-xs text-gray-400 mt-1">
+                {tenant?.es_trial
+                  ? (isEs
+                      ? `Trial activo · vence ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('es') : '—'}`
+                      : `Trial active · expires ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('en') : '—'}`)
+                  : (isEs
+                      ? `${tenant?.billing_cycle === 'anual' ? 'Facturación anual' : 'Facturación mensual'}`
+                      : `${tenant?.billing_cycle === 'anual' ? 'Annual billing' : 'Monthly billing'}`)}
+              </p>
+              {suscripcion?.current_period_end && (
+                <p className="text-xs font-medium mt-1" style={{ color: '#1B3A6B' }}>
+                  {isEs
+                    ? `Próxima renovación: ${new Date(suscripcion.current_period_end).toLocaleDateString('es')}`
+                    : `Next renewal: ${new Date(suscripcion.current_period_end).toLocaleDateString('en')}`}
+                </p>
               )}
             </div>
           </div>

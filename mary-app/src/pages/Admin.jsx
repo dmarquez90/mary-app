@@ -76,6 +76,7 @@ export default function Admin() {
     maxProjects:      isEs ? 'Proyectos máx.' : 'Max projects',
     statusCol:        isEs ? 'Estado' : 'Status',
     createdCol:       isEs ? 'Creada' : 'Created',
+    renewalCol:       isEs ? 'Renovación' : 'Renewal',
     actionsCol:       isEs ? 'Acciones' : 'Actions',
     nameCol:          isEs ? 'Nombre' : 'Name',
     emailCol:         'Email',
@@ -591,7 +592,7 @@ export default function Admin() {
             <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="bg-gray-50 border-b border-gray-100">
-                  {[T.company, T.planCol, T.usersCol, T.maxProjects, T.statusCol, T.createdCol, T.actionsCol].map((h,i) => (
+                  {[T.company, T.planCol, T.usersCol, T.maxProjects, T.statusCol, T.createdCol, T.renewalCol, T.actionsCol].map((h,i) => (
                     <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr></thead>
@@ -629,6 +630,12 @@ export default function Admin() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-400">{t.fecha_creacion?.slice(0,10)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400">
+                          {t.es_trial
+                            ? (t.trial_fin ? new Date(t.trial_fin).toLocaleDateString(isEs ? 'es' : 'en') : '—')
+                            : (t.stripe_subscription_id ? <span className="text-blue-500">via Stripe</span> : '—')
+                          }
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-1">
                             <button onClick={() => openDrawer('edit_tenant', {...t})}
