@@ -727,7 +727,7 @@ export default function Configuracion() {
 
       {/* ── TAB SUSCRIPCION ──────────────────────────────────────────────── */}
       {activeTab === 'suscripcion' && (
-        <div className="max-w-2xl">
+        <div className="max-w-2xl mx-auto">
 
           {/* Plan actual */}
           <div className="bg-white border border-gray-100 rounded-xl p-5 mb-6 text-center">
