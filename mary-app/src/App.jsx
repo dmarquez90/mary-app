@@ -24,6 +24,7 @@ import Chat from './pages/Chat'
 import NotificacionesPanel from './pages/NotificacionesPanel'
 import PagoExitoso from './pages/PagoExitoso'
 import Planes from './pages/Planes'
+import WelcomeTour from './pages/WelcomeTour'
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
@@ -393,6 +394,10 @@ function Layout() {
           }
         </main>
       </div>
+
+      {/* Tour de bienvenida — primera vez de cada usuario */}
+      <WelcomeTour />
+
     </div>
   )
 }

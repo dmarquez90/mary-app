@@ -6,9 +6,9 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
 })
 
 const PRICE_IDS = {
-  starter:    { mensual: 'price_1TZk0lJZWJ0VISBDC0xTA9us', anual: 'price_1TZk9CJZWJ0VISBDjaAT7NdV' },
-  pro:        { mensual: 'price_1TZkM8JZWJ0VISBDMQpKeT7X', anual: 'price_1TZkMoJZWJ0VISBDbmHJvETa' },
-  enterprise: { mensual: 'price_1TZk4CJZWJ0VISBD1xzoc3iq', anual: 'price_1TZkA6JZWJ0VISBDbm0FqWtR' },
+  starter:    { mensual: 'price_1TaKbQJSrIBXg6vRDX68M4V4', anual: 'price_1TaKbQJSrIBXg6vRsoilDO90' },
+  pro:        { mensual: 'price_1TaKbWJSrIBXg6vR0UbtBeTe', anual: 'price_1TaKbVJSrIBXg6vRsdqW5Cwn' },
+  enterprise: { mensual: 'price_1TaKbSJSrIBXg6vRTHEm9cXX', anual: 'price_1TaKbRJSrIBXg6vRoRQTdZHn' },
 }
 
 const corsHeaders = {
