@@ -345,6 +345,20 @@ useEffect(() => {
       } catch (e) { console.error('notify error:', e) }
     }
 
+    // ── Helper: notificar a un usuario específico por ID ──────────────
+    async function notifyUser({ usuario_id, tipo, titulo, mensaje, modulo, referencia_id }) {
+      if (!usuario_id) return
+      try {
+        await supabase.from('notificaciones').insert({
+          tenant_id: tenantId,
+          usuario_id,
+          tipo, titulo, mensaje, modulo,
+          referencia_id: referencia_id || null,
+          leida: false,
+        })
+      } catch (e) { console.error('notifyUser error:', e) }
+    }
+
     switch (action.type) {
 
       case 'ADD_PRES_IND': {
@@ -717,27 +731,30 @@ useEffect(() => {
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
-        await notify({
+        // Notificar al usuario específico que elaboró la solicitud
+        await notifyUser({
+          usuario_id: sol.solicitante_id,
           tipo: 'aprobacion',
           titulo: '✅ Solicitud de eliminación aprobada',
-          mensaje: `Tu solicitud de eliminar ${sol.tipo === 'entrada' ? 'entrada' : 'salida'} de "${sol.material_desc}" fue aprobada.`,
+          mensaje: `Tu solicitud de eliminar ${sol.tipo === 'entrada' ? 'una entrada' : 'una salida'} de "${sol.material_desc}" fue aprobada.${action.payload.comentario ? ' Comentario: ' + action.payload.comentario : ''}`,
           modulo: 'inventario',
           referencia_id: sol.id,
-          roles: ['bodeguero'],
         })
         break
       }
       case 'RECHAZAR_SOL_ELIM': {
+        const sol2 = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
         const upd = { estado: 'rechazada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', action.payload.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: action.payload.id, ...upd } })
-        await notify({
+        // Notificar al usuario específico que elaboró la solicitud
+        await notifyUser({
+          usuario_id: sol2?.solicitante_id,
           tipo: 'rechazo',
           titulo: '❌ Solicitud de eliminación rechazada',
-          mensaje: `Tu solicitud de eliminación fue rechazada.`,
+          mensaje: `Tu solicitud de eliminar "${sol2?.material_desc || 'material'}" fue rechazada.${action.payload.comentario ? ' Motivo: ' + action.payload.comentario : ''}`,
           modulo: 'inventario',
           referencia_id: action.payload.id,
-          roles: ['bodeguero'],
         })
         break
       }
