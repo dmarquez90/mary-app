@@ -145,7 +145,7 @@ export default function OrdenesCambio() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">
-            {t('oc_title')}
+            {isEs ? 'Órdenes de Cambio' : 'Change Orders'}
           </h1>
           {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
         </div>
@@ -158,23 +158,23 @@ export default function OrdenesCambio() {
           </select>
           {proyId && puedeEditar && (
             <PrimaryBtn onClick={openNueva}>
-              + {t('oc_new').replace('+ ', '')}
+              + {isEs ? 'Nueva OC' : 'New CO'}
             </PrimaryBtn>
           )}
         </div>
       </div>
 
       {!proyId ? (
-        <EmptyState icon={Icons.budget} title={t('oc_select_project')} />
+        <EmptyState icon={Icons.budget} title={isEs ? 'Selecciona un proyecto' : 'Select a project'} />
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             {[
-              { label: t('oc_kpi_approved'), value: fmt(totalAprobadas, moneda), color: '#1D9E75' },
-              { label: t('oc_kpi_submitted'),  value: totalPresentadas,            color: '#185FA5' },
-              { label: t('oc_kpi_draft'),                value: totalBorradores,             color: '#6b7280' },
-              { label: t('oc_kpi_total'),            value: ocs.length,                  color: BRAND     },
+              { label: isEs ? 'OC Aprobadas (monto)' : 'Approved COs (amount)', value: fmt(totalAprobadas, moneda), color: '#1D9E75' },
+              { label: isEs ? 'Presentadas al cliente' : 'Submitted to client',  value: totalPresentadas,            color: '#185FA5' },
+              { label: isEs ? 'En borrador'            : 'Draft',                value: totalBorradores,             color: '#6b7280' },
+              { label: isEs ? 'Total OC'               : 'Total COs',            value: ocs.length,                  color: BRAND     },
             ].map(k => (
               <div key={k.label} className="bg-white border border-gray-100 rounded-xl p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -187,9 +187,9 @@ export default function OrdenesCambio() {
           {ocs.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-xl py-16">
               <EmptyState icon={Icons.budget}
-                title={t('oc_empty_title')}
-                subtitle={t('oc_empty_sub')}
-                action={puedeEditar ? (t('oc_new')) : null}
+                title={isEs ? 'No hay órdenes de cambio' : 'No change orders'}
+                subtitle={isEs ? 'Crea una OC para registrar cambios al contrato' : 'Create a CO to record contract changes'}
+                action={puedeEditar ? (isEs ? '+ Nueva OC' : '+ New CO') : null}
                 onAction={puedeEditar ? openNueva : null} />
             </div>
           ) : (
@@ -231,25 +231,20 @@ export default function OrdenesCambio() {
                             </TBtn>
                             {puedeEditar && oc.estado === 'borrador' && (
                               <TBtn onClick={() => cambiarEstado(oc.id, 'presentada')}>
-                                {t('oc_action_submit')}
+                                {isEs ? 'Presentar' : 'Submit'}
                               </TBtn>
                             )}
                             {puedeEditar && oc.estado === 'presentada' && <>
                               <TBtn onClick={() => cambiarEstado(oc.id, 'aprobada')}
                                 className="text-green-600 hover:bg-green-50">
-                                {t('oc_action_approve')}
+                                {isEs ? 'Aprobar' : 'Approve'}
                               </TBtn>
                               <TBtn danger onClick={() => cambiarEstado(oc.id, 'rechazada')}>
-                                {t('oc_action_reject')}
+                                {isEs ? 'Rechazar' : 'Reject'}
                               </TBtn>
                             </>}
-                            {puedeEditar && (
-                              <TBtn danger onClick={() => {
-                                if (window.confirm(isEs
-                                  ? `Eliminar OC ${oc.numero}? Esta accion no se puede deshacer.`
-                                  : `Delete CO ${oc.numero}? This action cannot be undone.`))
-                                  eliminarOC(oc.id)
-                              }}>{t('btn_delete')}</TBtn>
+                            {puedeEditar && (oc.estado === 'borrador' || oc.estado === 'rechazada') && (
+                              <TBtn danger onClick={() => eliminarOC(oc.id)}>{t('btn_delete')}</TBtn>
                             )}
                           </div>
                         </td>
@@ -262,42 +257,51 @@ export default function OrdenesCambio() {
           )}
         </>
       )}
-
+{puedeEditar && (oc.estado === 'borrador' || oc.estado === 'rechazada') && (
+  <TBtn danger onClick={() => {
+    if (window.confirm(isEs
+      ? `Eliminar OC ${oc.numero}? Esta accion no se puede deshacer.`
+      : `Delete CO ${oc.numero}? This action cannot be undone.`))
+      eliminarOC(oc.id)
+  }}>
+    {isEs ? 'Eliminar' : 'Delete'}
+  </TBtn>
+)}
       {/* ── DRAWER: NUEVA OC ── */}
       <Drawer open={drawer === 'nueva'} onClose={() => setDrawer(null)}
-        title={t('oc_form_title')} width={700}>
+        title={isEs ? 'Nueva Orden de Cambio' : 'New Change Order'} width={700}>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('oc_form_number')}>
+          <Field label={isEs ? 'Número *' : 'Number *'}>
             <input className={inputCls} value={form.numero||''} onChange={set('numero')} />
           </Field>
-          <Field label={t('oc_form_date')}>
+          <Field label={isEs ? 'Fecha' : 'Date'}>
             <input type="date" className={inputCls} value={form.fecha||''} onChange={set('fecha')} />
           </Field>
         </div>
 
-        <Field label={t('oc_form_submitted_to')}>
+        <Field label={isEs ? 'Presentado a' : 'Submitted to'}>
           <input className={inputCls} value={form.presentado_a||''}
             onChange={set('presentado_a')}
-            placeholder={t('oc_form_submitted_ph')} />
+            placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
         </Field>
 
-        <Field label={t('oc_form_reason')}>
+        <Field label={isEs ? 'Motivo / Justificación' : 'Reason / Justification'}>
           <textarea className={inputCls} rows={2} value={form.motivo||''}
             onChange={set('motivo')}
-            placeholder={t('oc_form_reason_ph')} />
+            placeholder={isEs ? 'Ej: Planos incompletos — cantidades incorrectas en excavación' : 'E.g.: Incomplete drawings — incorrect quantities in excavation'} />
         </Field>
 
         {/* Items de la OC */}
         <div className="border-t border-gray-100 pt-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {t('oc_form_changes_title')}
+              {isEs ? 'Cambios en actividades *' : 'Activity changes *'}
             </p>
             <button onClick={addItem}
               className="text-xs font-medium px-3 py-1 rounded-lg"
               style={{ color: BRAND, background: '#EEF2F7' }}>
-              {t('oc_form_add')}
+              + {isEs ? 'Agregar' : 'Add'}
             </button>
           </div>
 
@@ -325,8 +329,8 @@ export default function OrdenesCambio() {
                             : 'border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}>
                         {tipo === 'existente'
-                          ? (t('oc_form_existing_act'))
-                          : (t('oc_form_new_act'))}
+                          ? (isEs ? 'Actividad existente' : 'Existing activity')
+                          : (isEs ? 'Actividad nueva' : 'New activity')}
                       </button>
                     ))}
                   </div>
@@ -345,7 +349,7 @@ export default function OrdenesCambio() {
                           setItem(idx, 'precio_unitario', pu || '')
                         }
                       }}>
-                        <option value="">{t('oc_form_select_act')}</option>
+                        <option value="">{isEs ? '— Seleccionar actividad —' : '— Select activity —'}</option>
                         {actividades.map(a => (
                           <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>
                         ))}
@@ -358,20 +362,20 @@ export default function OrdenesCambio() {
                     <input className={inputCls} value={it.descripcion||''}
                       onChange={e => setItem(idx, 'descripcion', e.target.value)}
                       placeholder={it.tipo === 'nueva'
-                        ? (t('oc_form_new_act_desc'))
-                        : (t('oc_form_act_desc'))} />
+                        ? (isEs ? 'Descripción de la actividad nueva' : 'New activity description')
+                        : (isEs ? 'Descripción (editable)' : 'Description (editable)')} />
                   </div>
 
                   {/* Cantidades y precio */}
                   <div className="grid grid-cols-4 gap-2">
                     <div>
-                      <label className="text-xs text-gray-500 block mb-1">{t('oc_form_unit')}</label>
+                      <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
                       <input className={inputCls} value={it.unidad||'und'}
                         onChange={e => setItem(idx, 'unidad', e.target.value)} />
                     </div>
                     <div>
                       <label className="text-xs text-gray-500 block mb-1">
-                        {t('oc_form_orig_qty')}
+                        {isEs ? 'Cant. Original' : 'Original Qty'}
                       </label>
                       <input type="number" className={`${inputCls} ${it.tipo==='nueva'?'bg-gray-100 text-gray-400':''}`}
                         value={it.cantidad_original||''} readOnly={it.tipo==='nueva'}
@@ -380,7 +384,7 @@ export default function OrdenesCambio() {
                     </div>
                     <div>
                       <label className="text-xs text-gray-500 block mb-1">
-                        {t('oc_form_new_qty')}
+                        {isEs ? 'Cant. Nueva *' : 'New Qty *'}
                       </label>
                       <input type="number" className={inputCls}
                         value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
@@ -388,7 +392,7 @@ export default function OrdenesCambio() {
                     </div>
                     <div>
                       <label className="text-xs text-gray-500 block mb-1">
-                        {t('oc_form_unit_price')}
+                        {isEs ? 'P.U.' : 'Unit Price'}
                       </label>
                       <input type="number" className={inputCls}
                         value={it.precio_unitario||''} onChange={e => setItem(idx, 'precio_unitario', e.target.value)}
@@ -400,14 +404,14 @@ export default function OrdenesCambio() {
                   {(it.cantidad_nueva !== '' && it.precio_unitario !== '') && (
                     <div className="mt-2 flex items-center gap-3 text-xs">
                       <span className="text-gray-500">
-                        {t('oc_form_diff')} <strong>{diff >= 0 ? '+' : ''}{fmtNum(diff)} {it.unidad}</strong>
+                        {isEs ? 'Diferencia:' : 'Difference:'} <strong>{diff >= 0 ? '+' : ''}{fmtNum(diff)} {it.unidad}</strong>
                       </span>
                       <span className={`font-bold ${monto >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                         {monto >= 0 ? '+' : ''}{fmt(monto, moneda)}
                       </span>
                       {it.tipo === 'nueva' && (
                         <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          {t('oc_form_new_act')}
+                          {isEs ? 'Actividad nueva' : 'New activity'}
                         </span>
                       )}
                     </div>
@@ -421,14 +425,14 @@ export default function OrdenesCambio() {
         {/* Total OC */}
         <div className="border-t border-gray-100 pt-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">{t('oc_form_total')}</span>
+            <span className="text-sm text-gray-500">{isEs ? 'Total Orden de Cambio' : 'Total Change Order'}</span>
             <span className={`text-xl font-bold font-mono ${totalOC >= 0 ? 'text-green-600' : 'text-red-500'}`}>
               {totalOC >= 0 ? '+' : ''}{fmt(totalOC, moneda)}
             </span>
           </div>
         </div>
 
-        <Field label={t('oc_form_notes')}>
+        <Field label={isEs ? 'Notas adicionales' : 'Additional notes'}>
           <textarea className={inputCls} rows={2} value={form.notas||''} onChange={set('notas')} />
         </Field>
 
@@ -437,7 +441,7 @@ export default function OrdenesCambio() {
           <PrimaryBtn onClick={saveOC}
             disabled={!proyId || !form.numero || items.every(it => !it.descripcion || it.cantidad_nueva === '')}
             className="flex-1">
-            {t('oc_form_save')}
+            {isEs ? 'Guardar OC' : 'Save CO'}
           </PrimaryBtn>
         </div>
       </Drawer>
@@ -456,17 +460,17 @@ export default function OrdenesCambio() {
                     <button onClick={() => { cambiarEstado(ocDetalle.id, 'presentada'); setDrawer(null) }}
                       className="text-xs px-3 py-1.5 rounded-lg text-white font-medium"
                       style={{ background: '#185FA5' }}>
-                      {t('oc_detail_submit')}
+                      {isEs ? 'Presentar al cliente' : 'Submit to client'}
                     </button>
                   )}
                   {ocDetalle.estado === 'presentada' && <>
                     <button onClick={() => { cambiarEstado(ocDetalle.id, 'aprobada'); setDrawer(null) }}
                       className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-green-600">
-                      {t('oc_detail_approve')}
+                      {isEs ? 'Marcar aprobada' : 'Mark approved'}
                     </button>
                     <button onClick={() => { cambiarEstado(ocDetalle.id, 'rechazada'); setDrawer(null) }}
                       className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-red-500">
-                      {t('oc_detail_rejected')}
+                      {isEs ? 'Rechazada' : 'Rejected'}
                     </button>
                   </>}
                 </div>
@@ -490,7 +494,7 @@ export default function OrdenesCambio() {
 
             {ocDetalle.motivo && (
               <div className="bg-blue-50 rounded-lg p-3">
-                <p className="text-xs text-blue-600 font-medium mb-1">{t('oc_detail_reason')}</p>
+                <p className="text-xs text-blue-600 font-medium mb-1">{isEs ? 'Motivo' : 'Reason'}</p>
                 <p className="text-sm text-gray-700">{ocDetalle.motivo}</p>
               </div>
             )}
@@ -499,7 +503,7 @@ export default function OrdenesCambio() {
             <div className="border border-gray-100 rounded-xl overflow-hidden">
               <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  {t('oc_detail_changes')}
+                  {isEs ? 'Cambios en actividades' : 'Activity changes'}
                 </p>
               </div>
               <table className="w-full">
@@ -545,7 +549,7 @@ export default function OrdenesCambio() {
               </table>
               <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-600">
-                  {t('oc_form_total')}
+                  {isEs ? 'Total Orden de Cambio' : 'Total Change Order'}
                 </span>
                 <span className={`text-lg font-bold font-mono ${parseFloat(ocDetalle.total_oc||0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {parseFloat(ocDetalle.total_oc||0) >= 0 ? '+' : ''}{fmt(ocDetalle.total_oc, moneda)}
@@ -555,7 +559,7 @@ export default function OrdenesCambio() {
 
             {ocDetalle.notas && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-1">{t('oc_detail_notes')}</p>
+                <p className="text-xs text-gray-400 mb-1">{isEs ? 'Notas' : 'Notes'}</p>
                 <p className="text-sm text-gray-600">{ocDetalle.notas}</p>
               </div>
             )}

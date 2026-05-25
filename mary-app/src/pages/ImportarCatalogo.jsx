@@ -6,7 +6,7 @@ import { LangContext } from '../i18n'
 const CATEGORIAS = [
   { es: 'Concreto',     en: 'Concrete',   key: 'concreto'     },
   { es: 'Acero',        en: 'Steel',      key: 'acero'        },
-  { es: 'Madera',       en: 'Lumber',     key: 'madera'       },
+  { es: 'Madera',       en: 'Wood',     key: 'madera'       },
   { es: 'Electrico',    en: 'Electrical', key: 'electrico'    },
   { es: 'Plomeria',     en: 'Plumbing',   key: 'plomeria'     },
   { es: 'Acabados',     en: 'Finishes',   key: 'acabados'     },
