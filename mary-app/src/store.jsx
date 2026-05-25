@@ -696,6 +696,14 @@ useEffect(() => {
         const item = { ...action.payload, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
         await supabase.from('solicitudes_eliminacion').insert(item)
         dispatch({ type: 'ADD_SOL_ELIM', payload: item })
+        await notify({
+          tipo: 'solicitud',
+          titulo: '⚠️ Solicitud de eliminación pendiente',
+          mensaje: `${action.payload.solicitante_nombre || 'Un usuario'} solicita eliminar ${action.payload.tipo === 'entrada' ? 'una entrada' : 'una salida'} de "${action.payload.material_desc || 'material'}". Justificación: ${action.payload.justificacion || '—'}`,
+          modulo: 'inventario',
+          referencia_id: item.id,
+          roles: ['client_admin', 'coordinador', 'gerente'],
+        })
         break
       }
       case 'APROBAR_SOL_ELIM': {
