@@ -369,7 +369,7 @@ export default function Inventario() {
                         return (
                           <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                             <td className="px-4 py-3 text-xs font-mono text-gray-500">{m.codigo}</td>
-                            <td className="px-4 py-3 text-sm text-gray-800">{m.descripcion}</td>
+                            <td className="px-4 py-3 text-sm text-gray-800" style={{minWidth:200}}>{m.descripcion}</td>
                             <td className="px-4 py-3">
                               {cat
                                 ? <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: cat.color }}>{isEs ? cat.es : cat.en}</span>
@@ -392,7 +392,7 @@ export default function Inventario() {
                                 return m.precio_unitario > 0 ? fmt(m.precio_unitario, 'USD') : '---'
                               })()}
                             </td>
-                            <td className="px-4 py-3 text-sm font-mono font-semibold" style={{color:"#1B3A6B"}}>
+                            <td className="px-4 py-3 text-sm font-mono font-semibold" style={{color:"#1B3A6B", minWidth:120}}>
                               {(() => {
                                 const entsM = entradas.filter(e => e.material_id === m.id)
                                 const precio = entsM.length > 0
