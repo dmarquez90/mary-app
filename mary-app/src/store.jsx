@@ -465,7 +465,7 @@ useEffect(() => {
         const { proyectoId, ...rest } = action.payload
         const byProject = state.presupuesto.filter(b => b.proyecto_id === proyectoId)
         const code = genBudgetCode(byProject, rest.tipo, rest.parent_id)
-        const item = { ...rest, id: uuid(), proyecto_id: proyectoId, code, created_at: today(), tenant_id: tenantId }
+        const item = { ...rest, id: rest.id || uuid(), proyecto_id: proyectoId, code, created_at: today(), tenant_id: tenantId }
         await supabase.from('presupuesto').insert(item)
         dispatch({ type: 'ADD_BUDGET', payload: item })
         break
@@ -475,7 +475,20 @@ useEffect(() => {
           .from('presupuesto').select('*')
           .eq('proyecto_id', action.payload.proyectoId)
           .eq('tenant_id', tenantId)
-        dispatch({ type: 'REFRESH_PRESUPUESTO', payload: { proyectoId: action.payload.proyectoId, items: data || [] } })
+
+        const allItems = data || []
+        const validIds = new Set(allItems.map(i => i.id))
+        const huerfanos = allItems
+          .filter(i => i.parent_id !== null && !validIds.has(i.parent_id))
+          .map(i => i.id)
+
+        if (huerfanos.length > 0) {
+          await supabase.from('presupuesto').delete().in('id', huerfanos)
+          await supabase.from('materiales_presupuestados').delete().in('actividad_id', huerfanos)
+        }
+
+        const itemsLimpios = allItems.filter(i => !huerfanos.includes(i.id))
+        dispatch({ type: 'REFRESH_PRESUPUESTO', payload: { proyectoId: action.payload.proyectoId, items: itemsLimpios } })
         break
       }
       case 'UPD_BUDGET': {

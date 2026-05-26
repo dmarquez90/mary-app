@@ -39,7 +39,10 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
         let headerRow = -1
         for (let i = 0; i < Math.min(data.length, 10); i++) {
           const row = data[i].map(c => String(c).toLowerCase())
-          if (row.some(c => c.includes('catego') || c.includes('descrip'))) {
+          const nonEmpty = row.filter(c => c.trim() !== '')
+          // La fila de headers debe tener al menos 2 columnas con contenido
+          // y alguna debe coincidir exactamente con 'catego' o 'descrip'
+          if (nonEmpty.length >= 2 && row.some(c => c.includes('catego') || c.includes('descrip'))) {
             headerRow = i; break
           }
         }

@@ -161,9 +161,12 @@ export const calcSubtotal = (items, id, tipo) => {
   return 0
 }
 
-export const calcGrandTotal = (items) =>
-  items.filter(i => i.tipo === 'actividad')
+export const calcGrandTotal = (items) => {
+  const validIds = new Set(items.map(i => i.id))
+  return items
+    .filter(i => i.tipo === 'actividad' && validIds.has(i.parent_id))
     .reduce((s, a) => s + (a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0)), 0)
+}
 
 export const ESTADO_COLORS = {
   planificacion:          'bg-blue-100 text-blue-700',
@@ -221,35 +224,8 @@ export const MONEDAS = [
   'DOP','BRL','ARS','CLP','BOB','PYG','UYU','CAD',
 ]
 
-// Unidades del sistema métrico (español por defecto)
-export const UNIDADES_METRICO = [
-  'm²', 'm³', 'm', 'ml', 'cm', 'km',
-  'kg', 'ton', 'lt', 'gl',
-  'und', 'hr', 'día', 'semana', 'mes', 'lote', 'viaje', '%',
+export const UNIDADES = [
+  'm²','m³','m','ml','kg','ton','und','gl',
+  'hr','día','semana','mes','lote','viaje','%',
+  'lb','pie²','LF',
 ]
-
-// Unidades del sistema imperial (inglés por defecto)
-export const UNIDADES_IMPERIAL = [
-  'ft²', 'ft³', 'ft', 'LF', 'in', 'yd',
-  'lb', 'ton', 'fl oz', 'gal',
-  'unit', 'hr', 'day', 'week', 'month', 'lot', 'trip', '%',
-]
-
-// Todas las unidades combinadas (sin duplicados), útil para formularios bilingües
-export const UNIDADES_ALL = [
-  ...new Set([...UNIDADES_METRICO, ...UNIDADES_IMPERIAL])
-]
-
-/**
- * Devuelve la lista de unidades según el idioma activo.
- * @param {string} lang - 'es' para métrico, 'en' para imperial, 'all' para ambas
- * @returns {string[]}
- */
-export const getUnidades = (lang = 'es') => {
-  if (lang === 'en') return UNIDADES_IMPERIAL
-  if (lang === 'all') return UNIDADES_ALL
-  return UNIDADES_METRICO
-}
-
-// Alias de compatibilidad: apunta al sistema métrico por defecto
-export const UNIDADES = UNIDADES_METRICO
