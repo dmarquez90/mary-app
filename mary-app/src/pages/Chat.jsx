@@ -355,8 +355,9 @@ export default function Chat({ onNavigate }) {
     supabase.from('chat_participantes')
       .update({ ultimo_leido: new Date().toISOString() })
       .eq('canal_id', canalActivo.id).eq('usuario_id', usuarioId)
-
-    setNoLeidos(prev => ({ ...prev, [canalActivo.id]: 0 }))
+      .then(() => {
+        setNoLeidos(prev => ({ ...prev, [canalActivo.id]: 0 }))
+      })
   }, [canalActivo?.id])
 
   // ── Scroll al último mensaje ──────────────────────────
@@ -379,6 +380,7 @@ export default function Chat({ onNavigate }) {
           supabase.from('chat_participantes')
             .update({ ultimo_leido: new Date().toISOString() })
             .eq('canal_id', msg.canal_id).eq('usuario_id', usuarioId)
+            .then(() => {})
         } else {
           // Incrementar no leídos
           setNoLeidos(prev => ({ ...prev, [msg.canal_id]: (prev[msg.canal_id] || 0) + 1 }))
