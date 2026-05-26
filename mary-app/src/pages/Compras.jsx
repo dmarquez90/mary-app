@@ -4,6 +4,7 @@ import { LangContext } from '../i18n'
 import { today } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 import { supabase } from '../supabase'
+import { usePermissions } from '../usePermissions'
 
 const BRAND = '#1B3A6B'
 
@@ -212,6 +213,7 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
 export default function Compras() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
+  const { can } = usePermissions()
   const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales } = state
 
   const [tab, setTab]       = useState(0)
@@ -478,14 +480,14 @@ export default function Compras() {
             className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-40 transition-colors text-sm">
             {syncing ? '⟳' : '↺'}
           </button>
-        {tab === 0 && (
+        {tab === 0 && can('solicitud_crear') && (
           <PrimaryBtn onClick={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
             setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
             setDrawer('sol')
           }}>{t('comp_new_sol')}</PrimaryBtn>
         )}
-        {tab === 1 && (
+        {tab === 1 && can('oc_crear') && (
           <PrimaryBtn onClick={() => {
             setForm({ solicitud_id:'', proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre:'', solicitante_cargo:'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
             setDrawer('oc')
@@ -510,11 +512,11 @@ export default function Compras() {
       {/* SOLICITUDES */}
       {tab === 0 && (
         solicitudes.length === 0 ? (
-          <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={t('comp_new_sol')} onAction={() => {
+          <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={can('solicitud_crear') ? t('comp_new_sol') : null} onAction={can('solicitud_crear') ? () => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
             setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
             setDrawer('sol')
-          }} />
+          } : null} />
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
             <table className="w-full">
@@ -551,7 +553,7 @@ export default function Compras() {
                           <TBtn onClick={() => openPrintSol(sol)}>🖨</TBtn>
 
                           {/* FLUJO: Pendiente — Aprobar activa detección automática */}
-                          {sol.estado === 'pendiente' && <>
+                          {sol.estado === 'pendiente' && can('oc_aprobar') && <>
                             <TBtn onClick={async () => {
                               await dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'pendiente_bodega' } })
                               await procesarFlujo(sol.id)
@@ -569,7 +571,7 @@ export default function Compras() {
                           )}
 
                           {/* FLUJO B: Sin stock — generar OC */}
-                          {(sol.estado === 'pendiente_oc' || sol.estado === 'oc_generada') && (
+                          {(sol.estado === 'pendiente_oc' || sol.estado === 'oc_generada') && can('oc_crear') && (
                             <TBtn onClick={() => {
                               setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
                               setDrawer('oc')
@@ -577,7 +579,7 @@ export default function Compras() {
                           )}
 
                           {/* FLUJO C: Dividida — muestra ambas rutas */}
-                          {sol.estado === 'dividida' && (
+                          {sol.estado === 'dividida' && can('oc_crear') && (
                             <div className="flex gap-1">
                               <span className="text-xs text-blue-600 font-medium px-1 flex items-center">📦+🛒</span>
                               <TBtn onClick={() => {
@@ -588,7 +590,7 @@ export default function Compras() {
                           )}
 
                           {/* Estado legacy aprobada */}
-                          {sol.estado === 'aprobada' && (
+                          {sol.estado === 'aprobada' && can('oc_crear') && (
                             <TBtn onClick={() => {
                               setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
                               setDrawer('oc')
@@ -633,7 +635,7 @@ export default function Compras() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetail(oc.id); setDrawer('detoc') }}>{t('btn_view')}</TBtn>
                           <TBtn onClick={() => openPrintOC(oc)}>🖨</TBtn>
-                          {oc.estado === 'pendiente_aprobacion' && <>
+                          {oc.estado === 'pendiente_aprobacion' && can('oc_aprobar') && <>
                             <TBtn onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'aprobada' } })}>{t('btn_approve')}</TBtn>
                             <TBtn danger onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'cancelada' } })}>{t('comp_cancel_oc')}</TBtn>
                           </>}

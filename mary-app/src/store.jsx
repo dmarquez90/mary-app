@@ -202,6 +202,7 @@ function reducer(state, action) {
 
     case 'ADD_SOL_ELIM': return { ...state, solicitudes_eliminacion: [...state.solicitudes_eliminacion, action.payload] }
     case 'UPD_SOL_ELIM': return { ...state, solicitudes_eliminacion: state.solicitudes_eliminacion.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
+    case 'DEL_SOL_ELIM': return { ...state, solicitudes_eliminacion: state.solicitudes_eliminacion.filter(s => s.id !== action.payload) }
 
     case 'ADD_PRES_IND': return { ...state, presupuesto_indirectos: [...(state.presupuesto_indirectos||[]), action.payload] }
     case 'UPD_PRES_IND': return { ...state, presupuesto_indirectos: (state.presupuesto_indirectos||[]).map(p => p.id === action.payload.id ? { ...p, ...action.payload } : p) }
@@ -766,10 +767,10 @@ useEffect(() => {
           }
         } catch (e) { console.warn('Error al procesar eliminación:', e.message) }
 
-        // Siempre actualizar el estado de la solicitud
+        // Siempre actualizar el estado de la solicitud — primero local, luego DB
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
-        await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
+        await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
         // Notificar al usuario específico que elaboró la solicitud
         await notifyUser({
           usuario_id: sol.solicitante_id,
@@ -784,8 +785,8 @@ useEffect(() => {
       case 'RECHAZAR_SOL_ELIM': {
         const sol2 = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
         const upd = { estado: 'rechazada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
-        await supabase.from('solicitudes_eliminacion').update(upd).eq('id', action.payload.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: action.payload.id, ...upd } })
+        await supabase.from('solicitudes_eliminacion').update(upd).eq('id', action.payload.id)
         // Notificar al usuario específico que elaboró la solicitud
         await notifyUser({
           usuario_id: sol2?.solicitante_id,
@@ -795,6 +796,15 @@ useEffect(() => {
           modulo: 'inventario',
           referencia_id: action.payload.id,
         })
+        break
+      }
+
+      case 'DEL_SOL_ELIM': {
+        // Eliminar solicitud de eliminación del historial (solo aprobadas/rechazadas)
+        const solDel = state.solicitudes_eliminacion.find(s => s.id === action.payload)
+        if (!solDel || solDel.estado === 'pendiente') break
+        await supabase.from('solicitudes_eliminacion').delete().eq('id', action.payload)
+        dispatch({ type: 'DEL_SOL_ELIM', payload: action.payload })
         break
       }
 

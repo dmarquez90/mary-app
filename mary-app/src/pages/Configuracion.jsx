@@ -540,7 +540,19 @@ export default function Configuracion() {
       {/* ── TAB SOLICITUDES DE ELIMINACIÓN ───────────────────────────────── */}
       {activeTab === 'solicitudes' && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Solicitudes de eliminación de registros</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-700">Solicitudes de eliminación de registros</h2>
+            {(state.solicitudes_eliminacion || []).some(s => s.estado !== 'pendiente') && (
+              <button
+                onClick={() => {
+                  const procesadas = (state.solicitudes_eliminacion || []).filter(s => s.estado !== 'pendiente')
+                  procesadas.forEach(s => dispatch({ type: 'DEL_SOL_ELIM', payload: s.id }))
+                }}
+                className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 px-3 py-1 rounded-lg transition-colors">
+                Limpiar historial
+              </button>
+            )}
+          </div>
 
           {(state.solicitudes_eliminacion || []).length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
@@ -582,7 +594,15 @@ export default function Configuracion() {
                             Revisar
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-400">{sol.comentario_admin || '—'}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">{sol.comentario_admin || '—'}</span>
+                            <button
+                              onClick={() => dispatch({ type: 'DEL_SOL_ELIM', payload: sol.id })}
+                              title="Eliminar del historial"
+                              className="text-xs text-gray-300 hover:text-red-400 transition-colors ml-1 flex-shrink-0">
+                              ✕
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
