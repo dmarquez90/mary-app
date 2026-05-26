@@ -221,8 +221,35 @@ export const MONEDAS = [
   'DOP','BRL','ARS','CLP','BOB','PYG','UYU','CAD',
 ]
 
-export const UNIDADES = [
-  'm²','m³','m','ml','kg','ton','und','gl',
-  'hr','día','semana','mes','lote','viaje','%',
-  'lb','pie²','LF',
+// Unidades del sistema métrico (español por defecto)
+export const UNIDADES_METRICO = [
+  'm²', 'm³', 'm', 'ml', 'cm', 'km',
+  'kg', 'ton', 'lt', 'gl',
+  'und', 'hr', 'día', 'semana', 'mes', 'lote', 'viaje', '%',
 ]
+
+// Unidades del sistema imperial (inglés por defecto)
+export const UNIDADES_IMPERIAL = [
+  'ft²', 'ft³', 'ft', 'LF', 'in', 'yd',
+  'lb', 'ton', 'fl oz', 'gal',
+  'unit', 'hr', 'day', 'week', 'month', 'lot', 'trip', '%',
+]
+
+// Todas las unidades combinadas (sin duplicados), útil para formularios bilingües
+export const UNIDADES_ALL = [
+  ...new Set([...UNIDADES_METRICO, ...UNIDADES_IMPERIAL])
+]
+
+/**
+ * Devuelve la lista de unidades según el idioma activo.
+ * @param {string} lang - 'es' para métrico, 'en' para imperial, 'all' para ambas
+ * @returns {string[]}
+ */
+export const getUnidades = (lang = 'es') => {
+  if (lang === 'en') return UNIDADES_IMPERIAL
+  if (lang === 'all') return UNIDADES_ALL
+  return UNIDADES_METRICO
+}
+
+// Alias de compatibilidad: apunta al sistema métrico por defecto
+export const UNIDADES = UNIDADES_METRICO

@@ -416,10 +416,21 @@ function AppContent() {
 
   if (!user) return <AuthRouter />
 
-const pathname = window.location.pathname
-if (pathname === '/admin' && perfil?.rol === 'super_admin') return <Admin />
-if (pathname === '/pago-exitoso') return <PagoExitoso />
-if (pathname === '/planes') return <Planes />
+  const pathname = window.location.pathname
+  if (pathname === '/pago-exitoso') return <PagoExitoso />
+  if (pathname === '/planes') return <Planes />
+  if (pathname === '/admin') {
+    if (!perfil) return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4F8' }}>
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-blue-200 border-t-[#1B3A6B] rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Verificando acceso...</p>
+        </div>
+      </div>
+    )
+    if (perfil.rol === 'super_admin') return <Admin />
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500 text-sm">Acceso no autorizado.</p></div>
+  }
 
   return (
     <StoreProvider tenantId={perfil?.tenant_id}>
