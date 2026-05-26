@@ -723,16 +723,49 @@ useEffect(() => {
       case 'APROBAR_SOL_ELIM': {
         const sol = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
         if (!sol) break
-        // Intentar eliminar el registro — si ya no existe, continuar igual
+
         try {
           if (sol.tipo === 'entrada') {
-            const existe = state.entradas.find(e => e.id === sol.registro_id)
-            if (existe) await dbDispatch({ type: 'DEL_ENTRADA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+            // Eliminar la entrada si existe en el store
+            const existeLocal = state.entradas.find(e => e.id === sol.registro_id)
+            if (existeLocal) {
+              await dbDispatch({ type: 'DEL_ENTRADA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+            } else {
+              // El registro ya no está en el store — actualizar stock directamente en Supabase
+              const { data: entradaDB } = await supabase.from('entradas').select('id').eq('id', sol.registro_id).single()
+              if (entradaDB) {
+                // La entrada existe en DB pero no en store — eliminarla y ajustar stock
+                await supabase.from('entradas').delete().eq('id', sol.registro_id)
+              }
+              // Ajustar stock del material independientemente
+              const { data: mat } = await supabase.from('materiales').select('stock_actual').eq('id', sol.material_id).single()
+              if (mat) {
+                const nuevoStock = Math.max(0, parseFloat(mat.stock_actual || 0) - parseFloat(sol.cantidad || 0))
+                await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', sol.material_id)
+                // Actualizar el store local también
+                const matLocal = state.materiales.find(m => m.id === sol.material_id)
+                if (matLocal) dispatch({ type: 'UPD_MATERIAL', payload: { ...matLocal, stock_actual: nuevoStock } })
+              }
+            }
           } else if (sol.tipo === 'salida') {
-            const existe = state.salidas.find(s => s.id === sol.registro_id)
-            if (existe) await dbDispatch({ type: 'DEL_SALIDA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+            const existeLocal = state.salidas.find(s => s.id === sol.registro_id)
+            if (existeLocal) {
+              await dbDispatch({ type: 'DEL_SALIDA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+            } else {
+              // La salida ya no está en el store — ajustar stock directamente
+              const { data: salidaDB } = await supabase.from('salidas').select('id').eq('id', sol.registro_id).single()
+              if (salidaDB) await supabase.from('salidas').delete().eq('id', sol.registro_id)
+              const { data: mat } = await supabase.from('materiales').select('stock_actual').eq('id', sol.material_id).single()
+              if (mat) {
+                const nuevoStock = parseFloat(mat.stock_actual || 0) + parseFloat(sol.cantidad || 0)
+                await supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', sol.material_id)
+                const matLocal = state.materiales.find(m => m.id === sol.material_id)
+                if (matLocal) dispatch({ type: 'UPD_MATERIAL', payload: { ...matLocal, stock_actual: nuevoStock } })
+              }
+            }
           }
-        } catch (e) { console.warn('Registro ya eliminado:', e.message) }
+        } catch (e) { console.warn('Error al procesar eliminación:', e.message) }
+
         // Siempre actualizar el estado de la solicitud
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
