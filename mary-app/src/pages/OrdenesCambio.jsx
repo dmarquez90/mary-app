@@ -257,16 +257,7 @@ export default function OrdenesCambio() {
           )}
         </>
       )}
-{puedeEditar && (oc.estado === 'borrador' || oc.estado === 'rechazada') && (
-  <TBtn danger onClick={() => {
-    if (window.confirm(isEs
-      ? `Eliminar OC ${oc.numero}? Esta accion no se puede deshacer.`
-      : `Delete CO ${oc.numero}? This action cannot be undone.`))
-      eliminarOC(oc.id)
-  }}>
-    {isEs ? 'Eliminar' : 'Delete'}
-  </TBtn>
-)}
+
       {/* ── DRAWER: NUEVA OC ── */}
       <Drawer open={drawer === 'nueva'} onClose={() => setDrawer(null)}
         title={isEs ? 'Nueva Orden de Cambio' : 'New Change Order'} width={700}>
