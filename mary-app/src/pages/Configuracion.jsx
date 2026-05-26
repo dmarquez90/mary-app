@@ -20,10 +20,11 @@ const inputCls  = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm fo
 const selectCls = inputCls
 
 export default function Configuracion() {
-  const { perfil }        = useAuth()
+  const { perfil, isClientAdmin, isSuperAdmin } = useAuth()
   const { state, dispatch } = useStore()
   const { t, lang }       = useContext(LangContext)
   const isEs = lang === 'ES'
+  const esAdmin = isClientAdmin || isSuperAdmin
 
   const [usuarios, setUsuarios]   = useState([])
   const [tenant, setTenant]       = useState(null)
@@ -34,7 +35,7 @@ export default function Configuracion() {
   const [error, setError]         = useState('')
   const [success, setSuccess]     = useState('')
   const [confirmAct, setConfirmAct] = useState(null)
-  const [activeTab, setActiveTab] = useState('usuarios')
+  const [activeTab, setActiveTab] = useState(() => (isClientAdmin || isSuperAdmin) ? 'usuarios' : 'micuenta')
   const [permDrawer, setPermDrawer] = useState(null) // usuario seleccionado
   const [permData, setPermData]     = useState({})   // { modulo: { ver, editar } }
   const [permProys, setPermProys]   = useState([])   // IDs de proyectos permitidos
@@ -397,11 +398,14 @@ export default function Configuracion() {
 
       {/* HEADER */}
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">{t('cfg_users_title')}</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          {esAdmin ? t('cfg_users_title') : (isEs ? 'Configuración' : 'Settings')}
+        </h1>
         <p className="text-sm text-gray-400 mt-0.5">{tenant?.nombre_empresa}</p>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — solo para admins */}
+      {esAdmin && (
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <p className="text-xs text-gray-400 mb-1">{t('cfg_users_plan')}</p>
@@ -425,16 +429,17 @@ export default function Configuracion() {
           )}
         </div>
       </div>
+      )} {/* fin esAdmin KPIs */}
 
       {/* ALERTA LÍMITE */}
-      {limiteAlcanzado && (
+      {esAdmin && limiteAlcanzado && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-sm text-amber-700">
           {t('cfg_users_limit_reached')}
         </div>
       )}
 
       {/* ALERTA SOLICITUDES PENDIENTES */}
-      {solicitudesPendientes.length > 0 && (
+      {esAdmin && solicitudesPendientes.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-red-700">
             <span className="text-lg">🔔</span>
@@ -452,11 +457,11 @@ export default function Configuracion() {
       {/* TABS */}
       <div className="flex border-b border-gray-200 mb-5">
         {[
-          { id:'usuarios',    label: t('cfg_users_sub') },
-          { id:'solicitudes', label: `Solicitudes de eliminación${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
-          { id:'micuenta',      label: isEs ? 'Mi cuenta' : 'My account' },
-          { id:'suscripcion',   label: isEs ? 'Suscripción' : 'Subscription' },
-        ].map(tab => (
+          esAdmin && { id:'usuarios',    label: t('cfg_users_sub') },
+          esAdmin && { id:'solicitudes', label: `Solicitudes de eliminación${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
+          { id:'micuenta',   label: isEs ? 'Mi cuenta' : 'My account' },
+          esAdmin && { id:'suscripcion', label: isEs ? 'Suscripción' : 'Subscription' },
+        ].filter(Boolean).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
               ${activeTab===tab.id ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>

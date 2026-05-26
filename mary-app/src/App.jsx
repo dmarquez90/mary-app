@@ -271,8 +271,8 @@ function Layout() {
           })}
         </nav>
 
-        {/* Configuración — client_admin y super_admin */}
-        {isClientAdmin && (
+        {/* Configuración — visible para todos los roles */}
+        {(isClientAdmin || perfil?.rol) && (
           <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
             <button onClick={() => setPage('configuracion')}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors relative"
