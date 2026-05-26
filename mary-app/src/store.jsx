@@ -723,11 +723,17 @@ useEffect(() => {
       case 'APROBAR_SOL_ELIM': {
         const sol = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
         if (!sol) break
-        if (sol.tipo === 'entrada') {
-          await dbDispatch({ type: 'DEL_ENTRADA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
-        } else if (sol.tipo === 'salida') {
-          await dbDispatch({ type: 'DEL_SALIDA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
-        }
+        // Intentar eliminar el registro — si ya no existe, continuar igual
+        try {
+          if (sol.tipo === 'entrada') {
+            const existe = state.entradas.find(e => e.id === sol.registro_id)
+            if (existe) await dbDispatch({ type: 'DEL_ENTRADA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+          } else if (sol.tipo === 'salida') {
+            const existe = state.salidas.find(s => s.id === sol.registro_id)
+            if (existe) await dbDispatch({ type: 'DEL_SALIDA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+          }
+        } catch (e) { console.warn('Registro ya eliminado:', e.message) }
+        // Siempre actualizar el estado de la solicitud
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
