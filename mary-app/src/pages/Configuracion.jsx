@@ -618,11 +618,10 @@ export default function Configuracion() {
           )}
         </div>
       )}
-    </div>
 
-    {/* ── TAB MI CUENTA ────────────────────────────────────────────────── */}
+      {/* ── TAB MI CUENTA ────────────────────────────────────────────────── */}
       {activeTab === 'micuenta' && (
-        <div className="max-w-md">
+        <div className="max-w-md mx-auto">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">
             {isEs ? 'Cambiar contraseña' : 'Change password'}
           </h2>
@@ -1065,6 +1064,7 @@ export default function Configuracion() {
         </div>
       </div>
     )}
+    </div>
     </>
   )
 }
