@@ -324,21 +324,28 @@ useEffect(() => {
   async function dbDispatch(action) {
 
     // ── Helper: enviar notificación a usuarios del tenant ──────────────
-    async function notify({ tipo, titulo, mensaje, modulo, referencia_id, roles }) {
+    // ── Helper: texto bilingüe según lang del usuario ───────────────
+    function txt(usuario, es, en) {
+      return usuario?.lang === 'EN' ? en : es
+    }
+
+    async function notify({ tipo, titulo, mensaje, titulo_en, mensaje_en, modulo, referencia_id, roles }) {
       try {
-        // Obtener usuarios del tenant que tengan los roles indicados
-        let query = supabase.from('usuarios').select('id').eq('tenant_id', tenantId).eq('activo', true)
+        // Obtener usuarios del tenant con su lang preferido
+        let query = supabase.from('usuarios').select('id, lang').eq('tenant_id', tenantId).eq('activo', true)
         if (roles?.length) query = query.in('rol', roles)
         const { data: usuarios } = await query
         if (!usuarios?.length) return
         const { data: { user: currentUser } } = await supabase.auth.getUser()
-        // No notificar al propio usuario que hace la acción
         const targets = usuarios.filter(u => u.id !== currentUser?.id)
         if (!targets.length) return
         const notifs = targets.map(u => ({
           tenant_id: tenantId,
           usuario_id: u.id,
-          tipo, titulo, mensaje, modulo,
+          tipo,
+          titulo:  txt(u, titulo,  titulo_en  || titulo),
+          mensaje: txt(u, mensaje, mensaje_en || mensaje),
+          modulo,
           referencia_id: referencia_id || null,
           leida: false,
         }))
@@ -347,13 +354,18 @@ useEffect(() => {
     }
 
     // ── Helper: notificar a un usuario específico por ID ──────────────
-    async function notifyUser({ usuario_id, tipo, titulo, mensaje, modulo, referencia_id }) {
+    async function notifyUser({ usuario_id, tipo, titulo, mensaje, titulo_en, mensaje_en, modulo, referencia_id }) {
       if (!usuario_id) return
       try {
+        // Obtener lang del usuario destinatario
+        const { data: usr } = await supabase.from('usuarios').select('lang').eq('id', usuario_id).single()
         await supabase.from('notificaciones').insert({
           tenant_id: tenantId,
           usuario_id,
-          tipo, titulo, mensaje, modulo,
+          tipo,
+          titulo:  txt(usr, titulo,  titulo_en  || titulo),
+          mensaje: txt(usr, mensaje, mensaje_en || mensaje),
+          modulo,
           referencia_id: referencia_id || null,
           leida: false,
         })
@@ -1027,8 +1039,10 @@ useEffect(() => {
         dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
         await notify({
           tipo: 'aprobacion',
-          titulo: '✅ Avalúo de subcontrato aprobado',
+          titulo: `Avalúo #${av.numero} de subcontrato aprobado`,
+          titulo_en: `Subcontract Valuation #${av.numero} approved`,
           mensaje: `Avalúo #${av.numero} de ${contrato.subcontratista} fue aprobado.`,
+          mensaje_en: `Valuation #${av.numero} from ${contrato.subcontratista} was approved.`,
           modulo: 'financiero',
           referencia_id: av.id,
           roles: ['client_admin', 'gerente', 'contador'],
@@ -1186,45 +1200,43 @@ useEffect(() => {
         await supabase.from('avaluos_cliente').insert(av)
         if (avi.length) await supabase.from('avaluos_cliente_items').insert(avi)
         dispatch({ type: 'ADD_AVALUO_CLIENTE', payload: { avaluo: av, items: avi } })
-        await notify({
-          tipo: 'info',
-          titulo: '📋 Nuevo avalúo de cliente creado',
-          mensaje: `Se creó el avalúo #${av.numero} del proyecto. Revisa cuando esté listo para presentar.`,
-          modulo: 'avaluos',
-          referencia_id: av.id,
-          roles: ['gerente', 'client_admin'],
-        })
         break
       }
       case 'UPD_AVALUO_CLIENTE_ESTADO': {
         await supabase.from('avaluos_cliente').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
-        if (action.payload.estado === 'presentado') {
-          await notify({
-            tipo: 'info',
-            titulo: '📤 Avalúo presentado — pendiente de aprobación',
-            mensaje: `El avalúo #${action.payload.numero || ''} fue presentado al cliente y requiere aprobación.`,
-            modulo: 'avaluos',
-            referencia_id: action.payload.id,
-            roles: ['gerente', 'client_admin'],
-          })
-        } else if (action.payload.estado === 'aprobado') {
+        if (action.payload.estado === 'aprobado') {
           await notify({
             tipo: 'aprobacion',
-            titulo: '✅ Avalúo aprobado',
-            mensaje: `El avalúo de cliente fue aprobado.`,
-            modulo: 'financiero',
+            titulo: `Avalúo #${action.payload.numero || ''} aprobado`,
+            titulo_en: `Valuation #${action.payload.numero || ''} approved`,
+            mensaje: `El avalúo #${action.payload.numero || ''} del cliente fue aprobado.`,
+            mensaje_en: `Client valuation #${action.payload.numero || ''} was approved.`,
+            modulo: 'avaluos',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador', 'contador'],
           })
         } else if (action.payload.estado === 'rechazado') {
           await notify({
             tipo: 'rechazo',
-            titulo: '❌ Avalúo rechazado',
-            mensaje: `El avalúo fue rechazado. Requiere correcciones.`,
-            modulo: 'financiero',
+            titulo: `Avalúo #${action.payload.numero || ''} rechazado`,
+            titulo_en: `Valuation #${action.payload.numero || ''} rejected`,
+            mensaje: `El avalúo #${action.payload.numero || ''} fue rechazado. Requiere correcciones.`,
+            mensaje_en: `Valuation #${action.payload.numero || ''} was rejected. Corrections required.`,
+            modulo: 'avaluos',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador'],
+          })
+        } else if (action.payload.estado === 'presentado') {
+          await notify({
+            tipo: 'info',
+            titulo: `Avalúo #${action.payload.numero || ''} pendiente de aprobacion`,
+            titulo_en: `Valuation #${action.payload.numero || ''} pending approval`,
+            mensaje: `El avalúo #${action.payload.numero || ''} fue presentado al cliente y requiere aprobacion.`,
+            mensaje_en: `Valuation #${action.payload.numero || ''} was submitted to the client and requires approval.`,
+            modulo: 'avaluos',
+            referencia_id: action.payload.id,
+            roles: ['gerente', 'client_admin'],
           })
         }
         break

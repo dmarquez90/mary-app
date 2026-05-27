@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from './supabase'
 
 const LS_KEY = 'mary_lang'
 
@@ -1403,14 +1404,30 @@ export function LangProvider({ children }) {
   const [lang, setLang] = useState('ES')
 
   useEffect(() => {
+    // Load from localStorage first for instant render
     const saved = localStorage.getItem(LS_KEY)
     if (saved) setLang(saved)
+    // Then sync from Supabase if user is logged in
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('usuarios').select('lang').eq('id', user.id).single()
+        .then(({ data }) => {
+          if (data?.lang) {
+            setLang(data.lang)
+            localStorage.setItem(LS_KEY, data.lang)
+          }
+        })
+    })
   }, [])
 
   const toggleLang = () => {
     const newLang = lang === 'ES' ? 'EN' : 'ES'
     setLang(newLang)
     localStorage.setItem(LS_KEY, newLang)
+    // Persist to Supabase
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) supabase.from('usuarios').update({ lang: newLang }).eq('id', user.id)
+    })
   }
 
   const t = (key, vars = {}) => {
