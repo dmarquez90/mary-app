@@ -37,7 +37,8 @@ export default function CurvaS() {
   const { t } = useContext(LangContext)
   const { proyectos, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos,
     avaluos_cliente = [], avaluos_cliente_items = [], presupuesto_indirectos = [],
-    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [] } = state
+    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [],
+    ordenes_cambio = [] } = state
 
   const [proyId, setProyId]           = useState(proyectos[0]?.id || '')
   const [granularity, setGranularity] = useState('mes')
@@ -55,6 +56,11 @@ export default function CurvaS() {
   const granTotalPres  = subtotalPres + utilidadMonto
   const impuestoMonto  = granTotalPres * (impuestoPct / 100)
   const budget         = granTotalPres + impuestoMonto
+
+  // ── Presupuesto revisado por Órdenes de Cambio aprobadas ─────────────────
+  const ocsAprobadas   = ordenes_cambio.filter(o => o.proyecto_id === proyId && o.estado === 'aprobada')
+  const deltaOCs       = ocsAprobadas.reduce((s, o) => s + parseFloat(o.total_oc || 0), 0)
+  const budgetRevisado = budget + deltaOCs
 
   const allCosts = useMemo(() => {
     if (!proyId) return []
@@ -185,12 +191,18 @@ export default function CurvaS() {
       })
 
     let presAcum    = 0
+    let presRevAcum = 0
     let realAcum    = 0
     let ingresoAcum = 0
 
     return periodos.map(({ key, label }) => {
-      const montoPres = presPorPeriodo[key] || 0
+      const montoPres    = presPorPeriodo[key] || 0
+      // Presupuesto revisado: misma distribución proporcional aplicada al budgetRevisado
+      const montoPresRev = budgetRevisado > 0 && budget > 0
+        ? montoPres * (budgetRevisado / budget)
+        : montoPres
       presAcum    += montoPres
+      presRevAcum += montoPresRev
       realAcum    += (realPorPeriodo[key] || 0)
       ingresoAcum += (ingresoPorPeriodo[key] || 0)
       return {
@@ -199,11 +211,12 @@ export default function CurvaS() {
         real_periodo:   Math.round((realPorPeriodo[key] || 0) * 100) / 100,
         ingreso_periodo:Math.round((ingresoPorPeriodo[key] || 0) * 100) / 100,
         presAcum:       Math.round(Math.min(presAcum, budget) * 100) / 100,
+        presRevAcum:    deltaOCs > 0 ? Math.round(Math.min(presRevAcum, budgetRevisado) * 100) / 100 : undefined,
         realAcum:       Math.round(realAcum * 100) / 100,
         ingresoAcum:    Math.round(ingresoAcum * 100) / 100,
       }
     })
-  }, [allCosts, budget, granularity, proy, avaluos_cliente, proyId])
+  }, [allCosts, budget, budgetRevisado, deltaOCs, granularity, proy, avaluos_cliente, proyId])
 
   const totalReal      = allCosts.reduce((s,c) => s + c.monto, 0)
   const isEs           = useContext(LangContext).lang === 'ES'
@@ -211,8 +224,9 @@ export default function CurvaS() {
   const totalIngresado = avaluos_cliente
     .filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
     .reduce((s,a) => s + parseFloat(a.total || a.monto_total || 0), 0)
-  const flujo          = totalIngresado - totalReal
-  const desviacion = totalReal - budget
+  const flujo      = totalIngresado - totalReal
+  // Desviación contra presupuesto revisado (con OCs) si hay OCs, sino contra base
+  const desviacion = totalReal - budgetRevisado
 
   const actDeviations = useMemo(() => {
     if (!proyId) return []
@@ -236,18 +250,24 @@ export default function CurvaS() {
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null
-    const pres  = payload.find(p => p.dataKey === 'presAcum')
-    const real  = payload.find(p => p.dataKey === 'realAcum')
-    const ing   = payload.find(p => p.dataKey === 'ingresoAcum')
+    const pres    = payload.find(p => p.dataKey === 'presAcum')
+    const presRev = payload.find(p => p.dataKey === 'presRevAcum')
+    const real    = payload.find(p => p.dataKey === 'realAcum')
+    const ing     = payload.find(p => p.dataKey === 'ingresoAcum')
     const presPer = payload.find(p => p.dataKey === 'pres_periodo')
     const realPer = payload.find(p => p.dataKey === 'real_periodo')
-    const ejecucion = pres?.value > 0 ? ((real?.value || 0) / pres.value * 100).toFixed(1) : null
+    const base    = presRev?.value || pres?.value
+    const ejecucion = base > 0 ? ((real?.value || 0) / base * 100).toFixed(1) : null
     return (
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-lg text-xs min-w-[180px]">
         <p className="font-semibold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">{label}</p>
         {pres && <div className="flex justify-between gap-4 mb-1">
           <span style={{ color: '#185FA5' }}>● {isEs ? 'Presupuestado' : 'Budgeted'}</span>
           <span className="font-mono font-medium">{fmt(pres.value, moneda)}</span>
+        </div>}
+        {presRev && presRev.value != null && <div className="flex justify-between gap-4 mb-1">
+          <span style={{ color: '#F59E0B' }}>● {isEs ? 'Pres. revisado' : 'Revised budget'}</span>
+          <span className="font-mono font-medium">{fmt(presRev.value, moneda)}</span>
         </div>}
         {real && <div className="flex justify-between gap-4 mb-1">
           <span style={{ color: '#1D9E75' }}>● {isEs ? 'Real ejecutado' : 'Real executed'}</span>
@@ -302,16 +322,26 @@ export default function CurvaS() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             <StatCard label={t('curva_kpi_budget')} value={fmt(budget, moneda)} />
+            {deltaOCs > 0 && (
+              <StatCard
+                label={isEs ? 'Presupuesto revisado' : 'Revised budget'}
+                value={fmt(budgetRevisado, moneda)}
+                color='#F59E0B'
+                sub={isEs ? `${ocsAprobadas.length} OC${ocsAprobadas.length !== 1 ? 's' : ''} aprobada${ocsAprobadas.length !== 1 ? 's' : ''}` : `${ocsAprobadas.length} approved CO${ocsAprobadas.length !== 1 ? 's' : ''}`}
+              />
+            )}
             <StatCard label={t('curva_kpi_real')}   value={fmt(totalReal, moneda)} />
             <StatCard
               label={t('curva_kpi_deviation')}
               value={`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`}
               color={desviacion > 0 ? '#ef4444' : desviacion < 0 ? '#1D9E75' : '#6b7280'}
-              sub={desviacion > 0 ? t('curva_overcost') : desviacion < 0 ? t('curva_saving') : t('curva_on_budget')}
+              sub={deltaOCs > 0
+                ? (isEs ? 'vs presupuesto revisado' : 'vs revised budget')
+                : (desviacion > 0 ? t('curva_overcost') : desviacion < 0 ? t('curva_saving') : t('curva_on_budget'))}
             />
             <StatCard
               label={t('curva_kpi_execution')}
-              value={budget > 0 ? `${((totalReal/budget)*100).toFixed(1)}%` : '0%'}
+              value={budgetRevisado > 0 ? `${((totalReal/budgetRevisado)*100).toFixed(1)}%` : '0%'}
               sub={t('curva_kpi_execution_sub')}
             />
             <StatCard
@@ -391,6 +421,18 @@ export default function CurvaS() {
                     dot={false}
                     activeDot={{ r:5, strokeWidth:0 }}
                   />
+                  {deltaOCs > 0 && (
+                    <Line
+                      type="monotone"
+                      dataKey="presRevAcum"
+                      name={isEs ? 'Pres. revisado (OCs)' : 'Revised budget (COs)'}
+                      stroke="#F59E0B"
+                      strokeWidth={2}
+                      strokeDasharray="8 4"
+                      dot={false}
+                      activeDot={{ r:5, strokeWidth:0 }}
+                    />
+                  )}
                   <Area
                     type="stepAfter"
                     dataKey="realAcum"

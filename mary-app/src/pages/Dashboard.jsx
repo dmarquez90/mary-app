@@ -25,7 +25,7 @@ export default function Dashboard() {
   const { state } = useStore()
   const { t, lang } = useContext(LangContext)
   const isEs = lang === 'ES'
-  const { proyectos, materiales, entradas, salidas, ordenes_compra, solicitudes } = state
+  const { proyectos, materiales, entradas, salidas, ordenes_compra, solicitudes, ordenes_cambio = [] } = state
 
   // ── Materiales activos ────────────────────────────────────────────────────
   const activos = materiales.filter(m => m.activo !== false)
@@ -82,6 +82,14 @@ export default function Dashboard() {
     const canceladas = ordenes_compra.filter(o => o.status === 'cancelled').length
     return { pendientes, aprobadas, canceladas }
   }, [ordenes_compra])
+
+  // ── Órdenes de Cambio stats ───────────────────────────────────────────────
+  const ocCambioStats = useMemo(() => {
+    const aprobadas   = ordenes_cambio.filter(o => o.estado === 'aprobada')
+    const pendientes  = ordenes_cambio.filter(o => o.estado === 'presentada')
+    const deltaTotal  = aprobadas.reduce((s, o) => s + parseFloat(o.total_oc || 0), 0)
+    return { aprobadas: aprobadas.length, pendientes: pendientes.length, deltaTotal }
+  }, [ordenes_cambio])
 
   // ── Valor inventario FIFO ─────────────────────────────────────────────────
   const valorInventario = useMemo(() => {
@@ -280,6 +288,37 @@ export default function Dashboard() {
             </li>
           </ul>
         </div>
+
+        {/* ── ÓRDENES DE CAMBIO ── */}
+        {ordenes_cambio.length > 0 && (
+          <div className="bg-white shadow rounded p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-700">
+                {isEs ? 'Órdenes de Cambio' : 'Change Orders'}
+              </h2>
+              <span className="text-2xl font-bold" style={{ color: '#F59E0B' }}>{ordenes_cambio.length}</span>
+            </div>
+            <ul className="space-y-2">
+              <li className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">{isEs ? 'Aprobadas' : 'Approved'}</span>
+                <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-medium">{ocCambioStats.aprobadas}</span>
+              </li>
+              <li className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">{isEs ? 'Pendientes aprobación' : 'Pending approval'}</span>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${ocCambioStats.pendientes > 0 ? 'bg-amber-50 text-amber-700' : 'bg-gray-50 text-gray-500'}`}>{ocCambioStats.pendientes}</span>
+              </li>
+              {ocCambioStats.deltaTotal !== 0 && (
+                <li className="flex items-center justify-between text-sm pt-1 border-t border-gray-100 mt-1">
+                  <span className="text-gray-600 font-medium">{isEs ? 'Variación total' : 'Total variation'}</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded"
+                    style={{ color: ocCambioStats.deltaTotal > 0 ? '#1D9E75' : '#ef4444', background: ocCambioStats.deltaTotal > 0 ? '#F0FDF4' : '#FEF2F2' }}>
+                    {ocCambioStats.deltaTotal > 0 ? '+' : ''}{fmt(ocCambioStats.deltaTotal, monedaPrincipal)}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
 
       </div>
     </div>

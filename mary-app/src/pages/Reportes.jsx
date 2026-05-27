@@ -385,6 +385,66 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     ws4.mergeCells(r4,5,r4,5); const ts=ws4.getCell(r4,5); ts.value=''; styleTotal(ts)
   }
 
+  // ── HOJA 5: Órdenes de Cambio ──
+  if (data.ocsDelProy?.length > 0) {
+    const ws5 = wb.addWorksheet(isEs ? 'Órdenes de Cambio' : 'Change Orders')
+    setCols(ws5, [16, 12, 14, 32, 16, 16, 12])
+    let r5 = addHeaderBlock(ws5, isEs ? 'Órdenes de Cambio' : 'Change Orders', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
+
+    // KPI resumen en la hoja
+    ws5.getRow(r5).height = 20
+    const kOrig = ws5.getCell(r5, 1); kOrig.value = isEs ? 'Presupuesto original' : 'Original budget'; styleLabel(kOrig)
+    const vOrig = ws5.getCell(r5, 2); vOrig.value = budget; vOrig.numFmt = '"$"#,##0.00'; styleData(vOrig, { bold: true, align: 'right' })
+    const kDelta = ws5.getCell(r5, 3); kDelta.value = isEs ? 'Variación OCs' : 'CO variation'; styleLabel(kDelta)
+    const vDelta = ws5.getCell(r5, 4); vDelta.value = data.deltaOCs; vDelta.numFmt = '"$"#,##0.00'
+    styleData(vDelta, { bold: true, align: 'right', color: data.deltaOCs > 0 ? GREEN_HX : RED_HX })
+    const kRev = ws5.getCell(r5, 5); kRev.value = isEs ? 'Presupuesto revisado' : 'Revised budget'; styleLabel(kRev)
+    const vRev = ws5.getCell(r5, 6); vRev.value = data.budgetRevisado; vRev.numFmt = '"$"#,##0.00'; styleData(vRev, { bold: true, align: 'right', color: 'F59E0B' })
+    ws5.mergeCells(r5, 7, r5, 7)
+    r5 += 2
+
+    // Tabla de OCs
+    r5 = addSectionTitle(ws5, r5, isEs ? 'DETALLE DE ÓRDENES DE CAMBIO' : 'CHANGE ORDER DETAIL', 7)
+    ws5.getRow(r5).height = 18
+    ;[isEs?'Número':'Number', isEs?'Fecha':'Date', isEs?'Estado':'Status',
+      isEs?'Motivo':'Reason', isEs?'Presentado a':'Submitted to',
+      isEs?'Total OC':'CO Total', isEs?'% variación':'% variation'
+    ].forEach((h, i) => { const c = ws5.getCell(r5, i+1); c.value = h; styleHeader(c) })
+    r5++
+
+    const ESTADO_LABELS = {
+      borrador:   isEs ? 'Borrador'   : 'Draft',
+      presentada: isEs ? 'Presentada' : 'Submitted',
+      aprobada:   isEs ? 'Aprobada'   : 'Approved',
+      rechazada:  isEs ? 'Rechazada'  : 'Rejected',
+    }
+    data.ocsDelProy.forEach((oc, i) => {
+      ws5.getRow(r5).height = 17
+      const even   = i % 2 === 1
+      const total  = parseFloat(oc.total_oc || 0)
+      const varPct = budget > 0 ? total / budget : 0
+      const isAprobada = oc.estado === 'aprobada'
+      const c1 = ws5.getCell(r5,1); c1.value = oc.numero || '—';          styleData(c1, { even })
+      const c2 = ws5.getCell(r5,2); c2.value = oc.fecha || '—';           styleData(c2, { even })
+      const c3 = ws5.getCell(r5,3); c3.value = ESTADO_LABELS[oc.estado] || oc.estado
+      styleData(c3, { even, bold: true, color: isAprobada ? GREEN_HX : oc.estado === 'rechazada' ? RED_HX : '000000' })
+      const c4 = ws5.getCell(r5,4); c4.value = oc.motivo || '—';          styleData(c4, { even })
+      const c5 = ws5.getCell(r5,5); c5.value = oc.presentado_a || '—';    styleData(c5, { even })
+      const c6 = ws5.getCell(r5,6); c6.value = total; c6.numFmt = '"$"#,##0.00'
+      styleData(c6, { even, align: 'right', bold: true, color: isAprobada ? GREEN_HX : '000000' })
+      const c7 = ws5.getCell(r5,7); c7.value = varPct; c7.numFmt = '0.00%'
+      styleData(c7, { even, align: 'right' })
+      r5++
+    })
+
+    // Total aprobado
+    ws5.getRow(r5).height = 18
+    ws5.mergeCells(r5, 1, r5, 5)
+    const tl5 = ws5.getCell(r5, 1); tl5.value = isEs ? 'TOTAL APROBADO' : 'TOTAL APPROVED'; styleTotal(tl5)
+    const tv5 = ws5.getCell(r5, 6); tv5.value = data.deltaOCs; tv5.numFmt = '"$"#,##0.00'; styleTotal(tv5)
+    const tp5 = ws5.getCell(r5, 7); tp5.value = budget > 0 ? data.deltaOCs / budget : 0; tp5.numFmt = '0.00%'; styleTotal(tp5)
+  }
+
   const buf = await wb.xlsx.writeBuffer()
   saveAs(new Blob([buf]), `${isEs?'Reporte_Financiero':'Financial_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
@@ -738,6 +798,7 @@ export default function Reportes() {
     subcontratos_contratos = [], subcontratos_avaluos = [],
     presupuesto_indirectos = [],
     avaluos_cliente = [], avaluos_cliente_items = [],
+    ordenes_cambio = [], ordenes_cambio_items = [],
   } = state
 
   const [reportType, setReportType] = useState('financiero')
@@ -832,6 +893,13 @@ export default function Reportes() {
       return { categoria: cat, presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
     }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
 
+    // Órdenes de Cambio del proyecto
+    const ocsDelProy      = ordenes_cambio.filter(o => o.proyecto_id === proyId)
+    const ocsAprobadas    = ocsDelProy.filter(o => o.estado === 'aprobada')
+    const deltaOCs        = ocsAprobadas.reduce((s, o) => s + parseFloat(o.total_oc || 0), 0)
+    const budgetRevisado  = budget + deltaOCs
+    const ocsItems        = ordenes_cambio_items.filter(i => ocsDelProy.some(o => o.id === i.oc_id))
+
     return {
       resumen:[
         {categoria: t('rep_cat_materiales'),   real:totalMat},
@@ -843,8 +911,9 @@ export default function Reportes() {
       ],
       actividades, totalReal, dirs, noms, subs, eqs, inds,
       avsProy, avsItems, indsPres, comparacionInd,
+      ocsDelProy, ocsAprobadas, deltaOCs, budgetRevisado, ocsItems,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -1074,6 +1143,75 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── SECCIÓN: Órdenes de Cambio ── */}
+      {data.ocsDelProy?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b flex items-center justify-between" style={{borderColor:'#D6E4F0'}}>
+            <p className="text-sm font-semibold text-gray-700">
+              {isEs ? 'Órdenes de Cambio' : 'Change Orders'}
+              <span className="ml-2 text-xs text-gray-400">({data.ocsDelProy.length})</span>
+            </p>
+            {data.deltaOCs !== 0 && (
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-gray-400">{isEs ? 'Pres. original:' : 'Original budget:'} <span className="font-mono font-medium text-gray-700">{fmt(budget, moneda)}</span></span>
+                <span style={{color:'#F59E0B'}}>{isEs ? 'Variación OCs:' : 'CO variation:'} <span className="font-mono font-medium">{data.deltaOCs >= 0 ? '+' : ''}{fmt(data.deltaOCs, moneda)}</span></span>
+                <span style={{color:BRAND}}>{isEs ? 'Pres. revisado:' : 'Revised budget:'} <span className="font-mono font-bold">{fmt(data.budgetRevisado, moneda)}</span></span>
+              </div>
+            )}
+          </div>
+          <table className="w-full">
+            <thead><tr style={thS}>
+              {[isEs?'Número':'Number', isEs?'Fecha':'Date', isEs?'Estado':'Status',
+                isEs?'Motivo':'Reason', isEs?'Presentado a':'Submitted to',
+                isEs?'Total OC':'CO Total', isEs?'% variación':'% variation'
+              ].map((h,i)=>(
+                <th key={i} className={thC+(i>4?' text-right':'')}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {data.ocsDelProy.map((oc, i) => {
+                const total   = parseFloat(oc.total_oc || 0)
+                const varPct  = budget > 0 ? ((total / budget) * 100).toFixed(2) : '—'
+                const isAprobada = oc.estado === 'aprobada'
+                const ESTADOS = { borrador: isEs?'Borrador':'Draft', presentada: isEs?'Presentada':'Submitted', aprobada: isEs?'Aprobada':'Approved', rechazada: isEs?'Rechazada':'Rejected' }
+                return (
+                  <tr key={oc.id} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                    <td className={tdC+' font-mono text-xs font-semibold'} style={{color:BRAND}}>{oc.numero||'—'}</td>
+                    <td className={tdC+' text-xs text-gray-500'}>{oc.fecha||'—'}</td>
+                    <td className={tdC}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                        ${isAprobada ? 'bg-green-100 text-green-700'
+                          : oc.estado==='rechazada' ? 'bg-red-100 text-red-600'
+                          : oc.estado==='presentada' ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-600'}`}>
+                        {ESTADOS[oc.estado] || oc.estado}
+                      </span>
+                    </td>
+                    <td className={tdC+' max-w-[160px] truncate text-xs text-gray-500'}>{oc.motivo||'—'}</td>
+                    <td className={tdC+' text-xs text-gray-500'}>{oc.presentado_a||'—'}</td>
+                    <td className={tdC+' text-right font-mono font-bold'} style={{color: isAprobada ? '#1D9E75' : '#6b7280'}}>
+                      {total > 0 ? (total >= 0 ? '+' : '') + fmt(total, moneda) : '—'}
+                    </td>
+                    <td className={tdC+' text-right text-xs'} style={{color: isAprobada ? '#1D9E75' : '#9ca3af'}}>
+                      {varPct !== '—' ? `${total >= 0 ? '+' : ''}${varPct}%` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr style={{background:'#EEF2F7'}}>
+                <td colSpan={5} className={tdC+' font-bold text-xs'} style={{color:BRAND}}>{isEs ? 'TOTAL APROBADO' : 'TOTAL APPROVED'}</td>
+                <td className={tdC+' text-right font-mono font-bold'} style={{color:'#1D9E75'}}>
+                  {data.deltaOCs > 0 ? `+${fmt(data.deltaOCs, moneda)}` : fmt(data.deltaOCs, moneda)}
+                </td>
+                <td className={tdC+' text-right text-xs font-medium'} style={{color:'#1D9E75'}}>
+                  {budget > 0 ? `${((data.deltaOCs / budget) * 100).toFixed(2)}%` : '—'}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
