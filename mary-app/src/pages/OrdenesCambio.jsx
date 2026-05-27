@@ -1,4 +1,4 @@
-import { useState, useContext, useMemo } from 'react'
+import { useState, useContext, useMemo, useEffect } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
@@ -24,7 +24,7 @@ function EstadoBadge({ estado, isEs }) {
 }
 
 const emptyItem = () => ({
-  tipo: 'existente', actividad_id: '', descripcion: '',
+  tipo: 'existente', actividad_id: '', descripcion: '', parent_id: '',
   unidad: 'und', cantidad_original: '', cantidad_nueva: '',
   precio_unitario: '', costo_mo: '', costo_materiales: '', costo_equipos: '',
 })
@@ -59,6 +59,9 @@ export default function OrdenesCambio() {
     presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad'),
     [presupuesto, proyId]
   )
+
+  const etapas    = useMemo(() => presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'etapa'), [presupuesto, proyId])
+  const subEtapas = useMemo(() => presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'sub_etapa'), [presupuesto, proyId])
 
   // Indirectos del proyecto para el formulario de ajuste
   const indsDelProy = useMemo(() =>
@@ -95,8 +98,12 @@ export default function OrdenesCambio() {
   }
 
   const calcItem = (it) => {
-    const pu   = getPU(it)
-    const diff = parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)
+    const pu = getPU(it)
+    if (it.tipo === 'nueva') {
+      const cantidad = parseFloat(it.cantidad_nueva||0)
+      return { diff: cantidad, monto: cantidad * pu, pu }
+    }
+    const diff  = parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)
     const monto = diff * pu
     return { diff, monto, pu }
   }
@@ -118,9 +125,16 @@ export default function OrdenesCambio() {
 
   const saveOC = () => {
     const validItems = items.filter(it => it.descripcion && it.cantidad_nueva !== '')
+    // Actividades nuevas requieren parent_id
+    const nuevasSinParent = validItems.filter(it => it.tipo === 'nueva' && !it.parent_id)
+    if (nuevasSinParent.length > 0) {
+      alert(isEs
+        ? 'Las actividades nuevas deben tener una etapa o sub-etapa asignada.'
+        : 'New activities must have a stage or sub-stage assigned.')
+      return
+    }
     if (!proyId || !form.numero || validItems.length === 0) return
 
-    // Construir lista de ajustes de indirectos con ajuste != 0
     const indirectosPayload = indsDelProy
       .filter(ind => parseFloat(ajustesInd[ind.id] || 0) !== 0)
       .map(ind => ({
@@ -140,12 +154,13 @@ export default function OrdenesCambio() {
           return {
             ...it,
             descripcion:       it.descripcion || act?.descripcion || '',
-            cantidad_original: parseFloat(it.cantidad_original||0),
+          cantidad_original: it.tipo === 'nueva' ? 0 : parseFloat(it.cantidad_original||0),
             cantidad_nueva:    parseFloat(it.cantidad_nueva||0),
             precio_unitario:   pu,
             costo_mo:          parseFloat(it.costo_mo||0),
             costo_materiales:  parseFloat(it.costo_materiales||0),
             costo_equipos:     parseFloat(it.costo_equipos||0),
+            parent_id:         it.parent_id || null,
           }
         }),
         indirectos: indirectosPayload,
@@ -163,6 +178,14 @@ export default function OrdenesCambio() {
   const ocDetalle    = ordenes_cambio.find(o => o.id === detailId)
   const itemsDetalle = ordenes_cambio_items.filter(i => i.oc_id === detailId)
   const indsDetalle  = ordenes_cambio_indirectos.filter(i => i.oc_id === detailId)
+
+  // Cargar items desde Supabase cada vez que se abre el detalle
+  // (cubre OCs aprobadas antes del fix y cualquier desfase de estado local)
+  useEffect(() => {
+    if (detailId && drawer === 'detalle') {
+      dispatch({ type: 'FETCH_OC_ITEMS', payload: detailId })
+    }
+  }, [detailId, drawer])
 
   // Para el panel de impacto — separar nuevas de existentes
   const itemsNuevos     = itemsDetalle.filter(i => i.tipo === 'nueva')
@@ -453,6 +476,36 @@ export default function OrdenesCambio() {
                         : (isEs ? 'Descripción (editable)' : 'Description (editable)')} />
                   </div>
 
+                  {/* Parent — solo para actividad nueva */}
+                  {it.tipo === 'nueva' && (
+                    <div className="mb-2">
+                      <label className="text-xs text-gray-500 block mb-1">
+                        {isEs ? 'Pertenece a (etapa / sub-etapa) *' : 'Belongs to (stage / sub-stage) *'}
+                      </label>
+                      <select className={selectCls} value={it.parent_id||''}
+                        onChange={e => setItem(idx, 'parent_id', e.target.value)}>
+                        <option value="">{isEs ? '— Seleccionar —' : '— Select —'}</option>
+                        {subEtapas.length > 0 && (
+                          <optgroup label={isEs ? 'Sub-etapas' : 'Sub-stages'}>
+                            {subEtapas.map(s => (
+                              <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                        <optgroup label={isEs ? 'Etapas (directo)' : 'Stages (direct)'}>
+                          {etapas.map(s => (
+                            <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {!it.parent_id && (
+                        <p className="text-xs text-red-400 mt-1">
+                          {isEs ? 'Requerido — define dónde aparecerá en el presupuesto' : 'Required — defines where it appears in the budget'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Costos desglosados — solo para actividad NUEVA */}
                   {it.tipo === 'nueva' && (
                     <div className="grid grid-cols-3 gap-2 mb-2 p-2 bg-white rounded-lg border border-amber-100">
@@ -490,45 +543,51 @@ export default function OrdenesCambio() {
                     </div>
                   )}
 
-                  {/* Cantidades y PU — actividad EXISTENTE */}
-                  <div className={`grid gap-2 ${it.tipo === 'nueva' ? 'grid-cols-3' : 'grid-cols-4'}`}>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
-                      <input className={inputCls} value={it.unidad||'und'}
-                        onChange={e => setItem(idx, 'unidad', e.target.value)} />
-                    </div>
-                    {it.tipo === 'existente' && (
+                  {/* Cantidades */}
+                  {it.tipo === 'nueva' ? (
+                    /* Actividad nueva: solo unidad y cantidad */
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-gray-500 block mb-1">
-                          {isEs ? 'Cant. Original' : 'Original Qty'}
-                        </label>
+                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
+                        <input className={inputCls} value={it.unidad||'und'}
+                          onChange={e => setItem(idx, 'unidad', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Cantidad *' : 'Quantity *'}</label>
+                        <input type="number" className={inputCls}
+                          value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
+                          placeholder="0.00" min="0" step="0.01" />
+                      </div>
+                    </div>
+                  ) : (
+                    /* Actividad existente: unidad, cant original, cant nueva, PU */
+                    <div className="grid grid-cols-4 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
+                        <input className={inputCls} value={it.unidad||'und'}
+                          onChange={e => setItem(idx, 'unidad', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Cant. Original' : 'Original Qty'}</label>
                         <input type="number" className={inputCls}
                           value={it.cantidad_original||''}
                           onChange={e => setItem(idx, 'cantidad_original', e.target.value)}
                           placeholder="0.00" min="0" step="0.01" />
                       </div>
-                    )}
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">
-                        {it.tipo === 'nueva'
-                          ? (isEs ? 'Cantidad *' : 'Quantity *')
-                          : (isEs ? 'Cant. Nueva *' : 'New Qty *')}
-                      </label>
-                      <input type="number" className={inputCls}
-                        value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
-                        placeholder="0.00" min="0" step="0.01" />
-                    </div>
-                    {it.tipo === 'existente' && (
                       <div>
-                        <label className="text-xs text-gray-500 block mb-1">
-                          {isEs ? 'P.U.' : 'Unit Price'}
-                        </label>
+                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Cant. Nueva *' : 'New Qty *'}</label>
+                        <input type="number" className={inputCls}
+                          value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
+                          placeholder="0.00" min="0" step="0.01" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'P.U.' : 'Unit Price'}</label>
                         <input type="number" className={inputCls}
                           value={it.precio_unitario||''} onChange={e => setItem(idx, 'precio_unitario', e.target.value)}
                           placeholder="0.00" min="0" step="0.01" />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Resultado del item */}
                   {(it.cantidad_nueva !== '' && pu > 0) && (

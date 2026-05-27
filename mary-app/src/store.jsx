@@ -179,6 +179,18 @@ function reducer(state, action) {
       ordenes_cambio: (state.ordenes_cambio||[]).map(o =>
         o.id === action.payload.id ? { ...o, estado: action.payload.estado } : o)
     }
+    // Carga/refresca los items de una OC específica en el estado local
+    case 'LOAD_OC_ITEMS': return {
+      ...state,
+      ordenes_cambio_items: [
+        ...(state.ordenes_cambio_items||[]).filter(i => i.oc_id !== action.payload.oc_id),
+        ...action.payload.items,
+      ],
+      ordenes_cambio_indirectos: [
+        ...(state.ordenes_cambio_indirectos||[]).filter(i => i.oc_id !== action.payload.oc_id),
+        ...action.payload.indirectos,
+      ],
+    }
     case 'DEL_ORDEN_CAMBIO': return {
       ...state,
       ordenes_cambio:            (state.ordenes_cambio||[]).filter(o => o.id !== action.payload),
@@ -1150,10 +1162,11 @@ useEffect(() => {
         if (errOrden) { console.error('ordenes_cambio insert error:', errOrden); break }
 
         if (items.length) {
-          const dbItems = items.map(it => ({
+          const dbItems = items.map(({ parent_id, ...it }) => ({
             ...it,
-            diferencia:   parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
-            monto_cambio: (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0),
+            actividad_id:  it.actividad_id || null,
+            diferencia:    parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
+            monto_cambio:  (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0),
           }))
           const { error: errItems } = await supabase.from('ordenes_cambio_items').insert(dbItems)
           if (errItems) console.error('ordenes_cambio_items insert error:', errItems)
@@ -1165,6 +1178,18 @@ useEffect(() => {
         }
         break
       }
+      case 'FETCH_OC_ITEMS': {
+        const { data: items } = await supabase
+          .from('ordenes_cambio_items').select('*').eq('oc_id', action.payload)
+        const { data: indirectos } = await supabase
+          .from('ordenes_cambio_indirectos').select('*').eq('oc_id', action.payload)
+        dispatch({
+          type: 'LOAD_OC_ITEMS',
+          payload: { oc_id: action.payload, items: items||[], indirectos: indirectos||[] }
+        })
+        break
+      }
+
       case 'UPD_ORDEN_CAMBIO_ESTADO': {
         await supabase.from('ordenes_cambio').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
@@ -1177,6 +1202,18 @@ useEffect(() => {
             .from('ordenes_cambio').select('*').eq('id', action.payload.id).single()
           const { data: ocItems } = await supabase
             .from('ordenes_cambio_items').select('*').eq('oc_id', action.payload.id)
+          const { data: ocIndsRaw } = await supabase
+            .from('ordenes_cambio_indirectos').select('*').eq('oc_id', action.payload.id)
+
+          // Cargar items e indirectos en el estado local de inmediato
+          dispatch({
+            type: 'LOAD_OC_ITEMS',
+            payload: {
+              oc_id:      action.payload.id,
+              items:      ocItems || [],
+              indirectos: ocIndsRaw || [],
+            }
+          })
 
           if (ocData && ocItems?.length) {
             const proyId = ocData.proyecto_id
@@ -1184,12 +1221,12 @@ useEffect(() => {
             // 2. Actividades NUEVAS → INSERT en presupuesto
             const nuevas = ocItems.filter(it => it.tipo === 'nueva')
             for (const it of nuevas) {
-              // Generar código secuencial para la nueva actividad
+              // Obtener items actuales del presupuesto para generar código correcto
               const { data: presExist } = await supabase
-                .from('presupuesto').select('code').eq('proyecto_id', proyId).eq('tenant_id', tenantId)
-              const codigosExist = (presExist||[]).map(p => p.code)
-              const nextNum = codigosExist.length + 1
-              const newCode = `ACT-OC-${String(nextNum).padStart(3,'0')}`
+                .from('presupuesto').select('id,tipo,code,parent_id').eq('proyecto_id', proyId).eq('tenant_id', tenantId)
+              const presItems = presExist || []
+              // Usar genBudgetCode para código jerárquico correcto
+              const newCode = genBudgetCode(presItems, 'actividad', it.parent_id)
 
               const newAct = {
                 id:               uuid(),
@@ -1203,7 +1240,7 @@ useEffect(() => {
                 costo_mo:         parseFloat(it.costo_mo || 0),
                 costo_materiales: parseFloat(it.costo_materiales || 0),
                 costo_equipos:    parseFloat(it.costo_equipos || 0),
-                parent_id:        null,
+                parent_id:        it.parent_id || null,
                 origen_oc_id:     action.payload.id,
                 created_at:       today(),
               }
@@ -1221,8 +1258,7 @@ useEffect(() => {
             }
 
             // 4. Aplicar ajustes de costos indirectos registrados en la OC
-            const { data: ocInds } = await supabase
-              .from('ordenes_cambio_indirectos').select('*').eq('oc_id', action.payload.id)
+            const ocInds = ocIndsRaw || []
 
             if (ocInds?.length) {
               for (const ind of ocInds) {

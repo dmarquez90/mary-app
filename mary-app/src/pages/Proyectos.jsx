@@ -35,7 +35,8 @@ export default function Proyectos({ onNavigate }) {
 
   const { proyectos, presupuesto, fases, entradas, salidas, solicitudes,
     ordenes_compra, materiales_presupuestados, costos_directos,
-    nominas, subcontratos, equipos, costos_indirectos } = state
+    nominas, subcontratos, equipos, costos_indirectos,
+    presupuesto_indirectos = [] } = state
 
   const [drawer, setDrawer]         = useState(false)
   const [form, setForm]             = useState(empty())
@@ -132,9 +133,23 @@ export default function Proyectos({ onNavigate }) {
     setAddFase(false)
   }
 
+  // Presupuesto total = directo + indirectos + utilidad + impuesto
+  const calcBudgetTotal = (proyId) => {
+    const p       = proyectos.find(x => x.id === proyId)
+    const directo = calcGrandTotal(presupuesto.filter(b => b.proyecto_id === proyId))
+    const ind     = presupuesto_indirectos
+      .filter(i => i.proyecto_id === proyId)
+      .reduce((s, i) => s + parseFloat(i.monto_presupuestado || 0), 0)
+    const subtotal    = directo + ind
+    const utilidad    = subtotal * (parseFloat(p?.utilidad_pct || 0) / 100)
+    const baseImp     = subtotal + utilidad
+    const impuesto    = baseImp * (parseFloat(p?.impuesto_pct || 0) / 100)
+    return subtotal + utilidad + impuesto
+  }
+
   const proyecto  = proyectos.find(p => p.id === detail)
   const proyFases = fases.filter(f => f.proyecto_id === detail)
-  const budget    = detail ? calcGrandTotal(presupuesto.filter(b => b.proyecto_id === detail)) : 0
+  const budget    = detail ? calcBudgetTotal(detail) : 0
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -202,7 +217,7 @@ export default function Proyectos({ onNavigate }) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {proyectos.map(p => {
-            const b      = calcGrandTotal(presupuesto.filter(x => x.proyecto_id === p.id))
+            const b      = calcBudgetTotal(p.id)
             const closed = p.estado === 'completado' || p.estado === 'cancelado'
             return (
               <div key={p.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-sm transition-shadow">
@@ -258,9 +273,14 @@ export default function Proyectos({ onNavigate }) {
                   [t('proy_form_end'),     proyecto.fecha_fin_estimada || '—'],
                   [t('proy_form_country'), proyecto.pais || '—'],
                   ...(proyecto.estado_usa ? [[t('proy_state_usa'), proyecto.estado_usa]] : []),
-                  [t('proy_budget_label'), `${MONEDA_SIMBOLO[proyecto.moneda] || proyecto.moneda} ${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(budget)}`],
+                  [isEs ? 'Pres. directo' : 'Direct budget',
+                    `${MONEDA_SIMBOLO[proyecto.moneda]||proyecto.moneda} ${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(calcGrandTotal(presupuesto.filter(b=>b.proyecto_id===detail)))}`],
+                  [isEs ? 'Pres. indirecto' : 'Indirect budget',
+                    `${MONEDA_SIMBOLO[proyecto.moneda]||proyecto.moneda} ${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(presupuesto_indirectos.filter(i=>i.proyecto_id===detail).reduce((s,i)=>s+parseFloat(i.monto_presupuestado||0),0))}`],
                   ...(proyecto.utilidad_pct ? [[t('proy_profit'), `${proyecto.utilidad_pct}%`]] : []),
                   ...(proyecto.impuesto_pct ? [[t('proy_tax'), `${proyecto.impuesto_pct}% ${proyecto.impuesto_descripcion||''}`]] : []),
+                  [isEs ? 'PRESUPUESTO TOTAL' : 'TOTAL BUDGET',
+                    <span className="font-bold" style={{color:'#1B3A6B'}}>{`${MONEDA_SIMBOLO[proyecto.moneda]||proyecto.moneda} ${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(budget)}`}</span>],
                 ].map(([k,v]) => (
                   <div key={k}>
                     <p className="text-xs text-gray-400">{k}</p>
