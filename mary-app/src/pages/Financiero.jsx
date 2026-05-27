@@ -96,7 +96,7 @@ export default function Financiero() {
   const acts   = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
   const closed = proy?.estado === 'completado' || proy?.estado === 'cancelado'
 
-  const directs = costos_directos.filter(c => c.proyecto_id === proyId)
+  const directs = costos_directos.filter(c => c.proyecto_id === proyId && c.tipo !== 'subcontrato')
   const noms    = nominas.filter(n => n.proyecto_id === proyId)
   const subs    = subcontratos.filter(s => s.proyecto_id === proyId)
   const eqs     = equipos.filter(e => e.proyecto_id === proyId)
