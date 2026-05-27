@@ -732,7 +732,7 @@ export default function Reportes() {
   const {
     proyectos, presupuesto, materiales, entradas, salidas,
     costos_directos, nominas, subcontratos, equipos, costos_indirectos,
-    subcontratos_contratos = [], subcontratos_avaluos = [],
+    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [],
     presupuesto_indirectos = [],
     avaluos_cliente = [], avaluos_cliente_items = [],
   } = state
@@ -745,8 +745,17 @@ export default function Reportes() {
 
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
-  const items  = presupuesto.filter(b => b.proyecto_id === proyId)
-  const budget = calcGrandTotal(items)
+  const items          = presupuesto.filter(b => b.proyecto_id === proyId)
+  const totalDirectos  = calcGrandTotal(items)
+  const indsDelProy    = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
+  const totalIndPres   = indsDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+  const subtotalPres   = totalDirectos + totalIndPres
+  const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
+  const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
+  const utilidadMonto  = subtotalPres * (utilidadPct / 100)
+  const granTotalPres  = subtotalPres + utilidadMonto
+  const impuestoMonto  = granTotalPres * (impuestoPct / 100)
+  const budget         = granTotalPres + impuestoMonto
 
   const datosFinanciero = useMemo(() => {
     if (!proyId) return null
@@ -780,7 +789,7 @@ export default function Reportes() {
     const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
       const pres=(act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0))
       // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
-      const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)
+      const scActIds = subcontratos_items.filter(si=>si.actividad_id===act.id).map(si=>si.subcontrato_id)
       const realScNuevo = subcontratos_avaluos
         .filter(a=>scActIds.includes(a.subcontrato_id)&&a.estado==='aprobado')
         .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
@@ -832,7 +841,7 @@ export default function Reportes() {
       actividades, totalReal, dirs, noms, subs, eqs, inds,
       avsProy, avsItems, indsPres, comparacionInd,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),

@@ -1,5 +1,6 @@
-import { useState, useContext, useMemo } from 'react'
+import { useState, useContext, useMemo, useEffect } from 'react'
 import { useStore } from '../store'
+import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum } from '../utils'
@@ -77,6 +78,8 @@ export default function Financiero() {
   const fmt2 = (n) => new Intl.NumberFormat('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(n||0)
 
   const puedeEditar = can('financiero_editar')
+  const [currentUserId, setCurrentUserId] = useState(null)
+  useEffect(() => { supabase.auth.getUser().then(({ data: { user } }) => { if (user) setCurrentUserId(user.id) }) }, [])
   const set         = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   // Tabs: Imprevistos | Nómina | Subcontratos | Equipos | Administración
@@ -369,6 +372,7 @@ export default function Financiero() {
             subcontratos_avaluo_items={subcontratos_avaluo_items}
             subcontratos_retenciones={state.subcontratos_retenciones||[]}
             dispatch={dispatch} fmt2={fmt2} fmt={fmt}
+            can={can} currentUserId={currentUserId}
             t={t}
           />}
 
@@ -714,7 +718,7 @@ export default function Financiero() {
 }
 
 // ── SUBCONTRATOS MODULE ──────────────────────────────────────────────────────
-function SubcontratosModule({
+function SubcontratosModule({ can,
   proyId, moneda, puedeEditar, closed, presupuesto, isEs,
   scView, setScView, scSelected, setScSelected,
   scAvaluoId, setScAvaluoId,
@@ -724,8 +728,10 @@ function SubcontratosModule({
   subcontratos_avaluos, subcontratos_avaluo_items,
   subcontratos_retenciones,
   dispatch, fmt2, fmt, t,
+  currentUserId,
 }) {
   const BRAND = '#1B3A6B'
+  const puedeRechazar = can('financiero_editar') && (can('gerente') || can('client_admin') || can('super_admin'))
   const acts  = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
   const contratosProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
 
@@ -840,7 +846,11 @@ function SubcontratosModule({
         monto_actual:        parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0),
       }
     })
-    dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo, items, contrato: scSelected } })
+    if (avForm._editId) {
+      dispatch({ type: 'UPD_SC_AVALUO', payload: { avaluo: { ...avaluo, id: avForm._editId }, items } })
+    } else {
+      dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo, items, contrato: scSelected } })
+    }
     setScView('detail')
     setAvForm({})
     setAvItems([])
@@ -848,7 +858,49 @@ function SubcontratosModule({
 
   // ── Aprobar avalúo ──
   const aprobarAvaluo = (av) => {
-    dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato: scSelected } })
+    dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato: scSelected, creador_id: av.created_by || currentUserId } })
+  }
+
+  const rechazarAvaluo = (av) => {
+    if (!window.confirm(isEs ? '¿Rechazar este avalúo? El subcontratista será notificado.' : 'Reject this valuation? The subcontractor will be notified.')) return
+    dispatch({ type: 'RECHAZAR_SC_AVALUO', payload: { avaluo: av, contrato: scSelected, creador_id: av.created_by || currentUserId } })
+  }
+
+  const eliminarAvaluoAprobado = (av) => {
+    if (!window.confirm(isEs ? '¿Eliminar este avalúo aprobado? Se revertirá el costo directo asociado.' : 'Delete this approved valuation? The associated direct cost will be reversed.')) return
+    dispatch({ type: 'ELIMINAR_SC_AVALUO_APROBADO', payload: { avaluo: av, contrato: scSelected } })
+  }
+
+  const editarAvaluo = (av) => {
+    const itemsContrato = subcontratos_items.filter(i => i.subcontrato_id === scSelected.id)
+    setAvForm({
+      periodo_inicio:    av.periodo_inicio || '',
+      periodo_fin:       av.periodo_fin    || '',
+      fecha_elaboracion: av.fecha_elaboracion || new Date().toISOString().split('T')[0],
+      notas:             av.notas || '',
+      _editId:           av.id,
+      _editAvaluoNum:    av.numero,
+    })
+    setAvItems(itemsContrato.map(it => {
+      const avItem = subcontratos_avaluo_items.find(x => x.avaluo_id === av.id && x.subcontrato_item_id === it.id)
+      const cantAnt = subcontratos_avaluos
+        .filter(a => a.subcontrato_id === scSelected.id && a.estado === 'aprobado' && a.numero < av.numero)
+        .reduce((s, a) => {
+          const ai = subcontratos_avaluo_items.find(x => x.avaluo_id === a.id && x.subcontrato_item_id === it.id)
+          return s + parseFloat(ai?.cantidad_actual || 0)
+        }, 0)
+      return {
+        subcontrato_item_id: it.id,
+        descripcion:         it.descripcion || '',
+        unidad:              it.unidad || 'und',
+        cantidad_contrato:   parseFloat(it.cantidad_contrato || 0),
+        costo_unitario:      parseFloat(it.costo_unitario || 0),
+        cantidad_acumulada:  cantAnt,
+        cantidad_actual:     avItem ? String(avItem.cantidad_actual) : '',
+      }
+    }))
+    setScAvaluoId(av.id)
+    setScView('avaluo')
   }
 
   // ── VISTA: LISTA DE CONTRATOS ──
@@ -1347,20 +1399,44 @@ function SubcontratosModule({
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         av.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
                         av.estado === 'borrador' ? 'bg-gray-100 text-gray-500' :
+                        av.estado === 'rechazado' ? 'bg-red-100 text-red-600' :
                         'bg-amber-100 text-amber-700'}`}>
                         {av.estado === 'aprobado' ? t('fin_sc_status_approved') :
                          av.estado === 'borrador' ? t('fin_sc_status_draft') :
+                         av.estado === 'rechazado' ? (isEs?'Rechazado':'Rejected') :
                          av.estado}
                       </span>
                     </td>
                     <td className={tdCls}>
-                      {av.estado === 'borrador' && puedeEditar && (
-                        <button onClick={() => aprobarAvaluo(av)}
-                          className="text-xs px-3 py-1 rounded-lg text-white font-medium"
-                          style={{ background: '#1D9E75' }}>
-                          {t('fin_sc_approve_btn')}
-                        </button>
-                      )}
+                      <div className="flex gap-1 flex-wrap">
+                        {av.estado === 'borrador' && puedeEditar && (
+                          <>
+                            <button onClick={() => editarAvaluo(av)}
+                              className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+                              {isEs ? 'Editar' : 'Edit'}
+                            </button>
+                            {puedeRechazar && (
+                              <button onClick={() => rechazarAvaluo(av)}
+                                className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
+                                {isEs ? 'Rechazar' : 'Reject'}
+                              </button>
+                            )}
+                            {puedeRechazar && (
+                              <button onClick={() => aprobarAvaluo(av)}
+                                className="text-xs px-3 py-1 rounded-lg text-white font-medium"
+                                style={{ background: '#1D9E75' }}>
+                                {t('fin_sc_approve_btn')}
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {av.estado === 'aprobado' && puedeRechazar && (
+                          <button onClick={() => eliminarAvaluoAprobado(av)}
+                            className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
+                            {isEs ? 'Eliminar' : 'Delete'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1380,7 +1456,7 @@ function SubcontratosModule({
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setScView('detail')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <h2 className="text-base font-semibold text-gray-800">
-            {isEs ? `Avalúo #${numAvaluo}` : `Valuation #${numAvaluo}`} — {scSelected.subcontratista}
+            {avForm._editId ? (isEs ? `Editar Avalúo #${avForm._editAvaluoNum||numAvaluo}` : `Edit Valuation #${avForm._editAvaluoNum||numAvaluo}`) : (isEs ? `Avalúo #${numAvaluo}` : `Valuation #${numAvaluo}`)} — {scSelected.subcontratista}
           </h2>
         </div>
 

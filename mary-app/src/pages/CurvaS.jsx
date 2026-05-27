@@ -36,15 +36,25 @@ export default function CurvaS() {
   const { state } = useStore()
   const { t } = useContext(LangContext)
   const { proyectos, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos,
-    avaluos_cliente = [], avaluos_cliente_items = [] } = state
+    avaluos_cliente = [], avaluos_cliente_items = [], presupuesto_indirectos = [],
+    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [] } = state
 
   const [proyId, setProyId]           = useState(proyectos[0]?.id || '')
   const [granularity, setGranularity] = useState('mes')
 
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
-  const items  = presupuesto.filter(b => b.proyecto_id === proyId)
-  const budget = calcGrandTotal(items)
+  const items          = presupuesto.filter(b => b.proyecto_id === proyId)
+  const totalDirectos  = calcGrandTotal(items)
+  const indsDelProy    = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
+  const totalIndPres   = indsDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+  const subtotalPres   = totalDirectos + totalIndPres
+  const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
+  const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
+  const utilidadMonto  = subtotalPres * (utilidadPct / 100)
+  const granTotalPres  = subtotalPres + utilidadMonto
+  const impuestoMonto  = granTotalPres * (impuestoPct / 100)
+  const budget         = granTotalPres + impuestoMonto
 
   const allCosts = useMemo(() => {
     if (!proyId) return []
@@ -194,13 +204,16 @@ export default function CurvaS() {
         return s + (parseFloat(sa.cantidad)||0) * (parseFloat(e?.precio_unitario)||0)
       }, 0)
       const dirCost = costos_directos.filter(c => c.proyecto_id===proyId && c.actividad_id===act.id).reduce((s,c) => s + (parseFloat(c.monto)||0), 0)
-      const subCost = subcontratos.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sc) => s + (parseFloat(sc.monto_pagado)||0), 0)
+      const scIdsNuevo = subcontratos_items.filter(si => si.actividad_id===act.id).map(si => si.subcontrato_id)
+      const subCostNuevo = subcontratos_avaluos.filter(a => scIdsNuevo.includes(a.subcontrato_id) && a.estado==='aprobado').reduce((s,a) => s + (parseFloat(a.monto_total)||0), 0)
+      const subCostAntiguo = subcontratos.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sc) => s + (parseFloat(sc.monto_pagado)||0), 0)
+      const subCost = subCostNuevo + subCostAntiguo
       const eqCost  = equipos.filter(e => e.proyecto_id===proyId && e.actividad_id===act.id).reduce((s,e) => s + (parseFloat(e.costo_total)||0), 0)
       const real = matCost + dirCost + subCost + eqCost
       const dev  = real - presupuestado
       return { code: act.code, descripcion: act.descripcion, presupuestado, real, dev, devPct: presupuestado ? (dev/presupuestado)*100 : 0 }
     }).filter(a => a.presupuestado > 0 || a.real > 0)
-  }, [items, salidas, entradas, costos_directos, subcontratos, equipos, proyId])
+  }, [items, salidas, entradas, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, equipos, proyId])
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload) return null
