@@ -3,9 +3,28 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { fmt } from '../utils'
 
+const ESTADO_LABELS_ES = {
+  activo: 'Activo', en_ejecucion: 'En Ejecución', planificacion: 'Planificación',
+  pausado: 'Pausado', completado: 'Completado', cancelado: 'Cancelado',
+  finalizado: 'Finalizado',
+}
+const ESTADO_LABELS_EN = {
+  activo: 'Active', en_ejecucion: 'In Progress', planificacion: 'Planning',
+  pausado: 'On Hold', completado: 'Completed', cancelado: 'Cancelled',
+  finalizado: 'Finalized',
+}
+
+const CAT_LABELS_EN = {
+  madera: 'Wood', acero: 'Steel', concreto: 'Concrete', hierro: 'Iron',
+  aluminio: 'Aluminum', plastico: 'Plastic', electrico: 'Electrical',
+  herramienta: 'Tool', pintura: 'Paint', ceramica: 'Ceramic',
+  plomeria: 'Plumbing', vidrio: 'Glass', otros: 'Other',
+}
+
 export default function Dashboard() {
   const { state } = useStore()
-  const { t } = useContext(LangContext)
+  const { t, lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const { proyectos, materiales, entradas, salidas, ordenes_compra, solicitudes } = state
 
   // ── Materiales activos ────────────────────────────────────────────────────
@@ -140,7 +159,7 @@ export default function Dashboard() {
                   <span className="text-gray-700 truncate max-w-[160px]" title={p.nombre}>{p.nombre}</span>
                   {p.estado && (
                     <span className={`text-xs px-2 py-0.5 rounded font-medium ${estadoColor(p.estado)}`}>
-                      {p.estado}
+                      {isEs ? (ESTADO_LABELS_ES[p.estado] || p.estado) : (ESTADO_LABELS_EN[p.estado] || p.estado)}
                     </span>
                   )}
                 </li>
@@ -161,7 +180,9 @@ export default function Dashboard() {
             <ul className="space-y-1.5">
               {categorias.map(([cat, count]) => (
                 <li key={cat} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700 truncate max-w-[160px]" title={cat}>{cat}</span>
+                  <span className="text-gray-700 truncate max-w-[160px]" title={cat}>
+                    {isEs ? cat : (CAT_LABELS_EN[cat?.toLowerCase()] || cat)}
+                  </span>
                   <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-medium">{count}</span>
                 </li>
               ))}

@@ -246,7 +246,7 @@ export default function MatPresupuestados() {
 
                     return (
                       <tr key={mp.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 min-w-[180px]">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm text-gray-800">{getNombre(mp)}</span>
                             {mp.es_adicional && (
@@ -277,7 +277,7 @@ export default function MatPresupuestados() {
                         <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: dif < 0 ? '#ef4444' : '#1D9E75' }}>
                           {dif >= 0 ? '+' : ''}{fmtNum(dif)}
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: costoPres(mp) - costoConsumido(mp) < 0 ? '#ef4444' : '#1D9E75' }}>
+                        <td className="px-4 py-3 text-sm font-mono font-medium min-w-[100px]" style={{ color: costoPres(mp) - costoConsumido(mp) < 0 ? '#ef4444' : '#1D9E75' }}>
                           {costoPres(mp) - costoConsumido(mp) >= 0 ? '+' : ''}{fmt(costoPres(mp) - costoConsumido(mp), moneda)}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">{getActividad(mp)}</td>
