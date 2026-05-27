@@ -18,7 +18,7 @@ const MATRIX = {
   oc_crear:           { client_admin: true,  coordinador: false, gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
   oc_aprobar:         { client_admin: true,  coordinador: false, gerente: 'cond',residente: false, bodeguero: false, contador: false, lectura: false },
   financiero_ver:     { client_admin: true,  coordinador: false, gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
-  financiero_editar:  { client_admin: true,  coordinador: false, gerente: false, residente: true,  bodeguero: false, contador: true,  lectura: false },
+  financiero_editar:  { client_admin: true,  coordinador: false, gerente: true, residente: true,  bodeguero: false, contador: true,  lectura: false },
   curvas_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
   configuracion:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   reportes_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: false },

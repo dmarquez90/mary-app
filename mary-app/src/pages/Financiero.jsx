@@ -47,7 +47,7 @@ const CAT_KEYS = Object.keys(CATEGORIAS_IND)
 export default function Financiero() {
   const { state, dispatch }     = useStore()
   const { t, lang }             = useContext(LangContext)
-  const { can }                 = usePermissions()
+  const { can, rol }            = usePermissions()
   const isEs                    = lang === 'ES'
 
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
@@ -372,7 +372,7 @@ export default function Financiero() {
             subcontratos_avaluo_items={subcontratos_avaluo_items}
             subcontratos_retenciones={state.subcontratos_retenciones||[]}
             dispatch={dispatch} fmt2={fmt2} fmt={fmt}
-            can={can} currentUserId={currentUserId}
+            can={can} rol={rol} currentUserId={currentUserId}
             t={t}
           />}
 
@@ -718,7 +718,7 @@ export default function Financiero() {
 }
 
 // ── SUBCONTRATOS MODULE ──────────────────────────────────────────────────────
-function SubcontratosModule({ can,
+function SubcontratosModule({ can, rol,
   proyId, moneda, puedeEditar, closed, presupuesto, isEs,
   scView, setScView, scSelected, setScSelected,
   scAvaluoId, setScAvaluoId,
@@ -731,7 +731,7 @@ function SubcontratosModule({ can,
   currentUserId,
 }) {
   const BRAND = '#1B3A6B'
-  const puedeRechazar = can('financiero_editar') && (can('gerente') || can('client_admin') || can('super_admin'))
+  const puedeRechazar = ['super_admin','client_admin','gerente'].includes(rol)
   const acts  = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
   const contratosProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
 
