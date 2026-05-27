@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { fmt, calcGrandTotal } from '../utils'
 import { EmptyState, StatCard, Icons } from '../components'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
 function generarPeriodosMensuales(fechaInicio, fechaFin) {
   const periodos = []
@@ -73,6 +73,11 @@ export default function CurvaS() {
     subcontratos.filter(s => s.proyecto_id === proyId).forEach(s =>
       s.monto_pagado > 0 && costs.push({ fecha: s.created_at?.slice(0,10), monto: parseFloat(s.monto_pagado)||0 })
     )
+    // Nuevo sistema de subcontratos — avalúos aprobados
+    const scIdsProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId).map(sc => sc.id)
+    subcontratos_avaluos
+      .filter(a => scIdsProy.includes(a.subcontrato_id) && a.estado === 'aprobado')
+      .forEach(a => costs.push({ fecha: a.fecha_elaboracion || a.created_at?.slice(0,10), monto: parseFloat(a.monto_total)||0 }))
     equipos.filter(e => e.proyecto_id === proyId).forEach(e =>
       costs.push({ fecha: e.created_at?.slice(0,10), monto: parseFloat(e.costo_total)||0 })
     )
@@ -80,7 +85,7 @@ export default function CurvaS() {
       costs.push({ fecha: c.fecha || c.created_at?.slice(0,10), monto: parseFloat(c.monto)||0 })
     )
     return costs.filter(c => c.fecha && c.monto > 0).sort((a,b) => a.fecha.localeCompare(b.fecha))
-  }, [proyId, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos])
+  }, [proyId, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos])
 
   const chartData = useMemo(() => {
     if (!proy?.fecha_inicio) return []
@@ -144,9 +149,23 @@ export default function CurvaS() {
         }
       }
     } else {
-      // Fallback: distribución lineal uniforme si no hay avalúos
-      const montoPorPeriodo = budget / periodos.length
-      periodos.forEach(({ key }) => { presPorPeriodo[key] = montoPorPeriodo })
+      // Distribución en curva S real usando CDF beta(2,2) acumulada
+      // La CDF garantiza que siempre empiece en 0 y termine en budget,
+      // independientemente del número de períodos
+      const n = periodos.length
+      if (n === 1) {
+        presPorPeriodo[periodos[0].key] = budget
+      } else {
+        // CDF beta(2,2): F(x) = 3x² - 2x³  (integra la PDF 6x(1-x))
+        // Genera valores acumulados 0→1 con forma de S suave
+        const betaCDF = (x) => 3 * x * x - 2 * x * x * x
+        // Calcular el presupuesto incremental por período usando la diferencia de la CDF
+        periodos.forEach(({ key }, i) => {
+          const x0 = i / n       // inicio del período normalizado
+          const x1 = (i + 1) / n // fin del período normalizado
+          presPorPeriodo[key] = budget * (betaCDF(x1) - betaCDF(x0))
+        })
+      }
     }
 
     // Costos reales por período
@@ -216,13 +235,36 @@ export default function CurvaS() {
   }, [items, salidas, entradas, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, equipos, proyId])
 
   const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload) return null
+    if (!active || !payload || !payload.length) return null
+    const pres  = payload.find(p => p.dataKey === 'presAcum')
+    const real  = payload.find(p => p.dataKey === 'realAcum')
+    const ing   = payload.find(p => p.dataKey === 'ingresoAcum')
+    const presPer = payload.find(p => p.dataKey === 'pres_periodo')
+    const realPer = payload.find(p => p.dataKey === 'real_periodo')
+    const ejecucion = pres?.value > 0 ? ((real?.value || 0) / pres.value * 100).toFixed(1) : null
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm text-xs">
-        <p className="font-medium text-gray-700 mb-1">{label}</p>
-        {payload.map((p,i) => (
-          <p key={i} style={{ color: p.color }}>{p.name}: {fmt(p.value, moneda)}</p>
-        ))}
+      <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-lg text-xs min-w-[180px]">
+        <p className="font-semibold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">{label}</p>
+        {pres && <div className="flex justify-between gap-4 mb-1">
+          <span style={{ color: '#185FA5' }}>● {isEs ? 'Presupuestado' : 'Budgeted'}</span>
+          <span className="font-mono font-medium">{fmt(pres.value, moneda)}</span>
+        </div>}
+        {real && <div className="flex justify-between gap-4 mb-1">
+          <span style={{ color: '#1D9E75' }}>● {isEs ? 'Real ejecutado' : 'Real executed'}</span>
+          <span className="font-mono font-medium">{fmt(real.value, moneda)}</span>
+        </div>}
+        {ing && ing.value > 0 && <div className="flex justify-between gap-4 mb-1">
+          <span style={{ color: '#7C3AED' }}>● {isEs ? 'Cobrado' : 'Billed'}</span>
+          <span className="font-mono font-medium">{fmt(ing.value, moneda)}</span>
+        </div>}
+        {realPer?.value > 0 && <div className="flex justify-between gap-4 mt-1.5 pt-1.5 border-t border-gray-100 text-gray-400">
+          <span>{isEs ? 'Gasto período' : 'Period spend'}</span>
+          <span className="font-mono">{fmt(realPer.value, moneda)}</span>
+        </div>}
+        {ejecucion && <div className="flex justify-between gap-4 mt-1 text-gray-400">
+          <span>{isEs ? 'Ejecución' : 'Execution'}</span>
+          <span className="font-mono">{ejecucion}%</span>
+        </div>}
       </div>
     )
   }
@@ -302,21 +344,35 @@ export default function CurvaS() {
                 {isEs ? 'Distribución del presupuesto basada en avance físico de avalúos registrados.' : 'Budget distribution based on physical progress from registered billings.'}
               </p>
             ) : (
-              <p className="text-xs text-amber-600 mb-3 flex items-center gap-1">
-                <span>⚠</span>
-                {isEs ? 'Sin avalúos registrados — distribución lineal uniforme.' : 'No billings registered — uniform linear distribution.'}
+              <p className="text-xs text-blue-500 mb-3 flex items-center gap-1">
+                <span>📈</span>
+                {isEs ? 'Curva S calculada con distribución beta — registra avalúos para mayor precisión.' : 'S-Curve using beta distribution — register billings for higher accuracy.'}
               </p>
             )}
-            <ResponsiveContainer width="100%" height={320}>
-                <LineChart data={chartData} margin={{ top:5, right:20, left:10, bottom:5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <ResponsiveContainer width="100%" height={340}>
+                <ComposedChart data={chartData} margin={{ top:10, right:20, left:10, bottom:5 }}>
+                  <defs>
+                    <linearGradient id="gradReal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#1D9E75" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#1D9E75" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="gradPres" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#185FA5" stopOpacity={0.08}/>
+                      <stop offset="95%" stopColor="#185FA5" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                   <XAxis
                     dataKey="periodo"
                     tick={{ fontSize:11, fill:'#9ca3af' }}
                     interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <YAxis
                     tick={{ fontSize:11, fill:'#9ca3af' }}
+                    axisLine={false}
+                    tickLine={false}
                     tickFormatter={v => {
                       if (v >= 1000000) return `${(v/1000000).toFixed(1)}M`
                       if (v >= 1000)    return `${(v/1000).toFixed(0)}K`
@@ -324,36 +380,42 @@ export default function CurvaS() {
                     }}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize:12 }} />
-                  <Line
+                  <Legend wrapperStyle={{ fontSize:12, paddingTop: 12 }} />
+                  <Area
                     type="monotone"
                     dataKey="presAcum"
                     name={t('curva_line_budget')}
                     stroke="#185FA5"
                     strokeWidth={2.5}
+                    fill="url(#gradPres)"
                     dot={false}
-                    activeDot={{ r:5 }}
+                    activeDot={{ r:5, strokeWidth:0 }}
                   />
-                  <Line
-                    type="monotone"
+                  <Area
+                    type="stepAfter"
                     dataKey="realAcum"
                     name={t('curva_line_real')}
                     stroke="#1D9E75"
                     strokeWidth={2.5}
-                    dot={false}
-                    activeDot={{ r:5 }}
+                    fill="url(#gradReal)"
+                    dot={(props) => {
+                      const { cx, cy, payload } = props
+                      if (!payload.real_periodo || payload.real_periodo === 0) return null
+                      return <Dot key={props.key} cx={cx} cy={cy} r={4} fill="#1D9E75" stroke="#fff" strokeWidth={2} />
+                    }}
+                    activeDot={{ r:6, strokeWidth:0 }}
                   />
                   <Line
                     type="monotone"
                     dataKey="ingresoAcum"
                     name={isEs ? 'Cobrado acumulado' : 'Accumulated billed'}
                     stroke="#7C3AED"
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     strokeDasharray="6 3"
                     dot={false}
-                    activeDot={{ r:5 }}
+                    activeDot={{ r:5, strokeWidth:0 }}
                   />
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}
