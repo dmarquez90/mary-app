@@ -12,7 +12,7 @@ const INIT = {
   solicitudes_eliminacion: [],
   subcontratos_contratos: [], subcontratos_items: [],
   subcontratos_avaluos: [], subcontratos_avaluo_items: [],
-  ordenes_cambio: [], ordenes_cambio_items: [],
+  ordenes_cambio: [], ordenes_cambio_items: [], ordenes_cambio_indirectos: [],
   presupuesto_indirectos: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
   notificaciones: [],
@@ -170,8 +170,9 @@ function reducer(state, action) {
 
     case 'ADD_ORDEN_CAMBIO': return {
       ...state,
-      ordenes_cambio:       [...(state.ordenes_cambio||[]),       action.payload.orden],
-      ordenes_cambio_items: [...(state.ordenes_cambio_items||[]), ...action.payload.items],
+      ordenes_cambio:             [...(state.ordenes_cambio||[]),             action.payload.orden],
+      ordenes_cambio_items:       [...(state.ordenes_cambio_items||[]),       ...action.payload.items],
+      ordenes_cambio_indirectos:  [...(state.ordenes_cambio_indirectos||[]),  ...action.payload.indirectos],
     }
     case 'UPD_ORDEN_CAMBIO_ESTADO': return {
       ...state,
@@ -180,8 +181,9 @@ function reducer(state, action) {
     }
     case 'DEL_ORDEN_CAMBIO': return {
       ...state,
-      ordenes_cambio:       (state.ordenes_cambio||[]).filter(o => o.id !== action.payload),
-      ordenes_cambio_items: (state.ordenes_cambio_items||[]).filter(i => i.oc_id !== action.payload),
+      ordenes_cambio:            (state.ordenes_cambio||[]).filter(o => o.id !== action.payload),
+      ordenes_cambio_items:      (state.ordenes_cambio_items||[]).filter(i => i.oc_id !== action.payload),
+      ordenes_cambio_indirectos: (state.ordenes_cambio_indirectos||[]).filter(i => i.oc_id !== action.payload),
     }
 
     case 'ADD_AVALUO_CLIENTE': return {
@@ -237,7 +239,7 @@ export function StoreProvider({ children, tenantId }) {
         'materiales_presupuestados','solicitudes_eliminacion',
         'subcontratos_contratos','subcontratos_items',
         'subcontratos_avaluos','subcontratos_avaluo_items',
-        'ordenes_cambio','ordenes_cambio_items',
+        'ordenes_cambio','ordenes_cambio_items','ordenes_cambio_indirectos',
         'avaluos_cliente','avaluos_cliente_items',
         'presupuesto_indirectos',
       ]
@@ -276,7 +278,7 @@ useEffect(() => {
     'materiales_presupuestados', 'solicitudes_eliminacion',
     'subcontratos_contratos', 'subcontratos_items',
     'subcontratos_avaluos', 'subcontratos_avaluo_items',
-    'ordenes_cambio', 'ordenes_cambio_items',
+    'ordenes_cambio', 'ordenes_cambio_items', 'ordenes_cambio_indirectos',
     'avaluos_cliente', 'avaluos_cliente_items',
   ]
 
@@ -1135,13 +1137,18 @@ useEffect(() => {
       }
 
       case 'ADD_ORDEN_CAMBIO': {
-        const orden = { ...action.payload.orden, id: uuid(), estado: 'borrador', created_at: today(), tenant_id: tenantId }
-        const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
-        // Dispatch primero para que la UI se actualice de inmediato
-        dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items } })
-        // Limpiar campos de UI antes de insertar en Supabase
+        const orden      = { ...action.payload.orden, id: uuid(), estado: 'borrador', created_at: today(), tenant_id: tenantId }
+        const items      = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
+        const indirectos = (action.payload.indirectos||[])
+          .filter(i => parseFloat(i.ajuste||0) !== 0)
+          .map(i => ({ ...i, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
+
+        // Dispatch primero para UI inmediata
+        dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items, indirectos } })
+
         const { error: errOrden } = await supabase.from('ordenes_cambio').insert(orden)
         if (errOrden) { console.error('ordenes_cambio insert error:', errOrden); break }
+
         if (items.length) {
           const dbItems = items.map(it => ({
             ...it,
@@ -1151,20 +1158,93 @@ useEffect(() => {
           const { error: errItems } = await supabase.from('ordenes_cambio_items').insert(dbItems)
           if (errItems) console.error('ordenes_cambio_items insert error:', errItems)
         }
+
+        if (indirectos.length) {
+          const { error: errInds } = await supabase.from('ordenes_cambio_indirectos').insert(indirectos)
+          if (errInds) console.error('ordenes_cambio_indirectos insert error:', errInds)
+        }
         break
       }
       case 'UPD_ORDEN_CAMBIO_ESTADO': {
         await supabase.from('ordenes_cambio').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
+
+        // ── PROPAGACIÓN AL APROBAR ─────────────────────────────────────────
         if (action.payload.estado === 'aprobada') {
+
+          // 1. Obtener la OC y sus items
+          const { data: ocData } = await supabase
+            .from('ordenes_cambio').select('*').eq('id', action.payload.id).single()
+          const { data: ocItems } = await supabase
+            .from('ordenes_cambio_items').select('*').eq('oc_id', action.payload.id)
+
+          if (ocData && ocItems?.length) {
+            const proyId = ocData.proyecto_id
+
+            // 2. Actividades NUEVAS → INSERT en presupuesto
+            const nuevas = ocItems.filter(it => it.tipo === 'nueva')
+            for (const it of nuevas) {
+              // Generar código secuencial para la nueva actividad
+              const { data: presExist } = await supabase
+                .from('presupuesto').select('code').eq('proyecto_id', proyId).eq('tenant_id', tenantId)
+              const codigosExist = (presExist||[]).map(p => p.code)
+              const nextNum = codigosExist.length + 1
+              const newCode = `ACT-OC-${String(nextNum).padStart(3,'0')}`
+
+              const newAct = {
+                id:               uuid(),
+                tenant_id:        tenantId,
+                proyecto_id:      proyId,
+                tipo:             'actividad',
+                code:             newCode,
+                descripcion:      it.descripcion,
+                unidad:           it.unidad || 'und',
+                cantidad:         parseFloat(it.cantidad_nueva || 0),
+                costo_mo:         parseFloat(it.costo_mo || 0),
+                costo_materiales: parseFloat(it.costo_materiales || 0),
+                costo_equipos:    parseFloat(it.costo_equipos || 0),
+                parent_id:        null,
+                origen_oc_id:     action.payload.id,
+                created_at:       today(),
+              }
+              await supabase.from('presupuesto').insert(newAct)
+              dispatch({ type: 'ADD_BUDGET', payload: newAct })
+            }
+
+            // 3. Actividades EXISTENTES → UPDATE cantidad en presupuesto
+            const existentes = ocItems.filter(it => it.tipo === 'existente' && it.actividad_id)
+            for (const it of existentes) {
+              const cantNueva = parseFloat(it.cantidad_nueva || 0)
+              await supabase
+                .from('presupuesto').update({ cantidad: cantNueva }).eq('id', it.actividad_id)
+              dispatch({ type: 'UPD_BUDGET', payload: { id: it.actividad_id, cantidad: cantNueva } })
+            }
+
+            // 4. Aplicar ajustes de costos indirectos registrados en la OC
+            const { data: ocInds } = await supabase
+              .from('ordenes_cambio_indirectos').select('*').eq('oc_id', action.payload.id)
+
+            if (ocInds?.length) {
+              for (const ind of ocInds) {
+                const indActual = state.presupuesto_indirectos?.find(p => p.id === ind.ind_id)
+                if (!indActual) continue
+                const montoNuevo = Math.round((parseFloat(indActual.monto_presupuestado||0) + parseFloat(ind.ajuste||0)) * 100) / 100
+                await supabase
+                  .from('presupuesto_indirectos').update({ monto_presupuestado: montoNuevo }).eq('id', ind.ind_id)
+                dispatch({ type: 'UPD_PRES_IND', payload: { id: ind.ind_id, monto_presupuestado: montoNuevo } })
+              }
+            }
+          }
+
           await notify({
             tipo: 'aprobacion',
             titulo: '✅ Orden de Cambio aprobada',
-            mensaje: `La orden de cambio fue aprobada.`,
+            mensaje: `La orden de cambio fue aprobada y aplicada al presupuesto.`,
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador', 'contador'],
           })
+
         } else if (action.payload.estado === 'rechazada') {
           await notify({
             tipo: 'rechazo',
@@ -1187,6 +1267,7 @@ useEffect(() => {
         break
       }
       case 'DEL_ORDEN_CAMBIO': {
+        await supabase.from('ordenes_cambio_indirectos').delete().eq('oc_id', action.payload)
         await supabase.from('ordenes_cambio_items').delete().eq('oc_id', action.payload)
         await supabase.from('ordenes_cambio').delete().eq('id', action.payload)
         dispatch(action)

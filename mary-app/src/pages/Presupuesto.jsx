@@ -252,10 +252,16 @@ export default function Presupuesto() {
                           )}
                         </td>
                         <td className="px-3 py-2.5 max-w-xs">
-                          <span className={`text-sm ${isEt?'font-semibold text-gray-800':isSs?'font-medium text-gray-700':'text-gray-600'}`}
-                            style={{ paddingLeft: isAc?24:isSs?12:0 }}>
-                            {item.descripcion}
-                          </span>
+                          <div className="flex items-center gap-1.5" style={{ paddingLeft: isAc?24:isSs?12:0 }}>
+                            <span className={`text-sm ${isEt?'font-semibold text-gray-800':isSs?'font-medium text-gray-700':'text-gray-600'}`}>
+                              {item.descripcion}
+                            </span>
+                            {item.origen_oc_id && (
+                              <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                                OC
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2.5 text-center text-xs text-gray-500">{isAc?item.unidad:'—'}</td>
                         <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-600">{isAc?fmtNum(item.cantidad):'—'}</td>
