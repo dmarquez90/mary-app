@@ -152,29 +152,30 @@ function setCols(ws, widths) {
 }
 
 // ── EXPORT FINANCIERO ─────────────────────────────────────
-async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presupuesto }) {
+async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presupuesto, lang='ES' }) {
+  const isEs = lang === 'ES'
   const wb  = new ExcelJS.Workbook()
   wb.creator = 'MARY ERP — Marquez Project Solutions LLC'
   wb.created = new Date()
 
   const proyLabel    = `${proy?.project_code} — ${proy?.nombre}`
-  const periodoLabel = desde || hasta ? `${desde||'inicio'} al ${hasta||'hoy'}` : 'Todo el período'
-  const fechaHoy     = new Date().toLocaleDateString('es')
+  const periodoLabel = desde || hasta ? `${desde||( isEs?'inicio':'start')} al ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
+  const fechaHoy     = new Date().toLocaleDateString(isEs?'es':'en-US')
   const COLS         = 7
 
   // ── HOJA 1: Resumen ──
-  const ws1 = wb.addWorksheet('Presupuesto vs Real')
+  const ws1 = wb.addWorksheet(isEs?'Presupuesto vs Real':'Budget vs Actual')
   setCols(ws1, [32, 18, 14, 14, 14, 14, 12])
 
-  let row = addHeaderBlock(ws1, 'Reporte Financiero', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, COLS)
+  let row = addHeaderBlock(ws1, isEs?'Reporte Financiero':'Financial Report', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, COLS)
 
   // KPIs
-  row = addSectionTitle(ws1, row, 'RESUMEN EJECUTIVO', COLS)
+  row = addSectionTitle(ws1, row, isEs?'RESUMEN EJECUTIVO':'EXECUTIVE SUMMARY', COLS)
   const totalReal  = data.resumen.reduce((s,r) => s+r.real, 0)
   const desviacion = totalReal - budget
   const kpis = [
-    ['Presupuesto total', budget, '', 'Costo real ejecutado', totalReal, ''],
-    ['Desviación', desviacion, '', '% Ejecución', budget>0?totalReal/budget:0, ''],
+    [isEs?'Presupuesto total':'Total budget', budget, '', isEs?'Costo real ejecutado':'Real cost executed', totalReal, ''],
+    [isEs?'Desviación':'Deviation', desviacion, '', isEs?'% Ejecución':'% Execution', budget>0?totalReal/budget:0, ''],
   ]
   kpis.forEach((krow, ki) => {
     ws1.getRow(row).height = 20
@@ -190,11 +191,11 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   })
 
   row++
-  row = addSectionTitle(ws1, row, 'RESUMEN DE GASTOS POR CATEGORÍA', COLS)
+  row = addSectionTitle(ws1, row, isEs?'RESUMEN DE GASTOS POR CATEGORÍA':'COST SUMMARY BY CATEGORY', COLS)
 
   // Headers
   ws1.getRow(row).height = 18
-  ;['Categoría', 'Costo Real', '% del Total', '', '', '', ''].forEach((h, i) => {
+  ;[isEs?'Categoría':'Category', isEs?'Costo Real':'Real Cost', isEs?'% del Total':'% of Total', '', '', '', ''].forEach((h, i) => {
     const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
   })
   row++
@@ -210,16 +211,16 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   })
   // Total
   ws1.getRow(row).height = 18
-  const tl = ws1.getCell(row, 1); tl.value = 'TOTAL REAL'; styleTotal(tl)
+  const tl = ws1.getCell(row, 1); tl.value = isEs?'TOTAL REAL':'TOTAL ACTUAL'; styleTotal(tl)
   const tv = ws1.getCell(row, 2); tv.value = totalReal; tv.numFmt = '"$"#,##0.00'; styleTotal(tv)
   const tp = ws1.getCell(row, 3); tp.value = 1; tp.numFmt = '0.0%'; styleTotal(tp)
   ws1.mergeCells(row, 4, row, COLS)
   row += 2
 
   // Presupuesto vs Real por actividad
-  row = addSectionTitle(ws1, row, 'PRESUPUESTO VS REAL POR ACTIVIDAD', COLS)
+  row = addSectionTitle(ws1, row, isEs?'PRESUPUESTO VS REAL POR ACTIVIDAD':'BUDGET VS ACTUAL BY ACTIVITY', COLS)
   ws1.getRow(row).height = 18
-  ;['Código','Actividad','Presupuestado','Real','Saldo en Presupuesto $','S.%','Estado'].forEach((h,i) => {
+  ;[isEs?'Código':'Code',isEs?'Actividad':'Activity',isEs?'Presupuestado':'Budgeted',isEs?'Real':'Actual',isEs?'Saldo en Presupuesto $':'Budget Balance $',isEs?'S.%':'B.%',isEs?'Estado':'Status'].forEach((h,i) => {
     const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
   })
   row++
@@ -230,7 +231,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     const saldo    = a.pres - a.real
     const devClr   = saldo >= 0 ? GREEN_HX : RED_HX
     const pctUsado = a.pres > 0 ? (a.real / a.pres) * 100 : 0
-    const status   = pctUsado <= 100 ? '✓ OK' : pctUsado <= 115 ? '⚠ Alerta' : '⚠ Crítico'
+    const status   = pctUsado <= 100 ? '✓ OK' : pctUsado <= 115 ? (isEs?'⚠ Alerta':'⚠ Alert') : (isEs?'⚠ Crítico':'⚠ Critical')
     const c1 = ws1.getCell(row,1); c1.value=a.code;        styleData(c1,{even})
     const c2 = ws1.getCell(row,2); c2.value=a.descripcion; styleData(c2,{even})
     const c3 = ws1.getCell(row,3); c3.value=a.pres;        styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
@@ -242,9 +243,9 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   })
 
   // ── HOJA 2: Detalle por categoría ──
-  const ws2 = wb.addWorksheet('Detalle por Categoría')
+  const ws2 = wb.addWorksheet(isEs?'Detalle por Categoría':'Detail by Category')
   setCols(ws2, [14, 20, 35, 22, 16, 16, 16])
-  let r2 = addHeaderBlock(ws2, 'Detalle de Costos', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
+  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
 
   const addDetalle = (ws, rowRef, titulo, headers, rows, subtotal) => {
     rowRef = addSectionTitle(ws, rowRef, titulo, 7)
@@ -271,8 +272,8 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   }
 
   r2 = addDetalle(ws2, r2,
-    'COSTOS DIRECTOS',
-    ['Fecha','Tipo','Descripción','Actividad','Documento','Monto'],
+    isEs?'COSTOS DIRECTOS':'DIRECT COSTS',
+    [isEs?'Fecha':'Date',isEs?'Tipo':'Type',isEs?'Descripción':'Description',isEs?'Actividad':'Activity',isEs?'Documento':'Document',isEs?'Monto':'Amount'],
     data.dirs.map(c => [c.fecha||'',c.tipo||'',c.descripcion||'',
       presupuesto.find(b=>b.id===c.actividad_id)?.descripcion||'—',
       c.numero_documento||'—', parseFloat(c.monto)||0]),
@@ -280,8 +281,8 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   )
 
   r2 = addDetalle(ws2, r2,
-    'NÓMINA / PLANILLA',
-    ['Período inicio','Período fin','Trabajador','Cargo','Salario base','Deducciones','Neto'],
+    isEs?'NÓMINA / PLANILLA':'PAYROLL',
+    [isEs?'Período inicio':'Period start',isEs?'Período fin':'Period end',isEs?'Trabajador':'Worker',isEs?'Cargo':'Position',isEs?'Salario base':'Base salary',isEs?'Deducciones':'Deductions',isEs?'Neto':'Net'],
     data.noms.map(n => [n.periodo_inicio||'',n.periodo_fin||'',n.trabajador||'',n.cargo||'',
       parseFloat(n.salario_base)||0, parseFloat(n.deducciones)||0,
       (parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0)]),
@@ -289,8 +290,8 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   )
 
   r2 = addDetalle(ws2, r2,
-    'SUBCONTRATOS',
-    ['Subcontratista','Descripción trabajo','Actividad','Contrato','% Avance','Pagado'],
+    isEs?'SUBCONTRATOS':'SUBCONTRACTS',
+    [isEs?'Subcontratista':'Subcontractor',isEs?'Descripción trabajo':'Work description',isEs?'Actividad':'Activity',isEs?'Contrato':'Contract',isEs?'% Avance':'% Progress',isEs?'Pagado':'Paid'],
     data.subs.map(s => [s.subcontratista||'',s.descripcion_trabajo||'',
       presupuesto.find(b=>b.id===s.actividad_id)?.descripcion||'—',
       parseFloat(s.monto_contrato)||0, parseFloat(s.avance_porcentaje)||0, parseFloat(s.monto_pagado)||0]),
@@ -298,27 +299,27 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   )
 
   r2 = addDetalle(ws2, r2,
-    'EQUIPOS',
-    ['Descripción','Tipo','Tarifa diaria','Días de uso','Costo total'],
+    isEs?'EQUIPOS':'EQUIPMENT',
+    [isEs?'Descripción':'Description',isEs?'Tipo':'Type',isEs?'Tarifa diaria':'Daily rate',isEs?'Días de uso':'Days used',isEs?'Costo total':'Total cost'],
     data.eqs.map(e => [e.descripcion||'',e.tipo||'',
       parseFloat(e.tarifa_diaria)||0, parseFloat(e.dias_uso)||0, parseFloat(e.costo_total)||0]),
     data.eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
   )
 
   r2 = addDetalle(ws2, r2,
-    'COSTOS INDIRECTOS',
-    ['Fecha','Categoría','Descripción','Monto'],
+    isEs?'COSTOS INDIRECTOS':'INDIRECT COSTS',
+    [isEs?'Fecha':'Date',isEs?'Categoría':'Category',isEs?'Descripción':'Description',isEs?'Monto':'Amount'],
     data.inds.map(c => [c.fecha||c.created_at?.slice(0,10)||'',c.categoria||'',c.descripcion||'',parseFloat(c.monto)||0]),
     data.inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   )
 
   // ── HOJA 3: Avalúo financiero acumulado ──
   if (data.avsProy?.length > 0) {
-    const ws3 = wb.addWorksheet('Avalúo Financiero')
+    const ws3 = wb.addWorksheet(isEs?'Avalúo Financiero':'Financial Valuation')
     setCols(ws3, [14, 32, 12, 14, 16, 16, 16, 16])
-    let r3 = addHeaderBlock(ws3, 'Avalúo Financiero Acumulado', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+    let r3 = addHeaderBlock(ws3, isEs?'Avalúo Financiero Acumulado':'Accumulated Financial Valuation', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
     ws3.getRow(r3).height = 18
-    ;['Avalúo','Actividad','Unidad','P.U.','Contrato $','Ant. $','Periodo $','Acumulado $'].forEach((h,i) => {
+    ;[isEs?'Avalúo':'Valuation',isEs?'Actividad':'Activity',isEs?'Unidad':'Unit','P.U.',isEs?'Contrato $':'Contract $',isEs?'Ant. $':'Prev. $',isEs?'Periodo $':'Period $',isEs?'Acumulado $':'Accumulated $'].forEach((h,i) => {
       const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
     })
     r3++
@@ -348,17 +349,17 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
         r3++
       })
     })
-    ws3.mergeCells(r3,1,r3,7); const at=ws3.getCell(r3,1); at.value='TOTAL ACUMULADO COBRADO'; styleTotal(at)
+    ws3.mergeCells(r3,1,r3,7); const at=ws3.getCell(r3,1); at.value=isEs?'TOTAL ACUMULADO COBRADO':'TOTAL ACCUMULATED BILLED'; styleTotal(at)
     const av=ws3.getCell(r3,8); av.value=totalAcum; av.numFmt='"$"#,##0.00'; styleTotal(av)
   }
 
   // ── HOJA 4: Costos indirectos presupuestados vs ejecutados ──
   if (data.comparacionInd?.length > 0) {
-    const ws4 = wb.addWorksheet('Indirectos Pres vs Ejec')
+    const ws4 = wb.addWorksheet(isEs?'Indirectos Pres vs Ejec':'Indirect Costs Bud vs Act')
     setCols(ws4, [40, 20, 20, 20, 16])
-    let r4 = addHeaderBlock(ws4, 'Costos Indirectos: Presupuestado vs Ejecutado', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 5)
+    let r4 = addHeaderBlock(ws4, isEs?'Costos Indirectos: Presupuestado vs Ejecutado':'Indirect Costs: Budgeted vs Executed', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 5)
     ws4.getRow(r4).height = 18
-    ;['Categoría','Presupuestado','Ejecutado','Diferencia','Estado'].forEach((h,i) => {
+    ;[isEs?'Categoría':'Category',isEs?'Presupuestado':'Budgeted',isEs?'Ejecutado':'Executed',isEs?'Diferencia':'Difference',isEs?'Estado':'Status'].forEach((h,i) => {
       const c = ws4.getCell(r4,i+1); c.value=h; styleHeader(c)
     })
     r4++
@@ -366,7 +367,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     data.comparacionInd.forEach((r, idx) => {
       ws4.getRow(r4).height = 17
       const even   = idx%2===1
-      const status = r.diferencia < 0 ? 'Sobrecosto' : r.diferencia === 0 ? 'En punto' : 'Ahorro'
+      const status = r.diferencia < 0 ? (isEs?'Sobrecosto':'Overrun') : r.diferencia === 0 ? (isEs?'En punto':'On target') : (isEs?'Ahorro':'Saving')
       const clr    = r.diferencia < 0 ? RED_HX : GREEN_HX
       const c1=ws4.getCell(r4,1); c1.value=r.categoria; styleData(c1,{even})
       const c2=ws4.getCell(r4,2); c2.value=r.presupuestado; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
@@ -377,7 +378,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
       r4++
     })
     ws4.getRow(r4).height=18
-    const tl=ws4.getCell(r4,1); tl.value='TOTAL'; styleTotal(tl)
+    const tl=ws4.getCell(r4,1); tl.value=isEs?'TOTAL':'TOTAL'; styleTotal(tl)
     const tp=ws4.getCell(r4,2); tp.value=totPres; tp.numFmt='"$"#,##0.00'; styleTotal(tp)
     const te=ws4.getCell(r4,3); te.value=totEjec; te.numFmt='"$"#,##0.00'; styleTotal(te)
     const td=ws4.getCell(r4,4); td.value=totPres-totEjec; td.numFmt='"$"#,##0.00'; styleTotal(td)
@@ -385,22 +386,23 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   }
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `Reporte_Financiero_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Financiero':'Financial_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
 // ── EXPORT INVENTARIO ─────────────────────────────────────
-async function buildInventario({ data, materiales, proyectos, presupuesto, desde, hasta }) {
+async function buildInventario({ data, materiales, proyectos, presupuesto, desde, hasta, lang='ES' }) {
+  const isEs = lang === 'ES'
   const wb       = new ExcelJS.Workbook()
   wb.creator     = 'MARY ERP'
-  const periodoLabel = desde||hasta ? `${desde||'inicio'} al ${hasta||'hoy'}` : 'Todo el período'
-  const fechaHoy = new Date().toLocaleDateString('es')
+  const periodoLabel = desde||hasta ? `${desde||(isEs?'inicio':'start')} al ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
+  const fechaHoy = new Date().toLocaleDateString(isEs?'es':'en-US')
 
   // HOJA 1: Stock
-  const ws1 = wb.addWorksheet('Stock Actual')
+  const ws1 = wb.addWorksheet(isEs?'Stock Actual':'Current Stock')
   setCols(ws1, [14, 35, 10, 24, 14, 14, 10])
-  let r1 = addHeaderBlock(ws1, 'Stock Actual de Materiales', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 7)
+  let r1 = addHeaderBlock(ws1, isEs?'Stock Actual de Materiales':'Current Material Stock', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 7)
   ws1.getRow(r1).height = 18
-  ;['Código','Descripción','Unidad','Ubicación en bodega','Stock actual','Stock mínimo','Estado'].forEach((h,i) => {
+  ;[isEs?'Código':'Code',isEs?'Descripción':'Description',isEs?'Unidad':'Unit',isEs?'Ubicación en bodega':'Warehouse location',isEs?'Stock actual':'Current stock',isEs?'Stock mínimo':'Min stock',isEs?'Estado':'Status'].forEach((h,i) => {
     const c = ws1.getCell(r1,i+1); c.value=h; styleHeader(c)
   })
   r1++
@@ -421,11 +423,11 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   })
 
   // HOJA 2: Entradas
-  const ws2 = wb.addWorksheet('Entradas de Materiales')
+  const ws2 = wb.addWorksheet(isEs?'Entradas de Materiales':'Material Entries')
   setCols(ws2, [12, 12, 32, 12, 8, 14, 14, 14, 22, 12])
-  let r2 = addHeaderBlock(ws2, 'Entradas de Materiales', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 10)
+  let r2 = addHeaderBlock(ws2, isEs?'Entradas de Materiales':'Material Entries', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 10)
   ws2.getRow(r2).height = 18
-  ;['Fecha','Código','Material','Cantidad','Unidad','Precio unit.','Total','Factura','Proveedor','Proyecto'].forEach((h,i) => {
+  ;[isEs?'Fecha':'Date',isEs?'Código':'Code',isEs?'Material':'Material',isEs?'Cantidad':'Quantity',isEs?'Unidad':'Unit',isEs?'Precio unit.':'Unit price',isEs?'Total':'Total',isEs?'Factura':'Invoice',isEs?'Proveedor':'Supplier',isEs?'Proyecto':'Project'].forEach((h,i) => {
     const c = ws2.getCell(r2,i+1); c.value=h; styleHeader(c)
   })
   r2++
@@ -449,15 +451,15 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
     })
     r2++
   })
-  ws2.mergeCells(r2,1,r2,6); const te=ws2.getCell(r2,1); te.value='TOTAL ENTRADAS'; styleTotal(te)
+  ws2.mergeCells(r2,1,r2,6); const te=ws2.getCell(r2,1); te.value=isEs?'TOTAL ENTRADAS':'TOTAL ENTRIES'; styleTotal(te)
   const tv2=ws2.getCell(r2,7); tv2.value=totalEntradas; tv2.numFmt='"$"#,##0.00'; styleTotal(tv2)
 
   // HOJA 3: Salidas
-  const ws3 = wb.addWorksheet('Salidas de Materiales')
+  const ws3 = wb.addWorksheet(isEs?'Salidas de Materiales':'Material Exits')
   setCols(ws3, [12, 12, 32, 12, 8, 14, 40])
-  let r3 = addHeaderBlock(ws3, 'Salidas de Materiales', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 7)
+  let r3 = addHeaderBlock(ws3, isEs?'Salidas de Materiales':'Material Exits', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 7)
   ws3.getRow(r3).height = 18
-  ;['Fecha','Código','Material','Cantidad','Unidad','Proyecto','Actividad'].forEach((h,i) => {
+  ;[isEs?'Fecha':'Date',isEs?'Código':'Code',isEs?'Material':'Material',isEs?'Cantidad':'Quantity',isEs?'Unidad':'Unit',isEs?'Proyecto':'Project',isEs?'Actividad':'Activity'].forEach((h,i) => {
     const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
   })
   r3++
@@ -480,19 +482,20 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   })
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Inventario':'Inventory_Report'}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
 // ── EXPORT RESUMEN GENERAL ────────────────────────────────
 async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
   subcontratos, subcontratos_contratos = [], subcontratos_avaluos = [],
-  equipos, costos_indirectos, salidas, entradas, budget, moneda }) {
+  equipos, costos_indirectos, salidas, entradas, budget, moneda, lang='ES' }) {
+  const isEs = lang === 'ES'
 
   const wb       = new ExcelJS.Workbook()
   wb.creator     = 'MARY ERP'
   const proyId   = proy?.id
   const proyLabel = `${proy?.project_code} — ${proy?.nombre}`
-  const fechaHoy  = new Date().toLocaleDateString('es')
+  const fechaHoy  = new Date().toLocaleDateString(isEs?'es':'en-US')
   const COLS      = 7
 
   const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>{
@@ -517,17 +520,17 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
   const desviacion = totalReal - budget
 
-  const ws = wb.addWorksheet('Resumen General')
+  const ws = wb.addWorksheet(isEs?'Resumen General':'General Summary')
   setCols(ws, [28, 20, 32, 20, 16, 16, 16])
-  let row = addHeaderBlock(ws, 'Resumen General del Proyecto', 'Marquez Project Solutions LLC', proyLabel, null, fechaHoy, COLS)
+  let row = addHeaderBlock(ws, isEs?'Resumen General del Proyecto':'General Project Summary', 'Marquez Project Solutions LLC', proyLabel, null, fechaHoy, COLS)
 
   // Info proyecto
-  row = addSectionTitle(ws, row, 'INFORMACIÓN DEL PROYECTO', COLS)
+  row = addSectionTitle(ws, row, isEs?'INFORMACIÓN DEL PROYECTO':'PROJECT INFORMATION', COLS)
   const infoRows = [
-    ['Código', proy?.project_code||''], ['Nombre', proy?.nombre||''],
-    ['Cliente', proy?.cliente_externo||'—'], ['Estado', proy?.estado||''],
-    ['Fecha inicio', proy?.fecha_inicio||'—'], ['Fecha fin estimada', proy?.fecha_fin_estimada||'—'],
-    ['Ciudad / País', `${proy?.ciudad||''} ${proy?.pais||''}`.trim()||'—'], ['Moneda', moneda],
+    [isEs?'Código':'Code', proy?.project_code||''], [isEs?'Nombre':'Name', proy?.nombre||''],
+    [isEs?'Cliente':'Client', proy?.cliente_externo||'—'], [isEs?'Estado':'Status', proy?.estado||''],
+    [isEs?'Fecha inicio':'Start date', proy?.fecha_inicio||'—'], [isEs?'Fecha fin estimada':'Est. end date', proy?.fecha_fin_estimada||'—'],
+    [isEs?'Ciudad / País':'City / Country', `${proy?.ciudad||''} ${proy?.pais||''}`.trim()||'—'], [isEs?'Moneda':'Currency', moneda],
   ]
   infoRows.forEach((r, i) => {
     ws.getRow(row).height = 17
@@ -543,27 +546,27 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   row++
 
   // Resumen financiero
-  row = addSectionTitle(ws, row, 'RESUMEN FINANCIERO', COLS)
+  row = addSectionTitle(ws, row, isEs?'RESUMEN FINANCIERO':'FINANCIAL SUMMARY', COLS)
   ws.getRow(row).height = 18
-  ;['Concepto','Monto','% del Costo Real','','','',''].forEach((h,i) => {
+  ;[isEs?'Concepto':'Concept',isEs?'Monto':'Amount',isEs?'% del Costo Real':'% of Real Cost','','','',''].forEach((h,i) => {
     const c = ws.getCell(row,i+1); c.value=h; styleHeader(c)
   })
   row++
 
   // Fila presupuesto
   ws.getRow(row).height=17
-  const pb = ws.getCell(row,1); pb.value='Presupuesto total'; styleLabel(pb)
+  const pb = ws.getCell(row,1); pb.value=isEs?'Presupuesto total':'Total budget'; styleLabel(pb)
   const pv = ws.getCell(row,2); pv.value=budget; pv.numFmt='"$"#,##0.00'; styleData(pv,{bold:true,align:'right',color:BRAND_HX})
   ws.mergeCells(row,3,row,COLS)
   row++
 
   const categorias = [
-    ['  Materiales', totalMat],
-    ['  Costos directos', totalDir],
-    ['  Nómina / Planilla', totalNom],
-    ['  Subcontratos', totalSub],
-    ['  Equipos', totalEq],
-    ['  Costos indirectos', totalInd],
+    [isEs?'  Materiales':'  Materials', totalMat],
+    [isEs?'  Costos directos':'  Direct costs', totalDir],
+    [isEs?'  Nómina / Planilla':'  Payroll', totalNom],
+    [isEs?'  Subcontratos':'  Subcontracts', totalSub],
+    [isEs?'  Equipos':'  Equipment', totalEq],
+    [isEs?'  Costos indirectos':'  Indirect costs', totalInd],
   ]
   categorias.forEach((cat, i) => {
     ws.getRow(row).height=17
@@ -577,19 +580,19 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 
   // Total
   ws.getRow(row).height=18
-  const tl=ws.getCell(row,1); tl.value='TOTAL COSTO REAL'; styleTotal(tl)
+  const tl=ws.getCell(row,1); tl.value=isEs?'TOTAL COSTO REAL':'TOTAL ACTUAL COST'; styleTotal(tl)
   const tv=ws.getCell(row,2); tv.value=totalReal; tv.numFmt='"$"#,##0.00'; styleTotal(tv)
   const tp=ws.getCell(row,3); tp.value=1; tp.numFmt='0.0%'; styleTotal(tp)
   ws.mergeCells(row,4,row,COLS)
   row+=2
 
   // Desviacion
-  row = addSectionTitle(ws, row, 'ANÁLISIS DE DESVIACIÓN', COLS)
+  row = addSectionTitle(ws, row, isEs?'ANÁLISIS DE DESVIACIÓN':'DEVIATION ANALYSIS', COLS)
   ws.getRow(row).height=17
   ;[
-    ['Desviación ($)', desviacion, '"$"#,##0.00', desviacion>0?RED_HX:GREEN_HX],
-    ['Desviación (%)', budget>0?desviacion/budget:0, '0.0%', desviacion>0?RED_HX:GREEN_HX],
-    ['% Ejecución del presupuesto', budget>0?totalReal/budget:0, '0.0%', BRAND_HX],
+    [isEs?'Desviación ($)':'Deviation ($)', desviacion, '"$"#,##0.00', desviacion>0?RED_HX:GREEN_HX],
+    [isEs?'Desviación (%)':'Deviation (%)', budget>0?desviacion/budget:0, '0.0%', desviacion>0?RED_HX:GREEN_HX],
+    [isEs?'% Ejecución del presupuesto':'% Budget execution', budget>0?totalReal/budget:0, '0.0%', BRAND_HX],
   ].forEach(([lbl,val,fmt,clr]) => {
     ws.getRow(row).height=17
     const lc=ws.getCell(row,1); lc.value=lbl; styleLabel(lc)
@@ -601,9 +604,9 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 
   // Detalle nómina
   if (noms.length > 0) {
-    row = addSectionTitle(ws, row, 'DETALLE — NÓMINA / PLANILLA', COLS)
+    row = addSectionTitle(ws, row, isEs?'DETALLE — NÓMINA / PLANILLA':'DETAIL — PAYROLL', COLS)
     ws.getRow(row).height=18
-    ;['Trabajador','Cargo','Período inicio','Período fin','Salario base','Deducciones','Neto'].forEach((h,i) => {
+    ;[isEs?'Trabajador':'Worker',isEs?'Cargo':'Position',isEs?'Período inicio':'Period start',isEs?'Período fin':'Period end',isEs?'Salario base':'Base salary',isEs?'Deducciones':'Deductions',isEs?'Neto':'Net'].forEach((h,i) => {
       const c=ws.getCell(row,i+1); c.value=h; styleHeader(c)
     })
     row++
@@ -622,16 +625,16 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
       })
       row++
     })
-    ws.mergeCells(row,1,row,COLS-1); const nt=ws.getCell(row,1); nt.value='SUBTOTAL NÓMINA'; styleTotal(nt)
+    ws.mergeCells(row,1,row,COLS-1); const nt=ws.getCell(row,1); nt.value=isEs?'SUBTOTAL NÓMINA':'PAYROLL SUBTOTAL'; styleTotal(nt)
     const nv=ws.getCell(row,COLS); nv.value=totalNom; nv.numFmt='"$"#,##0.00'; styleTotal(nv)
     row+=2
   }
 
   // Detalle subcontratos
   if (subs.length > 0) {
-    row = addSectionTitle(ws, row, 'DETALLE — SUBCONTRATOS', COLS)
+    row = addSectionTitle(ws, row, isEs?'DETALLE — SUBCONTRATOS':'DETAIL — SUBCONTRACTS', COLS)
     ws.getRow(row).height=18
-    ;['Subcontratista','Descripción','Actividad','Monto contrato','% Avance','Monto pagado','Estado'].forEach((h,i) => {
+    ;[isEs?'Subcontratista':'Subcontractor',isEs?'Descripción':'Description',isEs?'Actividad':'Activity',isEs?'Monto contrato':'Contract amount',isEs?'% Avance':'% Progress',isEs?'Monto pagado':'Amount paid',isEs?'Estado':'Status'].forEach((h,i) => {
       const c=ws.getCell(row,i+1); c.value=h; styleHeader(c)
     })
     row++
@@ -652,16 +655,16 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
       })
       row++
     })
-    ws.mergeCells(row,1,row,COLS-1); const st=ws.getCell(row,1); st.value='SUBTOTAL SUBCONTRATOS'; styleTotal(st)
+    ws.mergeCells(row,1,row,COLS-1); const st=ws.getCell(row,1); st.value=isEs?'SUBTOTAL SUBCONTRATOS':'SUBCONTRACTS SUBTOTAL'; styleTotal(st)
     const sv=ws.getCell(row,COLS); sv.value=totalSub; sv.numFmt='"$"#,##0.00'; styleTotal(sv)
     row+=2
   }
 
   // Detalle equipos
   if (eqs.length > 0) {
-    row = addSectionTitle(ws, row, 'DETALLE — EQUIPOS', COLS)
+    row = addSectionTitle(ws, row, isEs?'DETALLE — EQUIPOS':'DETAIL — EQUIPMENT', COLS)
     ws.getRow(row).height=18
-    ;['Descripción','Tipo','Tarifa diaria','Días de uso','Costo total','',''].forEach((h,i) => {
+    ;[isEs?'Descripción':'Description',isEs?'Tipo':'Type',isEs?'Tarifa diaria':'Daily rate',isEs?'Días de uso':'Days used',isEs?'Costo total':'Total cost','',''].forEach((h,i) => {
       const c=ws.getCell(row,i+1); c.value=h; styleHeader(c)
     })
     row++
@@ -680,16 +683,16 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
       })
       row++
     })
-    ws.mergeCells(row,1,row,COLS-1); const et=ws.getCell(row,1); et.value='SUBTOTAL EQUIPOS'; styleTotal(et)
+    ws.mergeCells(row,1,row,COLS-1); const et=ws.getCell(row,1); et.value=isEs?'SUBTOTAL EQUIPOS':'EQUIPMENT SUBTOTAL'; styleTotal(et)
     const ev=ws.getCell(row,COLS); ev.value=totalEq; ev.numFmt='"$"#,##0.00'; styleTotal(ev)
     row+=2
   }
 
   // Detalle costos directos
   if (dirs.length > 0) {
-    row = addSectionTitle(ws, row, 'DETALLE — COSTOS DIRECTOS', COLS)
+    row = addSectionTitle(ws, row, isEs?'DETALLE — COSTOS DIRECTOS':'DETAIL — DIRECT COSTS', COLS)
     ws.getRow(row).height=18
-    ;['Fecha','Tipo','Descripción','Actividad','Documento','Monto',''].forEach((h,i) => {
+    ;[isEs?'Fecha':'Date',isEs?'Tipo':'Type',isEs?'Descripción':'Description',isEs?'Actividad':'Activity',isEs?'Documento':'Document',isEs?'Monto':'Amount',''].forEach((h,i) => {
       const c=ws.getCell(row,i+1); c.value=h; styleHeader(c)
     })
     row++
@@ -707,7 +710,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
       })
       row++
     })
-    ws.mergeCells(row,1,row,COLS-1); const dt=ws.getCell(row,1); dt.value='SUBTOTAL COSTOS DIRECTOS'; styleTotal(dt)
+    ws.mergeCells(row,1,row,COLS-1); const dt=ws.getCell(row,1); dt.value=isEs?'SUBTOTAL COSTOS DIRECTOS':'DIRECT COSTS SUBTOTAL'; styleTotal(dt)
     const dv=ws.getCell(row,COLS); dv.value=totalDir; dv.numFmt='"$"#,##0.00'; styleTotal(dv)
     row+=2
   }
@@ -716,12 +719,12 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   row++
   ws.mergeCells(row,1,row,COLS)
   const footer=ws.getCell(row,1)
-  footer.value='Marquez Project Solutions LLC · MARY ERP — Management And Resources Yield · Documento generado automáticamente'
+  footer.value=isEs?'Marquez Project Solutions LLC · MARY ERP — Management And Resources Yield · Documento generado automáticamente':'Marquez Project Solutions LLC · MARY ERP — Management And Resources Yield · Automatically generated document'
   footer.font={ size:8, name:'Arial', color:{ argb:'FF9CA3AF' }, italic:true }
   footer.alignment={ horizontal:'center' }
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `Resumen_General_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Resumen_General':'General_Summary'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────
@@ -732,7 +735,7 @@ export default function Reportes() {
   const {
     proyectos, presupuesto, materiales, entradas, salidas,
     costos_directos, nominas, subcontratos, equipos, costos_indirectos,
-    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [],
+    subcontratos_contratos = [], subcontratos_avaluos = [],
     presupuesto_indirectos = [],
     avaluos_cliente = [], avaluos_cliente_items = [],
   } = state
@@ -789,7 +792,7 @@ export default function Reportes() {
     const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
       const pres=(act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0))
       // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
-      const scActIds = subcontratos_items.filter(si=>si.actividad_id===act.id).map(si=>si.subcontrato_id)
+      const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)
       const realScNuevo = subcontratos_avaluos
         .filter(a=>scActIds.includes(a.subcontrato_id)&&a.estado==='aprobado')
         .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
@@ -841,7 +844,7 @@ export default function Reportes() {
       actividades, totalReal, dirs, noms, subs, eqs, inds,
       avsProy, avsItems, indsPres, comparacionInd,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -854,13 +857,13 @@ export default function Reportes() {
     try {
       if (reportType==='financiero' && datosFinanciero) {
         await buildFinanciero({ data:datosFinanciero, budget, moneda, proy, desde, hasta, presupuesto,
-          presupuesto_indirectos, avaluos_cliente, avaluos_cliente_items })
+          presupuesto_indirectos, avaluos_cliente, avaluos_cliente_items, lang })
       } else if (reportType==='inventario') {
-        await buildInventario({ data:datosInventario, materiales, proyectos, presupuesto, desde, hasta })
+        await buildInventario({ data:datosInventario, materiales, proyectos, presupuesto, desde, hasta, lang })
       } else if (reportType==='general' && proyId) {
         await buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
           subcontratos, subcontratos_contratos, subcontratos_avaluos,
-          equipos, costos_indirectos, salidas, entradas, budget, moneda })
+          equipos, costos_indirectos, salidas, entradas, budget, moneda, lang })
       }
     } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
     setLoading(false)
@@ -872,22 +875,22 @@ export default function Reportes() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('btn_view')==='Ver'?'Reportes':'Reports'}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{t('btn_view')==='Ver'?'Genera y exporta reportes a Excel con formato profesional':'Generate and export professionally formatted Excel reports'}</p>
+          <h1 className="text-xl font-semibold text-gray-800">{isEs?'Reportes':'Reports'}</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{isEs?'Genera y exporta reportes a Excel con formato profesional':'Generate and export professionally formatted Excel reports'}</p>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
-          {t('btn_view')==='Ver'?'Configurar reporte':'Configure report'}
+          {isEs?'Configurar reporte':'Configure report'}
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">{t('btn_view')==='Ver'?'Tipo de reporte':'Report type'}</label>
+            <label className="text-xs text-gray-500 block mb-1">{isEs?'Tipo de reporte':'Report type'}</label>
             <select className={inputCls+' w-full'} value={reportType} onChange={e=>setReportType(e.target.value)}>
-              <option value="financiero">📊 {t('btn_view')==='Ver'?'Reporte Financiero':'Financial Report'}</option>
-              <option value="inventario">📦 {t('btn_view')==='Ver'?'Reporte de Inventario':'Inventory Report'}</option>
-              <option value="general">📋 {t('btn_view')==='Ver'?'Resumen General del Proyecto':'General Project Summary'}</option>
+              <option value="financiero">📊 {isEs?'Reporte Financiero':'Financial Report'}</option>
+              <option value="inventario">📦 {isEs?'Reporte de Inventario':'Inventory Report'}</option>
+              <option value="general">📋 {isEs?'Resumen General del Proyecto':'General Project Summary'}</option>
             </select>
           </div>
           {(reportType==='financiero'||reportType==='general') && (
@@ -900,11 +903,11 @@ export default function Reportes() {
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1">{t('btn_view')==='Ver'?'Desde':'From'}</label>
+            <label className="text-xs text-gray-500 block mb-1">{isEs?'Desde':'From'}</label>
             <input type="date" className={inputCls+' w-full'} value={desde} onChange={e=>setDesde(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">{t('btn_view')==='Ver'?'Hasta':'To'}</label>
+            <label className="text-xs text-gray-500 block mb-1">{isEs?'Hasta':'To'}</label>
             <input type="date" className={inputCls+' w-full'} value={hasta} onChange={e=>setHasta(e.target.value)} />
           </div>
         </div>
@@ -914,13 +917,13 @@ export default function Reportes() {
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-lg disabled:opacity-40 transition-all hover:opacity-90"
             style={{background:BRAND}}>
             {loading
-              ? <><span className="animate-spin">⏳</span> {t('btn_view')==='Ver'?'Generando...':'Generating...'}</>
-              : <><span>⬇</span> {t('btn_view')==='Ver'?'Descargar Excel':'Download Excel'}</>
+              ? <><span className="animate-spin">⏳</span> {isEs?'Generando...':'Generating...'}</>
+              : <><span>⬇</span> {isEs?'Descargar Excel':'Download Excel'}</>
             }
           </button>
           <button onClick={()=>window.print()}
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50">
-            🖨 {t('btn_view')==='Ver'?'Imprimir vista':'Print view'}
+            🖨 {isEs?'Imprimir vista':'Print view'}
           </button>
         </div>
       </div>
