@@ -1135,7 +1135,7 @@ useEffect(() => {
       }
 
       case 'ADD_ORDEN_CAMBIO': {
-        const orden = { ...action.payload.orden, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
+        const orden = { ...action.payload.orden, id: uuid(), estado: 'borrador', created_at: today(), tenant_id: tenantId }
         const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
         // Dispatch primero para que la UI se actualice de inmediato
         dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items } })
