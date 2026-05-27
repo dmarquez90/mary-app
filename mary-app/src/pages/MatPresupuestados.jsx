@@ -8,7 +8,7 @@ import ImportarMatPresupuestados from './ImportarMatPresupuestados'
 
 const emptyForm = () => ({
   proyecto_id: '', nombre_libre: '', unidad_libre: 'und',
-  cantidad_presupuestada: '', actividad_id: '', etapa_id: '', sub_etapa_id: '',
+  cantidad_presupuestada: '', costo_unitario: '', actividad_id: '', etapa_id: '', sub_etapa_id: '',
   material_id: '', es_adicional: false,
 })
 
@@ -90,9 +90,8 @@ export default function MatPresupuestados() {
   }
 
   const costoPres = (mp) => {
-    const act = presupuesto.find(b => b.id === mp.actividad_id)
-    if (!act) return 0
-    return parseFloat(mp.cantidad_presupuestada || 0) * parseFloat(act.costo_materiales || 0)
+    if (!mp.costo_unitario) return 0
+    return parseFloat(mp.cantidad_presupuestada || 0) * parseFloat(mp.costo_unitario || 0)
   }
 
   const costoConsumido = (mp) => {
@@ -127,6 +126,7 @@ export default function MatPresupuestados() {
       nombre_libre: mp.nombre_libre || '',
       unidad_libre: mp.unidad_libre || 'und',
       cantidad_presupuestada: mp.cantidad_presupuestada || '',
+      costo_unitario: mp.costo_unitario || '',
       actividad_id: mp.actividad_id || '',
       etapa_id: mp.etapa_id || '',
       sub_etapa_id: mp.sub_etapa_id || '',
@@ -338,6 +338,18 @@ export default function MatPresupuestados() {
                 onChange={set('cantidad_presupuestada')} placeholder="0.00" min="0" step="0.01" />
             </Field>
           </div>
+          <Field label={isEs ? 'Costo unitario presupuestado (opcional)' : 'Budgeted unit cost (optional)'}>
+            <input type="number" className={inputCls} value={form.costo_unitario || ''}
+              onChange={set('costo_unitario')} placeholder="0.00" min="0" step="0.01" />
+            {form.costo_unitario && form.cantidad_presupuestada && (
+              <p className="text-xs text-gray-400 mt-1">
+                {isEs ? 'Total presupuestado:' : 'Budgeted total:'} {' '}
+                <span className="font-mono font-medium text-gray-600">
+                  $ {(parseFloat(form.costo_unitario||0) * parseFloat(form.cantidad_presupuestada||0)).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                </span>
+              </p>
+            )}
+          </Field>
 
           <div className="border border-gray-100 rounded-xl p-3 bg-gray-50/50">
             <p className="text-xs font-medium text-gray-500 mb-2">

@@ -324,28 +324,21 @@ useEffect(() => {
   async function dbDispatch(action) {
 
     // ── Helper: enviar notificación a usuarios del tenant ──────────────
-    // ── Helper: texto bilingüe según lang del usuario ───────────────
-    function txt(usuario, es, en) {
-      return usuario?.lang === 'EN' ? en : es
-    }
-
-    async function notify({ tipo, titulo, mensaje, titulo_en, mensaje_en, modulo, referencia_id, roles }) {
+    async function notify({ tipo, titulo, mensaje, modulo, referencia_id, roles }) {
       try {
-        // Obtener usuarios del tenant con su lang preferido
-        let query = supabase.from('usuarios').select('id, lang').eq('tenant_id', tenantId).eq('activo', true)
+        // Obtener usuarios del tenant que tengan los roles indicados
+        let query = supabase.from('usuarios').select('id').eq('tenant_id', tenantId).eq('activo', true)
         if (roles?.length) query = query.in('rol', roles)
         const { data: usuarios } = await query
         if (!usuarios?.length) return
         const { data: { user: currentUser } } = await supabase.auth.getUser()
+        // No notificar al propio usuario que hace la acción
         const targets = usuarios.filter(u => u.id !== currentUser?.id)
         if (!targets.length) return
         const notifs = targets.map(u => ({
           tenant_id: tenantId,
           usuario_id: u.id,
-          tipo,
-          titulo:  txt(u, titulo,  titulo_en  || titulo),
-          mensaje: txt(u, mensaje, mensaje_en || mensaje),
-          modulo,
+          tipo, titulo, mensaje, modulo,
           referencia_id: referencia_id || null,
           leida: false,
         }))
@@ -354,18 +347,13 @@ useEffect(() => {
     }
 
     // ── Helper: notificar a un usuario específico por ID ──────────────
-    async function notifyUser({ usuario_id, tipo, titulo, mensaje, titulo_en, mensaje_en, modulo, referencia_id }) {
+    async function notifyUser({ usuario_id, tipo, titulo, mensaje, modulo, referencia_id }) {
       if (!usuario_id) return
       try {
-        // Obtener lang del usuario destinatario
-        const { data: usr } = await supabase.from('usuarios').select('lang').eq('id', usuario_id).single()
         await supabase.from('notificaciones').insert({
           tenant_id: tenantId,
           usuario_id,
-          tipo,
-          titulo:  txt(usr, titulo,  titulo_en  || titulo),
-          mensaje: txt(usr, mensaje, mensaje_en || mensaje),
-          modulo,
+          tipo, titulo, mensaje, modulo,
           referencia_id: referencia_id || null,
           leida: false,
         })
@@ -1039,10 +1027,8 @@ useEffect(() => {
         dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
         await notify({
           tipo: 'aprobacion',
-          titulo: `Avalúo #${av.numero} de subcontrato aprobado`,
-          titulo_en: `Subcontract Valuation #${av.numero} approved`,
+          titulo: '✅ Avalúo de subcontrato aprobado',
           mensaje: `Avalúo #${av.numero} de ${contrato.subcontratista} fue aprobado.`,
-          mensaje_en: `Valuation #${av.numero} from ${contrato.subcontratista} was approved.`,
           modulo: 'financiero',
           referencia_id: av.id,
           roles: ['client_admin', 'gerente', 'contador'],
@@ -1118,6 +1104,7 @@ useEffect(() => {
           etapa_id:               action.payload.etapa_id               || null,
           sub_etapa_id:           action.payload.sub_etapa_id           || null,
           es_adicional:           action.payload.es_adicional           || false,
+          costo_unitario:         parseFloat(action.payload.costo_unitario) || 0,
         }
         const { error: eMP } = await supabase.from('materiales_presupuestados').insert(item)
         if (eMP) { console.error('ADD_MAT_PRES:', JSON.stringify(eMP)); break }
@@ -1135,6 +1122,7 @@ useEffect(() => {
           etapa_id:               fields.etapa_id      || null,
           sub_etapa_id:           fields.sub_etapa_id  || null,
           es_adicional:           fields.es_adicional  || false,
+          costo_unitario:         parseFloat(fields.costo_unitario || 0),
         }
         await supabase.from('materiales_presupuestados').update(upd).eq('id', id)
         dispatch({ type: 'UPD_MAT_PRES', payload: { ...upd, id } })
@@ -1208,35 +1196,20 @@ useEffect(() => {
         if (action.payload.estado === 'aprobado') {
           await notify({
             tipo: 'aprobacion',
-            titulo: `Avalúo #${action.payload.numero || ''} aprobado`,
-            titulo_en: `Valuation #${action.payload.numero || ''} approved`,
-            mensaje: `El avalúo #${action.payload.numero || ''} del cliente fue aprobado.`,
-            mensaje_en: `Client valuation #${action.payload.numero || ''} was approved.`,
-            modulo: 'avaluos',
+            titulo: '✅ Avalúo aprobado',
+            mensaje: `El avalúo de cliente fue aprobado.`,
+            modulo: 'financiero',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador', 'contador'],
           })
         } else if (action.payload.estado === 'rechazado') {
           await notify({
             tipo: 'rechazo',
-            titulo: `Avalúo #${action.payload.numero || ''} rechazado`,
-            titulo_en: `Valuation #${action.payload.numero || ''} rejected`,
-            mensaje: `El avalúo #${action.payload.numero || ''} fue rechazado. Requiere correcciones.`,
-            mensaje_en: `Valuation #${action.payload.numero || ''} was rejected. Corrections required.`,
-            modulo: 'avaluos',
+            titulo: '❌ Avalúo rechazado',
+            mensaje: `El avalúo fue rechazado. Requiere correcciones.`,
+            modulo: 'financiero',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador'],
-          })
-        } else if (action.payload.estado === 'presentado') {
-          await notify({
-            tipo: 'info',
-            titulo: `Avalúo #${action.payload.numero || ''} pendiente de aprobacion`,
-            titulo_en: `Valuation #${action.payload.numero || ''} pending approval`,
-            mensaje: `El avalúo #${action.payload.numero || ''} fue presentado al cliente y requiere aprobacion.`,
-            mensaje_en: `Valuation #${action.payload.numero || ''} was submitted to the client and requires approval.`,
-            modulo: 'avaluos',
-            referencia_id: action.payload.id,
-            roles: ['gerente', 'client_admin'],
           })
         }
         break
