@@ -1143,7 +1143,11 @@ useEffect(() => {
         const { error: errOrden } = await supabase.from('ordenes_cambio').insert(orden)
         if (errOrden) { console.error('ordenes_cambio insert error:', errOrden); break }
         if (items.length) {
-          const dbItems = items.map(({ tipo, ...rest }) => rest) // eliminar campo 'tipo' (UI only)
+          const dbItems = items.map(it => ({
+            ...it,
+            diferencia:   parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
+            monto_cambio: (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0),
+          }))
           const { error: errItems } = await supabase.from('ordenes_cambio_items').insert(dbItems)
           if (errItems) console.error('ordenes_cambio_items insert error:', errItems)
         }
