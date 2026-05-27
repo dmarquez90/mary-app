@@ -1050,12 +1050,10 @@ useEffect(() => {
         await supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id)
         const costo = {
           id: uuid(), proyecto_id: contrato.proyecto_id, tipo: 'subcontrato',
-          categoria: 'Subcontratos',
           descripcion: `Avalúo #${av.numero} — ${contrato.subcontratista}`,
-          proveedor: contrato.subcontratista, monto: parseFloat(av.monto_total||0),
+          monto: parseFloat(av.monto_total||0),
           fecha: av.fecha_elaboracion || today(),
           numero_documento: `SC-AV-${av.numero}`,
-          referencia: `SC-AV-${av.numero}`,
           created_at: today(), tenant_id: tenantId,
         }
         const { error: eCosto } = await supabase.from('costos_directos').insert(costo)
