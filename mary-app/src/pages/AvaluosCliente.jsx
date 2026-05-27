@@ -11,6 +11,7 @@ const ESTADO_AV = {
   borrador:   { label: 'Borrador',   labelEn: 'Draft',      cls: 'bg-gray-100 text-gray-600'   },
   presentado: { label: 'Presentado', labelEn: 'Submitted',  cls: 'bg-blue-100 text-blue-700'   },
   aprobado:   { label: 'Aprobado',   labelEn: 'Approved',   cls: 'bg-green-100 text-green-700' },
+  rechazado:  { label: 'Rechazado',  labelEn: 'Rejected',   cls: 'bg-red-100 text-red-600'     },
 }
 
 function EstadoBadge({ estado, isEs }) {
@@ -21,7 +22,7 @@ function EstadoBadge({ estado, isEs }) {
 export default function AvaluosCliente() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
-  const { can } = usePermissions()
+  const { can, rol } = usePermissions()
   const isEs = lang === 'ES'
 
   const {
@@ -31,6 +32,7 @@ export default function AvaluosCliente() {
   } = state
 
   const puedeEditar = can('financiero_editar')
+  const puedeAprobar = ['super_admin','client_admin','gerente'].includes(rol)
 
   const [proyId, setProyId]             = useState(proyectos[0]?.id || '')
   const [vista, setVista]               = useState('lista')
@@ -153,8 +155,8 @@ export default function AvaluosCliente() {
     setVista('lista')
   }
 
-  const cambiarEstado = (id, estado) =>
-    dispatch({ type: 'UPD_AVALUO_CLIENTE_ESTADO', payload: { id, estado } })
+  const cambiarEstado = (id, estado, numero) =>
+    dispatch({ type: 'UPD_AVALUO_CLIENTE_ESTADO', payload: { id, estado, numero } })
 
   const totalCobrado   = avs.filter(a=>a.estado==='aprobado').reduce((s,a)=>s+(parseFloat(a.total)||0),0)
   const saldoPorCobrar = presupuestoEfectivo - totalCobrado
@@ -332,39 +334,58 @@ export default function AvaluosCliente() {
         </div>
 
         {/* ── PANEL DE APROBACION ── */}
-        {puedeEditar && avDetalle.estado !== 'aprobado' && (
+        {avDetalle.estado !== 'aprobado' && (
           <div className={`rounded-xl border px-5 py-4 mb-5 flex items-center justify-between gap-4 flex-wrap
-            ${avDetalle.estado === 'presentado' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
+            ${avDetalle.estado === 'presentado' ? 'bg-blue-50 border-blue-200' :
+              avDetalle.estado === 'rechazado'  ? 'bg-red-50 border-red-200'  :
+              'bg-amber-50 border-amber-200'}`}>
             <div>
               <p className="text-sm font-semibold text-gray-800">
-                {avDetalle.estado === 'borrador'
-                  ? (isEs ? 'Este avaluo esta en borrador' : 'This valuation is a draft')
-                  : (isEs ? 'Pendiente de aprobacion' : 'Pending approval')}
+                {avDetalle.estado === 'borrador'   ? (isEs ? 'Este avaluo esta en borrador' : 'This valuation is a draft') :
+                 avDetalle.estado === 'rechazado'  ? (isEs ? 'Avaluo rechazado' : 'Valuation rejected') :
+                 (isEs ? 'Pendiente de aprobacion' : 'Pending approval')}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
                 {avDetalle.estado === 'borrador'
                   ? (isEs ? 'Presentalo al cliente cuando estes listo. Solo los aprobados cuentan como cobrado.' : 'Submit to client when ready. Only approved ones count as billed.')
+                  : avDetalle.estado === 'rechazado'
+                  ? (isEs ? 'Este avaluo fue rechazado. Corrige y vuelve a presentar.' : 'This valuation was rejected. Correct and resubmit.')
                   : (isEs ? 'Marcalo como aprobado cuando el cliente haya firmado o aceptado.' : 'Mark as approved when the client has signed or accepted.')}
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0 flex-wrap">
-              {avDetalle.estado === 'borrador' && (
-                <button onClick={() => cambiarEstado(avDetalle.id, 'presentado')}
+              {puedeEditar && avDetalle.estado === 'borrador' && (
+                <button onClick={() => cambiarEstado(avDetalle.id, 'presentado', avDetalle.numero)}
                   className="text-sm px-4 py-2 rounded-lg text-white font-medium" style={{ background: '#185FA5' }}>
                   {isEs ? 'Presentar al cliente' : 'Submit to client'}
                 </button>
               )}
-              {avDetalle.estado === 'presentado' && (
+              {puedeAprobar && avDetalle.estado === 'rechazado' && (
+                <button onClick={() => cambiarEstado(avDetalle.id, 'borrador', avDetalle.numero)}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-gray-50">
+                  {isEs ? 'Reabrir borrador' : 'Reopen draft'}
+                </button>
+              )}
+              {puedeAprobar && avDetalle.estado === 'presentado' && (
                 <>
-                  <button onClick={() => cambiarEstado(avDetalle.id, 'borrador')}
+                  <button onClick={() => cambiarEstado(avDetalle.id, 'borrador', avDetalle.numero)}
                     className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-gray-50">
                     {isEs ? 'Regresar a borrador' : 'Back to draft'}
                   </button>
                   <button onClick={() => {
                     if (window.confirm(isEs
+                      ? `Rechazar avaluo #${avDetalle.numero}?`
+                      : `Reject valuation #${avDetalle.numero}?`))
+                      cambiarEstado(avDetalle.id, 'rechazado', avDetalle.numero)
+                  }}
+                    className="text-sm px-4 py-2 rounded-lg border border-red-300 text-red-600 font-medium hover:bg-red-50">
+                    {isEs ? 'Rechazar' : 'Reject'}
+                  </button>
+                  <button onClick={() => {
+                    if (window.confirm(isEs
                       ? `Aprobar avaluo #${avDetalle.numero} por ${fmt(avTotal2, moneda)}? Esta accion sumara este monto al total cobrado.`
                       : `Approve valuation #${avDetalle.numero} for ${fmt(avTotal2, moneda)}? This will add this amount to the total billed.`))
-                      cambiarEstado(avDetalle.id, 'aprobado')
+                      cambiarEstado(avDetalle.id, 'aprobado', avDetalle.numero)
                   }}
                     className="text-sm px-4 py-2 rounded-lg text-white font-medium bg-green-600 hover:bg-green-700">
                     {isEs ? 'Aprobar y cobrar' : 'Approve and bill'}
@@ -600,25 +621,44 @@ export default function AvaluosCliente() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetailId(av.id); setVista('detalle') }}>{t('btn_view')}</TBtn>
                           {puedeEditar && av.estado === 'borrador' && (
-                            <button onClick={() => cambiarEstado(av.id, 'presentado')}
+                            <button onClick={() => cambiarEstado(av.id, 'presentado', av.numero)}
                               className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap"
                               style={{ background: '#185FA5' }}>
                               {isEs ? 'Presentar' : 'Submit'}
                             </button>
                           )}
-                          {puedeEditar && av.estado === 'presentado' && (
+                          {puedeAprobar && av.estado === 'presentado' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(isEs
+                                    ? `Rechazar avaluo #${av.numero}?`
+                                    : `Reject valuation #${av.numero}?`))
+                                    cambiarEstado(av.id, 'rechazado', av.numero)
+                                }}
+                                className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 whitespace-nowrap hover:bg-red-50">
+                                {isEs ? 'Rechazar' : 'Reject'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(isEs
+                                    ? `Aprobar avaluo #${av.numero} por ${fmt(av.total, moneda)}?`
+                                    : `Approve valuation #${av.numero} for ${fmt(av.total, moneda)}?`))
+                                    cambiarEstado(av.id, 'aprobado', av.numero)
+                                }}
+                                className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap bg-green-600 hover:bg-green-700">
+                                {isEs ? 'Aprobar' : 'Approve'}
+                              </button>
+                            </>
+                          )}
+                          {puedeAprobar && av.estado === 'rechazado' && (
                             <button
-                              onClick={() => {
-                                if (window.confirm(isEs
-                                  ? `Aprobar avaluo #${av.numero} por ${fmt(av.total, moneda)}?`
-                                  : `Approve valuation #${av.numero} for ${fmt(av.total, moneda)}?`))
-                                  cambiarEstado(av.id, 'aprobado')
-                              }}
-                              className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap bg-green-600 hover:bg-green-700">
-                              {isEs ? 'Aprobar' : 'Approve'}
+                              onClick={() => cambiarEstado(av.id, 'borrador', av.numero)}
+                              className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-600 whitespace-nowrap hover:bg-gray-50">
+                              {isEs ? 'Reabrir' : 'Reopen'}
                             </button>
                           )}
-                          {puedeEditar && (
+                          {puedeAprobar && (
                             <TBtn danger onClick={() => {
                               if (window.confirm(isEs
                                 ? `Eliminar avaluo #${av.numero}? Esta accion no se puede deshacer.`

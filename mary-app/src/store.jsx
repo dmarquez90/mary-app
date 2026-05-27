@@ -152,30 +152,6 @@ function reducer(state, action) {
       costos_directos: [...state.costos_directos, action.payload.costo],
     }
 
-    case 'RECHAZAR_SC_AVALUO': return {
-      ...state,
-      subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
-        a.id === action.payload.id ? { ...a, estado: 'rechazado' } : a),
-    }
-    case 'UPD_SC_AVALUO': return {
-      ...state,
-      subcontratos_avaluos:      (state.subcontratos_avaluos||[]).map(a => a.id === action.payload.avaluo.id ? { ...a, ...action.payload.avaluo } : a),
-      subcontratos_avaluo_items: [
-        ...(state.subcontratos_avaluo_items||[]).filter(i => i.avaluo_id !== action.payload.avaluo.id),
-        ...action.payload.items,
-      ],
-    }
-    case 'ELIMINAR_SC_AVALUO_APROBADO': return {
-      ...state,
-      subcontratos_avaluos:      (state.subcontratos_avaluos||[]).filter(a => a.id !== action.payload.avaluo.id),
-      subcontratos_avaluo_items: (state.subcontratos_avaluo_items||[]).filter(i => i.avaluo_id !== action.payload.avaluo.id),
-      subcontratos_contratos:    (state.subcontratos_contratos||[]).map(sc =>
-        sc.id === action.payload.avaluo.subcontrato_id
-          ? { ...sc, monto_pagado: Math.max(0, parseFloat(sc.monto_pagado||0) - parseFloat(action.payload.avaluo.monto_total||0)) }
-          : sc),
-      costos_directos: (state.costos_directos||[]).filter(c => c.id !== action.payload.costoId),
-    }
-
     case 'ADD_SUBCONTRATO':     return { ...state, subcontratos: [...state.subcontratos, action.payload] }
     case 'UPD_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.map(s => s.id === action.payload.id ? { ...s, ...action.payload } : s) }
     case 'DEL_SUBCONTRATO':     return { ...state, subcontratos: state.subcontratos.filter(s => s.id !== action.payload) }
@@ -1032,14 +1008,6 @@ useEffect(() => {
         await supabase.from('subcontratos_avaluos').insert(av)
         if (avi.length) await supabase.from('subcontratos_avaluo_items').insert(avi)
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
-        await notify({
-          tipo: 'info',
-          titulo: '📋 Avalúo pendiente de aprobación',
-          mensaje: `El avalúo #${av.numero} del subcontrato con ${action.payload.contrato?.subcontratista||'subcontratista'} requiere aprobación.`,
-          modulo: 'financiero',
-          referencia_id: av.id,
-          roles: ['gerente', 'client_admin'],
-        })
         break
       }
       case 'APROBAR_SC_AVALUO': {
@@ -1049,26 +1017,14 @@ useEffect(() => {
         const nuevoPagado = parseFloat(contrato.monto_pagado||0) + parseFloat(av.monto_total||0)
         await supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id)
         const costo = {
-          id: uuid(), proyecto_id: contrato.proyecto_id, tipo: 'subcontrato',
+          id: uuid(), proyecto_id: contrato.proyecto_id, categoria: 'Subcontratos',
           descripcion: `Avalúo #${av.numero} — ${contrato.subcontratista}`,
-          monto: parseFloat(av.monto_total||0),
-          fecha: av.fecha_elaboracion || today(),
-          numero_documento: `SC-AV-${av.numero}`,
+          proveedor: contrato.subcontratista, monto: parseFloat(av.monto_total||0),
+          fecha: av.fecha_elaboracion || today(), referencia: `SC-AV-${av.numero}`,
           created_at: today(), tenant_id: tenantId,
         }
-        const { error: eCosto } = await supabase.from('costos_directos').insert(costo)
-        if (eCosto) { console.error('APROBAR_SC_AVALUO costos_directos:', JSON.stringify(eCosto)); break }
+        await supabase.from('costos_directos').insert(costo)
         dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
-        if (action.payload.creador_id) {
-          await notifyUser({
-            usuario_id: action.payload.creador_id,
-            tipo: 'aprobacion',
-            titulo: '✅ Tu avalúo fue aprobado',
-            mensaje: `El avalúo #${av.numero} del subcontrato con ${contrato.subcontratista} fue aprobado.`,
-            modulo: 'financiero',
-            referencia_id: av.id,
-          })
-        }
         await notify({
           tipo: 'aprobacion',
           titulo: '✅ Avalúo de subcontrato aprobado',
@@ -1080,63 +1036,6 @@ useEffect(() => {
         break
       }
 
-
-      case 'RECHAZAR_SC_AVALUO': {
-        const { avaluo, contrato, creador_id } = action.payload
-        await supabase.from('subcontratos_avaluos').update({ estado: 'rechazado' }).eq('id', avaluo.id)
-        dispatch({ type: 'RECHAZAR_SC_AVALUO', payload: { id: avaluo.id } })
-        if (creador_id) {
-          await notifyUser({
-            usuario_id: creador_id,
-            tipo: 'rechazo',
-            titulo: '❌ Avalúo rechazado',
-            mensaje: `El avalúo #${avaluo.numero} del subcontrato con ${contrato.subcontratista} fue rechazado. Por favor revisa y corrige.`,
-            modulo: 'financiero',
-            referencia_id: avaluo.id,
-          })
-        }
-        break
-      }
-      case 'UPD_SC_AVALUO': {
-        const av  = action.payload.avaluo
-        const avi = action.payload.items.map(it => ({ ...it, id: uuid(), avaluo_id: av.id, created_at: today(), tenant_id: tenantId }))
-        await supabase.from('subcontratos_avaluos').update({
-          periodo_inicio:    av.periodo_inicio,
-          periodo_fin:       av.periodo_fin,
-          fecha_elaboracion: av.fecha_elaboracion,
-          subtotal:          av.subtotal,
-          impuesto_monto:    av.impuesto_monto,
-          monto_total:       av.monto_total,
-          retencion_monto:   av.retencion_monto,
-          monto_a_pagar:     av.monto_a_pagar,
-          notas:             av.notas,
-        }).eq('id', av.id)
-        await supabase.from('subcontratos_avaluo_items').delete().eq('avaluo_id', av.id)
-        if (avi.length) await supabase.from('subcontratos_avaluo_items').insert(avi)
-        dispatch({ type: 'UPD_SC_AVALUO', payload: { avaluo: av, items: avi } })
-        break
-      }
-      case 'ELIMINAR_SC_AVALUO_APROBADO': {
-        const { avaluo, contrato } = action.payload
-        const costoAEliminar = state.costos_directos.find(
-          c => c.referencia === `SC-AV-${avaluo.numero}` && c.proyecto_id === contrato.proyecto_id
-        )
-        await supabase.from('subcontratos_avaluo_items').delete().eq('avaluo_id', avaluo.id)
-        await supabase.from('subcontratos_avaluos').delete().eq('id', avaluo.id)
-        if (costoAEliminar) await supabase.from('costos_directos').delete().eq('id', costoAEliminar.id)
-        const nuevoPagado = Math.max(0, parseFloat(contrato.monto_pagado||0) - parseFloat(avaluo.monto_total||0))
-        await supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id)
-        dispatch({ type: 'ELIMINAR_SC_AVALUO_APROBADO', payload: { avaluo, costoId: costoAEliminar?.id } })
-        await notify({
-          tipo: 'info',
-          titulo: '🗑 Avalúo eliminado',
-          mensaje: `El avalúo #${avaluo.numero} de ${contrato.subcontratista} fue eliminado. El costo directo asociado fue revertido.`,
-          modulo: 'financiero',
-          referencia_id: avaluo.id,
-          roles: ['gerente', 'client_admin', 'contador'],
-        })
-        break
-      }
       case 'ADD_SUBCONTRATO': {
         const { fecha, ...rest } = action.payload
         const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
@@ -1287,12 +1186,29 @@ useEffect(() => {
         await supabase.from('avaluos_cliente').insert(av)
         if (avi.length) await supabase.from('avaluos_cliente_items').insert(avi)
         dispatch({ type: 'ADD_AVALUO_CLIENTE', payload: { avaluo: av, items: avi } })
+        await notify({
+          tipo: 'info',
+          titulo: '📋 Nuevo avalúo de cliente creado',
+          mensaje: `Se creó el avalúo #${av.numero} del proyecto. Revisa cuando esté listo para presentar.`,
+          modulo: 'avaluos',
+          referencia_id: av.id,
+          roles: ['gerente', 'client_admin'],
+        })
         break
       }
       case 'UPD_AVALUO_CLIENTE_ESTADO': {
         await supabase.from('avaluos_cliente').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
-        if (action.payload.estado === 'aprobado') {
+        if (action.payload.estado === 'presentado') {
+          await notify({
+            tipo: 'info',
+            titulo: '📤 Avalúo presentado — pendiente de aprobación',
+            mensaje: `El avalúo #${action.payload.numero || ''} fue presentado al cliente y requiere aprobación.`,
+            modulo: 'avaluos',
+            referencia_id: action.payload.id,
+            roles: ['gerente', 'client_admin'],
+          })
+        } else if (action.payload.estado === 'aprobado') {
           await notify({
             tipo: 'aprobacion',
             titulo: '✅ Avalúo aprobado',
