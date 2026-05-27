@@ -1137,9 +1137,16 @@ useEffect(() => {
       case 'ADD_ORDEN_CAMBIO': {
         const orden = { ...action.payload.orden, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
         const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
-        await supabase.from('ordenes_cambio').insert(orden)
-        if (items.length) await supabase.from('ordenes_cambio_items').insert(items)
+        // Dispatch primero para que la UI se actualice de inmediato
         dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items } })
+        // Limpiar campos de UI antes de insertar en Supabase
+        const { error: errOrden } = await supabase.from('ordenes_cambio').insert(orden)
+        if (errOrden) { console.error('ordenes_cambio insert error:', errOrden); break }
+        if (items.length) {
+          const dbItems = items.map(({ tipo, ...rest }) => rest) // eliminar campo 'tipo' (UI only)
+          const { error: errItems } = await supabase.from('ordenes_cambio_items').insert(dbItems)
+          if (errItems) console.error('ordenes_cambio_items insert error:', errItems)
+        }
         break
       }
       case 'UPD_ORDEN_CAMBIO_ESTADO': {

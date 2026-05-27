@@ -39,7 +39,8 @@ export default function OrdenesCambio() {
     ordenes_cambio = [], ordenes_cambio_items = [],
   } = state
 
-  const puedeEditar = can('financiero_editar')
+  const puedeEditar  = can('ordenes_cambio_editar')
+  const puedeAprobar = can('oc_aprobar')
 
   const [proyId, setProyId]     = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer]     = useState(null)   // null | 'nueva' | 'detalle'
@@ -234,7 +235,7 @@ export default function OrdenesCambio() {
                                 {isEs ? 'Presentar' : 'Submit'}
                               </TBtn>
                             )}
-                            {puedeEditar && oc.estado === 'presentada' && <>
+                            {(puedeEditar || puedeAprobar) && oc.estado === 'presentada' && <>
                               <TBtn onClick={() => cambiarEstado(oc.id, 'aprobada')}
                                 className="text-green-600 hover:bg-green-50">
                                 {isEs ? 'Aprobar' : 'Approve'}
@@ -243,7 +244,7 @@ export default function OrdenesCambio() {
                                 {isEs ? 'Rechazar' : 'Reject'}
                               </TBtn>
                             </>}
-                            {puedeEditar && (oc.estado === 'borrador' || oc.estado === 'rechazada') && (
+                            {(puedeEditar || puedeAprobar) && (oc.estado === 'borrador' || oc.estado === 'rechazada') && (
                               <TBtn danger onClick={() => eliminarOC(oc.id)}>{t('btn_delete')}</TBtn>
                             )}
                           </div>
@@ -445,7 +446,7 @@ export default function OrdenesCambio() {
             {/* Estado y acciones */}
             <div className="flex items-center justify-between">
               <EstadoBadge estado={ocDetalle.estado} isEs={isEs} />
-              {puedeEditar && (
+              {(puedeEditar || puedeAprobar) && (
                 <div className="flex gap-2">
                   {ocDetalle.estado === 'borrador' && (
                     <button onClick={() => { cambiarEstado(ocDetalle.id, 'presentada'); setDrawer(null) }}
