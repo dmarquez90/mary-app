@@ -1162,9 +1162,10 @@ useEffect(() => {
         if (errOrden) { console.error('ordenes_cambio insert error:', errOrden); break }
 
         if (items.length) {
-          const dbItems = items.map(({ parent_id, ...it }) => ({
+          const dbItems = items.map(({ ...it }) => ({
             ...it,
             actividad_id:  it.actividad_id || null,
+            parent_id:     it.parent_id || null,
             diferencia:    parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
             monto_cambio:  (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0),
           }))
