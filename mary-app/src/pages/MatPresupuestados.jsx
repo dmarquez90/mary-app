@@ -82,8 +82,8 @@ export default function MatPresupuestados() {
       .filter(si =>
         solsDelProy.includes(si.solicitud_id) &&
         si.material_id === mp.material_id &&
-        // Si el mat. presupuestado tiene actividad, filtrar por ella; si no, sumar todas
-        (!mp.actividad_id || si.actividad_id === mp.actividad_id)
+        // Contar si: no hay actividad en el item, O coincide con la actividad del mat. presupuestado
+        (!si.actividad_id || !mp.actividad_id || si.actividad_id === mp.actividad_id)
       )
       .reduce((s, si) => s + parseFloat(si.cantidad || 0), 0)
   }
