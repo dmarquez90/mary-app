@@ -2,7 +2,7 @@ import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES } from '../utils'
+import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
 
@@ -263,7 +263,7 @@ export default function Presupuesto() {
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 text-center text-xs text-gray-500">{isAc?item.unidad:'—'}</td>
+                        <td className="px-3 py-2.5 text-center text-xs text-gray-500">{isAc ? getUnitLabel(item.unidad, lang) : '—'}</td>
                         <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-600">{isAc?fmtNum(item.cantidad):'—'}</td>
                         <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-500">{isAc?fmt(item.costo_mo,moneda):'—'}</td>
                         <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-500">{isAc?fmt(item.costo_materiales,moneda):'—'}</td>
@@ -434,11 +434,9 @@ export default function Presupuesto() {
               <div className="grid grid-cols-2 gap-3">
                 <Field label={t('pres_form_unit')}>
                   <select className={selectCls} value={form.unidad} onChange={set('unidad')}>
-                    {UNIDADES.map(u => (
-                      <option key={u} value={u}>
-                        {u === 'LF'
-                          ? t('lbl_lf')
-                          : u}
+                    {UNIDADES_CONFIG.map(u => (
+                      <option key={u.value} value={u.value}>
+                        {lang === 'ES' ? u.es : u.en}
                       </option>
                     ))}
                   </select>

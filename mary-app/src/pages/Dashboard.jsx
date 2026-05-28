@@ -53,7 +53,7 @@ export default function Dashboard() {
       .slice(0, 3)
       .map(e => ({
         ...e,
-        nombreMaterial: materiales.find(m => m.id === e.material_id)?.nombre || '—',
+        nombreMaterial: materiales.find(m => m.id === e.material_id)?.descripcion || '—',
       }))
   }, [entradas, materiales])
 
@@ -64,7 +64,7 @@ export default function Dashboard() {
       .slice(0, 3)
       .map(s => ({
         ...s,
-        nombreMaterial: materiales.find(m => m.id === s.material_id)?.nombre || '—',
+        nombreMaterial: materiales.find(m => m.id === s.material_id)?.descripcion || '—',
       }))
   }, [salidas, materiales])
 
@@ -78,9 +78,9 @@ export default function Dashboard() {
 
   // ── OC por status ─────────────────────────────────────────────────────────
   const ocStats = useMemo(() => {
-    const pendientes = ordenes_compra.filter(o => o.status === 'pending' || o.status === 'draft').length
-    const aprobadas  = ordenes_compra.filter(o => o.status === 'approved' || o.status === 'sent' || o.status === 'received').length
-    const canceladas = ordenes_compra.filter(o => o.status === 'cancelled').length
+    const pendientes = ordenes_compra.filter(o => ['pending','draft','pendiente','borrador'].includes(o.estado)).length
+    const aprobadas  = ordenes_compra.filter(o => ['approved','sent','received','aprobada','enviada','recibida','recibida_parcial'].includes(o.estado)).length
+    const canceladas = ordenes_compra.filter(o => ['cancelled','cancelada','Cancelada'].includes(o.estado)).length
     return { pendientes, aprobadas, canceladas }
   }, [ordenes_compra])
 

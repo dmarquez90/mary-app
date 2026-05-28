@@ -859,6 +859,20 @@ useEffect(() => {
       case 'UPD_SOLICITUD_ESTADO': {
         await supabase.from('solicitudes').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
+        // Notificar al bodeguero y admin cuando hay material listo para despachar
+        if (action.payload.estado === 'pendiente_bodega' || action.payload.estado === 'dividida') {
+          const folio    = action.payload.folio || ''
+          const proyecto = action.payload.proyecto_nombre || ''
+          const esDividida = action.payload.estado === 'dividida'
+          await notify({
+            tipo:          'despacho',
+            titulo:        '📦 Material listo para despachar',
+            mensaje:       `${folio ? `Solicitud ${folio}` : 'Una solicitud'}${proyecto ? ` — ${proyecto}` : ''}: ${esDividida ? 'parte del material está en bodega y debe despacharse' : 'el material está en bodega y debe despacharse'}. Ve a Inventario → Salidas.`,
+            modulo:        'inventario',
+            referencia_id: action.payload.id,
+            roles:         ['bodeguero', 'client_admin'],
+          })
+        }
         break
       }
       case 'DEL_SOLICITUD': {

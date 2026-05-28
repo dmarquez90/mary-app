@@ -224,8 +224,46 @@ export const MONEDAS = [
   'DOP','BRL','ARS','CLP','BOB','PYG','UYU','CAD',
 ]
 
-export const UNIDADES = [
-  'm²','m³','m','ml','kg','ton','und','gl',
-  'hr','día','semana','mes','lote','viaje','%',
-  'lb','pie²','LF',
+// Configuración de unidades con labels bilingües
+// value = lo que se guarda en BD (símbolo estándar)
+// es    = label en español
+// en    = label en inglés
+export const UNIDADES_CONFIG = [
+  { value: 'm²',   es: 'm² — metro cuadrado',   en: 'm² — square meter'    },
+  { value: 'm³',   es: 'm³ — metro cúbico',     en: 'm³ — cubic meter'     },
+  { value: 'm',    es: 'm — metro',              en: 'm — meter'             },
+  { value: 'ml',   es: 'ml — metro lineal',      en: 'ml — linear meter'     },
+  { value: 'kg',   es: 'kg — kilogramo',          en: 'kg — kilogram'         },
+  { value: 'ton',  es: 'ton — tonelada métrica',  en: 'ton — metric ton'      },
+  { value: 'und',  es: 'und — unidad',            en: 'und — unit'            },
+  { value: 'gal',  es: 'gal — galón',             en: 'gal — gallon'          },
+  { value: 'h',    es: 'h — hora',                en: 'h — hour'              },
+  { value: 'day',  es: 'day — día',              en: 'day — day'             },
+  { value: 'wk',   es: 'wk — semana',             en: 'wk — week'             },
+  { value: 'mo',   es: 'mo — mes',                en: 'mo — month'            },
+  { value: 'lot',  es: 'lot — lote',              en: 'lot — lot'             },
+  { value: 'load', es: 'load — viaje',            en: 'load — load'           },
+  { value: '%',    es: '% — porcentaje',          en: '% — percentage'        },
+  { value: 'lb',   es: 'lb — libra',              en: 'lb — pound'            },
+  { value: 'ft²',  es: 'ft² — pie cuadrado',      en: 'ft² — square foot'    },
+  { value: 'LF',   es: 'LF — pie lineal',         en: 'LF — linear foot'     },
 ]
+
+// Mapa rápido: valor antiguo → nuevo valor (para mostrar unidades guardadas antes del cambio)
+export const UNIDADES_LEGADO = {
+  'pie²': 'ft²', 'gl': 'gal', 'hr': 'h',
+  'día': 'day', 'semana': 'wk', 'mes': 'mo',
+  'lote': 'lot', 'viaje': 'load',
+}
+
+// Valores del array (para compatibilidad con código existente)
+export const UNIDADES = UNIDADES_CONFIG.map(u => u.value)
+
+// Obtiene el label de una unidad según el idioma ('ES' | 'EN')
+// Acepta tanto valores nuevos como legados
+export const getUnitLabel = (value, lang = 'ES') => {
+  const normalized = UNIDADES_LEGADO[value] || value
+  const cfg = UNIDADES_CONFIG.find(u => u.value === normalized)
+  if (!cfg) return value
+  return lang === 'ES' ? cfg.es : cfg.en
+}

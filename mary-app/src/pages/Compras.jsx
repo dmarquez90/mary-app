@@ -214,7 +214,7 @@ export default function Compras() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
   const { can } = usePermissions()
-  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales } = state
+  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
 
   const [tab, setTab]       = useState(0)
   const [drawer, setDrawer] = useState(null)
@@ -229,7 +229,7 @@ export default function Compras() {
   const todasActsDelProy = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
   const activos          = materiales.filter(m => m.activo !== false)
   const solsAprobadas    = solicitudes.filter(s =>
-    ['aprobada', 'pendiente_oc', 'oc_generada', 'dividida'].includes(s.estado)
+    ['aprobada', 'pendiente_oc', 'dividida'].includes(s.estado)
   )
 
   const genFolio = () => {
@@ -285,6 +285,30 @@ export default function Compras() {
         observaciones: it.observaciones || '',
       }))
     }})
+
+    // Auto-crear materiales presupuestados adicionales
+    // Si el item es adicional, tiene material_id y no existe aún en mat. presupuestados del proyecto
+    itemsResueltos.forEach(it => {
+      if (!it.es_adicional || !it.material_id) return
+      const yaExiste = materiales_presupuestados.some(
+        mp => mp.proyecto_id === form.proyecto_id && mp.material_id === it.material_id
+      )
+      if (yaExiste) return
+      const mat = activos.find(m => m.id === it.material_id)
+      dispatch({ type: 'ADD_MAT_PRES', payload: {
+        proyecto_id:            form.proyecto_id,
+        nombre_libre:           mat?.descripcion || it.descripcion_libre || '',
+        unidad_libre:           mat?.unidad || it.unidad || 'und',
+        cantidad_presupuestada: 0,
+        costo_unitario:         '',
+        actividad_id:           it.actividad_id || '',
+        etapa_id:               '',
+        sub_etapa_id:           '',
+        material_id:            it.material_id,
+        es_adicional:           true,
+      }})
+    })
+
     setDrawer(null)
     setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'' }])
   }
@@ -341,6 +365,44 @@ export default function Compras() {
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
+  // Abre el drawer de OC con los items correctos según el estado de la solicitud
+  const openOCDrawer = (sol) => {
+    const allItems = solicitud_items.filter(i => i.solicitud_id === sol.id)
+    // Para dividida: solo items que requieren compra (sin_stock o stock_parcial)
+    const itemsParaOC = sol.estado === 'dividida'
+      ? allItems.filter(i => i.flujo_item === 'sin_stock' || i.flujo_item === 'stock_parcial')
+      : allItems
+    setForm({
+      solicitud_id:       sol.id,
+      proveedor:          '',
+      elaboro_nombre:     '',
+      elaboro_cargo:      '',
+      solicitante_nombre: sol.nombre_solicitante || '',
+      solicitante_cargo:  sol.cargo_solicitante  || '',
+      aprobador_nombre:   '',
+      aprobador_cargo:    '',
+      notas:              '',
+    })
+    setOcItems(itemsParaOC.map(it => {
+      const m = materiales.find(x => x.id === it.material_id)
+      // stock_parcial: usar cantidad_oc (solo la parte que falta comprar)
+      const cantidadOC = it.flujo_item === 'stock_parcial'
+        ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
+        : parseFloat(it.cantidad || 0)
+      return {
+        solicitud_item_id: it.id,
+        material_id:       it.material_id || null,
+        descripcion:       m?.descripcion || it.descripcion || '',
+        codigo:            m?.codigo || '',
+        unidad:            it.unidad || 'und',
+        cantidad:          cantidadOC,
+        precio_unitario:   '',
+        impuesto_pct:      '',
+      }
+    }))
+    setDrawer('oc')
+  }
+
   const pendSol = solicitudes.filter(s =>
     ['pendiente', 'pendiente_bodega', 'pendiente_oc', 'dividida'].includes(s.estado)
   ).length
@@ -390,7 +452,14 @@ export default function Compras() {
         .eq('id', solicitudId)
         .single()
       if (solActualizada) {
-        dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: { id: solicitudId, estado: solActualizada.estado } })
+        const sol = solicitudes.find(s => s.id === solicitudId)
+        const proy = proyectos.find(p => p.id === sol?.proyecto_id)
+        dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: {
+          id:              solicitudId,
+          estado:          solActualizada.estado,
+          folio:           sol?.folio || '',
+          proyecto_nombre: proy?.project_code || '',
+        }})
       }
       // Refrescar items con flujo calculado
       const { data: itemsActualizados } = await supabase
@@ -571,30 +640,21 @@ export default function Compras() {
                           )}
 
                           {/* FLUJO B: Sin stock — generar OC */}
-                          {(sol.estado === 'pendiente_oc' || sol.estado === 'oc_generada') && can('oc_crear') && (
-                            <TBtn onClick={() => {
-                              setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
-                              setDrawer('oc')
-                            }}>{t('comp_generate_oc')}</TBtn>
+                          {sol.estado === 'pendiente_oc' && can('oc_crear') && (
+                            <TBtn onClick={() => openOCDrawer(sol)}>{t('comp_generate_oc')}</TBtn>
                           )}
 
                           {/* FLUJO C: Dividida — muestra ambas rutas */}
                           {sol.estado === 'dividida' && can('oc_crear') && (
                             <div className="flex gap-1">
                               <span className="text-xs text-blue-600 font-medium px-1 flex items-center">📦+🛒</span>
-                              <TBtn onClick={() => {
-                                setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
-                                setDrawer('oc')
-                              }}>OC Faltante</TBtn>
+                              <TBtn onClick={() => openOCDrawer(sol)}>OC Faltante</TBtn>
                             </div>
                           )}
 
                           {/* Estado legacy aprobada */}
                           {sol.estado === 'aprobada' && can('oc_crear') && (
-                            <TBtn onClick={() => {
-                              setForm({ solicitud_id: sol.id, proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
-                              setDrawer('oc')
-                            }}>{t('comp_generate_oc')}</TBtn>
+                            <TBtn onClick={() => openOCDrawer(sol)}>{t('comp_generate_oc')}</TBtn>
                           )}
 
                           <TBtn danger onClick={() => setConfirmDel({ type:'sol', id:sol.id })}>{t('btn_delete')}</TBtn>
@@ -739,7 +799,38 @@ export default function Compras() {
                   placeholder={t('inv_form_material') + '...'}
                 />
 
-             {/* Campo libre — siempre visible si no hay material del catálogo */}
+             {/* Aviso: material no está en el presupuesto del proyecto */}
+                {it.material_id && form.proyecto_id && (() => {
+                  const enPresupuesto = materiales_presupuestados.some(
+                    mp => mp.proyecto_id === form.proyecto_id && mp.material_id === it.material_id
+                  )
+                  if (enPresupuesto) return null
+                  const isEn = t('btn_save') === 'Save'
+                  return (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <span className="text-amber-500 text-sm mt-0.5">⚠</span>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-amber-700">
+                          {isEn ? 'Not in project budget' : 'No está en el presupuesto del proyecto'}
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          {isEn
+                            ? 'This material has no budgeted quantity for this project. Mark it as additional or verify the project.'
+                            : 'Este material no tiene cantidad presupuestada en este proyecto. Márcalo como adicional o verifica el proyecto.'}
+                        </p>
+                        {!it.es_adicional && (
+                          <button
+                            className="mt-1.5 text-xs font-semibold text-amber-700 underline"
+                            onClick={() => setSolItem(idx, 'es_adicional', true)}>
+                            {isEn ? 'Mark as additional' : 'Marcar como adicional'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Campo libre — siempre visible si no hay material del catálogo */}
                 {!it.material_id && (
                   <>
                     <input className={inputCls}
@@ -826,17 +917,23 @@ export default function Compras() {
             onChange={sol => {
               if (!sol) { setForm(f => ({ ...f, solicitud_id:'', solicitante_nombre:'', solicitante_cargo:'' })); setOcItems([]); return }
               setForm(f => ({ ...f, solicitud_id: sol.id, solicitante_nombre: sol.nombre_solicitante||'', solicitante_cargo: sol.cargo_solicitante||'' }))
-              // Pre-cargar items de la solicitud
-              const items = solicitud_items.filter(i => i.solicitud_id === sol.id)
-              setOcItems(items.map(it => {
+              // Pre-cargar items: para dividida solo los que requieren OC
+              const allSolItems = solicitud_items.filter(i => i.solicitud_id === sol.id)
+              const itemsParaOC = sol.estado === 'dividida'
+                ? allSolItems.filter(i => i.flujo_item === 'sin_stock' || i.flujo_item === 'stock_parcial')
+                : allSolItems
+              setOcItems(itemsParaOC.map(it => {
                 const m = materiales.find(x => x.id === it.material_id)
+                const cantidadOC = it.flujo_item === 'stock_parcial'
+                  ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
+                  : parseFloat(it.cantidad || 0)
                 return {
                   solicitud_item_id: it.id,
                   material_id:       it.material_id || null,
                   descripcion:       m?.descripcion || it.descripcion || '',
                   codigo:            m?.codigo || '',
                   unidad:            it.unidad || 'und',
-                  cantidad:          parseFloat(it.cantidad || 0),
+                  cantidad:          cantidadOC,
                   precio_unitario:   '',
                   impuesto_pct:      '',
                 }
