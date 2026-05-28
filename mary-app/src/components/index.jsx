@@ -1,4 +1,6 @@
-import { ESTADO_COLORS, ESTADO_LABELS } from '../utils'
+import { useContext } from 'react'
+import { ESTADO_COLORS, getEstadoLabel } from '../utils'
+import { LangContext } from '../i18n'
 
 // ── DRAWER ────────────────────────────────────────────────
 export function Drawer({ open, onClose, title, children, width = 360 }) {
@@ -44,10 +46,11 @@ export function EmptyState({ icon, title, subtitle, action, onAction }) {
 
 // ── BADGE ─────────────────────────────────────────────────
 export function Badge({ estado, label }) {
+  const { lang } = useContext(LangContext)
   const cls = ESTADO_COLORS[estado] || 'bg-gray-100 text-gray-600'
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
-      {label || ESTADO_LABELS[estado] || estado}
+      {label || getEstadoLabel(estado, lang)}
     </span>
   )
 }

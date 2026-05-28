@@ -210,13 +210,44 @@ export const ESTADO_LABELS = {
   cancelada:              'Cancelada',
   activo:                 'Activo',
   completado_sub:         'Completado',
-  // Nuevos estados de flujo de solicitud
   pendiente_bodega:        'En Bodega',
   pendiente_oc:            'Pend. OC',
   dividida:                'Dividida',
   parcialmente_entregada:  'Parcial',
   completada:              'Completada',
   anulada:                 'Anulada',
+}
+
+export const ESTADO_LABELS_EN = {
+  planificacion:          'Planning',
+  en_ejecucion:           'In Progress',
+  pausado:                'On Hold',
+  completado:             'Completed',
+  cancelado:              'Cancelled',
+  pendiente:              'Pending',
+  aprobada:               'Approved',
+  rechazada:              'Rejected',
+  oc_generada:            'PO Generated',
+  borrador:               'Draft',
+  pendiente_aprobacion:   'Pend. Approval',
+  recibida_parcial:       'Partial Receipt',
+  recibida_total:         'Fully Received',
+  cancelada:              'Cancelled',
+  activo:                 'Active',
+  completado_sub:         'Completed',
+  pendiente_bodega:        'In Warehouse',
+  pendiente_oc:            'Pend. PO',
+  dividida:                'Split',
+  parcialmente_entregada:  'Partial',
+  completada:              'Completed',
+  anulada:                 'Voided',
+}
+
+// Obtiene el label de un estado según el idioma
+export const getEstadoLabel = (estado, lang = 'ES') => {
+  if (!estado) return ''
+  const labels = lang === 'ES' ? ESTADO_LABELS : ESTADO_LABELS_EN
+  return labels[estado] || estado
 }
 
 export const MONEDAS = [
