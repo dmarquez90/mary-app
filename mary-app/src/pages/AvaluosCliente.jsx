@@ -29,6 +29,7 @@ export default function AvaluosCliente() {
     proyectos, presupuesto,
     ordenes_cambio = [], ordenes_cambio_items = [],
     avaluos_cliente = [], avaluos_cliente_items = [],
+    presupuesto_indirectos = [],
   } = state
 
   const puedeEditar = can('financiero_editar')
@@ -44,6 +45,16 @@ export default function AvaluosCliente() {
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
   const setAvF = k => e => setAvForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Componentes del precio de venta del proyecto
+  const utilidadPct  = parseFloat(proy?.utilidad_pct  || 0) / 100
+  const impuestoPct  = parseFloat(proy?.impuesto_pct  || 0) / 100
+  const totalIndirectos = useMemo(() =>
+    presupuesto_indirectos
+      .filter(i => i.proyecto_id === proyId)
+      .reduce((s, i) => s + parseFloat(i.monto_presupuestado || 0), 0),
+    [presupuesto_indirectos, proyId]
+  )
 
   const actividades = useMemo(() =>
     presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad'),
@@ -113,9 +124,21 @@ export default function AvaluosCliente() {
     avItems.reduce((s,it) => s + parseFloat(it.cantidad_periodo||0) * parseFloat(it.precio_unitario||0), 0),
     [avItems]
   )
-  const avImpPct   = parseFloat(avForm.impuesto_pct || 0)
-  const avImpMonto = avSubtotal * (avImpPct / 100)
-  const avTotal    = avSubtotal + avImpMonto
+
+  // % de avance del período sobre el presupuesto directo efectivo
+  const pctAvancePeriodo = presupuestoEfectivo > 0 ? avSubtotal / presupuestoEfectivo : 0
+
+  // Overhead proporcional al avance del período
+  const avIndirecto  = totalIndirectos * pctAvancePeriodo
+  const avBase2      = avSubtotal + avIndirecto
+  const avUtilidad   = avBase2 * utilidadPct
+  const avBase3      = avBase2 + avUtilidad
+  const avImpuesto   = avBase3 * impuestoPct
+  const avTotal      = avBase3 + avImpuesto
+
+  // Mantener compatibilidad con campos guardados
+  const avImpPct     = parseFloat(avForm.impuesto_pct || 0)
+  const avImpMonto   = avImpuesto  // se guarda el calculado automáticamente
 
   const setItemPeriodo = (idx, v) => {
     const cant = parseFloat(v || 0)
@@ -138,7 +161,16 @@ export default function AvaluosCliente() {
     dispatch({
       type: 'ADD_AVALUO_CLIENTE',
       payload: {
-        avaluo: { ...avForm, proyecto_id: proyId, impuesto_monto: avImpMonto, subtotal: avSubtotal, total: avTotal },
+        avaluo: {
+          ...avForm,
+          proyecto_id:      proyId,
+          subtotal:         avSubtotal,
+          indirecto_monto:  avIndirecto,
+          utilidad_monto:   avUtilidad,
+          impuesto_monto:   avImpuesto,
+          total:            avTotal,
+          pct_avance:       pctAvancePeriodo,
+        },
         items: avItems.map(it => ({
           ...it,
           cantidad_periodo:   parseFloat(it.cantidad_periodo   || 0),
@@ -159,8 +191,17 @@ export default function AvaluosCliente() {
     dispatch({ type: 'UPD_AVALUO_CLIENTE_ESTADO', payload: { id, estado, numero } })
 
   const totalCobrado   = avs.filter(a=>a.estado==='aprobado').reduce((s,a)=>s+(parseFloat(a.total)||0),0)
-  const saldoPorCobrar = presupuestoEfectivo - totalCobrado
-  const pctEjecucion   = presupuestoEfectivo > 0 ? (totalCobrado/presupuestoEfectivo)*100 : 0
+
+  // Presupuesto total real = directo + indirectos + utilidad + impuesto
+  const presupuestoTotalReal = useMemo(() => {
+    const subtotal  = presupuestoEfectivo + totalIndirectos
+    const utilidad  = subtotal * utilidadPct
+    const impuesto  = (subtotal + utilidad) * impuestoPct
+    return subtotal + utilidad + impuesto
+  }, [presupuestoEfectivo, totalIndirectos, utilidadPct, impuestoPct])
+
+  const saldoPorCobrar = presupuestoTotalReal - totalCobrado
+  const pctEjecucion   = presupuestoTotalReal > 0 ? (totalCobrado/presupuestoTotalReal)*100 : 0
 
   const thCls = 'px-3 py-2.5 text-left text-xs text-gray-500 font-medium whitespace-nowrap'
   const tdCls = 'px-3 py-2.5 text-sm text-gray-700'
@@ -281,21 +322,35 @@ export default function AvaluosCliente() {
           )}
           <div className="border-t border-gray-100 pt-3">
             <div className="flex justify-between text-sm py-1">
-              <span className="text-gray-500">{isEs?'Subtotal periodo':'Period subtotal'}</span>
+              <span className="text-gray-500">{isEs ? 'Subtotal directo período' : 'Direct period subtotal'}</span>
               <span className="font-mono text-gray-700">{fmt(avSubtotal, moneda)}</span>
             </div>
-            <div className="flex items-center gap-3 py-2 border-t border-gray-50">
-              <span className="text-sm text-gray-500 flex-shrink-0">{isEs?'Impuesto / Tax:':'Tax:'}</span>
-              <input type="number" className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-[#1B3A6B]"
-                value={avForm.impuesto_pct||''} onChange={setAvF('impuesto_pct')} placeholder="0" min="0" step="0.01" />
-              <span className="text-sm text-gray-400">%</span>
-              <input className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-[#1B3A6B]"
-                value={avForm.impuesto_descripcion||''} onChange={setAvF('impuesto_descripcion')}
-                placeholder={isEs?'Ej: IR 1%, Sales tax CA 9.5%, N/A':'E.g.: IR 1%, Sales tax CA 9.5%, N/A'} />
-              <span className="font-mono text-sm text-gray-600 flex-shrink-0">{fmt(avImpMonto, moneda)}</span>
-            </div>
+            {avIndirecto > 0 && (
+              <div className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">
+                  {isEs ? `Costo indirecto proporcional (${(pctAvancePeriodo*100).toFixed(1)}%)` : `Proportional indirect cost (${(pctAvancePeriodo*100).toFixed(1)}%)`}
+                </span>
+                <span className="font-mono text-gray-600">{fmt(avIndirecto, moneda)}</span>
+              </div>
+            )}
+            {avUtilidad > 0 && (
+              <div className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">
+                  {isEs ? `Utilidad (${(utilidadPct*100).toFixed(1)}%)` : `Profit (${(utilidadPct*100).toFixed(1)}%)`}
+                </span>
+                <span className="font-mono text-gray-600">{fmt(avUtilidad, moneda)}</span>
+              </div>
+            )}
+            {avImpuesto > 0 && (
+              <div className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">
+                  {isEs ? `Impuesto (${(impuestoPct*100).toFixed(1)}%)` : `Tax (${(impuestoPct*100).toFixed(1)}%)`}
+                </span>
+                <span className="font-mono text-gray-600">{fmt(avImpuesto, moneda)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-100">
-              <span>{isEs?'Total a cobrar':'Total to bill'}</span>
+              <span>{isEs ? 'Total a cobrar' : 'Total to bill'}</span>
               <span style={{color:BRAND}}>{fmt(avTotal, moneda)}</span>
             </div>
           </div>
@@ -466,11 +521,21 @@ export default function AvaluosCliente() {
               </table>
             </div>
             <div className="px-4 py-4 border-t border-gray-100 flex flex-col gap-1.5">
-              {[[isEs?'Subtotal periodo':'Period subtotal', fmt(avSubtotal2, moneda)],
-                [avDetalle.impuesto_descripcion || (isEs?'Impuesto':'Tax'), fmt(avImp2, moneda)],
+              {[
+                [isEs?'Subtotal directo período':'Direct period subtotal', fmt(avSubtotal2, moneda)],
+                ...(parseFloat(avDetalle.indirecto_monto||0) > 0
+                  ? [[isEs?'Costo indirecto proporcional':'Proportional indirect cost', fmt(avDetalle.indirecto_monto, moneda)]]
+                  : []),
+                ...(parseFloat(avDetalle.utilidad_monto||0) > 0
+                  ? [[isEs?'Utilidad':'Profit', fmt(avDetalle.utilidad_monto, moneda)]]
+                  : []),
+                ...(parseFloat(avDetalle.impuesto_monto||0) > 0
+                  ? [[avDetalle.impuesto_descripcion || (isEs?'Impuesto':'Tax'), fmt(avDetalle.impuesto_monto, moneda)]]
+                  : []),
               ].map(([k,v]) => (
                 <div key={k} className="flex justify-between text-sm">
-                  <span className="text-gray-500">{k}</span><span className="font-mono text-gray-700">{v}</span>
+                  <span className="text-gray-500">{k}</span>
+                  <span className="font-mono text-gray-700">{v}</span>
                 </div>
               ))}
               <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
@@ -539,10 +604,10 @@ export default function AvaluosCliente() {
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             {[
-              { label: isEs?'Presupuesto efectivo':'Effective budget',      value: fmt(presupuestoEfectivo, moneda), color: BRAND },
-              { label: isEs?'Total cobrado (aprobado)':'Billed (approved)', value: fmt(totalCobrado, moneda),        color: '#1D9E75' },
-              { label: isEs?'Saldo por cobrar':'Balance to bill',            value: fmt(saldoPorCobrar, moneda),      color: '#D97706' },
-              { label: isEs?'% Ejecucion financiera':'% Financial exec.',   value: `${pctEjecucion.toFixed(1)}%`,   color: BRAND },
+              { label: isEs?'Presupuesto total (contrato)':'Total budget (contract)', value: fmt(presupuestoTotalReal, moneda), color: BRAND },
+              { label: isEs?'Total cobrado (aprobado)':'Billed (approved)',           value: fmt(totalCobrado, moneda),         color: '#1D9E75' },
+              { label: isEs?'Saldo por cobrar':'Balance to bill',                     value: fmt(saldoPorCobrar, moneda),       color: '#D97706' },
+              { label: isEs?'% Ejecucion financiera':'% Financial exec.',             value: `${pctEjecucion.toFixed(1)}%`,    color: BRAND },
             ].map(k => (
               <div key={k.label} className="bg-white border border-gray-100 rounded-xl p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -552,7 +617,7 @@ export default function AvaluosCliente() {
           </div>
 
           {/* ── RESUMEN FINANCIERO ── */}
-          {avs.length > 0 && presupuestoEfectivo > 0 && (
+          {avs.length > 0 && presupuestoTotalReal > 0 && (
             <div className="bg-white border border-gray-100 rounded-xl p-5 mb-5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 {isEs ? 'Resumen financiero del proyecto' : 'Project financial summary'}
@@ -561,18 +626,19 @@ export default function AvaluosCliente() {
                 <div>
                   <div className="flex justify-between text-xs text-gray-500 mb-1">
                     <span>{isEs ? 'Total cobrado (aprobado)' : 'Total billed (approved)'}</span>
-                    <span className="font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(totalCobrado, moneda)} / {fmt(presupuestoEfectivo, moneda)}</span>
+                    <span className="font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(totalCobrado, moneda)} / {fmt(presupuestoTotalReal, moneda)}</span>
                   </div>
                   <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-green-500" style={{width:`${Math.min(100, pctEjecucion)}%`, transition:'width 0.4s'}} />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{pctEjecucion.toFixed(1)}% {isEs ? 'ejecutado financieramente' : 'financially executed'}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-gray-50">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-gray-50">
                   {[
-                    { label: isEs?'Presupuesto original':'Original budget', value: fmt(presupuestoOriginal, moneda), color: BRAND },
-                    { label: isEs?'OC aprobadas':'Approved COs', value: `${totalOCAprobadas >= 0 ? '+' : ''}${fmt(totalOCAprobadas, moneda)}`, color: totalOCAprobadas > 0 ? '#D97706' : '#6b7280' },
-                    { label: isEs?'Saldo por cobrar':'Balance to bill', value: fmt(saldoPorCobrar, moneda), color: saldoPorCobrar > 0 ? '#D97706' : '#1D9E75' },
+                    { label: isEs?'Pres. directo':'Direct budget',     value: fmt(presupuestoEfectivo, moneda),   color: BRAND },
+                    { label: isEs?'Indirectos':'Indirect costs',        value: fmt(totalIndirectos, moneda),       color: '#6b7280' },
+                    { label: isEs?'OC aprobadas':'Approved COs',        value: `${totalOCAprobadas >= 0 ? '+' : ''}${fmt(totalOCAprobadas, moneda)}`, color: totalOCAprobadas > 0 ? '#D97706' : '#6b7280' },
+                    { label: isEs?'Saldo por cobrar':'Balance to bill', value: fmt(saldoPorCobrar, moneda),       color: saldoPorCobrar > 0 ? '#D97706' : '#1D9E75' },
                   ].map(k => (
                     <div key={k.label} className="bg-gray-50 rounded-lg p-3">
                       <p className="text-xs text-gray-400 mb-0.5">{k.label}</p>
