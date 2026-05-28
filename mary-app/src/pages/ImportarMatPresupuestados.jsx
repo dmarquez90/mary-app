@@ -56,10 +56,27 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           return -1
         }
 
-        const iCod  = col(['material code', 'código mat', 'codigo mat', 'código', 'codigo', 'code'])
-        const iNom  = col(['material name', 'nombre', 'name'])
-        const iUnit = col(['unit', 'unidad'])
-        const iCant = col(['budgeted quantity', 'budgeted qty', 'cant. presup', 'cantidad presup', 'qty pres', 'budgeted', 'quantity', 'cantidad', 'cant', 'qty'])
+        let iCod  = col(['material code', 'código mat', 'codigo mat', 'código', 'codigo', 'code'])
+        let iNom  = col(['material name', 'nombre', 'name'])
+        let iUnit = col(['unit', 'unidad'])
+        let iCant = col(['budgeted quantity', 'budgeted qty', 'cant. presup', 'cantidad presup', 'qty pres', 'budgeted', 'quantity', 'cantidad', 'cant', 'qty'])
+
+        // Si no se detectaron bien por celdas mergeadas, buscar por posición en la fila de datos
+        // Verificar en la primera fila de datos reales
+        const firstDataRow = data.slice(headerRow + 1).find(r =>
+          r && r.some(c => c !== null && c !== '')
+        )
+        if (firstDataRow && iCant !== -1) {
+          // Si el valor en iCant no es número, buscar la primera columna numérica
+          const valCant = firstDataRow[iCant]
+          if (typeof valCant !== 'number') {
+            const numCol = firstDataRow.findIndex(v => typeof v === 'number' && v > 0)
+            if (numCol !== -1) iCant = numCol
+          }
+        }
+
+        if (iCod === -1) iCod = 0   // fallback: primera columna
+        if (iCant === -1) iCant = 3 // fallback: cuarta columna
 
         if (iCod === -1 || iCant === -1) {
           setErrors([isEs
