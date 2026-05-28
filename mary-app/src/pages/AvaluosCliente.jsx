@@ -56,11 +56,15 @@ export default function AvaluosCliente() {
     [presupuesto_indirectos, proyId]
   )
 
-  const actividades = useMemo(() =>
-    presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad'),
+  const todosItems   = useMemo(() =>
+    presupuesto.filter(b => b.proyecto_id === proyId),
     [presupuesto, proyId]
   )
-  const ocAprobadas = useMemo(() =>
+  const actividades  = useMemo(() =>
+    todosItems.filter(b => b.tipo === 'actividad'),
+    [todosItems]
+  )
+  const ocAprobadas  = useMemo(() =>
     ordenes_cambio.filter(o => o.proyecto_id === proyId && o.estado === 'aprobada'),
     [ordenes_cambio, proyId]
   )
@@ -68,7 +72,7 @@ export default function AvaluosCliente() {
     ordenes_cambio_items.filter(i => ocAprobadas.some(o => o.id === i.oc_id)),
     [ordenes_cambio_items, ocAprobadas]
   )
-  const presupuestoOriginal = useMemo(() => calcGrandTotal(actividades), [actividades])
+  const presupuestoOriginal = useMemo(() => calcGrandTotal(todosItems), [todosItems])
   const totalOCAprobadas    = useMemo(() => ocAprobadas.reduce((s,o) => s + parseFloat(o.total_oc||0), 0), [ocAprobadas])
   const presupuestoEfectivo = presupuestoOriginal + totalOCAprobadas
 
