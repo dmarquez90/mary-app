@@ -1221,12 +1221,16 @@ useEffect(() => {
             // 2. Actividades NUEVAS → INSERT en presupuesto
             const nuevas = ocItems.filter(it => it.tipo === 'nueva')
             for (const it of nuevas) {
-              // Obtener items actuales del presupuesto para generar código correcto
+              // Obtener items del presupuesto para construir código bajo el parent
               const { data: presExist } = await supabase
-                .from('presupuesto').select('id,tipo,code,parent_id').eq('proyecto_id', proyId).eq('tenant_id', tenantId)
-              const presItems = presExist || []
-              // Usar genBudgetCode para código jerárquico correcto
-              const newCode = genBudgetCode(presItems, 'actividad', it.parent_id)
+                .from('presupuesto').select('id,tipo,code,parent_id')
+                .eq('proyecto_id', proyId).eq('tenant_id', tenantId)
+              const presItems  = presExist || []
+              const parent     = presItems.find(p => p.id === it.parent_id)
+              const parentCode = parent?.code || '00'
+              // Contar actividades existentes bajo ese parent para el siguiente número
+              const siblingsCount = presItems.filter(p => p.tipo === 'actividad' && p.parent_id === it.parent_id).length
+              const newCode = `${parentCode}.${String(siblingsCount + 1).padStart(3,'0')}`
 
               const newAct = {
                 id:               uuid(),
