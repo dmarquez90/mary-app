@@ -119,6 +119,11 @@ export default function ImportarCatalogo({ onDone }) {
           const desc = String(row[iDesc] || '').trim()
           if (!cod && !desc) continue
 
+          // Saltar filas de notas/instrucciones
+          if (cod.startsWith('*') || cod.length > 40 ||
+              desc.startsWith('*') || desc.toLowerCase().includes('required') ||
+              desc.toLowerCase().includes('obligatorio')) continue
+
           if (!cod)  { errs.push(`${isEs ? 'Fila' : 'Row'} ${r+1}: ${isEs ? 'codigo vacio' : 'empty code'}`); continue }
           if (!desc) { errs.push(`${isEs ? 'Fila' : 'Row'} ${r+1}: ${isEs ? 'descripcion vacia' : 'empty description'}`); continue }
 
