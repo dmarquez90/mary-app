@@ -29,15 +29,15 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const wb   = XLSX.read(e.target.result, { type: 'array' })
+        const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true })
         const ws   = wb.Sheets[wb.SheetNames[0]]
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true, blankrows: false })
 
-        // Encontrar fila de headers
+        // Encontrar fila de headers buscando "code" o "código"
         let headerRow = -1
         for (let i = 0; i < Math.min(data.length, 10); i++) {
-          const row = data[i].map(c => String(c).toLowerCase())
-          if (row.some(c => c.includes('código') || c.includes('codigo') || c.includes('code'))) {
+          const row = data[i].map(c => String(c ?? '').toLowerCase())
+          if (row.some(c => c.includes('material code') || c.includes('código') || c.includes('codigo'))) {
             headerRow = i; break
           }
         }
@@ -46,7 +46,8 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           setStep('error'); return
         }
 
-        const headers = data[headerRow].map(c => String(c).trim().toLowerCase())
+        const headers = data[headerRow].map(c => String(c ?? '').trim().toLowerCase())
+
         const col = (names) => {
           for (const n of names) {
             const i = headers.findIndex(h => h.includes(n))
@@ -55,51 +56,55 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           return -1
         }
 
-        const iCod   = col(['código mat', 'codigo mat', 'material code', 'código', 'codigo', 'code'])
-        const iNom   = col(['nombre', 'name'])
-        const iUnit  = col(['unidad', 'unit'])
-        const iCant  = col(['cant', 'qty', 'quantity', 'budgeted'])
+        const iCod  = col(['material code', 'código mat', 'codigo mat', 'código', 'codigo', 'code'])
+        const iNom  = col(['material name', 'nombre', 'name'])
+        const iUnit = col(['unit', 'unidad'])
+        const iCant = col(['budgeted quantity', 'budgeted qty', 'cant. presup', 'cantidad presup', 'qty pres', 'budgeted', 'quantity', 'cantidad', 'cant', 'qty'])
 
         if (iCod === -1 || iCant === -1) {
           setErrors([isEs
-            ? 'Columnas "Código Material" y "Cant. Presupuestada" son requeridas.'
-            : '"Material Code" and "Budgeted Quantity" columns are required.'])
+            ? `Columnas requeridas no encontradas. Headers detectados: ${headers.filter(Boolean).join(', ')}`
+            : `Required columns not found. Detected headers: ${headers.filter(Boolean).join(', ')}`])
           setStep('error'); return
         }
 
         const parsed = []
         const errs   = []
 
-        // Índice de materiales del catálogo para vincular
         const matsByCodigo = {}
         state.materiales.forEach(m => {
           if (m.codigo) matsByCodigo[m.codigo.toLowerCase()] = m
         })
 
+        // Empezar desde la fila DESPUÉS de los headers
+        // Saltar cualquier fila que no sea dato real (notas, instrucciones, etc.)
         for (let r = headerRow + 1; r < data.length; r++) {
-          const row  = data[r]
-          const cod  = String(row[iCod]  || '').trim()
-          const nom  = String(row[iNom]  || '').trim()
-          const unit = String(row[iUnit] || 'und').trim() || 'und'
-          const cant = parseFloat(row[iCant] || 0) || 0
+          const row = data[r]
+          if (!row || row.every(c => c === null || c === '')) continue
 
-          if (!cod && !nom && !cant) continue // fila vacía
+          const rawCod  = row[iCod]
+          const rawNom  = iNom >= 0 ? row[iNom] : null
+          const rawUnit = iUnit >= 0 ? row[iUnit] : null
+          const rawCant = row[iCant]
 
-          // Saltar filas de notas/instrucciones (contienen * o "required")
-          const rowText = row.slice(0, 6).map(c => String(c||'').toLowerCase()).join(' ')
-          if (rowText.includes('required') || rowText.includes('instruc') ||
-              (cod.startsWith('*') && !nom && !cant)) continue
+          const cod  = String(rawCod ?? '').trim()
+          const nom  = String(rawNom ?? '').trim()
+          const unit = String(rawUnit ?? 'und').trim() || 'und'
+          const cant = typeof rawCant === 'number' ? rawCant : parseFloat(String(rawCant ?? '').replace(',', '.')) || 0
 
-          if (!cod) {
-            errs.push(`${isEs?'Fila':'Row'} ${r+1}: ${isEs?'código vacío':'empty code'}`)
+          // Saltar filas sin código o con texto de nota/instrucción
+          if (!cod) continue
+          if (cod.length > 40) continue // notas largas
+          if (cod.startsWith('*')) continue
+          if (cod.toLowerCase().includes('required') || cod.toLowerCase().includes('code*')) continue
+
+          if (cant <= 0) {
+            errs.push(`${isEs ? 'Fila' : 'Row'} ${r + 1}: ${isEs
+              ? `cantidad inválida para "${cod}" (valor leído: ${JSON.stringify(rawCant)})`
+              : `invalid quantity for "${cod}" (read value: ${JSON.stringify(rawCant)})`}`)
             continue
           }
-          if (!cant || cant <= 0) {
-            errs.push(`${isEs?'Fila':'Row'} ${r+1}: ${isEs?`cantidad inválida para "${cod}"`:`invalid quantity for "${cod}"`}`)
-            continue
-          }
 
-          // Intentar vincular con el catálogo
           const matVinculado = matsByCodigo[cod.toLowerCase()] || null
           const nombreFinal  = nom || matVinculado?.descripcion || cod
           const unidadFinal  = unit || matVinculado?.unidad || 'und'
@@ -129,12 +134,13 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
         setErrors(errs)
         setStep('preview')
       } catch (err) {
-        setErrors([`${isEs?'Error al leer':'Error reading'}: ${err.message}`])
+        setErrors([`${isEs ? 'Error al leer' : 'Error reading'}: ${err.message}`])
         setStep('error')
       }
     }
     reader.readAsArrayBuffer(file)
   }
+
 
   const importar = async () => {
     setStep('importing')
