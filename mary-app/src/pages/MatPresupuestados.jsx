@@ -19,7 +19,7 @@ export default function MatPresupuestados() {
   const { t, lang } = useContext(LangContext)
   const isEs = lang === 'ES'
   const { can } = usePermissions()
-  const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas, solicitud_items = [] } = state
+  const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas, solicitud_items = [], solicitudes = [] } = state
 
   const [proyId, setProyId]   = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer]   = useState(false)
@@ -68,9 +68,25 @@ export default function MatPresupuestados() {
     })
   }, [matsPres, search, filterEtapa, materiales, subEtapas, actividades])
 
-  const cantSolicitada = (mpId) =>
-    solicitud_items.filter(si => si.mat_pres_id === mpId)
+  // Solo solicitudes "vivas" — excluir anuladas, rechazadas y completadas
+  const ESTADOS_ACTIVOS = ['pendiente', 'aprobada', 'oc_generada', 'pendiente_oc', 
+    'pendiente_bodega', 'dividida', 'parcialmente_entregada']
+
+  const solsDelProy = solicitudes
+    .filter(s => s.proyecto_id === proyId && ESTADOS_ACTIVOS.includes(s.estado))
+    .map(s => s.id)
+
+  const cantSolicitada = (mp) => {
+    if (!mp.material_id) return 0
+    return solicitud_items
+      .filter(si =>
+        solsDelProy.includes(si.solicitud_id) &&
+        si.material_id === mp.material_id &&
+        // Si el mat. presupuestado tiene actividad, filtrar por ella; si no, sumar todas
+        (!mp.actividad_id || si.actividad_id === mp.actividad_id)
+      )
       .reduce((s, si) => s + parseFloat(si.cantidad || 0), 0)
+  }
 
   const cantConsumida = (mp) => {
     if (!mp.material_id) return 0
@@ -238,7 +254,7 @@ export default function MatPresupuestados() {
                 <tbody>
                   {matsFiltrados.map(mp => {
                     const presup    = parseFloat(mp.cantidad_presupuestada || 0)
-                    const solicit   = cantSolicitada(mp.id)
+                    const solicit   = cantSolicitada(mp)
                     const consumido = cantConsumida(mp)
                     const dif       = presup - solicit
                     const pct       = presup > 0 ? (solicit / presup) * 100 : 0
