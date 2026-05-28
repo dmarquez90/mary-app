@@ -29,16 +29,24 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true })
-        const ws   = wb.Sheets[wb.SheetNames[0]]
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true, blankrows: false })
+        const wb = XLSX.read(e.target.result, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
 
-        // Encontrar fila de headers buscando "code" o "código"
+        // Leer celda por celda usando referencias directas (A1, B1, etc.)
+        // Esto evita el problema de celdas mergeadas que desplazan índices
+        const getCellValue = (col, row) => {
+          const ref = `${col}${row}`
+          const cell = ws[ref]
+          if (!cell) return null
+          return cell.v // valor raw
+        }
+
+        // Detectar fila de headers buscando "code" o "código" en columna A
         let headerRow = -1
-        for (let i = 0; i < Math.min(data.length, 10); i++) {
-          const row = data[i].map(c => String(c ?? '').toLowerCase())
-          if (row.some(c => c.includes('material code') || c.includes('código') || c.includes('codigo'))) {
-            headerRow = i; break
+        for (let r = 1; r <= 10; r++) {
+          const val = String(getCellValue('A', r) ?? '').toLowerCase()
+          if (val.includes('material code') || val.includes('código') || val.includes('codigo')) {
+            headerRow = r; break
           }
         }
         if (headerRow === -1) {
@@ -46,43 +54,28 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           setStep('error'); return
         }
 
-        const headers = data[headerRow].map(c => String(c ?? '').trim().toLowerCase())
-
-        const col = (names) => {
-          for (const n of names) {
-            const i = headers.findIndex(h => h.includes(n))
-            if (i !== -1) return i
-          }
-          return -1
-        }
-
-        let iCod  = col(['material code', 'código mat', 'codigo mat', 'código', 'codigo', 'code'])
-        let iNom  = col(['material name', 'nombre', 'name'])
-        let iUnit = col(['unit', 'unidad'])
-        let iCant = col(['budgeted quantity', 'budgeted qty', 'cant. presup', 'cantidad presup', 'qty pres', 'budgeted', 'quantity', 'cantidad', 'cant', 'qty'])
-
-        // Si no se detectaron bien por celdas mergeadas, buscar por posición en la fila de datos
-        // Verificar en la primera fila de datos reales
-        const firstDataRow = data.slice(headerRow + 1).find(r =>
-          r && r.some(c => c !== null && c !== '')
-        )
-        if (firstDataRow && iCant !== -1) {
-          // Si el valor en iCant no es número, buscar la primera columna numérica
-          const valCant = firstDataRow[iCant]
-          if (typeof valCant !== 'number') {
-            const numCol = firstDataRow.findIndex(v => typeof v === 'number' && v > 0)
-            if (numCol !== -1) iCant = numCol
+        // Con la plantilla conocida: A=código, B=nombre, C=unidad, D=cantidad
+        // Detectar qué columna tiene números en los datos
+        const dataStartRow = headerRow + 1
+        // Buscar la fila de nota si existe (fila después del header con texto largo)
+        let firstRealRow = dataStartRow
+        for (let r = dataStartRow; r <= dataStartRow + 2; r++) {
+          const valA = String(getCellValue('A', r) ?? '')
+          const valD = getCellValue('D', r)
+          if (valA.length > 30 || valA.startsWith('*')) {
+            firstRealRow = r + 1
+          } else if (valA && typeof valD === 'number') {
+            firstRealRow = r; break
           }
         }
 
-        if (iCod === -1) iCod = 0   // fallback: primera columna
-        if (iCant === -1) iCant = 3 // fallback: cuarta columna
-
-        if (iCod === -1 || iCant === -1) {
-          setErrors([isEs
-            ? `Columnas requeridas no encontradas. Headers detectados: ${headers.filter(Boolean).join(', ')}`
-            : `Required columns not found. Detected headers: ${headers.filter(Boolean).join(', ')}`])
-          setStep('error'); return
+        // Encontrar la columna de cantidad verificando en la primera fila real
+        // Por default D (índice 3), pero si D tiene texto buscar la primera numérica
+        const colLetters = ['A','B','C','D','E','F','G','H']
+        let cantColLetter = 'D'
+        for (const cl of colLetters) {
+          const val = getCellValue(cl, firstRealRow)
+          if (typeof val === 'number' && val > 0) { cantColLetter = cl; break }
         }
 
         const parsed = []
@@ -93,30 +86,21 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           if (m.codigo) matsByCodigo[m.codigo.toLowerCase()] = m
         })
 
-        // Empezar desde la fila DESPUÉS de los headers
-        // Saltar cualquier fila que no sea dato real (notas, instrucciones, etc.)
-        for (let r = headerRow + 1; r < data.length; r++) {
-          const row = data[r]
-          if (!row || row.every(c => c === null || c === '')) continue
-
-          const rawCod  = row[iCod]
-          const rawNom  = iNom >= 0 ? row[iNom] : null
-          const rawUnit = iUnit >= 0 ? row[iUnit] : null
-          const rawCant = row[iCant]
-
-          const cod  = String(rawCod ?? '').trim()
-          const nom  = String(rawNom ?? '').trim()
-          const unit = String(rawUnit ?? 'und').trim() || 'und'
+        // Encontrar el número máximo de filas con datos
+        const maxRow = 500
+        for (let r = firstRealRow; r <= maxRow; r++) {
+          const cod  = String(getCellValue('A', r) ?? '').trim()
+          const nom  = String(getCellValue('B', r) ?? '').trim()
+          const unit = String(getCellValue('C', r) ?? 'und').trim() || 'und'
+          const rawCant = getCellValue(cantColLetter, r)
           const cant = typeof rawCant === 'number' ? rawCant : parseFloat(String(rawCant ?? '').replace(',', '.')) || 0
 
-          // Saltar filas sin código o con texto de nota/instrucción
-          if (!cod) continue
-          if (cod.length > 40) continue // notas largas
-          if (cod.startsWith('*')) continue
-          if (cod.toLowerCase().includes('required') || cod.toLowerCase().includes('code*')) continue
+          if (!cod) continue // fila vacía
+          if (cod.length > 40 || cod.startsWith('*') ||
+              cod.toLowerCase().includes('required')) continue // nota
 
           if (cant <= 0) {
-            errs.push(`${isEs ? 'Fila' : 'Row'} ${r + 1}: ${isEs
+            errs.push(`${isEs ? 'Fila' : 'Row'} ${r}: ${isEs
               ? `cantidad inválida para "${cod}" (valor leído: ${JSON.stringify(rawCant)})`
               : `invalid quantity for "${cod}" (read value: ${JSON.stringify(rawCant)})`}`)
             continue
@@ -138,7 +122,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
             es_adicional:           false,
             _codigo:                cod,
             _vinculado:             !!matVinculado,
-            rowNum:                 r + 1,
+            rowNum:                 r,
           })
         }
 
