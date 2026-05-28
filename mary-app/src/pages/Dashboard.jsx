@@ -17,8 +17,9 @@ const ESTADO_LABELS_EN = {
 const CAT_LABELS_EN = {
   madera: 'Wood', acero: 'Steel', concreto: 'Concrete', hierro: 'Iron',
   aluminio: 'Aluminum', plastico: 'Plastic', electrico: 'Electrical',
-  herramienta: 'Tool', pintura: 'Paint', ceramica: 'Ceramic',
+  herramienta: 'Tools', herramientas: 'Tools', pintura: 'Paint', ceramica: 'Ceramic',
   plomeria: 'Plumbing', vidrio: 'Glass', otros: 'Other',
+  acabados: 'Finishes', equipos: 'Equipment',
 }
 
 export default function Dashboard() {
