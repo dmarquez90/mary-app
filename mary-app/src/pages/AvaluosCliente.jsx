@@ -162,19 +162,27 @@ export default function AvaluosCliente() {
   const saveAvaluo = () => {
     const itemsConAvance = avItems.filter(it => parseFloat(it.cantidad_periodo||0) > 0)
     if (!proyId || itemsConAvance.length === 0) return
+    const avaluoPayload = {
+      proyecto_id:      proyId,
+      numero:           avForm.numero,
+      periodo_inicio:   avForm.periodo_inicio   || null,
+      periodo_fin:      avForm.periodo_fin       || null,
+      fecha_elaboracion:avForm.fecha_elaboracion || null,
+      presentado_a:     avForm.presentado_a      || '',
+      notas:            avForm.notas             || '',
+      impuesto_pct:     parseFloat(avForm.impuesto_pct || 0),
+      impuesto_descripcion: avForm.impuesto_descripcion || '',
+      subtotal:         avSubtotal,
+      indirecto_monto:  avIndirecto,
+      utilidad_monto:   avUtilidad,
+      impuesto_monto:   avImpuesto,
+      total:            avTotal,
+      pct_avance:       pctAvancePeriodo,
+    }
     dispatch({
       type: 'ADD_AVALUO_CLIENTE',
       payload: {
-        avaluo: {
-          ...avForm,
-          proyecto_id:      proyId,
-          subtotal:         avSubtotal,
-          indirecto_monto:  avIndirecto,
-          utilidad_monto:   avUtilidad,
-          impuesto_monto:   avImpuesto,
-          total:            avTotal,
-          pct_avance:       pctAvancePeriodo,
-        },
+        avaluo: avaluoPayload,
         items: avItems.map(it => ({
           ...it,
           cantidad_periodo:   parseFloat(it.cantidad_periodo   || 0),
