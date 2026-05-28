@@ -85,6 +85,11 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
 
           if (!cod && !nom && !cant) continue // fila vacía
 
+          // Saltar filas de notas/instrucciones (contienen * o "required")
+          const rowText = row.slice(0, 6).map(c => String(c||'').toLowerCase()).join(' ')
+          if (rowText.includes('required') || rowText.includes('instruc') ||
+              (cod.startsWith('*') && !nom && !cant)) continue
+
           if (!cod) {
             errs.push(`${isEs?'Fila':'Row'} ${r+1}: ${isEs?'código vacío':'empty code'}`)
             continue
