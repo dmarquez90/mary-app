@@ -82,6 +82,8 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           const cat  = String(row[iCat]  || '').trim()
           const desc = String(row[iDesc] || '').trim()
           if (!cat && !desc) continue
+          // Saltar filas de notas/instrucciones
+          if (cat.startsWith('*') || cat.length > 30) continue
 
           const qty  = parseFloat(row[iQty] || 0) || 0
           const mo   = parseFloat(row[iMO]  || 0) || 0
