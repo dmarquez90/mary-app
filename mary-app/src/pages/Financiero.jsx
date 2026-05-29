@@ -908,7 +908,7 @@ function SubcontratosModule({ can, rol,
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">
-          {contratosProy.length}} {t('fin_subcontracts_count', { n: '' }).replace(' ', '')}{/* fix */}
+          {contratosProy.length} {t('fin_subcontracts_count', { n: '' }).replace(' ', '')}
         </p>
         {puedeEditar && !closed && (
           <button onClick={() => { setScForm({ impuesto_pct: '0' }); setScItems([]); setScView('nuevo') }}
