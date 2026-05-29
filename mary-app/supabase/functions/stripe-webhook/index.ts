@@ -26,21 +26,21 @@ const PLAN_CONFIG: Record<string, { max_usuarios: number; max_proyectos: number 
 
 // ── Price IDs TEST → plan / periodo ──────────────────────────────────────────
 const PRICE_TO_PLAN: Record<string, string> = {
-  'price_1TZk0lJZWJ0VISBDC0xTA9us': 'starter',
-  'price_1TZk9CJZWJ0VISBDjaAT7NdV': 'starter',
-  'price_1TZkM8JZWJ0VISBDMQpKeT7X': 'pro',
-  'price_1TZkMoJZWJ0VISBDbmHJvETa': 'pro',
-  'price_1TZk4CJZWJ0VISBD1xzoc3iq': 'enterprise',
-  'price_1TZkA6JZWJ0VISBDbm0FqWtR': 'enterprise',
+  'price_1TaKbQJSrIBXg6vRDX68M4V4': 'starter',
+  'price_1TaKbQJSrIBXg6vRsoilDO90': 'starter',
+  'price_1TaKbWJSrIBXg6vR0UbtBeTe': 'pro',
+  'price_1TaKbVJSrIBXg6vRsdqW5Cwn': 'pro',
+  'price_1TaKbSJSrIBXg6vRTHEm9cXX': 'enterprise',
+  'price_1TaKbRJSrIBXg6vRoRQTdZHn': 'enterprise',
 }
 
 const PRICE_TO_PERIODO: Record<string, string> = {
-  'price_1TZk0lJZWJ0VISBDC0xTA9us': 'mensual',
-  'price_1TZk9CJZWJ0VISBDjaAT7NdV': 'anual',
-  'price_1TZkM8JZWJ0VISBDMQpKeT7X': 'mensual',
-  'price_1TZkMoJZWJ0VISBDbmHJvETa': 'anual',
-  'price_1TZk4CJZWJ0VISBD1xzoc3iq': 'mensual',
-  'price_1TZkA6JZWJ0VISBDbm0FqWtR': 'anual',
+  'price_1TaKbQJSrIBXg6vRDX68M4V4': 'mensual',
+  'price_1TaKbQJSrIBXg6vRsoilDO90': 'anual',
+  'price_1TaKbWJSrIBXg6vR0UbtBeTe': 'mensual',
+  'price_1TaKbVJSrIBXg6vRsdqW5Cwn': 'anual',
+  'price_1TaKbSJSrIBXg6vRTHEm9cXX': 'mensual',
+  'price_1TaKbRJSrIBXg6vRoRQTdZHn': 'anual',
 }
 
 function toISO(val: unknown): string | null {
