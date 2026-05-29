@@ -195,6 +195,8 @@ Deno.serve(async (req) => {
           .eq('stripe_subscription_id', subscription.id)
 
         if (empresa_id) {
+          // Grace period: 3 días antes de bloquear acceso
+          const graceFin = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
           await supabase
             .from('tenants')
             .update({
@@ -203,6 +205,7 @@ Deno.serve(async (req) => {
               stripe_subscription_id: null,
               max_usuarios:           1,
               max_proyectos:          2,
+              grace_period_fin:       graceFin,
             })
             .eq('id', empresa_id)
         }

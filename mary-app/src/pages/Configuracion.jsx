@@ -89,11 +89,63 @@ export default function Configuracion() {
     }
   }
 
+  const cambiarPlan = async () => {
+    setSubLoading(true); setSubError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-change-plan`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            empresa_id:      perfil.tenant_id,
+            new_plan:        subPlan,
+            new_periodo:     subPeriodo,
+            subscription_id: suscripcion?.stripe_subscription_id,
+          }),
+        }
+      )
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Error al cambiar plan')
+      await loadData()
+      // Mostrar mensaje de éxito
+      const msg = result.is_upgrade
+        ? (isEs ? `¡Upgrade exitoso! Ahora tienes el plan ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)}.` : `Upgrade successful! You now have the ${subPlan} plan.`)
+        : (isEs ? `Downgrade programado. Tu plan cambiará el ${result.period_end}.` : `Downgrade scheduled. Your plan will change on ${result.period_end}.`)
+      setSubError('') 
+      showSuccess(msg)
+    } catch (e) {
+      setSubError(e.message)
+    }
+    setSubLoading(false)
+  }
+
   // Cambio de contraseña
   const [pwForm, setPwForm]     = useState({ actual: '', nueva: '', confirmar: '' })
   const [pwError, setPwError]   = useState('')
   const [pwSuccess, setPwSuccess] = useState('')
   const [suscripcion, setSuscripcion] = useState(null)
+
+  const PLAN_TIERS = { starter: 1, pro: 2, enterprise: 3 }
+  const activePlan   = tenant?.plan
+  const hasActiveSub = suscripcion?.status === 'active'
+  const isVitalicio  = tenant?.plan_vitalicio === true
+
+  const getPlanAction = (planId) => {
+    if (isVitalicio) return 'vitalicio'
+    if (!hasActiveSub) return 'subscribe'
+    if (planId === activePlan && subPeriodo === (suscripcion?.periodo || tenant?.billing_cycle || 'mensual')) return 'current'
+    if (PLAN_TIERS[planId] > PLAN_TIERS[activePlan]) return 'upgrade'
+    if (PLAN_TIERS[planId] < PLAN_TIERS[activePlan]) return 'downgrade'
+    return 'change_period'
+  }
+
+  const planAction = getPlanAction(subPlan)
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMode, setPwMode]     = useState('cambio') // 'cambio' | 'olvide'
   const [resetEmail, setResetEmail] = useState('')
@@ -906,34 +958,75 @@ export default function Configuracion() {
             </div>
           )}
 
-          {/* Botón pago */}
-          <button
-            onClick={iniciarCheckout}
-            disabled={subLoading}
-            className="w-full py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
-            style={{ background: '#1B3A6B' }}>
-            {subLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {isEs ? 'Redirigiendo a Stripe...' : 'Redirecting to Stripe...'}
-              </>
-            ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
-                </svg>
+          {/* Botón de acción inteligente */}
+          {planAction === 'current' ? (
+            <div className="w-full py-3 text-sm font-semibold text-center rounded-xl border-2 border-green-200 bg-green-50 text-green-700">
+              ✓ {isEs ? 'Plan activo' : 'Active plan'}
+              {suscripcion?.current_period_end && (
+                <span className="text-xs font-normal ml-2 text-green-600">
+                  · {isEs ? 'hasta' : 'until'} {new Date(suscripcion.current_period_end).toLocaleDateString(isEs ? 'es' : 'en')}
+                </span>
+              )}
+            </div>
+          ) : planAction === 'vitalicio' ? (
+            <div className="w-full py-3 text-sm font-semibold text-center rounded-xl border-2 border-amber-200 bg-amber-50 text-amber-700">
+              ⭐ {isEs ? 'Plan vitalicio activo' : 'Lifetime plan active'}
+            </div>
+          ) : (
+            <>
+              {/* Nota de prorrateo para upgrade */}
+              {planAction === 'upgrade' && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700 mb-3">
+                  {isEs
+                    ? '💡 Solo pagarás la diferencia proporcional al tiempo restante de tu plan actual. Stripe prorratea automáticamente.'
+                    : '💡 You will only pay the prorated difference for the remaining time on your current plan. Stripe calculates this automatically.'}
+                </div>
+              )}
+              {/* Nota para downgrade */}
+              {(planAction === 'downgrade' || planAction === 'change_period') && (
+                <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700 mb-3">
+                  {isEs
+                    ? `⏳ El cambio de plan será efectivo al finalizar tu ciclo actual (${suscripcion?.current_period_end ? new Date(suscripcion.current_period_end).toLocaleDateString('es') : '—'}). No se realiza ningún cargo ahora.`
+                    : `⏳ The plan change will take effect at the end of your current cycle (${suscripcion?.current_period_end ? new Date(suscripcion.current_period_end).toLocaleDateString('en') : '—'}). No charge now.`}
+                </div>
+              )}
+              <button
+                onClick={planAction === 'subscribe' ? iniciarCheckout : cambiarPlan}
+                disabled={subLoading}
+                className="w-full py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+                style={{ background: planAction === 'downgrade' ? '#92400E' : '#1B3A6B' }}>
+                {subLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    {isEs ? 'Procesando...' : 'Processing...'}
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                    </svg>
+                    {planAction === 'subscribe' && (isEs
+                      ? `Suscribirse a MARY ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)} · $${PLANES[subPlan][subPeriodo].toFixed(2)}/${subPeriodo === 'mensual' ? 'mes' : 'año'}`
+                      : `Subscribe to MARY ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)} · $${PLANES[subPlan][subPeriodo].toFixed(2)}/${subPeriodo === 'mensual' ? 'mo' : 'yr'}`)}
+                    {planAction === 'upgrade' && (isEs
+                      ? `↑ Upgrade a ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)} · pago prorrateado`
+                      : `↑ Upgrade to ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)} · prorated charge`)}
+                    {planAction === 'downgrade' && (isEs
+                      ? `↓ Cambiar a ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)} · efectivo al próximo ciclo`
+                      : `↓ Switch to ${subPlan.charAt(0).toUpperCase()+subPlan.slice(1)} · effective next cycle`)}
+                    {planAction === 'change_period' && (isEs
+                      ? `Cambiar a facturación ${subPeriodo} · efectivo al próximo ciclo`
+                      : `Switch to ${subPeriodo} billing · effective next cycle`)}
+                  </>
+                )}
+              </button>
+              <p className="text-xs text-gray-400 text-center mt-3">
                 {isEs
-                  ? `Suscribirse a MARY ${subPlan.charAt(0).toUpperCase() + subPlan.slice(1)} · $${PLANES[subPlan][subPeriodo].toFixed(2)}/${subPeriodo === 'mensual' ? 'mes' : 'año'}`
-                  : `Subscribe to MARY ${subPlan.charAt(0).toUpperCase() + subPlan.slice(1)} · $${PLANES[subPlan][subPeriodo].toFixed(2)}/${subPeriodo === 'mensual' ? 'mo' : 'yr'}`}
-              </>
-            )}
-          </button>
-
-          <p className="text-xs text-gray-400 text-center mt-3">
-            {isEs
-              ? 'Pago seguro procesado por Stripe. Puedes cancelar en cualquier momento.'
-              : 'Secure payment processed by Stripe. Cancel anytime.'}
-          </p>
+                  ? 'Pago seguro procesado por Stripe. Puedes cancelar en cualquier momento.'
+                  : 'Secure payment processed by Stripe. Cancel anytime.'}
+              </p>
+            </>
+          )}
         </div>
       )}
 

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { SubscriptionContext } from './subscriptionContext'
 import { StoreProvider } from './store'
 import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
@@ -126,6 +127,60 @@ function Layout() {
   const [sideOpen, setSideOpen] = useState(true)
   const [chatUnread, setChatUnread] = useState(0)
   const isEs = lang === 'ES'
+
+  // ── Estado de suscripción ────────────────────────────
+  const [subStatus, setSubStatus] = useState(null)
+
+  const checkSub = async () => {
+    if (!perfil?.tenant_id) return
+    const [{ data: t }, { data: s }] = await Promise.all([
+      supabase.from('tenants').select('plan, es_trial, plan_vitalicio, grace_period_fin').eq('id', perfil.tenant_id).single(),
+      supabase.from('suscripciones').select('status').eq('empresa_id', perfil.tenant_id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    setSubStatus({
+      plan:            t?.plan,
+      plan_vitalicio:  t?.plan_vitalicio,
+      grace_period_fin: t?.grace_period_fin,
+      subStatus:       s?.status || null,
+    })
+  }
+
+  useEffect(() => {
+    checkSub()
+  }, [perfil?.tenant_id])
+
+  // #5 — Realtime: detecta cambios de plan en tiempo real (ej. otro admin renueva)
+  useEffect(() => {
+    if (!perfil?.tenant_id) return
+    const channel = supabase
+      .channel(`tenant_plan_${perfil.tenant_id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'tenants',
+        filter: `id=eq.${perfil.tenant_id}`,
+      }, () => checkSub())
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [perfil?.tenant_id])
+
+  const now = new Date()
+  // Grace period activo: suscripción cancelada pero aún dentro del período de gracia
+  const gracePeriodActive = subStatus?.grace_period_fin && new Date(subStatus.grace_period_fin) > now
+  const daysGraceLeft = subStatus?.grace_period_fin
+    ? Math.max(0, Math.ceil((new Date(subStatus.grace_period_fin) - now) / (1000 * 60 * 60 * 24)))
+    : 0
+
+  // #2 — past_due: pago fallido pero aún no cancelado → advertencia sin bloqueo
+  const isPastDue = subStatus?.subStatus === 'past_due'
+
+  // Modo lectura: plan trial + grace period vencido (o inexistente) + no vitalicio
+  const isReadOnly = !isSuperAdmin && subStatus !== null && !subStatus.plan_vitalicio && (
+    subStatus.plan === 'trial' && !gracePeriodActive
+  )
+
+  // Tipo de advertencia (si no está bloqueado)
+  const subWarning = isReadOnly ? null : (
+    gracePeriodActive ? 'grace' : isPastDue ? 'past_due' : null
+  )
 
   // ── Badge de mensajes no leídos en nav ───────────────
   useEffect(() => {
@@ -387,11 +442,44 @@ function Layout() {
           </div>
         </header>
 
+        {/* Banner de suscripción — 3 estados posibles */}
+        {(isReadOnly || subWarning) && (
+          <div className="flex items-center justify-between px-6 py-2.5 text-xs font-medium flex-shrink-0"
+            style={{
+              background: isReadOnly ? '#FEE2E2' : '#FEF3C7',
+              borderBottom: `1px solid ${isReadOnly ? '#FCA5A5' : '#F59E0B'}`,
+              color: isReadOnly ? '#991B1B' : '#92400E',
+            }}>
+            <div className="flex items-center gap-2">
+              <span>{isReadOnly ? '🔒' : '⚠'}</span>
+              <span>
+                {isReadOnly && (isEs
+                  ? 'Suscripción vencida. Modo lectura activo — no puedes crear ni editar datos.'
+                  : 'Subscription expired. Read-only mode — no creating or editing.')}
+                {subWarning === 'grace' && (isEs
+                  ? `Suscripción cancelada. Tienes ${daysGraceLeft} día${daysGraceLeft !== 1 ? 's' : ''} antes de quedar en modo lectura.`
+                  : `Subscription cancelled. You have ${daysGraceLeft} day${daysGraceLeft !== 1 ? 's' : ''} before read-only mode.`)}
+                {subWarning === 'past_due' && (isEs
+                  ? 'Problema con tu pago. Stripe reintentará el cobro automáticamente.'
+                  : 'Payment issue. Stripe will automatically retry the charge.')}
+              </span>
+            </div>
+            <button
+              onClick={() => setPage('configuracion')}
+              className="ml-4 px-3 py-1 rounded-lg text-xs font-bold text-white flex-shrink-0"
+              style={{ background: isReadOnly ? '#DC2626' : '#D97706' }}>
+              {isEs ? 'Ver suscripción' : 'View subscription'}
+            </button>
+          </div>
+        )}
+
         <main className="flex-1 overflow-y-auto">
-          {pageBlockedByPlan
-            ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
-            : <Page onNavigate={setPage} />
-          }
+          <SubscriptionContext.Provider value={{ isReadOnly }}>
+            {pageBlockedByPlan
+              ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
+              : <Page onNavigate={setPage} />
+            }
+          </SubscriptionContext.Provider>
         </main>
       </div>
 

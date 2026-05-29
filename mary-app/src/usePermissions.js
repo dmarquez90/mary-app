@@ -1,5 +1,6 @@
 import { useAuth } from './auth'
 import { planTieneModulo } from './plans'
+import { useSubscription } from './subscriptionContext'
 
 const MATRIX = {
   dashboard:          { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true  },
@@ -74,9 +75,16 @@ export function usePermissions() {
   const rol = perfil?.rol || 'lectura'
   const permisosCuston       = perfil?.permisos_custom || null
   const proyectosPermitidos  = perfil?.proyectos_permitidos || null
+  const { isReadOnly }       = useSubscription()
 
   // ── Control por ROL ───────────────────────────────────────────────
+  // Permisos de edición bloqueados en modo lectura (suscripción vencida)
+  const EDIT_PERMISOS = ['proyectos_crear','proyectos_editar','proyectos_eliminar',
+    'presupuesto_editar','inventario_editar','mat_pres_editar','solicitud_crear',
+    'oc_crear','oc_aprobar','financiero_editar','ordenes_cambio_editar','avaluos_editar']
+
   const can = (permiso) => {
+    if (isReadOnly && EDIT_PERMISOS.includes(permiso)) return false
     if (rol === 'super_admin') return true
     if (permisosCuston) {
       const mapped = PERMISO_A_MODULO[permiso]
@@ -101,6 +109,7 @@ export function usePermissions() {
   }
 
   const canEdit = (modulo) => {
+    if (isReadOnly) return false
     if (rol === 'super_admin') return true
     if (permisosCuston?.[modulo] !== undefined) return permisosCuston[modulo].editar === true
     const row = MATRIX[`${modulo}_editar`]
