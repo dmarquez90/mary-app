@@ -15,12 +15,18 @@ const PLAN_CONFIG = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const { nombre, empresa, telefono, email, password, pais, plan } = await req.json()
+    const { nombre, empresa, telefono, email, password, pais, plan, ref_code } = await req.json()
+
     if (!nombre || !empresa || !email || !password || !pais)
       return new Response(JSON.stringify({ error: 'missing_fields' }), { status: 400, headers: corsHeaders })
 
     const planKey = PLAN_CONFIG[plan] ? plan : 'starter'
     const { max_usuarios, max_proyectos } = PLAN_CONFIG[planKey]
+
+    // Limpiar ref_code — solo letras y números, máx 20 chars, mayúsculas
+    const cleanRefCode = ref_code
+      ? String(ref_code).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
+      : null
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -28,15 +34,27 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { data: empresaExistente } = await supabase.from('tenants').select('id, activo').ilike('nombre_empresa', empresa.trim()).single()
+    // Verificar empresa duplicada
+    const { data: empresaExistente } = await supabase
+      .from('tenants')
+      .select('id, activo')
+      .ilike('nombre_empresa', empresa.trim())
+      .single()
+
     if (empresaExistente?.activo)
       return new Response(JSON.stringify({ error: 'company_taken' }), { status: 409, headers: corsHeaders })
 
+    // Verificar email duplicado
     const { data: { users: authUsers } } = await supabase.auth.admin.listUsers()
     const authUserExistente = authUsers?.find(u => u.email?.toLowerCase() === email.toLowerCase())
 
     if (authUserExistente) {
-      const { data: perfilExistente } = await supabase.from('usuarios').select('id, tenant_id, tenants(activo)').eq('id', authUserExistente.id).single()
+      const { data: perfilExistente } = await supabase
+        .from('usuarios')
+        .select('id, tenant_id, tenants(activo)')
+        .eq('id', authUserExistente.id)
+        .single()
+
       const tieneEmpresaActiva = perfilExistente?.tenants?.activo === true
       if (tieneEmpresaActiva)
         return new Response(JSON.stringify({ error: 'email_taken' }), { status: 409, headers: corsHeaders })
@@ -45,43 +63,98 @@ serve(async (req) => {
       if (perfilExistente) await supabase.from('usuarios').delete().eq('id', authUserExistente.id)
 
       const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 7)
-      const { data: nuevoTenant, error: tenantError } = await supabase.from('tenants').insert({
-        nombre_empresa: empresa.trim(), pais, telefono, plan: planKey,
-        max_usuarios, max_proyectos, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
-      }).select().single()
+      const { data: nuevoTenant, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          nombre_empresa: empresa.trim(),
+          pais,
+          telefono,
+          plan: planKey,
+          max_usuarios,
+          max_proyectos,
+          activo:    true,
+          es_trial:  true,
+          trial_fin: trialFin.toISOString(),
+          ref_code:  cleanRefCode,   // ← NUEVO: guardar código de referido
+        })
+        .select()
+        .single()
+
       if (tenantError) throw tenantError
 
       const { error: usuarioError } = await supabase.from('usuarios').insert({
-        id: authUserExistente.id, nombre, email: email.toLowerCase(),
-        rol: 'client_admin', tenant_id: nuevoTenant.id, activo: true,
+        id:        authUserExistente.id,
+        nombre,
+        email:     email.toLowerCase(),
+        rol:       'client_admin',
+        tenant_id: nuevoTenant.id,
+        activo:    true,
       })
       if (usuarioError) throw usuarioError
-      return new Response(JSON.stringify({ success: true, reactivated: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+      return new Response(
+        JSON.stringify({ success: true, reactivated: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
+    // ── Nuevo usuario y empresa ────────────────────────────────────────────
     const trialFin = new Date(); trialFin.setDate(trialFin.getDate() + 7)
-    const { data: tenant, error: tenantError } = await supabase.from('tenants').insert({
-      nombre_empresa: empresa.trim(), pais, telefono, plan: planKey,
-      max_usuarios, max_proyectos, activo: true, es_trial: true, trial_fin: trialFin.toISOString(),
-    }).select().single()
+
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .insert({
+        nombre_empresa: empresa.trim(),
+        pais,
+        telefono,
+        plan: planKey,
+        max_usuarios,
+        max_proyectos,
+        activo:    true,
+        es_trial:  true,
+        trial_fin: trialFin.toISOString(),
+        ref_code:  cleanRefCode,   // ← NUEVO: guardar código de referido
+      })
+      .select()
+      .single()
+
     if (tenantError) throw tenantError
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: email.toLowerCase(), password, email_confirm: true,
+      email:         email.toLowerCase(),
+      password,
+      email_confirm: true,
     })
-    if (authError) { await supabase.from('tenants').delete().eq('id', tenant.id); throw authError }
+
+    if (authError) {
+      await supabase.from('tenants').delete().eq('id', tenant.id)
+      throw authError
+    }
 
     const { error: usuarioError } = await supabase.from('usuarios').insert({
-      id: authData.user.id, nombre, email: email.toLowerCase(),
-      rol: 'client_admin', tenant_id: tenant.id, activo: true,
+      id:        authData.user.id,
+      nombre,
+      email:     email.toLowerCase(),
+      rol:       'client_admin',
+      tenant_id: tenant.id,
+      activo:    true,
     })
+
     if (usuarioError) {
       await supabase.auth.admin.deleteUser(authData.user.id)
       await supabase.from('tenants').delete().eq('id', tenant.id)
       throw usuarioError
     }
-    return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(
+      JSON.stringify({ error: err.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
 })

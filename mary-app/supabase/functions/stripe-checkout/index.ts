@@ -32,14 +32,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { plan, periodo, empresa_id, email, empresa_nombre } = await req.json()
+    // ── ref_code es opcional — no bloquea el checkout si está vacío ──────────
+    const { plan, periodo, empresa_id, email, empresa_nombre, ref_code } = await req.json()
 
     const priceId = PRICE_IDS[plan]?.[periodo]
     if (!priceId) {
       throw new Error(`Plan inválido: ${plan}/${periodo}`)
     }
 
-    console.log(`Creando checkout: empresa=${empresa_id} plan=${plan} periodo=${periodo} price=${priceId}`)
+    // Limpiar ref_code: solo letras y números, máx 20 chars, mayúsculas
+    const cleanRefCode = ref_code
+      ? String(ref_code).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
+      : ''
+
+    console.log(`Creando checkout: empresa=${empresa_id} plan=${plan} periodo=${periodo} price=${priceId} ref_code=${cleanRefCode || 'ninguno'}`)
 
     const session = await stripe.checkout.sessions.create({
       mode:                 'subscription',
@@ -53,9 +59,15 @@ Deno.serve(async (req) => {
         plan,
         periodo,
         empresa_nombre: empresa_nombre ?? '',
+        ref_code:       cleanRefCode,   // ← NUEVO: guardado en metadata de la sesión
       },
       subscription_data: {
-        metadata: { empresa_id, plan, periodo },
+        metadata: {
+          empresa_id,
+          plan,
+          periodo,
+          ref_code: cleanRefCode,       // ← NUEVO: guardado en metadata de la suscripción
+        },
       },
     })
 

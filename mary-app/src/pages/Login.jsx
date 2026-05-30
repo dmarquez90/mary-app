@@ -55,6 +55,9 @@ const T = {
     last_updated:      'Última actualización: Mayo 2026',
     show_pass:         'Mostrar contraseña',
     hide_pass:         'Ocultar contraseña',
+    reg_ref_code:      '¿Tienes un código de referido? (opcional)',
+    reg_ref_code_ph:   'Ej: GABR202601',
+    reg_ref_applied:   'Código aplicado',
   },
   EN: {
     tagline:           'MANAGEMENT & RESOURCES YIELD',
@@ -102,6 +105,9 @@ const T = {
     last_updated:      'Last updated: May 2026',
     show_pass:         'Show password',
     hide_pass:         'Hide password',
+    reg_ref_code:      'Do you have a referral code? (optional)',
+    reg_ref_code_ph:   'E.g.: GABR202601',
+    reg_ref_applied:   'Code applied',
   }
 }
 
@@ -523,7 +529,7 @@ export default function Login({ onNavigate }) {
   const [loading, setLoading]   = useState(false)
 
   // Register
-  const [reg, setReg]               = useState({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
+  const [reg, setReg]               = useState({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'', ref_code:'' })
   const [showRegPass, setShowRegPass] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [regError, setRegError]     = useState('')
@@ -571,7 +577,7 @@ export default function Login({ onNavigate }) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan })
+          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan, ref_code: reg.ref_code.trim().toUpperCase() || undefined })
         }
       )
       const result = await res.json()
@@ -581,7 +587,7 @@ export default function Login({ onNavigate }) {
         throw new Error(result.error || 'Error al crear la cuenta.')
       }
       setRegSuccess(true)
-      setReg({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'' })
+      setReg({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'', ref_code:'' })
       setSelectedPlan('')
       setTermsAccepted(false)
     } catch (err) {
@@ -855,6 +861,26 @@ export default function Login({ onNavigate }) {
                       <EyeIcon visible={showRegPass} />
                     </button>
                   </div>
+                </div>
+
+                {/* Código de referido — opcional */}
+                <div>
+                  <label style={{ fontSize: '12px', color: 'rgba(180,200,240,0.5)', display: 'block', marginBottom: '5px', letterSpacing: '0.03em' }}>
+                    {t.reg_ref_code}
+                  </label>
+                  <input
+                    type="text"
+                    style={{ ...inputNoIconStyle, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                    value={reg.ref_code}
+                    onChange={e => setReg(f => ({ ...f, ref_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                    maxLength={20}
+                    placeholder={t.reg_ref_code_ph}
+                  />
+                  {reg.ref_code && (
+                    <p style={{ fontSize: '11px', color: '#3bb876', marginTop: '4px' }}>
+                      ✓ {t.reg_ref_applied}: {reg.ref_code}
+                    </p>
+                  )}
                 </div>
 
                 {/* Términos */}
