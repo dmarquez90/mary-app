@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
   try {
     // ── ref_code es opcional — no bloquea el checkout si está vacío ──────────
-    const { plan, periodo, empresa_id, email, empresa_nombre, ref_code } = await req.json()
+    const { plan, periodo, empresa_id, email, empresa_nombre, ref_code, promotion_code_id } = await req.json()
 
     const priceId = PRICE_IDS[plan]?.[periodo]
     if (!priceId) {
@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
       line_items:           [{ price: priceId, quantity: 1 }],
       success_url:          `${SITE_URL}/pago-exitoso`,
       cancel_url:           `${SITE_URL}/pago-cancelado`,
+      // Apply promo code discount if provided
+      ...(promotion_code_id ? { discounts: [{ promotion_code: promotion_code_id }] } : { allow_promotion_codes: false }),
       metadata: {
         empresa_id,
         plan,

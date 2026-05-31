@@ -51,11 +51,37 @@ export default function Configuracion() {
   const [subPeriodo, setSubPeriodo]   = useState('mensual')
   const [subLoading, setSubLoading]   = useState(false)
   const [subError, setSubError]       = useState('')
+  // Código promo
+  const [promoCode, setPromoCode]     = useState('')
+  const [promoData, setPromoData]     = useState(null)   // { valid, promo_code_id, discount_type, discount_value, name }
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoError, setPromoError]   = useState('')
 
   const PLANES = {
     starter:    { mensual: 29.99, anual: 25.49 },
     pro:        { mensual: 49.99, anual: 42.49 },
     enterprise: { mensual: 69.99, anual: 59.49 },
+  }
+
+  const validatePromoCode = async () => {
+    if (!promoCode.trim()) return
+    setPromoLoading(true); setPromoError(''); setPromoData(null)
+    try {
+      // Calls the portal API to validate against Stripe
+      const res = await fetch(
+        `https://mary-portal.vercel.app/api/stripe/validate-coupon?code=${promoCode.trim().toUpperCase()}`
+      )
+      const data = await res.json()
+      if (data.valid) {
+        setPromoData(data)
+      } else {
+        setPromoError(isEs ? 'Código inválido o expirado' : 'Invalid or expired code')
+      }
+    } catch {
+      setPromoError(isEs ? 'Error al validar código' : 'Error validating code')
+    } finally {
+      setPromoLoading(false)
+    }
   }
 
   const iniciarCheckout = async () => {
@@ -72,11 +98,12 @@ export default function Configuracion() {
             'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
-            plan:           subPlan,
-            periodo:        subPeriodo,
-            empresa_id:     perfil.tenant_id,
-            email:          perfil.email,
-            empresa_nombre: tenant?.nombre_empresa || '',
+            plan:               subPlan,
+            periodo:            subPeriodo,
+            empresa_id:         perfil.tenant_id,
+            email:              perfil.email,
+            empresa_nombre:     tenant?.nombre_empresa || '',
+            promotion_code_id:  promoData?.promo_code_id || undefined,
           }),
         }
       )
@@ -990,8 +1017,47 @@ export default function Configuracion() {
                     : `⏳ The plan change will take effect at the end of your current cycle (${suscripcion?.current_period_end ? new Date(suscripcion.current_period_end).toLocaleDateString('en') : '—'}). No charge now.`}
                 </div>
               )}
+              {/* ── Código Promo (solo al suscribirse) ── */}
+              {planAction === 'subscribe' && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                    {isEs ? '¿Tienes un código de descuento? (opcional)' : 'Do you have a discount code? (optional)'}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={e => { setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setPromoData(null); setPromoError('') }}
+                      maxLength={20}
+                      placeholder={isEs ? 'Ej: GABO20' : 'E.g.: GABO20'}
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B]"
+                    />
+                    <button
+                      type="button"
+                      onClick={validatePromoCode}
+                      disabled={!promoCode.trim() || promoLoading}
+                      className="px-3 py-2 text-xs font-semibold text-white rounded-lg disabled:opacity-40 transition-opacity"
+                      style={{ background: '#1B3A6B' }}>
+                      {promoLoading
+                        ? (isEs ? 'Validando...' : 'Checking...')
+                        : (isEs ? 'Aplicar' : 'Apply')}
+                    </button>
+                  </div>
+                  {promoData && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-xs text-green-600 font-medium">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      {isEs
+                        ? `¡Código aplicado! ${promoData.discount_type === 'percent' ? `${promoData.discount_value}% de descuento` : `$${promoData.discount_value} de descuento`} en tu primer pago`
+                        : `Code applied! ${promoData.discount_type === 'percent' ? `${promoData.discount_value}% off` : `$${promoData.discount_value} off`} your first payment`}
+                    </div>
+                  )}
+                  {promoError && (
+                    <p className="mt-1 text-xs text-red-500">{promoError}</p>
+                  )}
+                </div>
+              )}
+
               <button
-                onClick={planAction === 'subscribe' ? iniciarCheckout : cambiarPlan}
                 disabled={subLoading}
                 className="w-full py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
                 style={{ background: planAction === 'downgrade' ? '#92400E' : '#1B3A6B' }}>
