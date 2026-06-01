@@ -371,6 +371,7 @@ export default function Financiero() {
             subcontratos_avaluos={subcontratos_avaluos}
             subcontratos_avaluo_items={subcontratos_avaluo_items}
             subcontratos_retenciones={state.subcontratos_retenciones||[]}
+            ordenes_pago_retencion={state.ordenes_pago_retencion||[]}
             dispatch={dispatch} fmt2={fmt2} fmt={fmt}
             can={can} rol={rol} currentUserId={currentUserId}
             t={t}
@@ -727,6 +728,7 @@ function SubcontratosModule({ can, rol,
   subcontratos_contratos, subcontratos_items,
   subcontratos_avaluos, subcontratos_avaluo_items,
   subcontratos_retenciones,
+  ordenes_pago_retencion = [],
   dispatch, fmt2, fmt, t,
   currentUserId,
 }) {
@@ -822,7 +824,7 @@ function SubcontratosModule({ can, rol,
     if (!scSelected) return
     const avaluo = {
       subcontrato_id:    scSelected.id,
-      numero:            avForm._editAvaluoNum || numAvaluo,
+      numero:            numAvaluo,
       periodo_inicio:    avForm.periodo_inicio || null,
       periodo_fin:       avForm.periodo_fin || null,
       fecha_elaboracion: avForm.fecha_elaboracion || new Date().toISOString().split('T')[0],
@@ -836,17 +838,14 @@ function SubcontratosModule({ can, rol,
       notas:             avForm.notas || '',
     }
     const items = avItems.map(it => {
-      const scIt    = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
-      const cantAnt = getCantAnterior(it.subcontrato_item_id)
-      const cantAct = Math.round(parseFloat(it.cantidad_actual||0) * 10000) / 10000
-      const costo   = parseFloat(scIt?.costo_unitario||0)
+      const scIt = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
       return {
         subcontrato_item_id: it.subcontrato_item_id,
-        cantidad_anterior:   cantAnt,
-        cantidad_actual:     cantAct,
-        cantidad_acumulada:  Math.round((cantAnt + cantAct) * 10000) / 10000,
-        costo_unitario:      costo,
-        monto_actual:        Math.round(cantAct * costo * 100) / 100,
+        cantidad_anterior:   getCantAnterior(it.subcontrato_item_id),
+        cantidad_actual:     parseFloat(it.cantidad_actual||0),
+        cantidad_acumulada:  getCantAnterior(it.subcontrato_item_id) + parseFloat(it.cantidad_actual||0),
+        costo_unitario:      parseFloat(scIt?.costo_unitario||0),
+        monto_actual:        parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0),
       }
     })
     if (avForm._editId) {
@@ -1247,17 +1246,51 @@ function SubcontratosModule({ can, rol,
           const retenciones = (subcontratos_retenciones||[])
             .filter(r => r.subcontrato_id === scSelected.id)
           const retencionDevuelta = retenciones
-            .filter(r => r.estado === 'devuelta')
-            .reduce((s,r) => s + parseFloat(r.monto_devuelto||0), 0)
+            .filter(r => r.estado === 'devuelta' || r.estado === 'pagada')
+            .reduce((s,r) => s + parseFloat(r.monto_retenido||0), 0)
           const retencionPendiente = retencionTotal - retencionDevuelta
+          // Retenciones liberadas sin orden de pago — candidatas para generar OPR
+          const sinOrden = retenciones.filter(r =>
+            (r.estado === 'devuelta') && !r.orden_pago_id)
+          const totalSinOrden = sinOrden.reduce((s,r) => s + parseFloat(r.monto_retenido||0), 0)
+          // Órdenes de pago de este subcontrato
+          const ordenes = (ordenes_pago_retencion||[]).filter(o => o.subcontrato_id === scSelected.id)
           if (retencionTotal === 0) return null
           return (
             <div className="mb-5 p-4 bg-amber-50 rounded-xl border border-amber-100">
+              {/* Header con botón Generar OPR */}
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
                   {t('fin_sc_retention_title')}
                 </p>
+                {sinOrden.length > 0 && puedeEditar && (
+                  <button
+                    onClick={() => {
+                      const msg = (isEs
+                        ? `Generar Orden de Pago por ${sinOrden.length} retención(es) liberada(s) de ${scSelected.subcontratista}?
+Total: `
+                        : `Generate Payment Order for ${sinOrden.length} released retention(s) of ${scSelected.subcontratista}?
+Total: `)
+                        + fmt(totalSinOrden, moneda)
+                      if (!window.confirm(msg)) return
+                      dispatch({
+                        type: 'EMITIR_ORDEN_PAGO_RETENCION',
+                        payload: {
+                          subcontrato:  scSelected,
+                          retenciones:  sinOrden,
+                          proyecto_id:  proyId,
+                          notas: '',
+                        }
+                      })
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg text-white font-semibold flex items-center gap-1.5"
+                    style={{ background: '#1B3A6B' }}>
+                    📄 {t('fin_sc_emit_order_btn')} ({fmt(totalSinOrden, moneda)})
+                  </button>
+                )}
               </div>
+
+              {/* KPIs */}
               <div className="grid grid-cols-3 gap-3 mb-3">
                 <div>
                   <p className="text-xs text-amber-600">{t('fin_sc_retained')}</p>
@@ -1272,19 +1305,23 @@ function SubcontratosModule({ can, rol,
                   <p className="text-base font-bold font-mono text-amber-700">{fmt(retencionPendiente, moneda)}</p>
                 </div>
               </div>
+
               {/* Tabla de retenciones por avalúo */}
-              <table className="w-full text-xs">
+              <table className="w-full text-xs mb-3">
                 <thead><tr className="border-b border-amber-200">
-                  {['Avalúo', isEs?'Retenido':'Retained', isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status', ''].map((h,i) =>
+                  {['Avalúo', isEs?'Retenido':'Retained', isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status', isEs?'Orden de pago':'Payment order'].map((h,i) =>
                     <th key={i} className="px-2 py-1 text-left text-amber-600 font-medium">{h}</th>
                   )}
                 </tr></thead>
                 <tbody>
                   {avaluosSc.filter(a=>a.estado==='aprobado'&&(a.retencion_monto||0)>0).map(av => {
-                    const ret = retenciones.find(r => r.avaluo_id === av.id)
-                    const devuelta = ret?.estado === 'devuelta'
+                    const ret      = retenciones.find(r => r.avaluo_id === av.id)
+                    const devuelta = ret?.estado === 'devuelta' || ret?.estado === 'pagada'
                     const fechaEst = ret?.fecha_devolucion_est
                     const vencida  = fechaEst && new Date(fechaEst) <= new Date() && !devuelta
+                    const orden    = ret?.orden_pago_id
+                      ? ordenes.find(o => o.id === ret.orden_pago_id)
+                      : null
                     return (
                       <tr key={av.id} className="border-b border-amber-100">
                         <td className="px-2 py-1.5 font-medium">#{av.numero}</td>
@@ -1294,29 +1331,81 @@ function SubcontratosModule({ can, rol,
                         </td>
                         <td className="px-2 py-1.5">
                           <span className={`px-2 py-0.5 rounded-full font-medium ${
+                            ret?.estado === 'pagada' ? 'bg-blue-100 text-blue-700' :
                             devuelta ? 'bg-green-100 text-green-700' :
                             vencida  ? 'bg-red-100 text-red-600' :
                             'bg-amber-100 text-amber-700'}`}>
-                            {devuelta ? (isEs?'Devuelta':'Released') :
+                            {ret?.estado === 'pagada' ? (isEs?'Pagada':'Paid') :
+                             devuelta ? (isEs?'Devuelta':'Released') :
                              vencida  ? (isEs?'Vencida':'Overdue') :
                              (isEs?'Retenida':'Retained')}
                           </span>
                         </td>
                         <td className="px-2 py-1.5">
-                          {!devuelta && ret && puedeEditar && (
+                          {orden ? (
+                            <span className="text-xs font-mono font-semibold text-blue-700">
+                              {orden.numero_orden}
+                            </span>
+                          ) : devuelta ? (
+                            <span className="text-xs text-amber-600 italic">
+                              {isEs ? 'Sin orden' : 'No order'}
+                            </span>
+                          ) : ret && puedeEditar ? (
                             <button
-                              onClick={() => dispatch({ type:'DEVOLVER_RETENCION', payload:{ retencion: ret, contrato: scSelected } })}
+                              onClick={() => {
+                                if (!window.confirm(
+                                  isEs ? `¿Liberar la retención #${av.numero} de ${scSelected.subcontratista}?`
+                                       : `Release retention #${av.numero} of ${scSelected.subcontratista}?`
+                                )) return
+                                dispatch({ type:'DEVOLVER_RETENCION', payload:{ retencion: ret, contrato: scSelected } })
+                              }}
                               className="text-xs px-2 py-0.5 rounded-lg text-white font-medium"
                               style={{ background: '#1D9E75' }}>
                               {t('fin_sc_release_btn')}
                             </button>
-                          )}
+                          ) : null}
                         </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
+
+              {/* Órdenes de pago emitidas para este subcontrato */}
+              {ordenes.length > 0 && (
+                <div className="mt-2 pt-3 border-t border-amber-200">
+                  <p className="text-xs font-semibold text-amber-700 mb-2 uppercase tracking-wide">
+                    {isEs ? 'Órdenes de pago emitidas' : 'Issued payment orders'}
+                  </p>
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b border-amber-200">
+                      {[isEs?'Número':'Number', isEs?'Fecha':'Date', isEs?'Avalúos':'Valuations',
+                        isEs?'Total':'Total', isEs?'Estado':'Status'].map((h,i) =>
+                        <th key={i} className="px-2 py-1 text-left text-amber-600 font-medium">{h}</th>
+                      )}
+                    </tr></thead>
+                    <tbody>
+                      {ordenes.map((o, idx) => (
+                        <tr key={o.id} className={`border-b border-amber-100 ${idx%2===1?'bg-amber-50/40':''}`}>
+                          <td className="px-2 py-1.5 font-mono font-semibold text-blue-700">{o.numero_orden}</td>
+                          <td className="px-2 py-1.5 text-gray-500">{o.fecha_orden}</td>
+                          <td className="px-2 py-1.5 text-center">{o.cantidad_avaluos}</td>
+                          <td className="px-2 py-1.5 font-mono font-bold" style={{color:'#1B3A6B'}}>{fmt(o.monto_total, moneda)}</td>
+                          <td className="px-2 py-1.5">
+                            <span className={`px-2 py-0.5 rounded-full font-medium ${
+                              o.estado === 'pagada' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {o.estado === 'pagada'
+                                ? (isEs?'Pagada':'Paid')
+                                : (isEs?'Emitida':'Issued')}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )
         })()}
