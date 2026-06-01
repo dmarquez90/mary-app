@@ -226,7 +226,7 @@ export default function Financiero() {
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
-          {proyId && !closed && puedeEditar && <PrimaryBtn onClick={openDrawer}>+ {TABS[tab]}</PrimaryBtn>}
+          {proyId && !closed && puedeEditar && tab !== 2 && <PrimaryBtn onClick={openDrawer}>+ {TABS[tab]}</PrimaryBtn>}
         </div>
       </div>
 
