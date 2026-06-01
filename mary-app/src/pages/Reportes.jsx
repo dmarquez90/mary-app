@@ -445,8 +445,255 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     const tp5 = ws5.getCell(r5, 7); tp5.value = budget > 0 ? data.deltaOCs / budget : 0; tp5.numFmt = '0.00%'; styleTotal(tp5)
   }
 
+  // ── HOJA 6: Subcontratos detallados (nuevo sistema) ──────────────────────────
+  if (data.scContratos?.length > 0) {
+    const ws6 = wb.addWorksheet(isEs ? 'Detalle Subcontratos' : 'Subcontract Detail')
+    setCols(ws6, [28, 30, 16, 16, 16, 12, 16, 16])
+    let r6 = addHeaderBlock(ws6, isEs ? 'Detalle de Subcontratos' : 'Subcontract Detail',
+      'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+    // Headers
+    ws6.getRow(r6).height = 18
+    ;[isEs?'Subcontratista':'Subcontractor',
+      isEs?'Descripción':'Description',
+      isEs?'Monto Contrato':'Contract Amount',
+      isEs?'Avaluado (aprob.)':'Valued (appr.)',
+      isEs?'Saldo':'Balance',
+      isEs?'% Retención':'Retention %',
+      isEs?'Total Retenido':'Total Retained',
+      isEs?'Estado':'Status',
+    ].forEach((h, i) => { const c = ws6.getCell(r6, i+1); c.value = h; styleHeader(c) })
+    r6++
+    let totContrato = 0, totValuado = 0, totRetenido = 0
+    data.scContratos.forEach((sc, idx) => {
+      ws6.getRow(r6).height = 17
+      const even     = idx % 2 === 1
+      const valuado  = data.scAvaluosDetalle
+        .filter(a => a.subcontrato_id === sc.id)
+        .reduce((s, a) => s + parseFloat(a.monto_total||0), 0)
+      const saldo    = parseFloat(sc.monto_total||0) - valuado
+      const retenido = data.scAvaluosDetalle
+        .filter(a => a.subcontrato_id === sc.id)
+        .reduce((s, a) => s + parseFloat(a.retencion_monto||0), 0)
+      const estado   = sc.estado === 'activo' ? (isEs?'Activo':'Active') :
+                       sc.estado === 'completado' ? (isEs?'Completado':'Completed') : sc.estado
+      totContrato += parseFloat(sc.monto_total||0)
+      totValuado  += valuado
+      totRetenido += retenido
+      const vals = [
+        sc.subcontratista, sc.descripcion||'—',
+        parseFloat(sc.monto_total||0), valuado, saldo,
+        parseFloat(sc.retencion_pct||0)/100, retenido, estado,
+      ]
+      vals.forEach((v, ci) => {
+        const c   = ws6.getCell(r6, ci+1)
+        const num = [2,3,4,6].includes(ci)
+        const pct = ci === 5
+        styleData(c, {
+          even,
+          numFmt: num ? '"$"#,##0.00' : pct ? '0.0%' : undefined,
+          align:  (num || pct) ? 'right' : 'left',
+          color:  ci === 4 ? (saldo < 0 ? RED_HX : GREEN_HX) : '000000',
+          bold:   ci === 4,
+        })
+        c.value = v
+      })
+      r6++
+    })
+    // Totales
+    ws6.getRow(r6).height = 18
+    ws6.mergeCells(r6, 1, r6, 2)
+    const tl6 = ws6.getCell(r6, 1); tl6.value = isEs ? 'TOTAL' : 'TOTAL'; styleTotal(tl6)
+    const t6c = ws6.getCell(r6, 3); t6c.value = totContrato; t6c.numFmt = '"$"#,##0.00'; styleTotal(t6c)
+    const t6v = ws6.getCell(r6, 4); t6v.value = totValuado;  t6v.numFmt = '"$"#,##0.00'; styleTotal(t6v)
+    const t6s = ws6.getCell(r6, 5); t6s.value = totContrato - totValuado; t6s.numFmt = '"$"#,##0.00'; styleTotal(t6s)
+    ws6.mergeCells(r6, 6, r6, 7)
+    const t6r = ws6.getCell(r6, 7); t6r.value = totRetenido; t6r.numFmt = '"$"#,##0.00'; styleTotal(t6r)
+  }
+
   const buf = await wb.xlsx.writeBuffer()
   saveAs(new Blob([buf]), `${isEs?'Reporte_Financiero':'Financial_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
+}
+
+// ── EXPORT RETENCIONES ────────────────────────────────────
+async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
+  const isEs      = lang === 'ES'
+  const wb        = new ExcelJS.Workbook()
+  wb.creator      = 'MARY ERP'
+  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+  const fechaHoy  = new Date().toLocaleDateString(isEs ? 'es' : 'en-US')
+  const periodoLabel = isEs ? 'Todas las retenciones' : 'All retentions'
+
+  // ── HOJA 1: Subcontratos resumen ──────────────────────────────────────────
+  const ws1 = wb.addWorksheet(isEs ? 'Subcontratos Resumen' : 'Subcontracts Summary')
+  setCols(ws1, [28, 30, 16, 16, 12, 16, 16, 14])
+  let r1 = addHeaderBlock(ws1, isEs ? 'Retenciones de Garantía — Subcontratos' : 'Retention Bonds — Subcontracts',
+    'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+  ws1.getRow(r1).height = 18
+  ;[isEs?'Subcontratista':'Subcontractor',
+    isEs?'Descripción':'Description',
+    isEs?'Monto Contrato':'Contract Amount',
+    isEs?'Avaluado (aprob.)':'Valued (approved)',
+    isEs?'% Retención':'Retention %',
+    isEs?'Total Retenido':'Total Retained',
+    isEs?'Devuelto':'Released',
+    isEs?'Pendiente':'Pending',
+  ].forEach((h, i) => { const c = ws1.getCell(r1, i+1); c.value = h; styleHeader(c) })
+  r1++
+  let totContrato=0, totValuado=0, totRetenido=0, totDevuelto=0
+  ;(data.scContratos||[]).forEach((sc, idx) => {
+    ws1.getRow(r1).height = 17
+    const even     = idx % 2 === 1
+    const valuado  = (data.scAvaluosDetalle||[])
+      .filter(a => a.subcontrato_id === sc.id)
+      .reduce((s, a) => s + parseFloat(a.monto_total||0), 0)
+    const retsDelSc = (data.retenciones||[]).filter(r => r.subcontrato_id === sc.id)
+    const retenido  = retsDelSc.reduce((s, r) => s + parseFloat(r.monto_retenido||0), 0)
+    const devuelto  = retsDelSc.filter(r => r.estado === 'devuelta' || r.estado === 'pagada')
+                                .reduce((s, r) => s + parseFloat(r.monto_devuelto||0), 0)
+    totContrato += parseFloat(sc.monto_total||0)
+    totValuado  += valuado
+    totRetenido += retenido
+    totDevuelto += devuelto
+    const vals = [
+      sc.subcontratista, sc.descripcion||'—',
+      parseFloat(sc.monto_total||0), valuado,
+      parseFloat(sc.retencion_pct||0)/100,
+      retenido, devuelto, retenido - devuelto,
+    ]
+    vals.forEach((v, ci) => {
+      const c   = ws1.getCell(r1, ci+1)
+      const num = [2,3,5,6,7].includes(ci)
+      const pct = ci === 4
+      styleData(c, {
+        even,
+        numFmt: num ? '"$"#,##0.00' : pct ? '0.0%' : undefined,
+        align:  (num || pct) ? 'right' : 'left',
+        color:  ci === 7 ? (v > 0 ? 'F59E0B' : GREEN_HX) : '000000',
+        bold:   ci === 7,
+      })
+      c.value = v
+    })
+    r1++
+  })
+  ws1.getRow(r1).height = 18
+  ws1.mergeCells(r1,1,r1,4)
+  const tl1 = ws1.getCell(r1,1); tl1.value = isEs?'TOTAL':'TOTAL'; styleTotal(tl1)
+  const tt1c = ws1.getCell(r1,5); tt1c.value=''; styleTotal(tt1c)
+  const tt1r = ws1.getCell(r1,6); tt1r.value=totRetenido; tt1r.numFmt='"$"#,##0.00'; styleTotal(tt1r)
+  const tt1d = ws1.getCell(r1,7); tt1d.value=totDevuelto; tt1d.numFmt='"$"#,##0.00'; styleTotal(tt1d)
+  const tt1p = ws1.getCell(r1,8); tt1p.value=totRetenido-totDevuelto; tt1p.numFmt='"$"#,##0.00'; styleTotal(tt1p)
+
+  // ── HOJA 2: Detalle retenciones por avalúo ────────────────────────────────
+  const ws2 = wb.addWorksheet(isEs ? 'Detalle Retenciones' : 'Retention Detail')
+  setCols(ws2, [28, 12, 14, 14, 16, 16, 16, 14])
+  let r2 = addHeaderBlock(ws2, isEs ? 'Detalle de Retenciones por Avalúo' : 'Retention Detail by Valuation',
+    'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+  ws2.getRow(r2).height = 18
+  ;[isEs?'Subcontratista':'Subcontractor',
+    isEs?'Avalúo #':'Valuation #',
+    isEs?'% Retención':'Retention %',
+    isEs?'Monto Retenido':'Amount Retained',
+    isEs?'Fecha Retención':'Retention Date',
+    isEs?'Devolución Est.':'Est. Release',
+    isEs?'Devolución Real':'Actual Release',
+    isEs?'Estado':'Status',
+  ].forEach((h, i) => { const c = ws2.getCell(r2, i+1); c.value = h; styleHeader(c) })
+  r2++
+  const STATUS_LABELS = {
+    retenida: isEs ? 'Retenida'  : 'Retained',
+    devuelta: isEs ? 'Devuelta'  : 'Released',
+    pagada:   isEs ? 'Pagada'    : 'Paid',
+  }
+  let totRet2 = 0
+  ;(data.retenciones||[]).forEach((r, idx) => {
+    ws2.getRow(r2).height = 17
+    const even   = idx % 2 === 1
+    const status = STATUS_LABELS[r.estado] || r.estado
+    const clr    = r.estado === 'retenida' ? 'F59E0B' : r.estado === 'devuelta' ? GREEN_HX : '1B3A6B'
+    // Verificar si está vencida
+    const vencida = r.fecha_devolucion_est && new Date(r.fecha_devolucion_est) <= new Date() && r.estado === 'retenida'
+    totRet2 += parseFloat(r.monto_retenido||0)
+    const vals = [
+      r.subcontratista||'—',
+      `#${r.numero_avaluo||'—'}`,
+      parseFloat(r.retencion_pct||0)/100,
+      parseFloat(r.monto_retenido||0),
+      r.fecha_retencion||'—',
+      r.fecha_devolucion_est ? r.fecha_devolucion_est + (vencida ? ' ⚠' : '') : '—',
+      r.fecha_devolucion_real||'—',
+      vencida ? (isEs?'VENCIDA ⚠':'OVERDUE ⚠') : status,
+    ]
+    vals.forEach((v, ci) => {
+      const c   = ws2.getCell(r2, ci+1)
+      const num = ci === 3
+      const pct = ci === 2
+      styleData(c, {
+        even,
+        numFmt: num ? '"$"#,##0.00' : pct ? '0.0%' : undefined,
+        align:  (num || pct) ? 'right' : 'left',
+        color:  ci === 7 ? (vencida ? RED_HX : clr) : '000000',
+        bold:   ci === 7,
+      })
+      c.value = v
+    })
+    r2++
+  })
+  ws2.getRow(r2).height = 18
+  ws2.mergeCells(r2,1,r2,3)
+  const tl2 = ws2.getCell(r2,1); tl2.value = isEs?'TOTAL RETENIDO':'TOTAL RETAINED'; styleTotal(tl2)
+  const tv2 = ws2.getCell(r2,4); tv2.value = totRet2; tv2.numFmt = '"$"#,##0.00'; styleTotal(tv2)
+
+  // ── HOJA 3: Órdenes de Pago ──────────────────────────────────────────────
+  if ((data.ordenesPago||[]).length > 0) {
+    const ws3 = wb.addWorksheet(isEs ? 'Órdenes de Pago' : 'Payment Orders')
+    setCols(ws3, [22, 22, 16, 14, 12, 16, 14])
+    let r3 = addHeaderBlock(ws3, isEs ? 'Órdenes de Pago de Retención' : 'Retention Payment Orders',
+      'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
+    ws3.getRow(r3).height = 18
+    ;[isEs?'Número Orden':'Order Number',
+      isEs?'Subcontratista':'Subcontractor',
+      isEs?'Fecha Emisión':'Issue Date',
+      isEs?'# Avalúos':'# Valuations',
+      isEs?'Total a Pagar':'Total to Pay',
+      isEs?'Estado':'Status',
+      isEs?'Fecha Pago':'Payment Date',
+    ].forEach((h, i) => { const c = ws3.getCell(r3, i+1); c.value = h; styleHeader(c) })
+    r3++
+    let totOpr = 0
+    ;(data.ordenesPago||[]).forEach((o, idx) => {
+      ws3.getRow(r3).height = 17
+      const even   = idx % 2 === 1
+      const eLabel = o.estado === 'emitida' ? (isEs?'Emitida':'Issued') : (isEs?'Pagada':'Paid')
+      const eClr   = o.estado === 'pagada' ? GREEN_HX : 'F59E0B'
+      totOpr += parseFloat(o.monto_total||0)
+      const vals = [
+        o.numero_orden||'—', o.subcontratista||'—',
+        o.fecha_orden||'—', parseInt(o.cantidad_avaluos||0),
+        parseFloat(o.monto_total||0), eLabel, o.fecha_pago||'—',
+      ]
+      vals.forEach((v, ci) => {
+        const c   = ws3.getCell(r3, ci+1)
+        const num = ci === 4
+        const cnt = ci === 3
+        styleData(c, {
+          even,
+          numFmt: num ? '"$"#,##0.00' : cnt ? '#,##0' : undefined,
+          align:  (num || cnt) ? 'right' : 'left',
+          color:  ci === 5 ? eClr : '000000',
+          bold:   ci === 5,
+        })
+        c.value = v
+      })
+      r3++
+    })
+    ws3.getRow(r3).height = 18
+    ws3.mergeCells(r3,1,r3,4)
+    const tl3 = ws3.getCell(r3,1); tl3.value=isEs?'TOTAL':'TOTAL'; styleTotal(tl3)
+    const tv3 = ws3.getCell(r3,5); tv3.value=totOpr; tv3.numFmt='"$"#,##0.00'; styleTotal(tv3)
+  }
+
+  const buf = await wb.xlsx.writeBuffer()
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Retenciones':'Retention_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
 // ── EXPORT INVENTARIO ─────────────────────────────────────
@@ -796,6 +1043,8 @@ export default function Reportes() {
     proyectos, presupuesto, materiales, entradas, salidas,
     costos_directos, nominas, subcontratos, equipos, costos_indirectos,
     subcontratos_contratos = [], subcontratos_avaluos = [],
+    subcontratos_items = [], subcontratos_avaluo_items = [],
+    subcontratos_retenciones = [], ordenes_pago_retencion = [],
     presupuesto_indirectos = [],
     avaluos_cliente = [], avaluos_cliente_items = [],
     ordenes_cambio = [], ordenes_cambio_items = [],
@@ -900,6 +1149,14 @@ export default function Reportes() {
     const budgetRevisado  = budget + deltaOCs
     const ocsItems        = ordenes_cambio_items.filter(i => ocsDelProy.some(o => o.id === i.oc_id))
 
+    // Subcontratos nuevo sistema para el reporte
+    const scContratos = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
+    const scAvaluosDetalle = subcontratos_avaluos.filter(a =>
+      scContratos.some(sc => sc.id === a.subcontrato_id) && a.estado === 'aprobado')
+    // Retenciones del proyecto
+    const retenciones = subcontratos_retenciones.filter(r => r.proyecto_id === proyId)
+    const ordenesPago = ordenes_pago_retencion.filter(o => o.proyecto_id === proyId)
+
     return {
       resumen:[
         {categoria: t('rep_cat_materiales'),   real:totalMat},
@@ -912,8 +1169,9 @@ export default function Reportes() {
       actividades, totalReal, dirs, noms, subs, eqs, inds,
       avsProy, avsItems, indsPres, comparacionInd,
       ocsDelProy, ocsAprobadas, deltaOCs, budgetRevisado, ocsItems,
+      scContratos, scAvaluosDetalle, retenciones, ordenesPago,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -933,6 +1191,8 @@ export default function Reportes() {
         await buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
           subcontratos, subcontratos_contratos, subcontratos_avaluos,
           equipos, costos_indirectos, salidas, entradas, budget, moneda, lang })
+      } else if (reportType==='retenciones' && datosFinanciero) {
+        await buildRetenciones({ data: datosFinanciero, proy, moneda, lang })
       }
     } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
     setLoading(false)
@@ -960,9 +1220,10 @@ export default function Reportes() {
               <option value="financiero">📊 {isEs?'Reporte Financiero':'Financial Report'}</option>
               <option value="inventario">📦 {isEs?'Reporte de Inventario':'Inventory Report'}</option>
               <option value="general">📋 {isEs?'Resumen General del Proyecto':'General Project Summary'}</option>
+              <option value="retenciones">🔒 {t('rep_type_retenciones')}</option>
             </select>
           </div>
-          {(reportType==='financiero'||reportType==='general') && (
+          {(reportType==='financiero'||reportType==='general'||reportType==='retenciones') && (
             <div>
               <label className="text-xs text-gray-500 block mb-1">{t('lbl_project')} *</label>
               <select className={inputCls+' w-full'} value={proyId} onChange={e=>setProyId(e.target.value)}>
@@ -982,7 +1243,7 @@ export default function Reportes() {
         </div>
         <div className="flex items-center gap-3 mt-5">
           <button onClick={handleExport}
-            disabled={loading||((reportType==='financiero'||reportType==='general')&&!proyId)}
+            disabled={loading||((reportType==='financiero'||reportType==='general'||reportType==='retenciones')&&!proyId)}
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-lg disabled:opacity-40 transition-all hover:opacity-90"
             style={{background:BRAND}}>
             {loading
@@ -1003,6 +1264,25 @@ export default function Reportes() {
       )}
       {reportType==='inventario' && (
         <VistaInventario data={datosInventario} materiales={materiales} proyectos={proyectos} presupuesto={presupuesto} fmtDate={fmtDate} fmtNum={fmtNum} />
+      )}
+      {reportType==='retenciones' && proyId && datosFinanciero && (
+        <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100">
+          <p className="text-sm font-semibold text-amber-700 mb-2">🔒 {t('rep_type_retenciones')}</p>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-gray-500">{isEs?'Subcontratos':'Subcontracts'}</p>
+              <p className="font-bold text-gray-800">{datosFinanciero.scContratos?.length || 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{isEs?'Retenciones':'Retentions'}</p>
+              <p className="font-bold text-amber-700">{datosFinanciero.retenciones?.length || 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{isEs?'Órdenes de pago':'Payment orders'}</p>
+              <p className="font-bold text-gray-800">{datosFinanciero.ordenesPago?.length || 0}</p>
+            </div>
+          </div>
+        </div>
       )}
       {reportType==='general' && proyId && (
         <VistaGeneral proy={proy} presupuesto={presupuesto} costos_directos={costos_directos}
