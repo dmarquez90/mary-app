@@ -5,6 +5,7 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
+import { buildOPR } from '../pages/Reportes'
 
 // ── CATEGORÍAS DE COSTOS INDIRECTOS ──────────────────────────────────────
 const CATEGORIAS_IND = {
@@ -359,6 +360,7 @@ export default function Financiero() {
           {tab === 2 && <SubcontratosModule
             proyId={proyId} moneda={moneda} puedeEditar={puedeEditar} closed={closed}
             presupuesto={presupuesto} isEs={isEs}
+            proyectos={proyectos}
             scView={scView} setScView={setScView}
             scSelected={scSelected} setScSelected={setScSelected}
             scAvaluoId={scAvaluoId} setScAvaluoId={setScAvaluoId}
@@ -720,7 +722,7 @@ export default function Financiero() {
 
 // ── SUBCONTRATOS MODULE ──────────────────────────────────────────────────────
 function SubcontratosModule({ can, rol,
-  proyId, moneda, puedeEditar, closed, presupuesto, isEs,
+  proyId, moneda, puedeEditar, closed, presupuesto, proyectos, isEs,
   scView, setScView, scSelected, setScSelected,
   scAvaluoId, setScAvaluoId,
   scItems, setScItems, avItems, setAvItems,
@@ -1380,7 +1382,7 @@ Total: `)
                   <table className="w-full text-xs">
                     <thead><tr className="border-b border-amber-200">
                       {[isEs?'Número':'Number', isEs?'Fecha':'Date', isEs?'Avalúos':'Valuations',
-                        isEs?'Total':'Total', isEs?'Estado':'Status'].map((h,i) =>
+                        isEs?'Total':'Total', isEs?'Estado':'Status', ''].map((h,i) =>
                         <th key={i} className="px-2 py-1 text-left text-amber-600 font-medium">{h}</th>
                       )}
                     </tr></thead>
@@ -1399,6 +1401,25 @@ Total: `)
                                 ? (isEs?'Pagada':'Paid')
                                 : (isEs?'Emitida':'Issued')}
                             </span>
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <button
+                              onClick={() => {
+                                const retsOrden = (subcontratos_retenciones||[]).filter(r => r.orden_pago_id === o.id)
+                                buildOPR({
+                                  orden:       o,
+                                  retenciones: retsOrden,
+                                  contrato:    scSelected,
+                                  proy:        proyectos?.find(p => p.id === proyId),
+                                  usuario:     null,
+                                  lang:        isEs ? 'ES' : 'EN',
+                                })
+                              }}
+                              className="text-xs px-2 py-0.5 rounded-lg text-white font-medium flex items-center gap-1"
+                              style={{ background: '#1D9E75' }}
+                              title={isEs ? 'Descargar Excel' : 'Download Excel'}>
+                              📥 Excel
+                            </button>
                           </td>
                         </tr>
                       ))}

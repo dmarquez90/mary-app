@@ -514,6 +514,295 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   saveAs(new Blob([buf]), `${isEs?'Reporte_Financiero':'Financial_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
+// ── EXPORT ORDEN DE PAGO DE RETENCIÓN (OPR) ──────────────
+export async function buildOPR({ orden, retenciones, contrato, proy, usuario, lang='ES' }) {
+  const isEs    = lang === 'ES'
+  const COLS    = 7
+  const wb      = new ExcelJS.Workbook()
+  wb.creator    = 'MARY ERP'
+
+  // ── Constantes de color locales ──────────────────────────────────────────
+  const BRAND   = '1B3A6B'
+  const GREEN   = '1D9E75'
+  const AMBER   = 'F59E0B'
+  const LIGHT   = 'EEF2F7'
+  const GRAY    = 'F8FAFC'
+
+  const fechaHoy   = new Date().toLocaleDateString(isEs ? 'es' : 'en-US')
+  const proyLabel  = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+
+  const ws = wb.addWorksheet(isEs ? 'Orden de Pago' : 'Payment Order')
+  setCols(ws, [22, 18, 18, 16, 16, 18, 18])
+
+  // helpers locales
+  const bord = () => ({
+    top:    { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    bottom: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    left:   { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    right:  { style: 'thin', color: { argb: 'FFD0D7DE' } },
+  })
+  const thickB = () => ({
+    top:    { style: 'medium', color: { argb: 'FF' + BRAND } },
+    bottom: { style: 'medium', color: { argb: 'FF' + BRAND } },
+    left:   { style: 'medium', color: { argb: 'FF' + BRAND } },
+    right:  { style: 'medium', color: { argb: 'FF' + BRAND } },
+  })
+
+  const cell = (r, c) => ws.getCell(r, c)
+  const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
+
+  // ── BLOQUE HEADER ─────────────────────────────────────────────────────────
+  ws.getRow(1).height = 34
+  merge(1, 1, 1, 3)
+  const h1 = cell(1, 1)
+  h1.value     = 'Marquez Project Solutions LLC'
+  h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h1.alignment = { vertical: 'middle' }
+  h1.border    = thickB()
+
+  merge(1, 4, 1, 5)
+  const h2 = cell(1, 4)
+  h2.value     = isEs ? 'ORDEN DE PAGO DE RETENCIÓN' : 'RETENTION PAYMENT ORDER'
+  h2.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  h2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+  h2.alignment = { horizontal: 'center', vertical: 'middle' }
+  h2.border    = thickB()
+
+  merge(1, 6, 1, COLS)
+  const h3 = cell(1, 6)
+  h3.value     = `MARY ERP\n${fechaHoy}`
+  h3.font      = { size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h3.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h3.border    = thickB()
+
+  // ── FILA INFO GENERAL ─────────────────────────────────────────────────────
+  ws.getRow(2).height = 18
+  merge(2, 1, 2, 3)
+  const i1 = cell(2, 1); i1.value = `${isEs?'Proyecto':'Project'}: ${proyLabel}`
+  i1.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i1.alignment = { vertical: 'middle' }; i1.border = thickB()
+
+  merge(2, 4, 2, 5)
+  const i2 = cell(2, 4); i2.value = `N°: ${orden.numero_orden}`
+  i2.font = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  i2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + GREEN } }
+  i2.alignment = { horizontal: 'center', vertical: 'middle' }; i2.border = thickB()
+
+  merge(2, 6, 2, COLS)
+  const i3 = cell(2, 6); i3.value = `${isEs?'Fecha':'Date'}: ${orden.fecha_orden}`
+  i3.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i3.alignment = { vertical: 'middle' }; i3.border = thickB()
+
+  // ── SECCIÓN: DATOS DEL SUBCONTRATISTA ────────────────────────────────────
+  let row = 4
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  const sec1 = cell(row, 1)
+  sec1.value = isEs ? 'DATOS DEL SUBCONTRATISTA' : 'SUBCONTRACTOR INFORMATION'
+  sec1.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec1.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec1.alignment = { vertical: 'middle' }; sec1.border = bord()
+  row++
+
+  const infoRows = [
+    [isEs?'Subcontratista / Payee:':'Subcontractor / Payee:', contrato?.subcontratista || orden.subcontratista],
+    [isEs?'Descripción del contrato:':'Contract description:', contrato?.descripcion || '—'],
+    [isEs?'Monto del contrato:':'Contract amount:', contrato?.monto_total
+      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(contrato.monto_total)
+      : '—'],
+  ]
+  infoRows.forEach(([lbl, val]) => {
+    ws.getRow(row).height = 17
+    merge(row, 1, row, 2)
+    const lc = cell(row, 1)
+    lc.value = lbl; lc.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    lc.border = bord(); lc.alignment = { vertical: 'middle' }
+    merge(row, 3, row, COLS)
+    const vc = cell(row, 3)
+    vc.value = val; vc.font = { size: 10, name: 'Arial' }
+    vc.border = bord(); vc.alignment = { vertical: 'middle' }
+    row++
+  })
+  row++ // espaciado
+
+  // ── SECCIÓN: DETALLE DE RETENCIONES ──────────────────────────────────────
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  const sec2 = cell(row, 1)
+  sec2.value = isEs ? 'DETALLE DE RETENCIONES A PAGAR' : 'RETENTION PAYMENT DETAIL'
+  sec2.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec2.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec2.alignment = { vertical: 'middle' }; sec2.border = bord()
+  row++
+
+  // Headers tabla
+  ws.getRow(row).height = 18
+  const tHeaders = isEs
+    ? ['Avalúo #', 'Fecha Retención', 'Devolución Est.', '% Retención', 'Monto Retenido', 'Fecha Liberación', 'Estado']
+    : ['Valuation #', 'Retention Date', 'Est. Release', 'Retention %', 'Amount Retained', 'Release Date', 'Status']
+  tHeaders.forEach((h, i) => {
+    const c2 = cell(row, i + 1)
+    c2.value = h
+    c2.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Arial' }
+    c2.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+    c2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    c2.border = bord()
+  })
+  row++
+
+  let totalMonto = 0
+  retenciones.forEach((r, idx) => {
+    ws.getRow(row).height = 17
+    const even   = idx % 2 === 1
+    const bg     = even ? 'FFF8FAFC' : 'FFFFFFFF'
+    const status = r.estado === 'devuelta' ? (isEs ? 'Liberada' : 'Released') :
+                   r.estado === 'pagada'   ? (isEs ? 'Pagada'   : 'Paid')     :
+                                             (isEs ? 'Retenida' : 'Retained')
+    const monto  = parseFloat(r.monto_retenido || 0)
+    totalMonto  += monto
+    const vals = [
+      `#${r.numero_avaluo || '—'}`,
+      r.fecha_retencion || '—',
+      r.fecha_devolucion_est || '—',
+      (parseFloat(r.retencion_pct || 0) / 100),
+      monto,
+      r.fecha_devolucion_real || '—',
+      status,
+    ]
+    vals.forEach((v, ci) => {
+      const c3 = cell(row, ci + 1)
+      c3.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      c3.border    = bord()
+      c3.alignment = { vertical: 'middle', horizontal: [3, 4].includes(ci) ? 'right' : 'center' }
+      if (ci === 3) { c3.numFmt = '0.0%'; c3.value = v }
+      else if (ci === 4) { c3.numFmt = '"$"#,##0.00'; c3.value = v; c3.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } } }
+      else { c3.value = v; c3.font = { size: 10, name: 'Arial' } }
+    })
+    row++
+  })
+
+  // Fila total
+  ws.getRow(row).height = 20
+  merge(row, 1, row, 4)
+  const tl = cell(row, 1)
+  tl.value = isEs ? 'TOTAL A PAGAR' : 'TOTAL TO PAY'
+  tl.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  tl.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+  tl.alignment = { horizontal: 'right', vertical: 'middle' }
+  tl.border = bord()
+  merge(row, 5, row, COLS)
+  const tv = cell(row, 5)
+  tv.value  = totalMonto
+  tv.numFmt = '"$"#,##0.00'
+  tv.font   = { bold: true, size: 13, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  tv.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + GREEN } }
+  tv.alignment = { horizontal: 'center', vertical: 'middle' }
+  tv.border = bord()
+  row += 2
+
+  // ── SECCIÓN: FIRMAS ───────────────────────────────────────────────────────
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  const sec3 = cell(row, 1)
+  sec3.value = isEs ? 'AUTORIZACIONES Y FIRMAS' : 'AUTHORIZATIONS AND SIGNATURES'
+  sec3.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec3.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec3.alignment = { vertical: 'middle' }; sec3.border = bord()
+  row++
+
+  // Instrucción
+  ws.getRow(row).height = 14
+  merge(row, 1, row, COLS)
+  const instr = cell(row, 1)
+  instr.value = isEs
+    ? 'Las partes abajo firmantes confirman la recepción y conformidad con el pago descrito en este documento.'
+    : 'The undersigned parties confirm receipt and agreement with the payment described in this document.'
+  instr.font  = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+  instr.alignment = { horizontal: 'center', vertical: 'middle' }
+  row += 2
+
+  // Bloques de firma — 4 columnas distribuidas en 2 filas
+  const firmantes = [
+    { label: isEs ? 'Preparado por' : 'Prepared by',    nombre: usuario?.nombre || '___________________________', cargo: isEs ? 'Administrador de Proyecto' : 'Project Administrator' },
+    { label: isEs ? 'Autorizado por' : 'Authorized by', nombre: '___________________________',                   cargo: isEs ? 'CEO / Director General'       : 'CEO / General Director' },
+    { label: isEs ? 'Recibido por' : 'Received by',     nombre: '___________________________',                   cargo: isEs ? 'Subcontratista / Representante' : 'Subcontractor / Representative' },
+    { label: isEs ? 'Conforme / Pagado por' : 'Confirmed / Paid by', nombre: '___________________________',      cargo: isEs ? 'Tesorería / Contabilidad'      : 'Treasury / Accounting' },
+  ]
+
+  // Fila de líneas de firma (2 columnas, 2 bloques por fila)
+  for (let i = 0; i < firmantes.length; i += 2) {
+    const left  = firmantes[i]
+    const right = firmantes[i + 1]
+
+    // Línea de firma
+    ws.getRow(row).height = 22
+    merge(row, 1, row, 3)
+    const fl = cell(row, 1)
+    fl.value = left.nombre
+    fl.font  = { size: 10, name: 'Arial' }
+    fl.border = { bottom: { style: 'medium', color: { argb: 'FF' + BRAND } } }
+    fl.alignment = { horizontal: 'center', vertical: 'bottom' }
+
+    merge(row, 5, row, COLS)
+    const fr = cell(row, 5)
+    fr.value = right.nombre
+    fr.font  = { size: 10, name: 'Arial' }
+    fr.border = { bottom: { style: 'medium', color: { argb: 'FF' + BRAND } } }
+    fr.alignment = { horizontal: 'center', vertical: 'bottom' }
+    row++
+
+    // Label del rol
+    ws.getRow(row).height = 16
+    merge(row, 1, row, 3)
+    const ll = cell(row, 1)
+    ll.value = left.label
+    ll.font  = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    ll.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    ll.alignment = { horizontal: 'center', vertical: 'middle' }
+    ll.border = bord()
+
+    merge(row, 5, row, COLS)
+    const lr = cell(row, 5)
+    lr.value = right.label
+    lr.font  = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lr.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    lr.alignment = { horizontal: 'center', vertical: 'middle' }
+    lr.border = bord()
+    row++
+
+    // Cargo
+    ws.getRow(row).height = 15
+    merge(row, 1, row, 3)
+    const cl = cell(row, 1)
+    cl.value = left.cargo
+    cl.font  = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+    cl.alignment = { horizontal: 'center', vertical: 'middle' }
+
+    merge(row, 5, row, COLS)
+    const cr = cell(row, 5)
+    cr.value = right.cargo
+    cr.font  = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+    cr.alignment = { horizontal: 'center', vertical: 'middle' }
+    row += 2
+  }
+
+  // ── FOOTER ────────────────────────────────────────────────────────────────
+  ws.getRow(row).height = 14
+  merge(row, 1, row, COLS)
+  const ft = cell(row, 1)
+  ft.value = `Marquez Project Solutions LLC  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+  ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
+  ft.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  const buf = await wb.xlsx.writeBuffer()
+  saveAs(new Blob([buf]), `OPR_${orden.numero_orden}_${orden.subcontratista.replace(/\s+/g,'_')}_${orden.fecha_orden}.xlsx`)
+}
+
 // ── EXPORT RETENCIONES ────────────────────────────────────
 async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
   const isEs      = lang === 'ES'
