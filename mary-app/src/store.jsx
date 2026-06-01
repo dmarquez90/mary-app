@@ -141,6 +141,15 @@ function reducer(state, action) {
       subcontratos_avaluos:      [...(state.subcontratos_avaluos||[]), action.payload.avaluo],
       subcontratos_avaluo_items: [...(state.subcontratos_avaluo_items||[]), ...action.payload.items],
     }
+    case 'UPD_SC_AVALUO': return {
+      ...state,
+      subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
+        a.id === action.payload.avaluo.id ? { ...a, ...action.payload.avaluo } : a),
+      subcontratos_avaluo_items: [
+        ...(state.subcontratos_avaluo_items||[]).filter(i => i.avaluo_id !== action.payload.avaluo.id),
+        ...action.payload.items,
+      ],
+    }
     case 'APROBAR_SC_AVALUO': return {
       ...state,
       subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
@@ -1036,6 +1045,30 @@ useEffect(() => {
         await supabase.from('subcontratos_avaluos').insert(av)
         if (avi.length) await supabase.from('subcontratos_avaluo_items').insert(avi)
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
+        break
+      }
+      case 'UPD_SC_AVALUO': {
+        const av  = action.payload.avaluo
+        const avi = action.payload.items
+        // Actualizar header del avalúo
+        await supabase.from('subcontratos_avaluos').update({
+          numero:            av.numero,
+          periodo_inicio:    av.periodo_inicio,
+          periodo_fin:       av.periodo_fin,
+          fecha_elaboracion: av.fecha_elaboracion,
+          subtotal:          av.subtotal,
+          impuesto_monto:    av.impuesto_monto,
+          monto_total:       av.monto_total,
+          retencion_pct:     av.retencion_pct,
+          retencion_monto:   av.retencion_monto,
+          monto_a_pagar:     av.monto_a_pagar,
+          notas:             av.notas,
+        }).eq('id', av.id)
+        // Reemplazar items: borrar los viejos e insertar los nuevos
+        await supabase.from('subcontratos_avaluo_items').delete().eq('avaluo_id', av.id)
+        const itemsConId = avi.map(it => ({ ...it, id: uuid(), avaluo_id: av.id, tenant_id: tenantId, created_at: today() }))
+        if (itemsConId.length) await supabase.from('subcontratos_avaluo_items').insert(itemsConId)
+        dispatch({ type: 'UPD_SC_AVALUO', payload: { avaluo: av, items: itemsConId } })
         break
       }
       case 'APROBAR_SC_AVALUO': {

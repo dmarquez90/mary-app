@@ -822,7 +822,7 @@ function SubcontratosModule({ can, rol,
     if (!scSelected) return
     const avaluo = {
       subcontrato_id:    scSelected.id,
-      numero:            numAvaluo,
+      numero:            avForm._editAvaluoNum || numAvaluo,
       periodo_inicio:    avForm.periodo_inicio || null,
       periodo_fin:       avForm.periodo_fin || null,
       fecha_elaboracion: avForm.fecha_elaboracion || new Date().toISOString().split('T')[0],
@@ -836,14 +836,17 @@ function SubcontratosModule({ can, rol,
       notas:             avForm.notas || '',
     }
     const items = avItems.map(it => {
-      const scIt = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
+      const scIt    = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
+      const cantAnt = getCantAnterior(it.subcontrato_item_id)
+      const cantAct = Math.round(parseFloat(it.cantidad_actual||0) * 10000) / 10000
+      const costo   = parseFloat(scIt?.costo_unitario||0)
       return {
         subcontrato_item_id: it.subcontrato_item_id,
-        cantidad_anterior:   getCantAnterior(it.subcontrato_item_id),
-        cantidad_actual:     parseFloat(it.cantidad_actual||0),
-        cantidad_acumulada:  getCantAnterior(it.subcontrato_item_id) + parseFloat(it.cantidad_actual||0),
-        costo_unitario:      parseFloat(scIt?.costo_unitario||0),
-        monto_actual:        parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0),
+        cantidad_anterior:   cantAnt,
+        cantidad_actual:     cantAct,
+        cantidad_acumulada:  Math.round((cantAnt + cantAct) * 10000) / 10000,
+        costo_unitario:      costo,
+        monto_actual:        Math.round(cantAct * costo * 100) / 100,
       }
     })
     if (avForm._editId) {
