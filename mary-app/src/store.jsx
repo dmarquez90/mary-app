@@ -12,6 +12,7 @@ const INIT = {
   solicitudes_eliminacion: [],
   subcontratos_contratos: [], subcontratos_items: [],
   subcontratos_avaluos: [], subcontratos_avaluo_items: [],
+  ordenes_pago_retencion: [],
   ordenes_cambio: [], ordenes_cambio_items: [], ordenes_cambio_indirectos: [],
   presupuesto_indirectos: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
@@ -141,15 +142,6 @@ function reducer(state, action) {
       subcontratos_avaluos:      [...(state.subcontratos_avaluos||[]), action.payload.avaluo],
       subcontratos_avaluo_items: [...(state.subcontratos_avaluo_items||[]), ...action.payload.items],
     }
-    case 'UPD_SC_AVALUO': return {
-      ...state,
-      subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
-        a.id === action.payload.avaluo.id ? { ...a, ...action.payload.avaluo } : a),
-      subcontratos_avaluo_items: [
-        ...(state.subcontratos_avaluo_items||[]).filter(i => i.avaluo_id !== action.payload.avaluo.id),
-        ...action.payload.items,
-      ],
-    }
     case 'APROBAR_SC_AVALUO': return {
       ...state,
       subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
@@ -159,6 +151,26 @@ function reducer(state, action) {
           ? { ...sc, monto_pagado: (parseFloat(sc.monto_pagado||0) + parseFloat(action.payload.avaluo.monto_total||0)) }
           : sc),
       costos_directos: [...state.costos_directos, action.payload.costo],
+      subcontratos_retenciones: action.payload.retencion
+        ? [...(state.subcontratos_retenciones||[]), action.payload.retencion]
+        : (state.subcontratos_retenciones||[]),
+    }
+
+    case 'DEVOLVER_RETENCION': return {
+      ...state,
+      subcontratos_retenciones: (state.subcontratos_retenciones||[]).map(r =>
+        r.id === action.payload.retencion.id
+          ? { ...r, estado: 'devuelta', fecha_devolucion_real: action.payload.fecha, monto_devuelto: r.monto_retenido }
+          : r),
+    }
+
+    case 'EMITIR_ORDEN_PAGO_RETENCION': return {
+      ...state,
+      ordenes_pago_retencion: [...(state.ordenes_pago_retencion||[]), action.payload.orden],
+      subcontratos_retenciones: (state.subcontratos_retenciones||[]).map(r =>
+        action.payload.retencion_ids.includes(r.id)
+          ? { ...r, orden_pago_id: action.payload.orden.id, estado: 'devuelta', fecha_devolucion_real: action.payload.orden.fecha_orden, monto_devuelto: r.monto_retenido }
+          : r),
     }
 
     case 'ADD_SUBCONTRATO':     return { ...state, subcontratos: [...state.subcontratos, action.payload] }
@@ -260,6 +272,7 @@ export function StoreProvider({ children, tenantId }) {
         'materiales_presupuestados','solicitudes_eliminacion',
         'subcontratos_contratos','subcontratos_items',
         'subcontratos_avaluos','subcontratos_avaluo_items',
+        'ordenes_pago_retencion',
         'ordenes_cambio','ordenes_cambio_items','ordenes_cambio_indirectos',
         'avaluos_cliente','avaluos_cliente_items',
         'presupuesto_indirectos',
@@ -299,6 +312,7 @@ useEffect(() => {
     'materiales_presupuestados', 'solicitudes_eliminacion',
     'subcontratos_contratos', 'subcontratos_items',
     'subcontratos_avaluos', 'subcontratos_avaluo_items',
+    'ordenes_pago_retencion',
     'ordenes_cambio', 'ordenes_cambio_items', 'ordenes_cambio_indirectos',
     'avaluos_cliente', 'avaluos_cliente_items',
   ]
@@ -1047,30 +1061,6 @@ useEffect(() => {
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
         break
       }
-      case 'UPD_SC_AVALUO': {
-        const av  = action.payload.avaluo
-        const avi = action.payload.items
-        // Actualizar header del avalúo
-        await supabase.from('subcontratos_avaluos').update({
-          numero:            av.numero,
-          periodo_inicio:    av.periodo_inicio,
-          periodo_fin:       av.periodo_fin,
-          fecha_elaboracion: av.fecha_elaboracion,
-          subtotal:          av.subtotal,
-          impuesto_monto:    av.impuesto_monto,
-          monto_total:       av.monto_total,
-          retencion_pct:     av.retencion_pct,
-          retencion_monto:   av.retencion_monto,
-          monto_a_pagar:     av.monto_a_pagar,
-          notas:             av.notas,
-        }).eq('id', av.id)
-        // Reemplazar items: borrar los viejos e insertar los nuevos
-        await supabase.from('subcontratos_avaluo_items').delete().eq('avaluo_id', av.id)
-        const itemsConId = avi.map(it => ({ ...it, id: uuid(), avaluo_id: av.id, tenant_id: tenantId, created_at: today() }))
-        if (itemsConId.length) await supabase.from('subcontratos_avaluo_items').insert(itemsConId)
-        dispatch({ type: 'UPD_SC_AVALUO', payload: { avaluo: av, items: itemsConId } })
-        break
-      }
       case 'APROBAR_SC_AVALUO': {
         const av       = action.payload.avaluo
         const contrato = action.payload.contrato
@@ -1086,7 +1076,36 @@ useEffect(() => {
           created_at: today(), tenant_id: tenantId,
         }
         await supabase.from('costos_directos').insert(costo)
-        dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo } })
+        // ── Crear registro de retención si el avalúo tiene retención ──
+        let retencion = null
+        const montoRetenido = parseFloat(av.retencion_monto||0)
+        if (montoRetenido > 0) {
+          // Calcular fecha estimada de devolución
+          const fechaBase  = av.fecha_elaboracion || today()
+          const plazoMeses = parseInt(contrato.plazo_garantia_meses || 6)
+          const fechaEst   = new Date(fechaBase)
+          fechaEst.setMonth(fechaEst.getMonth() + plazoMeses)
+          const fechaEstStr = fechaEst.toISOString().split('T')[0]
+          retencion = {
+            id:                   uuid(),
+            tenant_id:            tenantId,
+            subcontrato_id:       contrato.id,
+            avaluo_id:            av.id,
+            proyecto_id:          contrato.proyecto_id,
+            subcontratista:       contrato.subcontratista,
+            monto_retenido:       montoRetenido,
+            retencion_pct:        parseFloat(av.retencion_pct||0),
+            fecha_retencion:      fechaBase,
+            plazo_garantia_meses: plazoMeses,
+            fecha_devolucion_est: fechaEstStr,
+            numero_avaluo:        av.numero,
+            estado:               'retenida',
+            monto_devuelto:       0,
+            created_at:           today(),
+          }
+          await supabase.from('subcontratos_retenciones').insert(retencion)
+        }
+        dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo, retencion } })
         await notify({
           tipo: 'aprobacion',
           titulo: '✅ Avalúo de subcontrato aprobado',
@@ -1095,6 +1114,68 @@ useEffect(() => {
           referencia_id: av.id,
           roles: ['client_admin', 'gerente', 'contador'],
         })
+        break
+      }
+
+      case 'DEVOLVER_RETENCION': {
+        const ret      = action.payload.retencion
+        const fecha    = today()
+        const { data: { user } } = await supabase.auth.getUser()
+        await supabase.from('subcontratos_retenciones').update({
+          estado:               'devuelta',
+          fecha_devolucion_real: fecha,
+          monto_devuelto:        ret.monto_retenido,
+          liberado_por:          user?.id || null,
+        }).eq('id', ret.id)
+        dispatch({ type: 'DEVOLVER_RETENCION', payload: { retencion: ret, fecha } })
+        break
+      }
+
+      case 'EMITIR_ORDEN_PAGO_RETENCION': {
+        const { subcontrato, retenciones, proyecto_id, notas } = action.payload
+        const { data: { user } } = await supabase.auth.getUser()
+        // Generar número de orden: OPR-{año}-{secuencia}
+        const { count } = await supabase
+          .from('ordenes_pago_retencion')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+        const secuencia  = String((count || 0) + 1).padStart(4, '0')
+        const numeroOrden = `OPR-${new Date().getFullYear()}-${secuencia}`
+        const montoTotal  = retenciones.reduce((s, r) => s + parseFloat(r.monto_retenido||0), 0)
+        const orden = {
+          id:             uuid(),
+          tenant_id:      tenantId,
+          proyecto_id,
+          subcontrato_id: subcontrato.id,
+          subcontratista: subcontrato.subcontratista,
+          numero_orden:   numeroOrden,
+          monto_total:    montoTotal,
+          cantidad_avaluos: retenciones.length,
+          fecha_orden:    today(),
+          estado:         'emitida',
+          notas:          notas || '',
+          creado_por:     user?.id || null,
+          created_at:     today(),
+        }
+        await supabase.from('ordenes_pago_retencion').insert(orden)
+        // Vincular retenciones a la orden y marcarlas como devueltas
+        const retencionIds = retenciones.map(r => r.id)
+        await supabase.from('subcontratos_retenciones')
+          .update({
+            orden_pago_id:         orden.id,
+            estado:                'devuelta',
+            fecha_devolucion_real: today(),
+            monto_devuelto:        null, // Se actualiza por registro individual abajo
+            liberado_por:          user?.id || null,
+          })
+          .in('id', retencionIds)
+        // Actualizar monto_devuelto individualmente
+        for (const r of retenciones) {
+          await supabase.from('subcontratos_retenciones')
+            .update({ monto_devuelto: r.monto_retenido })
+            .eq('id', r.id)
+        }
+        dispatch({ type: 'EMITIR_ORDEN_PAGO_RETENCION', payload: { orden, retencion_ids: retencionIds } })
         break
       }
 
