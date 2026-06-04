@@ -366,17 +366,32 @@ useEffect(() => {
     async function notify({ tipo, titulo, mensaje, modulo, referencia_id, roles }) {
       try {
         // Obtener usuarios del tenant que tengan los roles indicados
-        let query = supabase.from('usuarios').select('id').eq('tenant_id', tenantId).eq('activo', true)
-        if (roles?.length) query = query.in('rol', roles)
-        const { data: usuarios } = await query
-        if (!usuarios?.length) return
+        let usuariosTenant = []
+        const rolesNormales = (roles || []).filter(r => r !== 'super_admin')
+        if (rolesNormales.length) {
+          let query = supabase.from('usuarios').select('id').eq('tenant_id', tenantId).eq('activo', true).in('rol', rolesNormales)
+          const { data } = await query
+          usuariosTenant = data || []
+        }
+
+        // Si roles incluye super_admin, buscarlo en toda la tabla (sin filtro tenant)
+        let superAdmins = []
+        if (roles?.includes('super_admin')) {
+          const { data: sas } = await supabase.from('usuarios').select('id').eq('rol', 'super_admin').eq('activo', true)
+          superAdmins = sas || []
+        }
+
+        // Combinar targets sin duplicados
+        const allIds = new Set([...(usuariosTenant||[]).map(u=>u.id), ...superAdmins.map(u=>u.id)])
+        if (!allIds.size) return
+
         const { data: { user: currentUser } } = await supabase.auth.getUser()
         // No notificar al propio usuario que hace la acción
-        const targets = usuarios.filter(u => u.id !== currentUser?.id)
+        const targets = [...allIds].filter(id => id !== currentUser?.id)
         if (!targets.length) return
-        const notifs = targets.map(u => ({
+        const notifs = targets.map(uid => ({
           tenant_id: tenantId,
-          usuario_id: u.id,
+          usuario_id: uid,
           tipo, titulo, mensaje, modulo,
           referencia_id: referencia_id || null,
           leida: false,
@@ -769,7 +784,7 @@ useEffect(() => {
           mensaje: `${action.payload.solicitante_nombre || 'Un usuario'} solicita eliminar ${action.payload.tipo === 'entrada' ? 'una entrada' : 'una salida'} de "${action.payload.material_desc || 'material'}". Justificación: ${action.payload.justificacion || '—'}`,
           modulo: 'inventario',
           referencia_id: item.id,
-          roles: ['client_admin', 'coordinador', 'gerente'],
+          roles: ['client_admin', 'coordinador', 'gerente', 'super_admin'],
         })
         break
       }

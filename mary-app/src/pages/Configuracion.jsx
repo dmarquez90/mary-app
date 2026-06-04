@@ -351,33 +351,33 @@ export default function Configuracion() {
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-lg">⚠</div>
               <div>
-                <p className="font-semibold text-gray-800 text-sm">Solicitud de eliminación</p>
-                <p className="text-xs text-gray-400">Pendiente de revisión</p>
+                <p className="font-semibold text-gray-800 text-sm">{isEs ? 'Solicitud de eliminación' : 'Deletion request'}</p>
+                <p className="text-xs text-gray-400">{isEs ? 'Pendiente de revisión' : 'Pending review'}</p>
               </div>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4 grid grid-cols-2 gap-3 text-sm">
-              <div><p className="text-xs text-gray-400">Solicitante</p><p className="font-medium">{modalSol.sol.solicitante_nombre || '—'}</p></div>
-              <div><p className="text-xs text-gray-400">Tipo</p>
+              <div><p className="text-xs text-gray-400">{isEs ? 'Solicitante' : 'Requested by'}</p><p className="font-medium">{modalSol.sol.solicitante_nombre || '—'}</p></div>
+              <div><p className="text-xs text-gray-400">{isEs ? 'Tipo' : 'Type'}</p>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${modalSol.sol.tipo==='entrada'?'bg-green-100 text-green-700':'bg-red-100 text-red-600'}`}>
-                  {modalSol.sol.tipo === 'entrada' ? '↑ Entrada' : '↓ Salida'}
+                  {modalSol.sol.tipo === 'entrada' ? `↑ ${isEs ? 'Entrada' : 'Entry'}` : `↓ ${isEs ? 'Salida' : 'Exit'}`}
                 </span>
               </div>
-              <div><p className="text-xs text-gray-400">Material</p><p className="font-medium">{modalSol.sol.material_desc || '—'}</p></div>
-              <div><p className="text-xs text-gray-400">Cantidad</p><p className="font-mono font-medium">{modalSol.sol.cantidad}</p></div>
+              <div><p className="text-xs text-gray-400">{isEs ? 'Material' : 'Material'}</p><p className="font-medium">{modalSol.sol.material_desc || '—'}</p></div>
+              <div><p className="text-xs text-gray-400">{isEs ? 'Cantidad' : 'Quantity'}</p><p className="font-mono font-medium">{modalSol.sol.cantidad}</p></div>
               <div className="col-span-2">
-                <p className="text-xs text-gray-400 mb-1">Justificación del bodeguero</p>
+                <p className="text-xs text-gray-400 mb-1">{isEs ? 'Justificación del bodeguero' : 'Warehouse keeper justification'}</p>
                 <p className="text-sm text-gray-700 bg-white border border-gray-100 rounded-lg p-2">{modalSol.sol.justificacion}</p>
               </div>
-              <div><p className="text-xs text-gray-400">Fecha solicitud</p><p className="text-sm">{modalSol.sol.created_at}</p></div>
+              <div><p className="text-xs text-gray-400">{isEs ? 'Fecha solicitud' : 'Request date'}</p><p className="text-sm">{modalSol.sol.created_at}</p></div>
             </div>
 
             <div className="mb-4">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Comentario del administrador (opcional)</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Comentario del administrador (opcional)' : 'Administrator comment (optional)'}</label>
               <textarea
                 className={inputCls + ' resize-none'}
                 rows={2}
-                placeholder="Motivo de aprobación o rechazo..."
+                placeholder={isEs ? 'Motivo de aprobación o rechazo...' : 'Reason for approval or rejection...'}
                 value={comentarioAdmin}
                 onChange={e => setComentarioAdmin(e.target.value)}
               />
@@ -386,16 +386,16 @@ export default function Configuracion() {
             <div className="flex gap-2">
               <button onClick={() => { setModalSol(null); setComentarioAdmin('') }}
                 className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
-                Cancelar
+                {isEs ? 'Cancelar' : 'Cancel'}
               </button>
               <button onClick={rechazarSolicitud}
                 className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600">
-                ✕ Rechazar
+                ✕ {isEs ? 'Rechazar' : 'Reject'}
               </button>
               <button onClick={aprobarSolicitud}
                 className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg"
                 style={{ background: BRAND }}>
-                ✓ Aprobar y eliminar
+                ✓ {isEs ? 'Aprobar y eliminar' : 'Approve & delete'}
               </button>
             </div>
           </div>
@@ -523,12 +523,14 @@ export default function Configuracion() {
           <div className="flex items-center gap-2 text-sm text-red-700">
             <span className="text-lg">🔔</span>
             <span className="font-semibold">
-              {solicitudesPendientes.length} solicitud(es) de eliminación pendiente(s) de revisión
+              {solicitudesPendientes.length} {isEs
+                ? `solicitud(es) de eliminación pendiente(s) de revisión`
+                : `deletion request(s) pending review`}
             </span>
           </div>
           <button onClick={() => setActiveTab('solicitudes')}
             className="text-xs font-semibold text-red-700 underline hover:no-underline">
-            Ver solicitudes →
+            {isEs ? 'Ver solicitudes →' : 'View requests →'}
           </button>
         </div>
       )}
@@ -537,7 +539,7 @@ export default function Configuracion() {
       <div className="flex border-b border-gray-200 mb-5">
         {[
           esAdmin && { id:'usuarios',    label: t('cfg_users_sub') },
-          esAdmin && { id:'solicitudes', label: `Solicitudes de eliminación${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
+          esAdmin && { id:'solicitudes', label: `${isEs ? 'Solicitudes de eliminación' : 'Deletion requests'}${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
           { id:'micuenta',   label: isEs ? 'Mi cuenta' : 'My account' },
           esAdmin && { id:'suscripcion', label: isEs ? 'Suscripción' : 'Subscription' },
         ].filter(Boolean).map(tab => (
@@ -625,7 +627,9 @@ export default function Configuracion() {
       {activeTab === 'solicitudes' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-700">Solicitudes de eliminación de registros</h2>
+            <h2 className="text-sm font-semibold text-gray-700">
+              {isEs ? 'Solicitudes de eliminación de registros' : 'Record deletion requests'}
+            </h2>
             {(state.solicitudes_eliminacion || []).some(s => s.estado !== 'pendiente') && (
               <button
                 onClick={() => {
@@ -633,20 +637,25 @@ export default function Configuracion() {
                   procesadas.forEach(s => dispatch({ type: 'DEL_SOL_ELIM', payload: s.id }))
                 }}
                 className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 px-3 py-1 rounded-lg transition-colors">
-                Limpiar historial
+                {isEs ? 'Limpiar historial' : 'Clear history'}
               </button>
             )}
           </div>
 
           {(state.solicitudes_eliminacion || []).length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-              <p className="text-sm text-gray-400">No hay solicitudes de eliminación registradas.</p>
+              <p className="text-sm text-gray-400">
+                {isEs ? 'No hay solicitudes de eliminación registradas.' : 'No deletion requests found.'}
+              </p>
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="bg-gray-50 border-b border-gray-100">
-                  {['Fecha','Solicitante','Tipo','Material','Cantidad','Justificación','Estado','Acciones'].map((h,i) => (
+                  {(isEs
+                    ? ['Fecha','Solicitante','Tipo','Material','Cantidad','Justificación','Estado','Acciones']
+                    : ['Date','Requested by','Type','Material','Quantity','Justification','Status','Actions']
+                  ).map((h,i) => (
                     <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr></thead>
@@ -657,7 +666,7 @@ export default function Configuracion() {
                       <td className="px-4 py-3 text-sm text-gray-700">{sol.solicitante_nombre || '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sol.tipo==='entrada'?'bg-green-100 text-green-700':'bg-red-100 text-red-600'}`}>
-                          {sol.tipo === 'entrada' ? '↑ Entrada' : '↓ Salida'}
+                          {sol.tipo === 'entrada' ? `↑ ${isEs ? 'Entrada' : 'Entry'}` : `↓ ${isEs ? 'Salida' : 'Exit'}`}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 max-w-[140px] truncate">{sol.material_desc || '—'}</td>
@@ -667,7 +676,11 @@ export default function Configuracion() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium
                           ${sol.estado==='pendiente'?'bg-amber-100 text-amber-700':
                             sol.estado==='aprobada'?'bg-green-100 text-green-700':'bg-red-100 text-red-600'}`}>
-                          {sol.estado==='pendiente'?'⏳ Pendiente':sol.estado==='aprobada'?'✓ Aprobada':'✕ Rechazada'}
+                          {sol.estado==='pendiente'
+                            ? `⏳ ${isEs ? 'Pendiente' : 'Pending'}`
+                            : sol.estado==='aprobada'
+                              ? `✓ ${isEs ? 'Aprobada' : 'Approved'}`
+                              : `✕ ${isEs ? 'Rechazada' : 'Rejected'}`}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -675,14 +688,14 @@ export default function Configuracion() {
                           <button onClick={() => { setModalSol({ sol }); setComentarioAdmin('') }}
                             className="text-xs px-3 py-1 font-semibold text-white rounded-lg"
                             style={{ background: BRAND }}>
-                            Revisar
+                            {isEs ? 'Revisar' : 'Review'}
                           </button>
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-400">{sol.comentario_admin || '—'}</span>
                             <button
                               onClick={() => dispatch({ type: 'DEL_SOL_ELIM', payload: sol.id })}
-                              title="Eliminar del historial"
+                              title={isEs ? 'Eliminar del historial' : 'Remove from history'}
                               className="text-xs text-gray-300 hover:text-red-400 transition-colors ml-1 flex-shrink-0">
                               ✕
                             </button>

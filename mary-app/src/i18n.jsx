@@ -1479,15 +1479,17 @@ export function LangProvider({ children }) {
     // Load from localStorage first for instant render
     const saved = localStorage.getItem(LS_KEY)
     if (saved) setLang(saved)
-    // Then sync from Supabase if user is logged in
+    // Then sync from Supabase if user has a row in usuarios table — only override localStorage if DB has a value
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from('usuarios').select('lang').eq('id', user.id).single()
         .then(({ data }) => {
           if (data?.lang) {
+            // DB wins over localStorage only when DB has an explicit value
             setLang(data.lang)
             localStorage.setItem(LS_KEY, data.lang)
           }
+          // If no row or no lang field (e.g. super_admin), keep localStorage value — already set above
         })
     })
   }, [])
@@ -1496,9 +1498,15 @@ export function LangProvider({ children }) {
     const newLang = lang === 'ES' ? 'EN' : 'ES'
     setLang(newLang)
     localStorage.setItem(LS_KEY, newLang)
-    // Persist to Supabase
+    // Persist to Supabase if user has a row in usuarios table (best-effort, non-blocking)
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) supabase.from('usuarios').update({ lang: newLang }).eq('id', user.id)
+      if (user) {
+        supabase.from('usuarios').update({ lang: newLang }).eq('id', user.id)
+          .then(({ error }) => {
+            // If no row exists (e.g. super_admin), silently ignore — localStorage is the source of truth
+            if (error) console.debug('lang persist skipped (no usuarios row):', error.message)
+          })
+      }
     })
   }
 
