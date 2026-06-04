@@ -78,7 +78,7 @@ export default function Inventario() {
   const { perfil } = useAuth()
   const { lang } = useContext(LangContext)
   const isEs = lang === 'ES'
-  const { materiales, entradas, salidas, proyectos, presupuesto, ordenes_compra, solicitudes = [], solicitud_items = [], ordenes_compra_items = [] } = state
+  const { materiales, entradas, salidas, proyectos, presupuesto, ordenes_compra, solicitudes = [], solicitud_items = [], ordenes_compra_items = [], solicitudes_eliminacion = [] } = state
 
   const [tab, setTab]             = useState(0)
   const [drawer, setDrawer]       = useState(null)
@@ -142,6 +142,15 @@ export default function Inventario() {
   const delEntrada = (e) => {
     const mat = materiales.find(m => m.id === e.material_id)
     if (esBodeguero) {
+      const tienePendiente = solicitudes_eliminacion.some(
+        x => x.registro_id === e.id && x.estado === 'pendiente'
+      )
+      if (tienePendiente) {
+        alert(isEs
+          ? 'Ya existe una solicitud de eliminacion pendiente para este registro. Espera la respuesta del administrador.'
+          : 'A deletion request is already pending for this record. Please wait for the administrator\'s response.')
+        return
+      }
       setModalElim({ tipo: 'entrada', registro: e, mat })
     } else {
       const salidasAfectadas = salidas.filter(s => s.material_id === e.material_id)
@@ -164,6 +173,15 @@ export default function Inventario() {
   const delSalida = (s) => {
     const mat = materiales.find(m => m.id === s.material_id)
     if (esBodeguero) {
+      const tienePendiente = solicitudes_eliminacion.some(
+        x => x.registro_id === s.id && x.estado === 'pendiente'
+      )
+      if (tienePendiente) {
+        alert(isEs
+          ? 'Ya existe una solicitud de eliminacion pendiente para este registro. Espera la respuesta del administrador.'
+          : 'A deletion request is already pending for this record. Please wait for the administrator\'s response.')
+        return
+      }
       setModalElim({ tipo: 'salida', registro: s, mat })
     } else {
       if (!window.confirm(isEs
@@ -532,11 +550,22 @@ export default function Inventario() {
                       </td>
                       {puedeEditar && (
                         <td className="px-4 py-3">
-                          <TBtn danger onClick={() => delEntrada(e)}>
-                            {esBodeguero
-                              ? (isEs ? 'Solicitar eliminacion' : 'Request deletion')
-                              : (isEs ? 'Eliminar' : 'Delete')}
-                          </TBtn>
+                          {esBodeguero ? (() => {
+                            const tienePendiente = solicitudes_eliminacion.some(
+                              x => x.registro_id === e.id && x.estado === 'pendiente'
+                            )
+                            return tienePendiente
+                              ? <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium">
+                                  {isEs ? 'Solicitud pendiente' : 'Request pending'}
+                                </span>
+                              : <TBtn danger onClick={() => delEntrada(e)}>
+                                  {isEs ? 'Solicitar eliminacion' : 'Request deletion'}
+                                </TBtn>
+                          })() : (
+                            <TBtn danger onClick={() => delEntrada(e)}>
+                              {isEs ? 'Eliminar' : 'Delete'}
+                            </TBtn>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -594,11 +623,22 @@ export default function Inventario() {
                       </td>
                       {puedeEditar && (
                         <td className="px-4 py-3">
-                          <TBtn danger onClick={() => delSalida(s)}>
-                            {esBodeguero
-                              ? (isEs ? 'Solicitar eliminacion' : 'Request deletion')
-                              : (isEs ? 'Eliminar' : 'Delete')}
-                          </TBtn>
+                          {esBodeguero ? (() => {
+                            const tienePendiente = solicitudes_eliminacion.some(
+                              x => x.registro_id === s.id && x.estado === 'pendiente'
+                            )
+                            return tienePendiente
+                              ? <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium">
+                                  {isEs ? 'Solicitud pendiente' : 'Request pending'}
+                                </span>
+                              : <TBtn danger onClick={() => delSalida(s)}>
+                                  {isEs ? 'Solicitar eliminacion' : 'Request deletion'}
+                                </TBtn>
+                          })() : (
+                            <TBtn danger onClick={() => delSalida(s)}>
+                              {isEs ? 'Eliminar' : 'Delete'}
+                            </TBtn>
+                          )}
                         </td>
                       )}
                     </tr>
