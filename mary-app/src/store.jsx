@@ -778,10 +778,15 @@ useEffect(() => {
         const item = { ...action.payload, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
         await supabase.from('solicitudes_eliminacion').insert(item)
         dispatch({ type: 'ADD_SOL_ELIM', payload: item })
+        const solicitante = action.payload.solicitante_nombre || 'A user'
+        const tipoES = action.payload.tipo === 'entrada' ? 'una entrada' : 'una salida'
+        const tipoEN = action.payload.tipo === 'entrada' ? 'an entry' : 'an exit'
+        const material = action.payload.material_desc || 'material'
+        const just = action.payload.justificacion || '—'
         await notify({
           tipo: 'solicitud',
-          titulo: '⚠️ Solicitud de eliminación pendiente',
-          mensaje: `${action.payload.solicitante_nombre || 'Un usuario'} solicita eliminar ${action.payload.tipo === 'entrada' ? 'una entrada' : 'una salida'} de "${action.payload.material_desc || 'material'}". Justificación: ${action.payload.justificacion || '—'}`,
+          titulo: `⚠️ Deletion request / Solicitud de eliminación`,
+          mensaje: `${solicitante} requested to delete ${tipoEN} of "${material}" | solicitó eliminar ${tipoES} de "${material}". ${just}`,
           modulo: 'inventario',
           referencia_id: item.id,
           roles: ['client_admin', 'coordinador', 'gerente', 'super_admin'],
@@ -838,12 +843,16 @@ useEffect(() => {
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id)
+        const tipoAprobEN = sol.tipo === 'entrada' ? 'an entry' : 'an exit'
+        const tipoAprobES = sol.tipo === 'entrada' ? 'una entrada' : 'una salida'
+        const comentAprobEN = action.payload.comentario ? ' Comment: ' + action.payload.comentario : ''
+        const comentAprobES = action.payload.comentario ? ' Comentario: ' + action.payload.comentario : ''
         // Notificar al usuario específico que elaboró la solicitud
         await notifyUser({
           usuario_id: sol.solicitante_id,
           tipo: 'aprobacion',
-          titulo: '✅ Solicitud de eliminación aprobada',
-          mensaje: `Tu solicitud de eliminar ${sol.tipo === 'entrada' ? 'una entrada' : 'una salida'} de "${sol.material_desc}" fue aprobada.${action.payload.comentario ? ' Comentario: ' + action.payload.comentario : ''}`,
+          titulo: '✅ Deletion request approved / Solicitud aprobada',
+          mensaje: `Your request to delete ${tipoAprobEN} of "${sol.material_desc}" was approved.${comentAprobEN} | Tu solicitud de eliminar ${tipoAprobES} de "${sol.material_desc}" fue aprobada.${comentAprobES}`,
           modulo: 'inventario',
           referencia_id: sol.id,
         })
@@ -854,12 +863,14 @@ useEffect(() => {
         const upd = { estado: 'rechazada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
         dispatch({ type: 'UPD_SOL_ELIM', payload: { id: action.payload.id, ...upd } })
         await supabase.from('solicitudes_eliminacion').update(upd).eq('id', action.payload.id)
+        const motivoEN = action.payload.comentario ? ' Reason: ' + action.payload.comentario : ''
+        const motivoES = action.payload.comentario ? ' Motivo: ' + action.payload.comentario : ''
         // Notificar al usuario específico que elaboró la solicitud
         await notifyUser({
           usuario_id: sol2?.solicitante_id,
           tipo: 'rechazo',
-          titulo: '❌ Solicitud de eliminación rechazada',
-          mensaje: `Tu solicitud de eliminar "${sol2?.material_desc || 'material'}" fue rechazada.${action.payload.comentario ? ' Motivo: ' + action.payload.comentario : ''}`,
+          titulo: '❌ Deletion request rejected / Solicitud rechazada',
+          mensaje: `Your request to delete "${sol2?.material_desc || 'material'}" was rejected.${motivoEN} | Tu solicitud de eliminar "${sol2?.material_desc || 'material'}" fue rechazada.${motivoES}`,
           modulo: 'inventario',
           referencia_id: action.payload.id,
         })

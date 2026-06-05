@@ -19,6 +19,17 @@ const MODULO_LABELS = {
   presupuesto:    { es: 'Presupuesto',       en: 'Budget' },
 }
 
+// Parser para mensajes bilingüe "EN text | ES text"
+// Si no hay separador |, devuelve el texto tal cual (compatibilidad con notifs viejas en ES)
+function parseBilingual(text, isEs) {
+  if (!text) return text
+  const sep = text.indexOf(' | ')
+  if (sep === -1) return text           // formato viejo — texto en español, se muestra tal cual
+  const en = text.substring(0, sep).trim()
+  const es = text.substring(sep + 3).trim()
+  return isEs ? es : en
+}
+
 function timeAgo(dateStr, isEs) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins  = Math.floor(diff / 60000)
@@ -76,6 +87,8 @@ export default function NotificacionesPanel({ onNavigate }) {
 
   const NotifItem = ({ n }) => {
     const cfg = TIPO_CONFIG[n.tipo] || TIPO_CONFIG.info
+    const titulo  = parseBilingual(n.titulo, isEs)
+    const mensaje = parseBilingual(n.mensaje, isEs)
     return (
       <button
         onClick={() => handleClick(n)}
@@ -87,14 +100,14 @@ export default function NotificacionesPanel({ onNavigate }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className={`text-sm font-medium leading-tight ${!n.leida ? 'text-gray-900' : 'text-gray-600'}`}>
-              {n.titulo}
+              {titulo}
             </p>
             {!n.leida && (
               <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
             )}
           </div>
-          {n.mensaje && (
-            <p className="text-xs text-gray-400 mt-0.5 truncate">{n.mensaje}</p>
+          {mensaje && (
+            <p className="text-xs text-gray-400 mt-0.5 truncate">{mensaje}</p>
           )}
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-gray-400">{timeAgo(n.created_at, isEs)}</span>

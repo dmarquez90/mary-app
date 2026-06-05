@@ -402,7 +402,7 @@ function Layout() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-400">Marquez Project Solutions LLC</p>
+              <p className="text-xs text-gray-400">{perfil?.tenants?.nombre_empresa || perfil?.tenant_id || ''}</p>
             </div>
           </div>
 
@@ -521,7 +521,7 @@ function AppContent() {
   }
 
   return (
-    <StoreProvider tenantId={perfil?.tenant_id}>
+    <StoreProvider key={perfil?.tenant_id} tenantId={perfil?.tenant_id}>
       <LangProvider>
         <Layout />
       </LangProvider>
