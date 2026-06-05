@@ -103,7 +103,7 @@ export default function Configuracion() {
             empresa_id:         perfil.tenant_id,
             email:              perfil.email,
             empresa_nombre:     tenant?.nombre_empresa || '',
-            promotion_code_id:  promoData?.promo_code_id || undefined,
+            promo_code:         promoData ? promoCode.trim().toUpperCase() : undefined,
           }),
         }
       )
@@ -1072,6 +1072,10 @@ export default function Configuracion() {
 
               <button
                 disabled={subLoading}
+                onClick={() => {
+                  if (planAction === 'subscribe') iniciarCheckout()
+                  else cambiarPlan()
+                }}
                 className="w-full py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
                 style={{ background: planAction === 'downgrade' ? '#92400E' : '#1B3A6B' }}>
                 {subLoading ? (
