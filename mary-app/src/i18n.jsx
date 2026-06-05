@@ -1472,24 +1472,34 @@ const EN = {
    ============================================================ */
 export const LangContext = createContext()
 
+// Detecta el idioma inicial: localStorage → DB → idioma del sistema → ES
+function detectInitialLang() {
+  const saved = localStorage.getItem(LS_KEY)
+  if (saved === 'ES' || saved === 'EN') return saved
+  const browser = (navigator.language || navigator.languages?.[0] || 'es').toLowerCase()
+  return browser.startsWith('es') ? 'ES' : 'EN'
+}
+
 export function LangProvider({ children }) {
-  const [lang, setLang] = useState('ES')
+  const [lang, setLang] = useState(detectInitialLang)
 
   useEffect(() => {
-    // Load from localStorage first for instant render
-    const saved = localStorage.getItem(LS_KEY)
-    if (saved) setLang(saved)
-    // Then sync from Supabase if user has a row in usuarios table — only override localStorage if DB has a value
+    // Si ya había preferencia en localStorage, ya se aplicó en detectInitialLang — solo sincronizar con DB
+    // Si NO había preferencia guardada, guardamos la detección automática para futuras cargas
+    if (!localStorage.getItem(LS_KEY)) {
+      localStorage.setItem(LS_KEY, lang)
+    }
+    // Luego sincronizar con Supabase — DB gana solo cuando tiene valor explícito
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       supabase.from('usuarios').select('lang').eq('id', user.id).single()
         .then(({ data }) => {
           if (data?.lang) {
-            // DB wins over localStorage only when DB has an explicit value
+            // DB wins over localStorage/system detection only when DB has an explicit value
             setLang(data.lang)
             localStorage.setItem(LS_KEY, data.lang)
           }
-          // If no row or no lang field (e.g. super_admin), keep localStorage value — already set above
+          // If no row or no lang field (e.g. super_admin), keep detected value — already set above
         })
     })
   }, [])
