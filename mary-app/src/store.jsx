@@ -305,9 +305,10 @@ export function StoreProvider({ children, tenantId }) {
 useEffect(() => {
   if (!tenantId) return
 
+  // Tablas donde el filtro tenant_id funciona para todos los eventos (INSERT/UPDATE/DELETE)
   const REALTIME_TABLES = [
     'proyectos', 'fases', 'presupuesto', 'presupuesto_indirectos',
-    'materiales', 'entradas', 'salidas',
+    'materiales',
     'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
     'costos_directos', 'nominas', 'subcontratos', 'equipos', 'costos_indirectos',
@@ -334,6 +335,49 @@ useEffect(() => {
       .subscribe()
   )
 
+  // ── Listener especial para entradas y salidas ────────────────────
+  // El filtro tenant_id NO funciona para DELETE en Supabase Realtime
+  // (la fila ya no existe cuando el evento llega). Se escuchan DOS canales:
+  // uno filtrado para INSERT/UPDATE, y uno sin filtro para DELETE
+  // que recarga la tabla completa del tenant.
+  const TABLES_WITH_DELETE = ['entradas', 'salidas']
+  const deleteChannels = TABLES_WITH_DELETE.flatMap(table => [
+    // Canal filtrado para INSERT y UPDATE
+    supabase
+      .channel(`rt_${table}_iupd_${tenantId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table,
+        filter: `tenant_id=eq.${tenantId}`,
+      }, async () => {
+        const { data } = await supabase.from(table).select('*').eq('tenant_id', tenantId)
+        dispatch({ type: 'LOAD_TABLE', payload: { key: table, data: data || [] } })
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table,
+        filter: `tenant_id=eq.${tenantId}`,
+      }, async () => {
+        const { data } = await supabase.from(table).select('*').eq('tenant_id', tenantId)
+        dispatch({ type: 'LOAD_TABLE', payload: { key: table, data: data || [] } })
+      })
+      .subscribe(),
+    // Canal sin filtro para DELETE — recarga la tabla del tenant
+    supabase
+      .channel(`rt_${table}_del_${tenantId}`)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table,
+      }, async () => {
+        const { data } = await supabase.from(table).select('*').eq('tenant_id', tenantId)
+        dispatch({ type: 'LOAD_TABLE', payload: { key: table, data: data || [] } })
+      })
+      .subscribe(),
+  ])
+
   // Realtime notificaciones: .on() SIEMPRE antes de .subscribe()
   // La variable cancelled evita condicion de carrera en StrictMode/hot-reload
   let notifChannel = null
@@ -357,6 +401,7 @@ useEffect(() => {
   return () => {
     cancelled = true
     channels.forEach(ch => supabase.removeChannel(ch))
+    deleteChannels.forEach(ch => supabase.removeChannel(ch))
     if (notifChannel) supabase.removeChannel(notifChannel)
   }
 }, [tenantId])
