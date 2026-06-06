@@ -2,11 +2,18 @@ import { useState } from 'react'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
 
-const PAISES = [
-  'Estados Unidos','México','Guatemala','El Salvador','Honduras','Nicaragua',
-  'Costa Rica','Panamá','Colombia','Venezuela','Ecuador','Perú','Bolivia',
-  'Chile','Argentina','Uruguay','Paraguay','España','Otro'
-]
+const PAISES = {
+  ES: [
+    'Estados Unidos','México','Guatemala','El Salvador','Honduras','Nicaragua',
+    'Costa Rica','Panamá','Colombia','Venezuela','Ecuador','Perú','Bolivia',
+    'Chile','Argentina','Uruguay','Paraguay','España','Otro'
+  ],
+  EN: [
+    'United States','Mexico','Guatemala','El Salvador','Honduras','Nicaragua',
+    'Costa Rica','Panama','Colombia','Venezuela','Ecuador','Peru','Bolivia',
+    'Chile','Argentina','Uruguay','Paraguay','Spain','Other'
+  ]
+}
 
 const T = {
   ES: {
@@ -829,7 +836,7 @@ export default function Login({ onNavigate }) {
                     <label style={labelStyle}>{t.reg_country} *</label>
                     <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
                       <option value="" style={{ backgroundColor: '#0d1117', color: '#ffffff' }}>{t.reg_select}</option>
-                      {PAISES.map(p => (
+                      {PAISES[lang].map(p => (
                         <option key={p} value={p} style={{ backgroundColor: '#0d1117', color: '#ffffff' }}>{p}</option>
                       ))}
                     </select>
