@@ -15,7 +15,8 @@ const PLAN_CONFIG = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const { nombre, empresa, telefono, email, password, pais, plan, ref_code } = await req.json()
+    const { nombre, empresa, telefono, email, password, pais, plan, ref_code, lang } = await req.json()
+    const safeLang = lang === 'EN' ? 'EN' : 'ES'
 
     if (!nombre || !empresa || !email || !password || !pais)
       return new Response(JSON.stringify({ error: 'missing_fields' }), { status: 400, headers: corsHeaders })
@@ -89,6 +90,7 @@ serve(async (req) => {
         rol:       'client_admin',
         tenant_id: nuevoTenant.id,
         activo:    true,
+        lang:      safeLang,
       })
       if (usuarioError) throw usuarioError
 
@@ -138,6 +140,7 @@ serve(async (req) => {
       rol:       'client_admin',
       tenant_id: tenant.id,
       activo:    true,
+      lang:      safeLang,
     })
 
     if (usuarioError) {

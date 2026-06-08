@@ -521,12 +521,27 @@ California, United States
 }
 
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────
+function detectLang() {
+  const saved = localStorage.getItem('mary_lang')
+  if (saved === 'ES' || saved === 'EN') return saved
+  const browser = (navigator.language || navigator.languages?.[0] || 'es').toLowerCase()
+  return browser.startsWith('es') ? 'ES' : 'EN'
+}
+
 export default function Login({ onNavigate }) {
   const { login }                   = useAuth()
-  const [lang, setLang]             = useState('ES')
+  const [lang, setLangState]        = useState(detectLang)
   const [view, setView]             = useState('login')
   const [legalModal, setLegalModal] = useState(null)
   const t = T[lang]
+
+  const setLang = (updater) => {
+    setLangState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      localStorage.setItem('mary_lang', next)
+      return next
+    })
+  }
 
   // Login
   const [email, setEmail]       = useState('')
@@ -584,7 +599,7 @@ export default function Login({ onNavigate }) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan, ref_code: reg.ref_code.trim().toUpperCase() || undefined })
+          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan, ref_code: reg.ref_code.trim().toUpperCase() || undefined, lang })
         }
       )
       const result = await res.json()

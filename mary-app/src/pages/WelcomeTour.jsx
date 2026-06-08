@@ -25,6 +25,34 @@ import { useAuth } from '../auth'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 
+// ─── Botón de idioma inline ────────────────────────────────────────────────
+function LangBtn({ lang, toggleLang }) {
+  return (
+    <button
+      onClick={toggleLang}
+      title={lang === 'ES' ? 'Switch to English' : 'Cambiar a Español'}
+      style={{
+        border: '1.5px solid rgba(255,255,255,0.25)',
+        background: 'rgba(255,255,255,0.10)',
+        color: 'rgba(255,255,255,0.85)',
+        borderRadius: 7,
+        padding: '4px 11px',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.07em',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        transition: 'all 0.15s',
+        lineHeight: 1.4,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.22)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)' }}
+    >
+      🌐 {lang === 'ES' ? 'EN' : 'ES'}
+    </button>
+  )
+}
+
 // ─── Contenido bilingüe ────────────────────────────────────────────────────
 
 const CONTENT = {
@@ -83,7 +111,7 @@ const btnBase = {
 
 export default function WelcomeTour() {
   const { perfil }    = useAuth()
-  const { lang }      = useContext(LangContext)
+  const { lang, toggleLang } = useContext(LangContext)
 
   const [visible,   setVisible]   = useState(false)
   const [step,      setStep]      = useState(0)   // 0=intro, 1..N=módulos, N+1=final
@@ -192,18 +220,21 @@ export default function WelcomeTour() {
           ))}
 
           <div style={{ position: 'relative', zIndex: 1 }}>
-            {/* Badge + Skip */}
+            {/* Badge + controles */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>
                 {c.badge}
               </span>
-              <button onClick={cerrar} style={{
-                ...btnBase,
-                background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)',
-                borderRadius: 7, padding: '4px 12px', fontSize: 12, fontWeight: 600,
-              }}>
-                {c.skip} ✕
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LangBtn lang={lang} toggleLang={toggleLang} />
+                <button onClick={cerrar} style={{
+                  ...btnBase,
+                  background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)',
+                  borderRadius: 7, padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                }}>
+                  {c.skip} ✕
+                </button>
+              </div>
             </div>
 
             {/* Título */}
