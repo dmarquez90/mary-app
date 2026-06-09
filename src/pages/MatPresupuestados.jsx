@@ -32,9 +32,14 @@ export default function MatPresupuestados() {
   const matRef = useRef(null)
   useEffect(() => {
     if (!matOpen) return
-    const handler = (e) => { if (matRef.current && !matRef.current.contains(e.target)) setMatOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const handleClick = (e) => {
+      if (matRef.current && !matRef.current.contains(e.target)) setMatOpen(false)
+    }
+    const handleKey = (e) => { if (e.key === 'Escape') setMatOpen(false) }
+    // Use setTimeout to avoid capturing the same click that opened the dropdown
+    const t = setTimeout(() => document.addEventListener('mousedown', handleClick), 0)
+    document.addEventListener('keydown', handleKey)
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey) }
   }, [matOpen])
 
   const puedeEditar = can('mat_pres_editar')
