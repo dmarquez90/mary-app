@@ -1,5 +1,12 @@
 export const uuid = () => crypto.randomUUID()
 
+// ── Redondeo contable a 2 decimales ──────────────────────────────────────────
+// Usa el método "redondeo bancario" correcto (Math.round con compensación de
+// floating-point). Siempre aplícalo al RESULTADO de cada multiplicación antes
+// de acumular sumas.
+// Ejemplo: r2(2.667) → 2.67   r2(1.344) → 1.34   2.67+1.34 = 4.01 ✓
+export const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
+
 // Mapa de países a moneda
 export const PAIS_MONEDA = {
   'Argentina':             'ARS',
@@ -147,7 +154,7 @@ export const flatBudgetItems = (items) => {
 export const calcSubtotal = (items, id, tipo) => {
   if (tipo === 'sub_etapa') {
     return items.filter(i => i.tipo === 'actividad' && i.parent_id === id)
-      .reduce((s, a) => s + (a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0)), 0)
+      .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
   }
   if (tipo === 'etapa') {
     // Suma sub-etapas
@@ -155,7 +162,7 @@ export const calcSubtotal = (items, id, tipo) => {
       .reduce((s, ss) => s + calcSubtotal(items, ss.id, 'sub_etapa'), 0)
     // Suma actividades directas bajo etapa (sin sub-etapa intermedia)
     const directTotal = items.filter(i => i.tipo === 'actividad' && i.parent_id === id)
-      .reduce((s, a) => s + (a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0)), 0)
+      .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
     return subTotal + directTotal
   }
   return 0
@@ -165,7 +172,7 @@ export const calcGrandTotal = (items) => {
   const validIds = new Set(items.map(i => i.id))
   return items
     .filter(i => i.tipo === 'actividad' && validIds.has(i.parent_id))
-    .reduce((s, a) => s + (a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0)), 0)
+    .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
 }
 
 export const ESTADO_COLORS = {

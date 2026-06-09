@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, calcGrandTotal } from '../utils'
+import { fmt, calcGrandTotal, r2 } from '../utils'
 import { EmptyState, StatCard, Icons } from '../components'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
@@ -52,10 +52,10 @@ export default function CurvaS() {
   const subtotalPres   = totalDirectos + totalIndPres
   const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
   const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
-  const utilidadMonto  = subtotalPres * (utilidadPct / 100)
-  const granTotalPres  = subtotalPres + utilidadMonto
-  const impuestoMonto  = granTotalPres * (impuestoPct / 100)
-  const budget         = granTotalPres + impuestoMonto
+  const utilidadMonto  = r2(subtotalPres * (utilidadPct / 100))
+  const granTotalPres  = r2(subtotalPres + utilidadMonto)
+  const impuestoMonto  = r2(granTotalPres * (impuestoPct / 100))
+  const budget         = r2(granTotalPres + impuestoMonto)
 
   // ── Presupuesto revisado por Órdenes de Cambio aprobadas ─────────────────
   const ocsAprobadas   = ordenes_cambio.filter(o => o.proyecto_id === proyId && o.estado === 'aprobada')
@@ -67,7 +67,7 @@ export default function CurvaS() {
     const costs = []
     salidas.filter(s => s.proyecto_id === proyId).forEach(s => {
       const e = entradas.find(en => en.material_id === s.material_id)
-      const monto = (parseFloat(s.cantidad)||0) * (parseFloat(e?.precio_unitario)||0)
+      const monto = r2((parseFloat(s.cantidad)||0) * (parseFloat(e?.precio_unitario)||0))
       if (monto > 0) costs.push({ fecha: s.fecha_salida, monto })
     })
     costos_directos.filter(c => c.proyecto_id === proyId).forEach(c =>
@@ -231,10 +231,10 @@ export default function CurvaS() {
   const actDeviations = useMemo(() => {
     if (!proyId) return []
     return items.filter(i => i.tipo === 'actividad').map(act => {
-      const presupuestado = (act.cantidad||0) * ((act.costo_mo||0) + (act.costo_materiales||0) + (act.costo_equipos||0))
+      const presupuestado = r2((act.cantidad||0) * ((act.costo_mo||0) + (act.costo_materiales||0) + (act.costo_equipos||0)))
       const matCost = salidas.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sa) => {
         const e = entradas.find(en => en.material_id === sa.material_id)
-        return s + (parseFloat(sa.cantidad)||0) * (parseFloat(e?.precio_unitario)||0)
+        return s + r2((parseFloat(sa.cantidad)||0) * (parseFloat(e?.precio_unitario)||0))
       }, 0)
       const dirCost = costos_directos.filter(c => c.proyecto_id===proyId && c.actividad_id===act.id).reduce((s,c) => s + (parseFloat(c.monto)||0), 0)
       const scIdsNuevo = subcontratos_items.filter(si => si.actividad_id===act.id).map(si => si.subcontrato_id)

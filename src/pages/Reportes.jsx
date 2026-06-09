@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, r2 as round2 } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 
@@ -1043,7 +1043,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
     const even = i%2===1
     const m     = materiales.find(x=>x.id===e.material_id)
     const p     = proyectos.find(x=>x.id===e.proyecto_id)
-    const total = (parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0)
+    const total = round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0))
     totalEntradas += total
     const vals = [e.fecha_recepcion, m?.codigo||'—', m?.descripcion||'—',
       parseFloat(e.cantidad)||0, m?.unidad||'', parseFloat(e.precio_unitario)||0,
@@ -1106,7 +1106,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 
   const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>{
     const e=entradas.find(en=>en.material_id===sa.material_id)
-    return s+(parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0)
+    return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))
   },0)
   const dirs     = costos_directos.filter(c=>c.proyecto_id===proyId)
   const noms     = nominas.filter(n=>n.proyecto_id===proyId)
@@ -1364,10 +1364,10 @@ export default function Reportes() {
   const subtotalPres   = totalDirectos + totalIndPres
   const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
   const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
-  const utilidadMonto  = subtotalPres * (utilidadPct / 100)
-  const granTotalPres  = subtotalPres + utilidadMonto
-  const impuestoMonto  = granTotalPres * (impuestoPct / 100)
-  const budget         = granTotalPres + impuestoMonto
+  const utilidadMonto  = round2(subtotalPres * (utilidadPct / 100))
+  const granTotalPres  = round2(subtotalPres + utilidadMonto)
+  const impuestoMonto  = round2(granTotalPres * (impuestoPct / 100))
+  const budget         = round2(granTotalPres + impuestoMonto)
 
   const datosFinanciero = useMemo(() => {
     if (!proyId) return null
@@ -1382,7 +1382,7 @@ export default function Reportes() {
 
     const totalMat = salidas.filter(s=>s.proyecto_id===proyId&&filtro(s.fecha_salida)).reduce((s,sa)=>{
       const e=entradas.find(en=>en.material_id===sa.material_id)
-      return s+(parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0)
+      return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))
     },0)
     const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
@@ -1399,7 +1399,7 @@ export default function Reportes() {
     const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
 
     const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
-      const pres=(act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0))
+      const pres=round2((act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)))
       // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
       const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)
       const realScNuevo = subcontratos_avaluos
@@ -1408,7 +1408,7 @@ export default function Reportes() {
       const realScAntiguo = subcontratos.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
         .reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
       const real=salidas.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
-        .reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+(parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0)},0)
+        .reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))},0)
         +costos_directos.filter(c=>c.proyecto_id===proyId&&c.actividad_id===act.id).reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
         +realScNuevo+realScAntiguo
       const dev=real-pres
@@ -1821,7 +1821,7 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
       </table></div>}
       {subTab===1&&<div className="bg-white rounded-xl border border-gray-100 overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{['Fecha','Código','Material','Cantidad','Precio unit.','Total','Factura','Proveedor','Proyecto'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
-        <tbody>{data.entradas.map((e,i)=>{const m=materiales.find(x=>x.id===e.material_id);const p=proyectos.find(x=>x.id===e.proyecto_id);const total=(parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0);return(<tr key={e.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(e.fecha_recepcion)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-green-600'}>+{fmtNum(e.cantidad)}</td><td className={tdC+' font-mono'}>${fmtNum(e.precio_unitario)}</td><td className={tdC+' font-mono font-medium'}>${fmtNum(total)}</td><td className={tdC}>{e.numero_factura||'—'}</td><td className={tdC}>{e.proveedor||'—'}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td></tr>)})}</tbody>
+        <tbody>{data.entradas.map((e,i)=>{const m=materiales.find(x=>x.id===e.material_id);const p=proyectos.find(x=>x.id===e.proyecto_id);const total=round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0));return(<tr key={e.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(e.fecha_recepcion)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-green-600'}>+{fmtNum(e.cantidad)}</td><td className={tdC+' font-mono'}>${fmtNum(e.precio_unitario)}</td><td className={tdC+' font-mono font-medium'}>${fmtNum(total)}</td><td className={tdC}>{e.numero_factura||'—'}</td><td className={tdC}>{e.proveedor||'—'}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td></tr>)})}</tbody>
       </table></div>}
       {subTab===2&&<div className="bg-white rounded-xl border border-gray-100 overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{['Fecha','Código','Material','Cantidad','Proyecto','Actividad'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
@@ -1838,7 +1838,7 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
   const thS={background:BRAND}
   const thC='px-4 py-2.5 text-left text-xs font-semibold text-white'
   const tdC='px-4 py-2.5 text-sm text-gray-700'
-  const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+(parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0)},0)
+  const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))},0)
   const dirs=costos_directos.filter(c=>c.proyecto_id===proyId)
   const noms=nominas.filter(n=>n.proyecto_id===proyId)
   const subs=subcontratos.filter(s=>s.proyecto_id===proyId)

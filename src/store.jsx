@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
 import { supabase } from './supabase'
-import { uuid, genProjectCode, genOCCode, genBudgetCode, today } from './utils'
+import { uuid, genProjectCode, genOCCode, genBudgetCode, today, r2 } from './utils'
 
 const INIT = {
   proyectos: [], fases: [], presupuesto: [],
@@ -989,7 +989,7 @@ useEffect(() => {
       case 'ADD_OC': {
         const oc_number   = genOCCode(state.ordenes_compra)
         const monto_total = parseFloat(action.payload.monto_total || 0) ||
-          (action.payload.items||[]).reduce((s, it) => s + (parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
+          (action.payload.items||[]).reduce((s, it) => s + r2(parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
         const oc = {
           id: uuid(), oc_number, estado: 'pendiente_aprobacion',
           created_at: today(), fecha_elaboracion: today(),
@@ -1012,7 +1012,7 @@ useEffect(() => {
         }
         const ocItems = (action.payload.items||[]).map(it => {
           const impPct = parseFloat(it.impuesto_pct !== '' && it.impuesto_pct !== undefined ? it.impuesto_pct : (action.payload.impuesto_pct||0))
-          const subtotal = parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)
+          const subtotal = r2(parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0))
           return {
             id: uuid(), oc_id: oc.id,
             solicitud_item_id: it.solicitud_item_id || it.id || null,
@@ -1023,8 +1023,8 @@ useEffect(() => {
             unidad:            it.unidad || 'und',
             precio_unitario:   parseFloat(it.precio_unitario||0),
             subtotal, impuesto_pct: impPct,
-            impuesto_monto:    subtotal * (impPct / 100),
-            total:             subtotal * (1 + impPct / 100),
+            impuesto_monto:    r2(subtotal * (impPct / 100)),
+            total:             r2(subtotal * (1 + impPct / 100)),
             tenant_id:         tenantId,
           }
         })
@@ -1369,7 +1369,7 @@ useEffect(() => {
             actividad_id:  it.actividad_id || null,
             parent_id:     it.parent_id || null,
             diferencia:    parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
-            monto_cambio:  (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0),
+            monto_cambio:  r2((parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0)),
           }))
           const { error: errItems } = await supabase.from('ordenes_cambio_items').insert(dbItems)
           if (errItems) console.error('ordenes_cambio_items insert error:', errItems)
@@ -1471,7 +1471,7 @@ useEffect(() => {
               for (const ind of ocInds) {
                 const indActual = state.presupuesto_indirectos?.find(p => p.id === ind.ind_id)
                 if (!indActual) continue
-                const montoNuevo = Math.round((parseFloat(indActual.monto_presupuestado||0) + parseFloat(ind.ajuste||0)) * 100) / 100
+                const montoNuevo = r2(parseFloat(indActual.monto_presupuestado||0) + parseFloat(ind.ajuste||0))
                 await supabase
                   .from('presupuesto_indirectos').update({ monto_presupuestado: montoNuevo }).eq('id', ind.ind_id)
                 dispatch({ type: 'UPD_PRES_IND', payload: { id: ind.ind_id, monto_presupuestado: montoNuevo } })

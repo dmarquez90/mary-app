@@ -1,8 +1,11 @@
 import { useState, useContext, useMemo } from 'react'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
+import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, calcGrandTotal } from '../utils'
+import { today, fmt, fmtNum, calcGrandTotal, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 
 const BRAND = '#1B3A6B'
@@ -17,6 +20,165 @@ const ESTADO_AV = {
 function EstadoBadge({ estado, isEs }) {
   const cfg = ESTADO_AV[estado] || ESTADO_AV.borrador
   return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>{isEs ? cfg.label : cfg.labelEn}</span>
+}
+
+
+// ── EXCEL EXPORT — AVALUO CLIENTE ────────────────────────────────────────────
+async function exportAvaluoExcel({ avaluo, items, proy, moneda, empresa, lang = 'ES' }) {
+  const isEs  = lang === 'ES'
+  const NAVY  = '1B3A6B'
+  const GREEN = '1D9E75'
+  const AMBER = 'F59E0B'
+  const WHITE = 'FFFFFF'
+  const LGRAY = 'F3F4F6'
+
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'MARY ERP'
+  const ws = wb.addWorksheet(isEs ? 'Avalúo' : 'Valuation')
+  ws.views = [{ showGridLines: false }]
+
+  const setCols = (widths) => widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
+  setCols([6, 38, 10, 10, 16, 10, 10, 10, 12, 16, 16, 16, 16])
+
+  const styleCell = (cell, opts = {}) => {
+    if (opts.fill)   cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill } }
+    if (opts.font)   cell.font   = { name: 'Arial', size: opts.size || 10, bold: opts.bold || false, color: { argb: opts.color || 'FF000000' }, ...opts.fontExtra }
+    if (opts.align)  cell.alignment = { horizontal: opts.align, vertical: 'middle', wrapText: opts.wrap || false }
+    if (opts.border) cell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' }
+    }
+    if (opts.numFmt) cell.numFmt = opts.numFmt
+  }
+
+  const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
+  const COLS = 13
+  let row = 1
+
+  // ── Banner MARY ──
+  ws.getRow(row).height = 36
+  merge(row, 1, row, COLS)
+  styleCell(ws.getCell(row, 1), { fill: NAVY, font: { name: 'Arial', size: 14, bold: true, color: { argb: `FF${WHITE}` } }, align: 'center' })
+  ws.getCell(row, 1).value = 'MARY · ' + (isEs ? 'Avalúo al Cliente' : 'Client Valuation')
+  row++
+
+  // ── Empresa ──
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  styleCell(ws.getCell(row, 1), { fill: NAVY, font: { name: 'Arial', size: 10, color: { argb: 'FFD1D5DB' } }, align: 'center' })
+  ws.getCell(row, 1).value = empresa + '  ·  appmary.com'
+  row++
+
+  // ── Info header ──
+  ws.getRow(row).height = 14; row++
+
+  const addInfoRow = (label, value) => {
+    ws.getRow(row).height = 18
+    merge(row, 1, row, 3)
+    styleCell(ws.getCell(row, 1), { fill: LGRAY, font: { name: 'Arial', size: 9, bold: true, color: { argb: 'FF6B7280' } }, align: 'right' })
+    ws.getCell(row, 1).value = label
+    merge(row, 4, row, 8)
+    styleCell(ws.getCell(row, 4), { font: { name: 'Arial', size: 9, bold: false, color: { argb: 'FF111827' } }, align: 'left' })
+    ws.getCell(row, 4).value = value
+    return row++
+  }
+
+  addInfoRow(isEs ? 'Proyecto:' : 'Project:', `${proy?.project_code || ''} — ${proy?.nombre || ''}`)
+  addInfoRow(isEs ? 'Cliente:' : 'Client:', proy?.cliente_externo || '—')
+  addInfoRow(isEs ? 'Avalúo #:' : 'Valuation #:', avaluo.numero)
+  addInfoRow(isEs ? 'Período:' : 'Period:', avaluo.periodo_inicio && avaluo.periodo_fin ? `${avaluo.periodo_inicio} → ${avaluo.periodo_fin}` : '—')
+  addInfoRow(isEs ? 'Estado:' : 'Status:', isEs
+    ? { borrador: 'Borrador', presentado: 'Presentado', aprobado: 'Aprobado', rechazado: 'Rechazado' }[avaluo.estado] || avaluo.estado
+    : { borrador: 'Draft', presentado: 'Submitted', aprobado: 'Approved', rechazado: 'Rejected' }[avaluo.estado] || avaluo.estado)
+  addInfoRow(isEs ? 'Elaborado:' : 'Prepared:', avaluo.fecha_elaboracion || '—')
+  addInfoRow(isEs ? 'Presentado a:' : 'Submitted to:', avaluo.presentado_a || '—')
+  addInfoRow(isEs ? 'Moneda:' : 'Currency:', moneda)
+  row++
+
+  // ── Column headers ──
+  const hdrs = isEs
+    ? ['#', 'Descripción', 'Unidad', 'Cant. Total', 'P.U.', 'Cant. Ant.', 'Cant. Período', 'Cant. Acum.', '% Fís.', 'Monto Ant.', 'Monto Período', 'Monto Acum.', 'Saldo $']
+    : ['#', 'Description', 'Unit', 'Total Qty', 'Unit Price', 'Prev. Qty', 'Period Qty', 'Accum. Qty', '% Phys.', 'Prev. Amt.', 'Period Amt.', 'Accum. Amt.', 'Balance $']
+  ws.getRow(row).height = 22
+  hdrs.forEach((h, i) => {
+    const c = ws.getCell(row, i + 1)
+    c.value = h
+    styleCell(c, { fill: NAVY, font: { name: 'Arial', size: 9, bold: true, color: { argb: `FF${WHITE}` } }, align: i === 1 ? 'left' : 'center', border: true })
+  })
+  row++
+
+  // ── Data rows ──
+  const itemsConAvance = items.filter(it => parseFloat(it.cantidad_periodo || 0) > 0)
+  itemsConAvance.forEach((it, idx) => {
+    const even = idx % 2 === 1
+    ws.getRow(row).height = 17
+    const vals = [
+      idx + 1,
+      it.descripcion + (it.es_oc ? ' [OC]' : ''),
+      it.unidad || 'und',
+      parseFloat(it.cantidad_total || 0),
+      parseFloat(it.precio_unitario || 0),
+      parseFloat(it.cantidad_anterior || 0) || null,
+      parseFloat(it.cantidad_periodo || 0),
+      parseFloat(it.cantidad_acumulada || 0),
+      parseFloat(it.pct_fisico || 0) / 100,
+      parseFloat(it.monto_anterior || 0) || null,
+      parseFloat(it.monto_periodo || 0),
+      parseFloat(it.monto_acumulado || 0),
+      parseFloat(it.monto_saldo || 0),
+    ]
+    const numFmts = [null, null, null, '#,##0.00', '"$"#,##0.00', '#,##0.00', '#,##0.00', '#,##0.00', '0.0%', '"$"#,##0.00', '"$"#,##0.00', '"$"#,##0.00', '"$"#,##0.00']
+    vals.forEach((v, ci) => {
+      const c = ws.getCell(row, ci + 1)
+      c.value = v === null ? '—' : v
+      styleCell(c, {
+        fill: even ? LGRAY : WHITE,
+        font: { name: 'Arial', size: 9, color: { argb: ci >= 10 ? `FF${GREEN}` : (ci === 12 ? 'FF6B7280' : 'FF111827') } },
+        align: ci === 1 ? 'left' : 'right',
+        numFmt: numFmts[ci] || undefined,
+      })
+    })
+    row++
+  })
+
+  // ── Totals ──
+  row++
+  const totals = [
+    [isEs ? 'Subtotal directo período' : 'Direct period subtotal', parseFloat(avaluo.subtotal || 0)],
+    ...(parseFloat(avaluo.indirecto_monto || 0) > 0 ? [[isEs ? 'Costo indirecto proporcional' : 'Prop. indirect cost', parseFloat(avaluo.indirecto_monto)]] : []),
+    ...(parseFloat(avaluo.utilidad_monto || 0) > 0 ? [[isEs ? 'Utilidad' : 'Profit', parseFloat(avaluo.utilidad_monto)]] : []),
+    ...(parseFloat(avaluo.impuesto_monto || 0) > 0 ? [[avaluo.impuesto_descripcion || (isEs ? 'Impuesto' : 'Tax'), parseFloat(avaluo.impuesto_monto)]] : []),
+  ]
+  totals.forEach(([label, val]) => {
+    ws.getRow(row).height = 16
+    merge(row, 1, row, 11)
+    styleCell(ws.getCell(row, 1), { fill: LGRAY, font: { name: 'Arial', size: 9, color: { argb: 'FF6B7280' } }, align: 'right' })
+    ws.getCell(row, 1).value = label
+    const c = ws.getCell(row, 12)
+    styleCell(c, { fill: LGRAY, font: { name: 'Arial', size: 9, bold: true, color: { argb: 'FF374151' } }, align: 'right', numFmt: '"$"#,##0.00' })
+    c.value = val
+    row++
+  })
+
+  // ── Grand total ──
+  ws.getRow(row).height = 22
+  merge(row, 1, row, 11)
+  styleCell(ws.getCell(row, 1), { fill: GREEN, font: { name: 'Arial', size: 11, bold: true, color: { argb: `FF${WHITE}` } }, align: 'right' })
+  ws.getCell(row, 1).value = isEs ? 'TOTAL COBRADO' : 'TOTAL BILLED'
+  const totalCell = ws.getCell(row, 12)
+  styleCell(totalCell, { fill: GREEN, font: { name: 'Arial', size: 11, bold: true, color: { argb: `FF${WHITE}` } }, align: 'right', numFmt: '"$"#,##0.00' })
+  totalCell.value = parseFloat(avaluo.total || 0)
+  row += 2
+
+  // ── Footer ──
+  merge(row, 1, row, COLS)
+  ws.getRow(row).height = 14
+  styleCell(ws.getCell(row, 1), { font: { name: 'Arial', size: 8, color: { argb: 'FF9CA3AF' } }, align: 'center' })
+  ws.getCell(row, 1).value = `${empresa}  ·  MARY ERP  ·  ${isEs ? 'Generado' : 'Generated'} ${new Date().toLocaleDateString(isEs ? 'es' : 'en-US')}`
+
+  const buf  = await wb.xlsx.writeBuffer()
+  const name = isEs ? `Avaluo_${avaluo.numero}_${proy?.project_code || ''}.xlsx` : `Valuation_${avaluo.numero}_${proy?.project_code || ''}.xlsx`
+  saveAs(new Blob([buf]), name)
 }
 
 export default function AvaluosCliente() {
@@ -34,6 +196,18 @@ export default function AvaluosCliente() {
 
   const puedeEditar = can('financiero_editar')
   const puedeAprobar = ['super_admin','client_admin','gerente'].includes(rol)
+
+  const [exportando, setExportando] = useState(false)
+
+  const handleExportAvaluo = async (av, avItems) => {
+    setExportando(true)
+    try {
+      const { data: tenantData } = await supabase.from('tenants').select('nombre_empresa').eq('id', proy?.tenant_id).single()
+      const empresa = tenantData?.nombre_empresa || 'MARY ERP'
+      await exportAvaluoExcel({ avaluo: av, items: avItems, proy, moneda, empresa, lang })
+    } catch(e) { console.error(e); alert('Error al generar Excel: ' + e.message) }
+    setExportando(false)
+  }
 
   const [proyId, setProyId]             = useState(proyectos[0]?.id || '')
   const [vista, setVista]               = useState('lista')
@@ -100,7 +274,7 @@ export default function AvaluosCliente() {
   }
 
   const precioUnitario = (act) =>
-    parseFloat(act.costo_mo||0) + parseFloat(act.costo_materiales||0) + parseFloat(act.costo_equipos||0)
+    r2(parseFloat(act.costo_mo||0) + parseFloat(act.costo_materiales||0) + parseFloat(act.costo_equipos||0))
 
   const openNuevo = () => {
     setAvForm({
@@ -111,13 +285,13 @@ export default function AvaluosCliente() {
     const itemsBase = actividades.map(act => {
       const ant = acumuladoPrevio(act.id); const total = cantidadTotal(act); const pu = precioUnitario(act)
       return { actividad_id: act.id, descripcion: act.descripcion, unidad: act.unidad || 'und',
-        cantidad_total: total, precio_unitario: pu, monto_contrato: total * pu,
+        cantidad_total: total, precio_unitario: pu, monto_contrato: r2(total * pu),
         cantidad_anterior: ant, cantidad_periodo: '', es_oc: false, oc_item_id: null }
     })
     const itemsNuevos = ocItemsAprobados.filter(i => i.tipo === 'nueva').map(i => ({
       actividad_id: null, descripcion: i.descripcion, unidad: i.unidad || 'und',
       cantidad_total: parseFloat(i.cantidad_nueva || 0), precio_unitario: parseFloat(i.precio_unitario || 0),
-      monto_contrato: parseFloat(i.cantidad_nueva || 0) * parseFloat(i.precio_unitario || 0),
+      monto_contrato: r2(parseFloat(i.cantidad_nueva || 0) * parseFloat(i.precio_unitario || 0)),
       cantidad_anterior: 0, cantidad_periodo: '', es_oc: true, oc_item_id: i.id,
     }))
     setAvItems([...itemsBase, ...itemsNuevos])
@@ -125,7 +299,7 @@ export default function AvaluosCliente() {
   }
 
   const avSubtotal = useMemo(() =>
-    avItems.reduce((s,it) => s + parseFloat(it.cantidad_periodo||0) * parseFloat(it.precio_unitario||0), 0),
+    avItems.reduce((s,it) => s + r2(parseFloat(it.cantidad_periodo||0) * parseFloat(it.precio_unitario||0)), 0),
     [avItems]
   )
 
@@ -133,12 +307,12 @@ export default function AvaluosCliente() {
   const pctAvancePeriodo = presupuestoEfectivo > 0 ? avSubtotal / presupuestoEfectivo : 0
 
   // Overhead proporcional al avance del período
-  const avIndirecto  = totalIndirectos * pctAvancePeriodo
-  const avBase2      = avSubtotal + avIndirecto
-  const avUtilidad   = avBase2 * utilidadPct
-  const avBase3      = avBase2 + avUtilidad
-  const avImpuesto   = avBase3 * impuestoPct
-  const avTotal      = avBase3 + avImpuesto
+  const avIndirecto  = r2(totalIndirectos * pctAvancePeriodo)
+  const avBase2      = r2(avSubtotal + avIndirecto)
+  const avUtilidad   = r2(avBase2 * utilidadPct)
+  const avBase3      = r2(avBase2 + avUtilidad)
+  const avImpuesto   = r2(avBase3 * impuestoPct)
+  const avTotal      = r2(avBase3 + avImpuesto)
 
   // Mantener compatibilidad con campos guardados
   const avImpPct     = parseFloat(avForm.impuesto_pct || 0)
@@ -150,12 +324,12 @@ export default function AvaluosCliente() {
       if (i !== idx) return it
       const acum = parseFloat(it.cantidad_anterior||0) + cant
       const saldo = parseFloat(it.cantidad_total||0) - acum
-      const pct  = it.cantidad_total > 0 ? (acum / it.cantidad_total) * 100 : 0
-      const mp   = cant * parseFloat(it.precio_unitario||0)
-      const ma   = parseFloat(it.cantidad_anterior||0) * parseFloat(it.precio_unitario||0)
+      const pct  = it.cantidad_total > 0 ? r2((acum / it.cantidad_total) * 100) : 0
+      const mp   = r2(cant * parseFloat(it.precio_unitario||0))
+      const ma   = r2(parseFloat(it.cantidad_anterior||0) * parseFloat(it.precio_unitario||0))
       return { ...it, cantidad_periodo: v, cantidad_acumulada: acum, cantidad_saldo: saldo,
         pct_fisico: pct, monto_periodo: mp, monto_anterior: ma,
-        monto_acumulado: ma + mp, monto_saldo: saldo * parseFloat(it.precio_unitario||0) }
+        monto_acumulado: r2(ma + mp), monto_saldo: r2(saldo * parseFloat(it.precio_unitario||0)) }
     }))
   }
 
@@ -397,7 +571,19 @@ export default function AvaluosCliente() {
               <p className="text-sm text-gray-400">{proy?.project_code} — {proy?.nombre}</p>
             </div>
           </div>
-          <EstadoBadge estado={avDetalle.estado} isEs={isEs} />
+          <div className="flex items-center gap-2">
+            <EstadoBadge estado={avDetalle.estado} isEs={isEs} />
+            <button
+              onClick={() => handleExportAvaluo(avDetalle, itemsDetalle)}
+              disabled={exportando}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {exportando ? '...' : (isEs ? 'Exportar Excel' : 'Export Excel')}
+            </button>
+          </div>
         </div>
 
         {/* ── PANEL DE APROBACION ── */}

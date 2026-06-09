@@ -2,7 +2,7 @@ import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel } from '../utils'
+import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
 
@@ -64,8 +64,8 @@ export default function Presupuesto() {
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const ucPreview = (parseFloat(form.costo_mo)||0) + (parseFloat(form.costo_materiales)||0) + (parseFloat(form.costo_equipos)||0)
-  const tcPreview = (parseFloat(form.cantidad)||0) * ucPreview
+  const ucPreview = r2((parseFloat(form.costo_mo)||0) + (parseFloat(form.costo_materiales)||0) + (parseFloat(form.costo_equipos)||0))
+  const tcPreview = r2((parseFloat(form.cantidad)||0) * ucPreview)
 
   const openAdd = (tipo) => {
     const f = emptyForm()
@@ -126,10 +126,10 @@ export default function Presupuesto() {
   const subtotalPres   = grandTotal + totalIndirecto
   const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
   const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
-  const utilidadMonto  = subtotalPres * (utilidadPct / 100)
-  const granTotal      = subtotalPres + utilidadMonto
-  const impuestoMonto  = granTotal * (impuestoPct / 100)
-  const totalConImp    = granTotal + impuestoMonto
+  const utilidadMonto  = r2(subtotalPres * (utilidadPct / 100))
+  const granTotal      = r2(subtotalPres + utilidadMonto)
+  const impuestoMonto  = r2(granTotal * (impuestoPct / 100))
+  const totalConImp    = r2(granTotal + impuestoMonto)
 
   const saveInd = () => {
     if (!indForm.categoria || !indForm.monto_presupuestado) return
@@ -226,8 +226,8 @@ export default function Presupuesto() {
                     const isEt = item.tipo==='etapa'
                     const isSs = item.tipo==='sub_etapa'
                     const isAc = item.tipo==='actividad'
-                    const uc   = isAc ? (item.costo_mo||0)+(item.costo_materiales||0)+(item.costo_equipos||0) : 0
-                    const tc   = isAc ? (item.cantidad||0)*uc : calcSubtotal(items, item.id, item.tipo)
+                    const uc   = isAc ? r2((item.costo_mo||0)+(item.costo_materiales||0)+(item.costo_equipos||0)) : 0
+                    const tc   = isAc ? r2((item.cantidad||0)*uc) : calcSubtotal(items, item.id, item.tipo)
                     const sel  = item.id===selected
                     return (
                       <tr key={item.id}

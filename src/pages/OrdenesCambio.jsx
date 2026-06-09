@@ -1,8 +1,11 @@
 import { useState, useContext, useMemo, useEffect } from 'react'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
+import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum } from '../utils'
+import { today, fmt, fmtNum, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 
 const BRAND = '#1B3A6B'
@@ -29,6 +32,165 @@ const emptyItem = () => ({
   precio_unitario: '', costo_mo: '', costo_materiales: '', costo_equipos: '',
 })
 
+
+// ── EXCEL EXPORT — ORDEN DE CAMBIO ───────────────────────────────────────────
+async function exportOCExcel({ oc, items, inds, proy, moneda, empresa, lang = 'ES' }) {
+  const isEs  = lang === 'ES'
+  const NAVY  = '1B3A6B'
+  const GREEN = '1D9E75'
+  const AMBER = 'F59E0B'
+  const WHITE = 'FFFFFF'
+  const LGRAY = 'F3F4F6'
+
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'MARY ERP'
+  const ws = wb.addWorksheet(isEs ? 'Orden de Cambio' : 'Change Order')
+  ws.views = [{ showGridLines: false }]
+
+  const setCols = (widths) => widths.forEach((w, i) => { ws.getColumn(i + 1).width = w })
+  setCols([8, 40, 10, 12, 12, 14, 16])
+
+  const styleCell = (cell, opts = {}) => {
+    if (opts.fill)   cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill } }
+    if (opts.font)   cell.font   = { name: 'Arial', size: opts.size || 10, bold: opts.bold || false, color: { argb: opts.color || 'FF000000' } }
+    if (opts.align)  cell.alignment = { horizontal: opts.align, vertical: 'middle', wrapText: opts.wrap || false }
+    if (opts.border) cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }
+    if (opts.numFmt) cell.numFmt = opts.numFmt
+  }
+
+  const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
+  const COLS = 7
+  let row = 1
+
+  // ── Banner ──
+  ws.getRow(row).height = 36
+  merge(row, 1, row, COLS)
+  styleCell(ws.getCell(row, 1), { fill: NAVY, size: 14, bold: true, font: { name: 'Arial', size: 14, bold: true, color: { argb: `FF${WHITE}` } }, align: 'center' })
+  ws.getCell(row, 1).value = 'MARY · ' + (isEs ? 'Orden de Cambio' : 'Change Order')
+  row++
+
+  // ── Empresa ──
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  styleCell(ws.getCell(row, 1), { fill: NAVY, font: { name: 'Arial', size: 10, color: { argb: 'FFD1D5DB' } }, align: 'center' })
+  ws.getCell(row, 1).value = empresa + '  ·  appmary.com'
+  row++; row++
+
+  // ── Info ──
+  const addInfoRow = (label, value) => {
+    ws.getRow(row).height = 17
+    merge(row, 1, row, 2)
+    styleCell(ws.getCell(row, 1), { fill: LGRAY, font: { name: 'Arial', size: 9, bold: true, color: { argb: 'FF6B7280' } }, align: 'right' })
+    ws.getCell(row, 1).value = label
+    merge(row, 3, row, COLS)
+    styleCell(ws.getCell(row, 3), { font: { name: 'Arial', size: 9, color: { argb: 'FF111827' } }, align: 'left' })
+    ws.getCell(row, 3).value = value
+    return row++
+  }
+
+  const estadoLabels = isEs
+    ? { borrador: 'Borrador', presentada: 'Presentada', aprobada: 'Aprobada', rechazada: 'Rechazada' }
+    : { borrador: 'Draft', presentada: 'Submitted', aprobada: 'Approved', rechazada: 'Rejected' }
+
+  addInfoRow(isEs ? 'Proyecto:' : 'Project:', `${proy?.project_code || ''} — ${proy?.nombre || ''}`)
+  addInfoRow(isEs ? 'Cliente:' : 'Client:', proy?.cliente_externo || '—')
+  addInfoRow(isEs ? 'OC de Cambio #:' : 'Change Order #:', oc.numero || '—')
+  addInfoRow(isEs ? 'Fecha:' : 'Date:', oc.fecha || '—')
+  addInfoRow(isEs ? 'Estado:' : 'Status:', estadoLabels[oc.estado] || oc.estado || '—')
+  addInfoRow(isEs ? 'Presentado a:' : 'Submitted to:', oc.presentado_a || '—')
+  if (oc.motivo) addInfoRow(isEs ? 'Motivo:' : 'Reason:', oc.motivo)
+  addInfoRow(isEs ? 'Moneda:' : 'Currency:', moneda)
+  row++
+
+  // ── Column headers ──
+  const hdrs = isEs
+    ? ['Tipo', 'Actividad / Descripción', 'Unidad', 'Cant. Orig.', 'Cant. Nueva', 'P.U.', 'Monto Cambio']
+    : ['Type', 'Activity / Description', 'Unit', 'Orig. Qty', 'New Qty', 'Unit Price', 'Change Amount']
+  ws.getRow(row).height = 22
+  hdrs.forEach((h, i) => {
+    const c = ws.getCell(row, i + 1)
+    c.value = h
+    styleCell(c, { fill: NAVY, font: { name: 'Arial', size: 9, bold: true, color: { argb: `FF${WHITE}` } }, align: i === 1 ? 'left' : 'center', border: true })
+  })
+  row++
+
+  // ── Items ──
+  items.forEach((it, idx) => {
+    const even  = idx % 2 === 1
+    const diff  = it.diferencia || (parseFloat(it.cantidad_nueva || 0) - parseFloat(it.cantidad_original || 0))
+    const monto = it.monto_cambio || r2(diff * parseFloat(it.precio_unitario || 0))
+    const tipoLabel = it.tipo === 'nueva'
+      ? (isEs ? 'Nueva' : 'New')
+      : (isEs ? 'Modificada' : 'Modified')
+    ws.getRow(row).height = 17
+    const vals = [tipoLabel, it.descripcion, it.unidad || 'und', parseFloat(it.cantidad_original || 0), parseFloat(it.cantidad_nueva || 0), parseFloat(it.precio_unitario || 0), monto]
+    const numFmts = [null, null, null, '#,##0.00', '#,##0.00', '"$"#,##0.00', '"$"#,##0.00']
+    vals.forEach((v, ci) => {
+      const c = ws.getCell(row, ci + 1)
+      c.value = v
+      styleCell(c, {
+        fill: even ? LGRAY : WHITE,
+        font: { name: 'Arial', size: 9, bold: ci === 6, color: { argb: ci === 6 ? (monto >= 0 ? `FF${GREEN}` : 'FFEF4444') : 'FF374151' } },
+        align: ci === 1 ? 'left' : 'right',
+        numFmt: numFmts[ci] || undefined,
+      })
+    })
+    row++
+  })
+
+  // ── Indirect adjustments ──
+  if (inds && inds.length > 0) {
+    row++
+    ws.getRow(row).height = 18
+    merge(row, 1, row, COLS)
+    styleCell(ws.getCell(row, 1), { fill: 'FFFBEB', font: { name: 'Arial', size: 9, bold: true, color: { argb: 'FF92400E' } }, align: 'left' })
+    ws.getCell(row, 1).value = isEs ? '  Ajustes a costos indirectos' : '  Indirect cost adjustments'
+    row++
+    inds.forEach((ind, idx) => {
+      const even = idx % 2 === 1
+      ws.getRow(row).height = 16
+      merge(row, 1, row, 5)
+      styleCell(ws.getCell(row, 1), { fill: even ? LGRAY : WHITE, font: { name: 'Arial', size: 9, color: { argb: 'FF374151' } }, align: 'left' })
+      ws.getCell(row, 1).value = ind.categoria
+      const c = ws.getCell(row, 7)
+      const ajuste = parseFloat(ind.ajuste || 0)
+      styleCell(c, { fill: even ? LGRAY : WHITE, font: { name: 'Arial', size: 9, bold: true, color: { argb: ajuste >= 0 ? `FF${AMBER}` : 'FFEF4444' } }, align: 'right', numFmt: '"$"#,##0.00' })
+      c.value = ajuste
+      row++
+    })
+  }
+
+  // ── Total ──
+  row++
+  ws.getRow(row).height = 24
+  merge(row, 1, row, 6)
+  styleCell(ws.getCell(row, 1), { fill: GREEN, font: { name: 'Arial', size: 11, bold: true, color: { argb: `FF${WHITE}` } }, align: 'right' })
+  ws.getCell(row, 1).value = isEs ? 'TOTAL ORDEN DE CAMBIO' : 'TOTAL CHANGE ORDER'
+  const totalCell = ws.getCell(row, 7)
+  styleCell(totalCell, { fill: GREEN, font: { name: 'Arial', size: 11, bold: true, color: { argb: `FF${WHITE}` } }, align: 'right', numFmt: '"$"#,##0.00' })
+  totalCell.value = parseFloat(oc.total_oc || 0)
+  row += 2
+
+  if (oc.notas) {
+    merge(row, 1, row, COLS)
+    ws.getRow(row).height = 14
+    styleCell(ws.getCell(row, 1), { fill: LGRAY, font: { name: 'Arial', size: 8, color: { argb: 'FF374151' } }, align: 'left' })
+    ws.getCell(row, 1).value = (isEs ? 'Notas: ' : 'Notes: ') + oc.notas
+    row++
+  }
+
+  // ── Footer ──
+  row++
+  merge(row, 1, row, COLS)
+  ws.getRow(row).height = 14
+  styleCell(ws.getCell(row, 1), { font: { name: 'Arial', size: 8, color: { argb: 'FF9CA3AF' } }, align: 'center' })
+  ws.getCell(row, 1).value = `${empresa}  ·  MARY ERP  ·  ${isEs ? 'Generado' : 'Generated'} ${new Date().toLocaleDateString(isEs ? 'es' : 'en-US')}`
+
+  const buf  = await wb.xlsx.writeBuffer()
+  const name = isEs ? `OC_Cambio_${oc.numero || 'SN'}_${proy?.project_code || ''}.xlsx` : `Change_Order_${oc.numero || 'SN'}_${proy?.project_code || ''}.xlsx`
+  saveAs(new Blob([buf]), name)
+}
+
 export default function OrdenesCambio() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
@@ -43,6 +205,18 @@ export default function OrdenesCambio() {
 
   const puedeEditar  = can('ordenes_cambio_editar')
   const puedeAprobar = can('oc_aprobar')
+
+  const [exportando, setExportando] = useState(false)
+
+  const handleExportOC = async (oc, ocItems, ocInds) => {
+    setExportando(oc.id)
+    try {
+      const { data: tenantData } = await supabase.from('tenants').select('nombre_empresa').eq('id', proy?.tenant_id).single()
+      const empresa = tenantData?.nombre_empresa || 'MARY ERP'
+      await exportOCExcel({ oc, items: ocItems, inds: ocInds, proy, moneda, empresa, lang })
+    } catch(e) { console.error(e); alert('Error al generar Excel: ' + e.message) }
+    setExportando(false)
+  }
 
   const [proyId, setProyId]     = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer]     = useState(null)
@@ -92,19 +266,19 @@ export default function OrdenesCambio() {
   // Para actividad nueva, PU = suma de los 3 costos
   const getPU = (it) => {
     if (it.tipo === 'nueva') {
-      return (parseFloat(it.costo_mo)||0) + (parseFloat(it.costo_materiales)||0) + (parseFloat(it.costo_equipos)||0)
+      return r2((parseFloat(it.costo_mo)||0) + (parseFloat(it.costo_materiales)||0) + (parseFloat(it.costo_equipos)||0))
     }
-    return parseFloat(it.precio_unitario||0)
+    return r2(parseFloat(it.precio_unitario||0))
   }
 
   const calcItem = (it) => {
     const pu = getPU(it)
     if (it.tipo === 'nueva') {
       const cantidad = parseFloat(it.cantidad_nueva||0)
-      return { diff: cantidad, monto: cantidad * pu, pu }
+      return { diff: cantidad, monto: r2(cantidad * pu), pu }
     }
     const diff  = parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)
-    const monto = diff * pu
+    const monto = r2(diff * pu)
     return { diff, monto, pu }
   }
 
@@ -645,7 +819,23 @@ export default function OrdenesCambio() {
 
             {/* Estado y acciones */}
             <div className="flex items-center justify-between">
-              <EstadoBadge estado={ocDetalle.estado} isEs={isEs} />
+              <div className="flex items-center gap-2">
+                <EstadoBadge estado={ocDetalle.estado} isEs={isEs} />
+                <button
+                  onClick={() => {
+                    const ocItems = ordenes_cambio_items.filter(i => i.oc_id === ocDetalle.id)
+                    const ocInds  = (ordenes_cambio_indirectos || []).filter(i => i.oc_id === ocDetalle.id)
+                    handleExportOC(ocDetalle, ocItems, ocInds)
+                  }}
+                  disabled={exportando === ocDetalle.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {exportando === ocDetalle.id ? '...' : (isEs ? 'Exportar Excel' : 'Export Excel')}
+                </button>
+              </div>
               <div className="flex gap-2">
                 {puedeEditar && ocDetalle.estado === 'borrador' && (
                   <button onClick={() => { cambiarEstado(ocDetalle.id, 'presentada'); setDrawer(null) }}
@@ -802,7 +992,7 @@ export default function OrdenesCambio() {
                 <tbody>
                   {itemsDetalle.map(it => {
                     const diff  = it.diferencia || (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0))
-                    const monto = it.monto_cambio || diff * parseFloat(it.precio_unitario||0)
+                    const monto = it.monto_cambio || r2(diff * parseFloat(it.precio_unitario||0))
                     return (
                       <tr key={it.id} className="border-b border-gray-50">
                         <td className={tdCls}>

@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum } from '../utils'
+import { today, fmt, fmtNum, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
 import { buildOPR } from '../pages/Reportes'
 
@@ -135,7 +135,7 @@ export default function Financiero() {
   const totalIndPres = indsPresDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
   const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => {
     const idx = entradas.find(e=>e.material_id===sa.material_id)
-    return s+(parseFloat(sa.cantidad)||0)*(parseFloat(idx?.precio_unitario)||0)
+    return s+r2((parseFloat(sa.cantidad)||0)*(parseFloat(idx?.precio_unitario)||0))
   }, 0)
   const totalReal = totalMat + totalDir + totalNom + totalSub + totalEq + totalInd
 
@@ -744,10 +744,10 @@ function SubcontratosModule({ can, rol,
 
   // ── Helpers ──
   const scSubtotal = scItems.reduce((s,it) =>
-    s + parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0), 0)
+    s + r2(parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0)), 0)
   const scImpPct   = parseFloat(scForm.impuesto_pct||0)
-  const scImpMonto = scSubtotal * (scImpPct/100)
-  const scTotal    = scSubtotal + scImpMonto
+  const scImpMonto = r2(scSubtotal * (scImpPct/100))
+  const scTotal    = r2(scSubtotal + scImpMonto)
 
   const setScItem = (idx, k, v) =>
     setScItems(items => items.map((it,i) => i===idx ? {...it,[k]:v} : it))
@@ -768,14 +768,14 @@ function SubcontratosModule({ can, rol,
 
   const avSubtotal    = avItems.reduce((s,it) => {
     const scIt = subcontratos_items.find(x => x.id === it.subcontrato_item_id)
-    return s + parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0)
+    return s + r2(parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0))
   }, 0)
-  const avImpMonto    = avSubtotal * (parseFloat(scSelected?.impuesto_pct||0)/100)
-  const avTotal       = avSubtotal + avImpMonto
+  const avImpMonto    = r2(avSubtotal * (parseFloat(scSelected?.impuesto_pct||0)/100))
+  const avTotal       = r2(avSubtotal + avImpMonto)
   // Retención: porcentaje definido en el contrato, aplicado sobre el total del avalúo
   const avRetencionPct   = parseFloat(scSelected?.retencion_pct ?? 0)
-  const avRetencionMonto = avTotal * (avRetencionPct / 100)
-  const avMontoAPagar    = avTotal - avRetencionMonto
+  const avRetencionMonto = r2(avTotal * (avRetencionPct / 100))
+  const avMontoAPagar    = r2(avTotal - avRetencionMonto)
 
   const numAvaluo = scSelected
     ? subcontratos_avaluos.filter(a => a.subcontrato_id === scSelected.id).length + 1
@@ -812,7 +812,7 @@ function SubcontratosModule({ can, rol,
           unidad:            it.unidad || 'und',
           cantidad_contrato: parseFloat(it.cantidad_contrato||0),
           costo_unitario:    parseFloat(it.costo_unitario||0),
-          costo_total:       parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0),
+          costo_total:       r2(parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0)),
         }))
       }
     })
@@ -847,7 +847,7 @@ function SubcontratosModule({ can, rol,
         cantidad_actual:     parseFloat(it.cantidad_actual||0),
         cantidad_acumulada:  getCantAnterior(it.subcontrato_item_id) + parseFloat(it.cantidad_actual||0),
         costo_unitario:      parseFloat(scIt?.costo_unitario||0),
-        monto_actual:        parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0),
+        monto_actual:        r2(parseFloat(it.cantidad_actual||0) * parseFloat(scIt?.costo_unitario||0)),
       }
     })
     if (avForm._editId) {
@@ -1085,7 +1085,7 @@ function SubcontratosModule({ can, rol,
 
           <div className="flex flex-col gap-2">
             {scItems.map((it, idx) => {
-              const subtotalIt = parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0)
+              const subtotalIt = r2(parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0))
               return (
                 <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
                   <div className="flex items-center justify-between mb-2">
@@ -1463,8 +1463,8 @@ Total: `)
                     <td className={tdCls + ' font-mono'}>{it.cantidad_contrato}</td>
                     <td className={tdCls + ' font-mono'}>{fmt2(it.costo_unitario)}</td>
                     <td className={tdCls + ' font-mono font-medium'}>{fmt2(it.costo_total)}</td>
-                    <td className={tdCls + ' font-mono'} style={{ color: '#1D9E75' }}>{fmt2(acum * parseFloat(it.costo_unitario||0))}</td>
-                    <td className={tdCls + ' font-mono'} style={{ color: saldo < 0 ? '#ef4444' : '#D97706' }}>{fmt2(saldo * parseFloat(it.costo_unitario||0))}</td>
+                    <td className={tdCls + ' font-mono'} style={{ color: '#1D9E75' }}>{fmt2(r2(acum * parseFloat(it.costo_unitario||0)))}</td>
+                    <td className={tdCls + ' font-mono'} style={{ color: saldo < 0 ? '#ef4444' : '#D97706' }}>{fmt2(r2(saldo * parseFloat(it.costo_unitario||0)))}</td>
                   </tr>
                 )
               })}
@@ -1615,7 +1615,7 @@ Total: `)
                   const cantAct   = parseFloat(avItem?.cantidad_actual||0)
                   const cantAcum  = cantAnt + cantAct
                   const cantSaldo = parseFloat(it.cantidad_contrato||0) - cantAcum
-                  const montoAct  = cantAct * parseFloat(it.costo_unitario||0)
+                  const montoAct  = r2(cantAct * parseFloat(it.costo_unitario||0))
                   const excede    = cantAcum > parseFloat(it.cantidad_contrato||0)
                   return (
                     <tr key={it.id} className={`border-b border-gray-50 ${excede ? 'bg-red-50/30' : ''}`}>
