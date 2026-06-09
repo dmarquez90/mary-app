@@ -153,6 +153,7 @@ export default function MatPresupuestados() {
     if (!form.proyecto_id || !form.nombre_libre || !form.cantidad_presupuestada) return
     if (editing) dispatch({ type: 'UPD_MAT_PRES', payload: { ...form, id: editing } })
     else         dispatch({ type: 'ADD_MAT_PRES', payload: form })
+    if (form.proyecto_id !== proyId) setProyId(form.proyecto_id)
     setDrawer(false); setEditing(null); setMatSearch(''); setMatOpen(false); setForm(emptyForm())
   }
 
