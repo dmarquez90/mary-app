@@ -1,4 +1,4 @@
-import { useState, useContext, useMemo } from 'react'
+import { useState, useContext, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
@@ -27,6 +27,15 @@ export default function MatPresupuestados() {
   const [editing, setEditing] = useState(null)
   const [search, setSearch]   = useState('')
   const [filterEtapa, setFilterEtapa] = useState('')
+  const [matSearch, setMatSearch]     = useState('')
+  const [matOpen, setMatOpen]         = useState(false)
+  const matRef = useRef(null)
+  useEffect(() => {
+    if (!matOpen) return
+    const handler = (e) => { if (matRef.current && !matRef.current.contains(e.target)) setMatOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [matOpen])
 
   const puedeEditar = can('mat_pres_editar')
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -34,15 +43,21 @@ export default function MatPresupuestados() {
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
 
+  // Para la vista principal (filtro por proyecto activo en la lista)
   const etapas      = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'etapa')
   const subEtapas   = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'sub_etapa')
   const actividades = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
 
-  const subEtapasFiltradas   = subEtapas.filter(s => !form.etapa_id || s.parent_id === form.etapa_id)
-  const actividadesFiltradas = actividades.filter(a => {
+  // Para el drawer — usa form.proyecto_id (puede ser distinto al proyecto de la vista)
+  const formEtapas    = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'etapa')
+  const formSubEtapas = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'sub_etapa')
+  const formActs      = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
+
+  const subEtapasFiltradas   = formSubEtapas.filter(s => !form.etapa_id || s.parent_id === form.etapa_id)
+  const actividadesFiltradas = formActs.filter(a => {
     if (form.sub_etapa_id) return a.parent_id === form.sub_etapa_id
     if (form.etapa_id) {
-      const subs = subEtapas.filter(s => s.parent_id === form.etapa_id).map(s => s.id)
+      const subs = formSubEtapas.filter(s => s.parent_id === form.etapa_id).map(s => s.id)
       return subs.includes(a.parent_id)
     }
     return true
@@ -133,7 +148,7 @@ export default function MatPresupuestados() {
     if (!form.proyecto_id || !form.nombre_libre || !form.cantidad_presupuestada) return
     if (editing) dispatch({ type: 'UPD_MAT_PRES', payload: { ...form, id: editing } })
     else         dispatch({ type: 'ADD_MAT_PRES', payload: form })
-    setDrawer(false); setEditing(null); setForm(emptyForm())
+    setDrawer(false); setEditing(null); setMatSearch(''); setMatOpen(false); setForm(emptyForm())
   }
 
   const openEdit = (mp) => {
@@ -328,7 +343,7 @@ export default function MatPresupuestados() {
       )}
 
       {puedeEditar && (
-        <Drawer open={drawer} onClose={() => { setDrawer(false); setEditing(null) }}
+        <Drawer open={drawer} onClose={() => { setDrawer(false); setEditing(null); setMatSearch(''); setMatOpen(false) }}
           title={editing ? t('mp_form_edit') : t('mp_form_new')} width={440}>
 
           <Field label={t('lbl_project')} required>
@@ -371,12 +386,79 @@ export default function MatPresupuestados() {
             <p className="text-xs font-medium text-gray-500 mb-2">
               {t('mp_form_link_catalog')}
             </p>
-            <select className={selectCls} value={form.material_id || ''} onChange={set('material_id')}>
-              <option value="">{t('mp_form_not_linked')}</option>
-              {materiales.filter(m => m.activo !== false).map(m => (
-                <option key={m.id} value={m.id}>{m.codigo} {m.descripcion}</option>
-              ))}
-            </select>
+            {/* Searchable catalog picker */}
+            <div className="relative" ref={matRef}>
+              {/* Trigger button */}
+              <button
+                type="button"
+                onClick={() => { setMatOpen(o => !o); setMatSearch('') }}
+                className="w-full flex items-center justify-between px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white hover:border-[#1B3A6B] focus:outline-none focus:border-[#1B3A6B] transition-colors"
+              >
+                <span className={form.material_id ? 'text-gray-800' : 'text-gray-400'}>
+                  {form.material_id
+                    ? (() => { const m = materiales.find(x => x.id === form.material_id); return m ? `${m.codigo} ${m.descripcion}` : t('mp_form_not_linked') })()
+                    : t('mp_form_not_linked')}
+                </span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${matOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown */}
+              {matOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  {/* Search input */}
+                  <div className="p-2 border-b border-gray-100">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={matSearch}
+                      onChange={e => setMatSearch(e.target.value)}
+                      placeholder={isEs ? 'Buscar por código o nombre...' : 'Search by code or name...'}
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-[#1B3A6B]"
+                    />
+                  </div>
+                  {/* Options list */}
+                  <div className="max-h-48 overflow-y-auto">
+                    {/* Not linked option */}
+                    <button
+                      type="button"
+                      onClick={() => { setForm(f => ({ ...f, material_id: '' })); setMatOpen(false); setMatSearch('') }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${!form.material_id ? 'bg-blue-50 text-[#1B3A6B] font-medium' : 'text-gray-400'}`}
+                    >
+                      {t('mp_form_not_linked')}
+                    </button>
+                    {materiales
+                      .filter(m => m.activo !== false)
+                      .filter(m => {
+                        if (!matSearch.trim()) return true
+                        const q = matSearch.toLowerCase()
+                        return (m.codigo || '').toLowerCase().includes(q) || (m.descripcion || '').toLowerCase().includes(q)
+                      })
+                      .map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => { setForm(f => ({ ...f, material_id: m.id })); setMatOpen(false); setMatSearch('') }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t border-gray-50 ${form.material_id === m.id ? 'bg-blue-50 text-[#1B3A6B] font-medium' : 'text-gray-700'}`}
+                        >
+                          <span className="font-mono text-xs text-gray-400 mr-1.5">{m.codigo}</span>
+                          {m.descripcion}
+                        </button>
+                      ))}
+                    {matSearch.trim() && materiales.filter(m => m.activo !== false).filter(m => {
+                      const q = matSearch.toLowerCase()
+                      return (m.codigo||'').toLowerCase().includes(q) || (m.descripcion||'').toLowerCase().includes(q)
+                    }).length === 0 && (
+                      <p className="px-3 py-2 text-xs text-gray-400 text-center">
+                        {isEs ? 'Sin resultados' : 'No results'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {form.material_id && (
               <p className="text-xs text-gray-400 mt-1.5">
                 {t('mp_form_current_stock')} <span className="font-mono font-medium text-gray-600">
@@ -386,12 +468,12 @@ export default function MatPresupuestados() {
             )}
           </div>
 
-          {form.proyecto_id && etapas.length > 0 && (
+          {form.proyecto_id && formEtapas.length > 0 && (
             <>
               <Field label={t('mp_form_stage')}>
                 <select className={selectCls} value={form.etapa_id || ''} onChange={e => setForm(f => ({ ...f, etapa_id: e.target.value, sub_etapa_id: '', actividad_id: '' }))}>
                   <option value="">{t('mp_form_unassigned')}</option>
-                  {etapas.map(e => <option key={e.id} value={e.id}>{e.code} {e.descripcion}</option>)}
+                  {formEtapas.map(e => <option key={e.id} value={e.id}>{e.code} {e.descripcion}</option>)}
                 </select>
               </Field>
               {form.etapa_id && subEtapasFiltradas.length > 0 && (
@@ -421,7 +503,7 @@ export default function MatPresupuestados() {
           </label>
 
           <div className="flex gap-2 mt-auto pt-2">
-            <SecondaryBtn onClick={() => { setDrawer(false); setEditing(null) }} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
+            <SecondaryBtn onClick={() => { setDrawer(false); setEditing(null); setMatSearch(''); setMatOpen(false) }} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
             <PrimaryBtn onClick={save}
               disabled={!form.proyecto_id || !form.nombre_libre || !form.cantidad_presupuestada}
               className="flex-1">
