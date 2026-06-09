@@ -255,20 +255,20 @@ export default function MatPresupuestados() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {[
-                      t('mp_col_material'),
-                      t('mp_col_unit'),
-                      t('mp_col_qty_budgeted'),
-                      t('mp_col_budget_cost'),
-                      t('mp_col_qty_requested'),
-                      t('mp_col_qty_consumed'),
-                      t('mp_col_consumed_cost'),
-                      t('mp_col_diff_qty'),
-                      t('mp_col_diff_money'),
-                      t('mp_col_activity'),
-                      t('mp_col_status'),
-                      puedeEditar ? '' : null,
+                      { label: t('mp_col_material'),       w: '220px' },
+                      { label: t('mp_col_unit'),           w: '70px'  },
+                      { label: t('mp_col_qty_budgeted'),   w: '100px' },
+                      { label: t('mp_col_budget_cost'),    w: '120px' },
+                      { label: t('mp_col_qty_requested'),  w: '90px'  },
+                      { label: t('mp_col_qty_consumed'),   w: '110px' },
+                      { label: t('mp_col_consumed_cost'),  w: '130px' },
+                      { label: t('mp_col_diff_qty'),       w: '90px'  },
+                      { label: t('mp_col_diff_money'),     w: '140px' },
+                      { label: t('mp_col_activity'),       w: '160px' },
+                      { label: t('mp_col_status'),         w: '100px' },
+                      puedeEditar ? { label: '', w: '80px' } : null,
                     ].filter(h => h !== null).map((h, i) => (
-                      <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                      <th key={i} style={{ minWidth: h.w, width: h.w }} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -283,7 +283,7 @@ export default function MatPresupuestados() {
 
                     return (
                       <tr key={mp.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-4 py-3 min-w-[180px]">
+                        <td className="px-4 py-3" style={{ minWidth: '220px', width: '220px' }}>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm text-gray-800">{getNombre(mp)}</span>
                             {mp.es_adicional && (
@@ -305,16 +305,16 @@ export default function MatPresupuestados() {
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500">{getUnidad(mp)}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-700">{fmtNum(presup)}</td>
-                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(costoPres(mp), moneda)}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600 whitespace-nowrap">{fmt(costoPres(mp), moneda)}</td>
                         <td className="px-4 py-3 text-sm font-mono" style={{ color: solicit > presup ? '#ef4444' : '#1B3A6B' }}>
                           {fmtNum(solicit)}{solicit > presup && ' ⚠'}
                         </td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(consumido)}</td>
-                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(costoConsumido(mp), moneda)}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600 whitespace-nowrap">{fmt(costoConsumido(mp), moneda)}</td>
                         <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: dif < 0 ? '#ef4444' : '#1D9E75' }}>
                           {dif >= 0 ? '+' : ''}{fmtNum(dif)}
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono font-medium min-w-[100px]" style={{ color: costoPres(mp) - costoConsumido(mp) < 0 ? '#ef4444' : '#1D9E75' }}>
+                        <td className="px-4 py-3 text-sm font-mono font-medium whitespace-nowrap" style={{ minWidth: '140px', width: '140px', color: costoPres(mp) - costoConsumido(mp) < 0 ? '#ef4444' : '#1D9E75' }}>
                           {costoPres(mp) - costoConsumido(mp) >= 0 ? '+' : ''}{fmt(costoPres(mp) - costoConsumido(mp), moneda)}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">{getActividad(mp)}</td>
