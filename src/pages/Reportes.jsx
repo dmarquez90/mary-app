@@ -1293,7 +1293,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
       const desvLabel = e.origen_oc_id && !e.es_presupuestado ? (isEs?'⚠️ Desviación':'⚠️ Deviation') : ''
       const vals=[e.descripcion||'',e.tipo||'',parseFloat(e.tarifa_diaria)||0,
         parseFloat(e.dias_uso)||0, costoFinal, estadoLabel + (desvLabel?' '+desvLabel:''), '']
-      vals.forEach((v,ci)=>{\
+      vals.forEach((v,ci)=>{
         const c=ws.getCell(row,ci+1)
         const isNum=[2,3,4].includes(ci)
         styleData(c,{even,align:isNum?'right':'left',
