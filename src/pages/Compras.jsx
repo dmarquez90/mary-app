@@ -883,7 +883,6 @@ export default function Compras() {
                     </div>
                   </div>
                 )}
-                </div>
 
                 {/* Buscar en catálogo O escribir libremente */}
                 <MaterialSearchInput
