@@ -84,9 +84,13 @@ export default function CurvaS() {
     subcontratos_avaluos
       .filter(a => scIdsProy.includes(a.subcontrato_id) && a.estado === 'aprobado')
       .forEach(a => costs.push({ fecha: a.fecha_elaboracion || a.created_at?.slice(0,10), monto: parseFloat(a.monto_total)||0 }))
-    equipos.filter(e => e.proyecto_id === proyId).forEach(e =>
-      costs.push({ fecha: e.created_at?.slice(0,10), monto: parseFloat(e.costo_total)||0 })
-    )
+    equipos.filter(e => e.proyecto_id === proyId).forEach(e => {
+      // Usar costo_real si el ajuste fue aprobado (estado ajustado o cerrado_parcial)
+      const costoEq = (e.costo_real && (e.estado_equipo === 'ajustado' || e.estado_equipo === 'cerrado_parcial'))
+        ? parseFloat(e.costo_real)
+        : parseFloat(e.costo_total) || 0
+      costs.push({ fecha: e.created_at?.slice(0,10), monto: costoEq })
+    })
     costos_indirectos.filter(c => c.proyecto_id === proyId).forEach(c =>
       costs.push({ fecha: c.fecha || c.created_at?.slice(0,10), monto: parseFloat(c.monto)||0 })
     )
@@ -241,7 +245,12 @@ export default function CurvaS() {
       const subCostNuevo = subcontratos_avaluos.filter(a => scIdsNuevo.includes(a.subcontrato_id) && a.estado==='aprobado').reduce((s,a) => s + (parseFloat(a.monto_total)||0), 0)
       const subCostAntiguo = subcontratos.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sc) => s + (parseFloat(sc.monto_pagado)||0), 0)
       const subCost = subCostNuevo + subCostAntiguo
-      const eqCost  = equipos.filter(e => e.proyecto_id===proyId && e.actividad_id===act.id).reduce((s,e) => s + (parseFloat(e.costo_total)||0), 0)
+      const eqCost  = equipos.filter(e => e.proyecto_id===proyId && e.actividad_id===act.id).reduce((s,e) => {
+        const costoEq = (e.costo_real && (e.estado_equipo === 'ajustado' || e.estado_equipo === 'cerrado_parcial'))
+          ? parseFloat(e.costo_real)
+          : parseFloat(e.costo_total) || 0
+        return s + costoEq
+      }, 0)
       const real = matCost + dirCost + subCost + eqCost
       const dev  = real - presupuestado
       return { code: act.code, descripcion: act.descripcion, presupuestado, real, dev, devPct: presupuestado ? (dev/presupuestado)*100 : 0 }

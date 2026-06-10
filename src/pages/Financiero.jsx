@@ -52,14 +52,19 @@ export default function Financiero() {
   const isEs                    = lang === 'ES'
 
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
-    equipos, costos_indirectos, salidas, entradas,
-    presupuesto_indirectos = [] } = state
+    equipos, equipos_ajustes = [], costos_indirectos, salidas, entradas,
+    presupuesto_indirectos = [], usuarios = [] } = state
 
   const [tab, setTab]       = useState(0)
   const [proyId, setProyId] = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer] = useState(false)
   const [form, setForm]     = useState({})
   const [editId, setEditId] = useState(null)
+
+  // Modal de ajuste/cierre parcial de equipo
+  const [ajusteModal, setAjusteModal] = useState(null) // { equipo, tipo: 'extension'|'cierre_parcial' }
+  const [ajusteForm, setAjusteForm]   = useState({})
+  const setAj = k => e => setAjusteForm(f => ({ ...f, [k]: e.target.value }))
 
   // Subcontratos module state
   const [scView, setScView]       = useState('list')   // 'list' | 'detail' | 'avaluo'
@@ -209,6 +214,55 @@ export default function Financiero() {
     const t2 = parseFloat(tarifa)||0
     const d  = parseFloat(dias)||0
     return t2>0&&d>0 ? t2*d : ''
+  }
+
+  // Calcular días entre dos fechas
+  const calcDias = (inicio, fin) => {
+    if (!inicio || !fin) return 0
+    const ini = new Date(inicio)
+    const end = new Date(fin)
+    return Math.max(1, Math.ceil((end - ini) / (1000 * 60 * 60 * 24)) + 1)
+  }
+
+  // Enviar solicitud de ajuste (cualquier usuario con acceso)
+  const submitAjuste = () => {
+    if (!ajusteModal || !ajusteForm.motivo?.trim()) return
+    const { equipo, tipo } = ajusteModal
+    const diasAjustados  = parseFloat(ajusteForm.dias_ajustados || equipo.dias_uso || 0)
+    const costoAjustado  = r2(diasAjustados * parseFloat(equipo.tarifa_diaria || 0))
+    const currentUser    = usuarios.find(u => u.id === currentUserId)
+    dispatch({
+      type: 'ADD_AJUSTE_EQUIPO',
+      payload: {
+        equipo_id:          equipo.id,
+        tipo_ajuste:        tipo,
+        dias_originales:    parseFloat(equipo.dias_uso      || 0),
+        dias_ajustados:     diasAjustados,
+        costo_original:     parseFloat(equipo.costo_total   || 0),
+        costo_ajustado:     costoAjustado,
+        fecha_fin_original: equipo.eq_fecha_fin             || null,
+        fecha_fin_ajustada: ajusteForm.eq_fecha_fin_nueva   || null,
+        motivo:             ajusteForm.motivo.trim(),
+        solicitado_por:     currentUserId,
+        solicitado_nombre:  currentUser?.nombre             || '',
+      }
+    })
+    setAjusteModal(null)
+    setAjusteForm({})
+  }
+
+  // Aprobar o rechazar ajuste (solo Admin/Gerente)
+  const resolverAjuste = (ajuste, estado) => {
+    const currentUser = usuarios.find(u => u.id === currentUserId)
+    dispatch({
+      type: 'UPD_AJUSTE_EQUIPO',
+      payload: {
+        id:              ajuste.id,
+        estado,
+        aprobado_por:    currentUserId,
+        aprobado_nombre: currentUser?.nombre || '',
+      }
+    })
   }
 
   const thCls = 'px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap'
@@ -380,42 +434,162 @@ export default function Financiero() {
           />}
 
           {/* ── TAB 3: EQUIPOS ────────────────────────────────────────── */}
-          {tab === 3 && (
-            eqs.length === 0 ? (
+          {tab === 3 && (() => {
+            const puedeAprobar = ['super_admin','client_admin','gerente'].includes(rol)
+            const ajustesProy  = equipos_ajustes.filter(a => eqs.some(e => e.id === a.equipo_id))
+            const pendientesCount = ajustesProy.filter(a => a.estado === 'pendiente').length
+            const estadoCfg = {
+              activo:          { label: t('fin_eq_state_active'),    cls: 'bg-green-100 text-green-700' },
+              ajustado:        { label: t('fin_eq_state_adjusted'),  cls: 'bg-blue-100 text-blue-700' },
+              cerrado_parcial: { label: t('fin_eq_state_partial'),   cls: 'bg-amber-100 text-amber-700' },
+              completado:      { label: t('fin_eq_state_completed'), cls: 'bg-gray-100 text-gray-600' },
+            }
+            return eqs.length === 0 ? (
               <EmptyState icon={Icons.financial} title={t('fin_empty_equipment')}
                 action={puedeEditar&&!closed ? `+ ${TABS[3]}` : null}
                 onAction={puedeEditar&&!closed ? openDrawer : null} />
             ) : (
-              <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">
-                    {[t('fin_col_eq_desc'), t('fin_col_eq_type'), t('fin_col_eq_rate'), t('fin_col_eq_days'), t('fin_col_eq_total'), puedeEditar?'':null]
-                      .filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {eqs.map(e => (
-                      <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className={tdCls}>{e.descripcion}</td>
-                        <td className={tdCls}><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{e.tipo}</span></td>
-                        <td className={tdCls+' font-mono'}>{fmt(e.tarifa_diaria,moneda)}</td>
-                        <td className={tdCls+' font-mono text-center'}>{fmtNum(e.dias_uso)}</td>
-                        <td className={tdCls+' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(e.costo_total,moneda)}</td>
-                        {puedeEditar && <td className={tdCls}><div className="flex gap-1">
-                          <TBtn onClick={()=>openEdit(e)}>{isEs?'Modificar':'Edit'}</TBtn>
-                          <TBtn danger onClick={()=>del(e.id)}>{isEs?'Eliminar':'Delete'}</TBtn>
-                        </div></td>}
+              <div>
+                {puedeAprobar && pendientesCount > 0 && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                    <span className="text-amber-500">🔧</span>
+                    <p className="text-sm text-amber-700 font-medium">
+                      {pendientesCount} {isEs ? 'ajuste(s) de equipo pendiente(s) de aprobación' : 'equipment adjustment(s) pending approval'}
+                    </p>
+                  </div>
+                )}
+                <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+                  <table className="w-full">
+                    <thead><tr className="bg-gray-50 border-b border-gray-100">
+                      {[t('fin_col_eq_desc'),t('fin_col_eq_type'),t('fin_eq_col_origin'),t('fin_col_eq_rate'),t('fin_col_eq_days'),t('fin_col_eq_total'),t('fin_eq_col_state'),puedeEditar?'':null]
+                        .filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>
+                      {eqs.map(eq => {
+                        const estadoInfo = estadoCfg[eq.estado_equipo || 'activo'] || estadoCfg.activo
+                        const ajustesEq  = equipos_ajustes.filter(a => a.equipo_id === eq.id)
+                        const ajustePend = ajustesEq.find(a => a.estado === 'pendiente')
+                        const desdeOC    = !!eq.origen_oc_id
+                        const act        = presupuesto.find(b => b.id === eq.actividad_id)
+                        const ocNum      = state.ordenes_compra?.find(o => o.id === eq.origen_oc_id)?.oc_number
+                        return (
+                          <tr key={eq.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <td className={tdCls}>
+                              <div className="flex flex-col gap-1">
+                                <span className="font-medium text-gray-800">{eq.descripcion}</span>
+                                <div className="flex flex-wrap gap-1">
+                                  {desdeOC && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">{t('fin_eq_badge_from_oc')}</span>}
+                                  {desdeOC && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${eq.es_presupuestado ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                                      {eq.es_presupuestado ? t('fin_eq_badge_budgeted') : `⚠️ ${t('fin_eq_badge_deviation')}`}
+                                    </span>
+                                  )}
+                                  {ajustePend && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">🔧 {t('fin_eq_adj_pending')}</span>}
+                                </div>
+                                {act && <span className="text-xs text-gray-400">{act.code} — {act.descripcion}</span>}
+                                {(eq.eq_fecha_inicio || eq.eq_fecha_fin) && (
+                                  <span className="text-xs text-gray-400">📅 {eq.eq_fecha_inicio||'—'} → {eq.eq_fecha_fin||'—'}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className={tdCls}>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                {eq.tipo === 'alquiler' ? t('fin_eq_rental') : t('fin_eq_owned')}
+                              </span>
+                            </td>
+                            <td className={tdCls}>
+                              {ocNum ? <span className="text-xs font-mono text-blue-600">{ocNum}</span> : <span className="text-xs text-gray-300">—</span>}
+                            </td>
+                            <td className={tdCls+' font-mono'}>{fmt(eq.tarifa_diaria,moneda)}</td>
+                            <td className={tdCls+' font-mono text-center'}>
+                              <div className="flex flex-col items-center">
+                                <span>{fmtNum(eq.dias_uso)}</span>
+                                {eq.dias_reales && eq.dias_reales !== eq.dias_uso && (
+                                  <span className="text-xs text-blue-600">({isEs?'real':'actual'}: {fmtNum(eq.dias_reales)})</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className={tdCls+' font-mono font-bold'} style={{color:'#1D9E75'}}>
+                              <div className="flex flex-col">
+                                <span>{fmt(eq.costo_total,moneda)}</span>
+                                {eq.costo_real && eq.costo_real !== eq.costo_total && (
+                                  <span className="text-xs text-blue-600">{t('fin_eq_real_vs_oc')}: {fmt(eq.costo_real,moneda)}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className={tdCls}>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoInfo.cls}`}>{estadoInfo.label}</span>
+                            </td>
+                            {puedeEditar && (
+                              <td className={tdCls}>
+                                <div className="flex flex-col gap-1">
+                                  {ajustePend && puedeAprobar && (
+                                    <div className="flex gap-1">
+                                      <button onClick={()=>resolverAjuste(ajustePend,'aprobado')} className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 font-medium">✓ {t('fin_eq_btn_approve_adj')}</button>
+                                      <button onClick={()=>resolverAjuste(ajustePend,'rechazado')} className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200 font-medium">✕ {t('fin_eq_btn_reject_adj')}</button>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-1 flex-wrap">
+                                    {!ajustePend && !closed && (
+                                      <>
+                                        <TBtn onClick={()=>{ setAjusteModal({equipo:eq,tipo:'extension'}); setAjusteForm({dias_ajustados:eq.dias_uso, eq_fecha_fin_nueva:eq.eq_fecha_fin||''}) }}>{t('fin_eq_btn_adjust')}</TBtn>
+                                        {(eq.estado_equipo==='activo'||eq.estado_equipo==='ajustado') && (
+                                          <TBtn onClick={()=>{ setAjusteModal({equipo:eq,tipo:'cierre_parcial'}); setAjusteForm({dias_ajustados:eq.dias_uso, eq_fecha_fin_nueva:eq.eq_fecha_fin||''}) }}>{t('fin_eq_btn_close')}</TBtn>
+                                        )}
+                                      </>
+                                    )}
+                                    {!eq.origen_oc_id && <TBtn onClick={()=>openEdit(eq)}>{isEs?'Modificar':'Edit'}</TBtn>}
+                                    <TBtn danger onClick={()=>del(eq.id)}>{isEs?'Eliminar':'Delete'}</TBtn>
+                                  </div>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        )
+                      })}
+                      <tr className="bg-gray-50">
+                        <td colSpan={6} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
+                        <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalEq,moneda)}</td>
+                        {puedeEditar&&<td/>}
                       </tr>
-                    ))}
-                    <tr className="bg-gray-50">
-                      <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
-                      <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalEq,moneda)}</td>
-                      {puedeEditar&&<td/>}
-                    </tr>
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
+
+                {ajustesProy.length > 0 && (
+                  <div className="mt-4 bg-white rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-700">🔧 {t('fin_eq_adj_tab')}</p>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      {ajustesProy.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(a => {
+                        const eq = eqs.find(e => e.id === a.equipo_id)
+                        const cfg = {
+                          pendiente: { cls:'bg-amber-100 text-amber-700', label:t('fin_eq_adj_pending') },
+                          aprobado:  { cls:'bg-green-100 text-green-700',  label:t('fin_eq_adj_approved') },
+                          rechazado: { cls:'bg-red-100 text-red-600',      label:t('fin_eq_adj_rejected') },
+                        }[a.estado] || { cls:'bg-gray-100 text-gray-600', label:a.estado }
+                        return (
+                          <div key={a.id} className="px-5 py-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium text-gray-800">{eq?.descripcion||'—'}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>{cfg.label}</span>
+                              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                                {a.tipo_ajuste==='extension'?(isEs?'Extensión':'Extension'):(isEs?'Cierre parcial':'Partial closure')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500">{fmt(a.costo_original,moneda)} → {fmt(a.costo_ajustado,moneda)} · {a.dias_originales} → {a.dias_ajustados} {isEs?'días':'days'}</p>
+                            <p className="text-xs text-gray-400 italic mt-0.5">{a.motivo}</p>
+                            <p className="text-xs text-gray-400">{t('fin_eq_adj_requested_by')}: {a.solicitado_nombre||'—'}{a.aprobado_nombre?` · ${t('fin_eq_adj_approved_by')}: ${a.aprobado_nombre}`:''}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )
-          )}
+          })()}
 
           {/* ── TAB 4: ADMINISTRACIÓN ─────────────────────────────────── */}
           {tab === 4 && (
@@ -715,6 +889,95 @@ export default function Financiero() {
             <PrimaryBtn onClick={save} className="flex-1">{t('btn_save')}</PrimaryBtn>
           </div>
         </Drawer>
+      )}
+
+      {/* ── MODAL AJUSTE / CIERRE PARCIAL DE EQUIPO ────────────────── */}
+      {ajusteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-lg">🔧</div>
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">
+                  {ajusteModal.tipo === 'extension' ? t('fin_eq_adj_title_ext') : t('fin_eq_adj_title_close')}
+                </p>
+                <p className="text-xs text-gray-400">{ajusteModal.equipo.descripcion}</p>
+              </div>
+            </div>
+
+            {/* Nota contextual */}
+            <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 mb-4">
+              <p className="text-xs text-orange-700">
+                {ajusteModal.tipo === 'extension' ? t('fin_eq_adj_extension_note') : t('fin_eq_adj_closure_note')}
+              </p>
+            </div>
+
+            {/* Comparativo original vs nuevo */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">{t('fin_eq_adj_days_original')}</p>
+                <p className="text-sm font-mono font-bold text-gray-700">{ajusteModal.equipo.dias_uso} {isEs ? 'días' : 'days'}</p>
+                <p className="text-xs text-gray-400 mt-1">{t('fin_eq_adj_cost_original')}</p>
+                <p className="text-sm font-mono font-bold text-gray-700">{fmt(ajusteModal.equipo.costo_total, moneda)}</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-xs text-blue-600 mb-1">{t('fin_eq_adj_days_new')}</p>
+                <input type="number"
+                  className="w-full border border-blue-200 rounded px-2 py-1 text-sm font-mono font-bold text-blue-700 bg-white focus:outline-none focus:border-[#1B3A6B]"
+                  value={ajusteForm.dias_ajustados || ''}
+                  min="1" step="1"
+                  onChange={e => {
+                    const d = e.target.value
+                    const costo = r2(parseFloat(d||0) * parseFloat(ajusteModal.equipo.tarifa_diaria||0))
+                    setAjusteForm(f => ({ ...f, dias_ajustados: d, costo_ajustado_calc: costo }))
+                  }} />
+                <p className="text-xs text-blue-600 mt-1">{t('fin_eq_adj_cost_new')}</p>
+                <p className="text-sm font-mono font-bold text-blue-700">
+                  {fmt(r2(parseFloat(ajusteForm.dias_ajustados||0) * parseFloat(ajusteModal.equipo.tarifa_diaria||0)), moneda)}
+                </p>
+              </div>
+            </div>
+
+            {/* Nueva fecha fin */}
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-1">{t('fin_eq_adj_date_fin_new')}</p>
+              <input type="date" className={inputCls}
+                value={ajusteForm.eq_fecha_fin_nueva || ''}
+                onChange={e => setAjusteForm(f => ({ ...f, eq_fecha_fin_nueva: e.target.value }))} />
+            </div>
+
+            {/* Motivo — obligatorio */}
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-1">{t('fin_eq_adj_reason')} *</p>
+              <textarea
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] resize-none"
+                rows={3}
+                placeholder={t('fin_eq_adj_reason_ph')}
+                value={ajusteForm.motivo || ''}
+                onChange={setAj('motivo')} />
+            </div>
+
+            <p className="text-xs text-amber-600 mb-4">
+              ⚠️ {isEs
+                ? 'Esta solicitud requiere aprobación del administrador o gerente. El costo no cambiará hasta ser aprobada.'
+                : 'This request requires approval from the administrator or manager. The cost will not change until approved.'}
+            </p>
+
+            <div className="flex gap-2">
+              <button onClick={() => { setAjusteModal(null); setAjusteForm({}) }}
+                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+                {t('btn_cancel')}
+              </button>
+              <button
+                disabled={!ajusteForm.motivo?.trim() || !ajusteForm.dias_ajustados}
+                onClick={submitAjuste}
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
+                style={{ background: '#1B3A6B' }}>
+                {t('fin_eq_adj_send')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

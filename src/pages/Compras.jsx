@@ -214,12 +214,12 @@ export default function Compras() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
   const { can } = usePermissions()
-  const { solicitudes, solicitud_items, ordenes_compra, proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
+  const { solicitudes, solicitud_items, ordenes_compra, ordenes_compra_items = [], proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
 
   const [tab, setTab]       = useState(0)
   const [drawer, setDrawer] = useState(null)
   const [form, setForm]     = useState({})
-  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
   const [detail, setDetail] = useState(null)
   const [printDoc, setPrintDoc] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
@@ -276,13 +276,18 @@ export default function Compras() {
         observaciones_generales: form.observaciones_generales || '',
       },
       items: itemsResueltos.map(it => ({
-        material_id:   it.material_id || null,
-        descripcion:   it.descripcion_libre || (activos.find(m=>m.id===it.material_id)?.descripcion) || '',
-        cantidad:      parseFloat(it.cantidad || 0),
-        unidad:        it.unidad || 'und',
-        actividad_id:  it.actividad_id || null,
-        es_adicional:  it.es_adicional || false,
-        observaciones: it.observaciones || '',
+        material_id:       it.material_id || null,
+        descripcion:       it.descripcion_libre || (activos.find(m=>m.id===it.material_id)?.descripcion) || '',
+        cantidad:          parseFloat(it.cantidad || 0),
+        unidad:            it.unidad || 'und',
+        actividad_id:      it.actividad_id || null,
+        es_adicional:      it.es_adicional || false,
+        observaciones:     it.observaciones || '',
+        tipo_item:         it.tipo_item         || 'material',
+        eq_tipo_propiedad: it.tipo_item === 'equipo_alquilado' ? (it.eq_tipo_propiedad || 'alquilado') : null,
+        eq_fecha_inicio:   it.tipo_item === 'equipo_alquilado' ? (it.eq_fecha_inicio || null) : null,
+        eq_fecha_fin:      it.tipo_item === 'equipo_alquilado' ? (it.eq_fecha_fin   || null) : null,
+        eq_dias_uso:       it.tipo_item === 'equipo_alquilado' && it.eq_dias_uso ? parseFloat(it.eq_dias_uso) : null,
       }))
     }})
 
@@ -310,7 +315,7 @@ export default function Compras() {
     })
 
     setDrawer(null)
-    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'' }])
+    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
   }
 
   const [ocItems, setOcItems] = useState([])
@@ -361,7 +366,7 @@ export default function Compras() {
   const detOC      = ordenes_compra.find(oc => oc.id === detail)
   const detOCItems = detOC ? solicitud_items.filter(i => i.solicitud_id === detOC.solicitud_id) : []
 
-  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'' }])
+  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
@@ -385,7 +390,6 @@ export default function Compras() {
     })
     setOcItems(itemsParaOC.map(it => {
       const m = materiales.find(x => x.id === it.material_id)
-      // stock_parcial: usar cantidad_oc (solo la parte que falta comprar)
       const cantidadOC = it.flujo_item === 'stock_parcial'
         ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
         : parseFloat(it.cantidad || 0)
@@ -398,6 +402,12 @@ export default function Compras() {
         cantidad:          cantidadOC,
         precio_unitario:   '',
         impuesto_pct:      '',
+        actividad_id:      it.actividad_id      || null,
+        tipo_item:         it.tipo_item         || 'material',
+        eq_tipo_propiedad: it.eq_tipo_propiedad || null,
+        eq_fecha_inicio:   it.eq_fecha_inicio   || null,
+        eq_fecha_fin:      it.eq_fecha_fin       || null,
+        eq_dias_uso:       it.eq_dias_uso        || null,
       }
     }))
     setDrawer('oc')
@@ -552,7 +562,7 @@ export default function Compras() {
         {tab === 0 && can('solicitud_crear') && (
           <PrimaryBtn onClick={() => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
             setDrawer('sol')
           }}>{t('comp_new_sol')}</PrimaryBtn>
         )}
@@ -583,7 +593,7 @@ export default function Compras() {
         solicitudes.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={can('solicitud_crear') ? t('comp_new_sol') : null} onAction={can('solicitud_crear') ? () => {
             setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'' }])
+            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
             setDrawer('sol')
           } : null} />
         ) : (
@@ -683,10 +693,17 @@ export default function Compras() {
               </tr></thead>
               <tbody>
                 {[...ordenes_compra].reverse().map(oc => {
-                  const proy = proyectos.find(p => p.id === oc.proyecto_id)
+                  const proy       = proyectos.find(p => p.id === oc.proyecto_id)
+                  const ocItemsRow = ordenes_compra_items.filter(i => i.oc_id === oc.id)
+                  const tieneEquipo = ocItemsRow.some(i => i.tipo_item === 'equipo_alquilado')
                   return (
                     <tr key={oc.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-4 py-3 text-xs font-mono font-semibold text-gray-700">{oc.oc_number}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-mono font-semibold text-gray-700">{oc.oc_number}</span>
+                          {tieneEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">🚜</span>}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-600">{proy?.project_code || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{oc.proveedor || '—'}</td>
                       <td className="px-4 py-3"><Badge estado={oc.estado} /></td>
@@ -766,10 +783,10 @@ export default function Compras() {
 
         <div className="border-t border-gray-100 pt-3">
           <div className="flex items-center justify-between mb-3">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('comp_form_items')} *</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('comp_form_items_eq')} *</label>
             <button onClick={addSolItem} className="text-xs font-medium px-2 py-1 rounded-md"
               style={{ color:BRAND, background:'#EEF2F7' }}>
-              {t('comp_form_add_item')}
+              {t('comp_form_add_item_eq')}
             </button>
           </div>
           <div className="flex flex-col gap-3">
@@ -777,9 +794,95 @@ export default function Compras() {
               <div key={idx} className="rounded-xl p-3 flex flex-col gap-2 border border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
-                  {solItems.length > 1 && (
-                    <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                  <div className="flex items-center gap-2">
+                    {/* Badge tipo equipo */}
+                    {it.tipo_item === 'equipo_alquilado' && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">🚜 {t('comp_eq_badge')}</span>
+                    )}
+                    {solItems.length > 1 && (
+                      <button onClick={() => removeSolItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selector tipo de ítem */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">{t('comp_item_type_label')}</p>
+                    <select className={selectCls} value={it.tipo_item || 'material'}
+                      onChange={e => {
+                        setSolItem(idx, 'tipo_item', e.target.value)
+                        if (e.target.value === 'material') {
+                          setSolItem(idx, 'eq_fecha_inicio', '')
+                          setSolItem(idx, 'eq_fecha_fin', '')
+                          setSolItem(idx, 'eq_dias_uso', '')
+                        }
+                      }}>
+                      <option value="material">{t('comp_item_type_material')}</option>
+                      <option value="equipo_alquilado">{t('comp_item_type_equipment')}</option>
+                    </select>
+                  </div>
+                  {it.tipo_item === 'equipo_alquilado' && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">{t('comp_eq_prop_label')}</p>
+                      <select className={selectCls} value={it.eq_tipo_propiedad || 'alquilado'}
+                        onChange={e => setSolItem(idx, 'eq_tipo_propiedad', e.target.value)}>
+                        <option value="alquilado">{t('comp_eq_prop_rented')}</option>
+                        <option value="propio_empresa">{t('comp_eq_prop_owned')}</option>
+                      </select>
+                    </div>
                   )}
+                </div>
+
+                {/* Campos de fecha para equipo alquilado */}
+                {it.tipo_item === 'equipo_alquilado' && (
+                  <div className="border border-orange-100 rounded-lg p-2.5 bg-orange-50/40 flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">{t('comp_eq_start_date')}</p>
+                        <input type="date" className={inputCls}
+                          value={it.eq_fecha_inicio || ''}
+                          onChange={e => {
+                            setSolItem(idx, 'eq_fecha_inicio', e.target.value)
+                            // Recalcular días automáticamente
+                            if (it.eq_fecha_fin && e.target.value) {
+                              const ini = new Date(e.target.value)
+                              const fin = new Date(it.eq_fecha_fin)
+                              const dias = Math.max(1, Math.ceil((fin - ini) / (1000 * 60 * 60 * 24)) + 1)
+                              setSolItem(idx, 'eq_dias_uso', dias)
+                            }
+                          }} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">{t('comp_eq_end_date')}</p>
+                        <input type="date" className={inputCls}
+                          value={it.eq_fecha_fin || ''}
+                          onChange={e => {
+                            setSolItem(idx, 'eq_fecha_fin', e.target.value)
+                            if (it.eq_fecha_inicio && e.target.value) {
+                              const ini = new Date(it.eq_fecha_inicio)
+                              const fin = new Date(e.target.value)
+                              const dias = Math.max(1, Math.ceil((fin - ini) / (1000 * 60 * 60 * 24)) + 1)
+                              setSolItem(idx, 'eq_dias_uso', dias)
+                            }
+                          }} />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">{t('comp_eq_days_use')}</p>
+                      <div className="flex items-center gap-2">
+                        <input type="number" className={inputCls} style={{width:'100px'}}
+                          value={it.eq_dias_uso || ''}
+                          min="1" step="1"
+                          placeholder="0"
+                          onChange={e => setSolItem(idx, 'eq_dias_uso', e.target.value)} />
+                        {it.eq_fecha_inicio && it.eq_fecha_fin && (
+                          <span className="text-xs text-orange-600">{t('comp_eq_days_auto')}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 </div>
 
                 {/* Buscar en catálogo O escribir libremente */}
@@ -936,6 +1039,12 @@ export default function Compras() {
                   cantidad:          cantidadOC,
                   precio_unitario:   '',
                   impuesto_pct:      '',
+                  actividad_id:      it.actividad_id || null,
+                  tipo_item:         it.tipo_item         || 'material',
+                  eq_tipo_propiedad: it.eq_tipo_propiedad || null,
+                  eq_fecha_inicio:   it.eq_fecha_inicio   || null,
+                  eq_fecha_fin:      it.eq_fecha_fin       || null,
+                  eq_dias_uso:       it.eq_dias_uso        || null,
                 }
               }))
             }}
@@ -968,21 +1077,49 @@ export default function Compras() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               {t('btn_cancel')==='Cancel' ? 'Items & Prices (from proforma)' : 'Ítems y Precios (de la proforma)'}
             </p>
+
+            {/* Aviso si la OC tiene equipos */}
+            {ocItems.some(i => i.tipo_item === 'equipo_alquilado') && (
+              <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2.5 mb-3">
+                <span className="text-orange-500 text-base">🚜</span>
+                <div>
+                  <p className="text-xs font-semibold text-orange-700">{t('comp_oc_has_equipment')}</p>
+                  <p className="text-xs text-orange-600 mt-0.5">{t('comp_oc_eq_note')}</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               {ocItems.map((it, idx) => {
+                const isEquipo    = it.tipo_item === 'equipo_alquilado'
                 const subtotalItem = parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)
                 const impItem = subtotalItem * (parseFloat(it.impuesto_pct || form.impuesto_pct || 0)/100)
                 const totalItem = subtotalItem + impItem
                 return (
-                  <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
+                  <div key={idx} className={`border rounded-xl p-3 ${isEquipo ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       {it.codigo && <span className="font-mono text-xs text-gray-400">{it.codigo}</span>}
                       <span className="text-sm font-medium text-gray-800 flex-1">{it.descripcion}</span>
-                      <span className="text-xs text-gray-400">{it.cantidad} {it.unidad}</span>
+                      <div className="flex items-center gap-1.5">
+                        {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium">🚜 {t('comp_eq_badge')}</span>}
+                        <span className="text-xs text-gray-400">{it.cantidad} {it.unidad}</span>
+                      </div>
                     </div>
+                    {/* Fechas de equipo si aplica */}
+                    {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin || it.eq_dias_uso) && (
+                      <div className="flex gap-3 mb-2 text-xs text-orange-600 bg-orange-50 rounded-lg px-2 py-1.5">
+                        {it.eq_fecha_inicio && <span>📅 {t('comp_eq_start_date')}: {it.eq_fecha_inicio}</span>}
+                        {it.eq_fecha_fin    && <span>→ {it.eq_fecha_fin}</span>}
+                        {it.eq_dias_uso     && <span>· {it.eq_dias_uso} {t('comp_eq_days_use').toLowerCase()}</span>}
+                      </div>
+                    )}
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <p className="text-xs text-gray-400 mb-1">{t('btn_cancel')==='Cancel' ? 'Unit price *' : 'Precio unitario *'}</p>
+                        <p className="text-xs text-gray-400 mb-1">
+                          {isEquipo
+                            ? (t('btn_cancel')==='Cancel' ? 'Daily rate *' : 'Tarifa diaria *')
+                            : (t('btn_cancel')==='Cancel' ? 'Unit price *' : 'Precio unitario *')}
+                        </p>
                         <input type="number" className={inputCls} value={it.precio_unitario||''} min="0" step="0.01"
                           placeholder="0.00"
                           onChange={e => setOcItem(idx,'precio_unitario',e.target.value)} />
@@ -1079,16 +1216,25 @@ export default function Compras() {
             {detItems.map(it => {
               const m   = materiales.find(x=>x.id===it.material_id)
               const act = presupuesto.find(b=>b.id===it.actividad_id)
+              const isEquipo = it.tipo_item === 'equipo_alquilado'
               return (
                 <div key={it.id} className="py-2 border-b border-gray-50">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-700 flex items-center gap-1.5">
+                      {isEquipo && <span className="text-xs">🚜</span>}
                       {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
                       {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{t('btn_cancel')==='Cancel'?'Additional':'Adicional'}</span>}
+                      {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{t('comp_eq_badge')}</span>}
                     </span>
                     <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
                   </div>
                   {act && <p className="text-xs text-gray-400 mt-0.5">{act.code} — {act.descripcion}</p>}
+                  {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin) && (
+                    <p className="text-xs text-orange-600 mt-0.5">
+                      📅 {it.eq_fecha_inicio || '—'} → {it.eq_fecha_fin || '—'}
+                      {it.eq_dias_uso ? ` · ${it.eq_dias_uso} días` : ''}
+                    </p>
+                  )}
                   {it.observaciones && <p className="text-xs text-gray-400 italic mt-0.5">{it.observaciones}</p>}
                   {/* FLUJO POR ITEM */}
                   <ItemFlujoBadge item={it} materiales={materiales} />
@@ -1142,11 +1288,24 @@ export default function Compras() {
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2">{t('comp_detail_items')}</p>
             {detOCItems.map(it => {
-              const m = materiales.find(x=>x.id===it.material_id)
+              const m        = materiales.find(x=>x.id===it.material_id)
+              const isEquipo = it.tipo_item === 'equipo_alquilado'
               return (
-                <div key={it.id} className="flex justify-between py-2 border-b border-gray-50 text-sm">
-                  <span className="text-gray-700">{m?.codigo} — {m?.descripcion || '—'}</span>
-                  <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
+                <div key={it.id} className={`py-2 border-b border-gray-50 ${isEquipo ? 'bg-orange-50/20 px-2 rounded' : ''}`}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-700 flex items-center gap-1.5">
+                      {isEquipo && <span className="text-xs">🚜</span>}
+                      {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
+                      {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{t('comp_eq_badge')}</span>}
+                    </span>
+                    <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
+                  </div>
+                  {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin) && (
+                    <p className="text-xs text-orange-600 mt-0.5">
+                      📅 {it.eq_fecha_inicio || '—'} → {it.eq_fecha_fin || '—'}
+                      {it.eq_dias_uso ? ` · ${it.eq_dias_uso} días` : ''}
+                    </p>
+                  )}
                 </div>
               )
             })}

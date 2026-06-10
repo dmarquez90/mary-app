@@ -301,9 +301,16 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   r2 = addDetalle(ws2, r2,
     isEs?'EQUIPOS':'EQUIPMENT',
     [isEs?'Descripción':'Description',isEs?'Tipo':'Type',isEs?'Tarifa diaria':'Daily rate',isEs?'Días de uso':'Days used',isEs?'Costo total':'Total cost'],
-    data.eqs.map(e => [e.descripcion||'',e.tipo||'',
-      parseFloat(e.tarifa_diaria)||0, parseFloat(e.dias_uso)||0, parseFloat(e.costo_total)||0]),
-    data.eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
+    data.eqs.map(e => {
+      const costoFinal = (e.costo_real && (e.estado_equipo==='ajustado'||e.estado_equipo==='cerrado_parcial'))
+        ? parseFloat(e.costo_real) : parseFloat(e.costo_total)||0
+      return [e.descripcion||'', e.tipo||'', parseFloat(e.tarifa_diaria)||0, parseFloat(e.dias_uso)||0, costoFinal]
+    }),
+    data.eqs.reduce((s,e)=>{
+      const c = (e.costo_real && (e.estado_equipo==='ajustado'||e.estado_equipo==='cerrado_parcial'))
+        ? parseFloat(e.costo_real) : parseFloat(e.costo_total)||0
+      return s+c
+    },0)
   )
 
   r2 = addDetalle(ws2, r2,
@@ -1121,7 +1128,8 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
     .filter(a=>scIdsRes.includes(a.subcontrato_id)&&a.estado==='aprobado')
     .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
     + subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
-  const totalEq  = eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
+  const costoEfectivoEq = (e) => (e.costo_real && (e.estado_equipo==='ajustado'||e.estado_equipo==='cerrado_parcial')) ? parseFloat(e.costo_real) : parseFloat(e.costo_total)||0
+  const totalEq  = eqs.reduce((s,e)=>s+costoEfectivoEq(e),0)
   const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
   const desviacion = totalReal - budget
@@ -1270,16 +1278,22 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   if (eqs.length > 0) {
     row = addSectionTitle(ws, row, isEs?'DETALLE — EQUIPOS':'DETAIL — EQUIPMENT', COLS)
     ws.getRow(row).height=18
-    ;[isEs?'Descripción':'Description',isEs?'Tipo':'Type',isEs?'Tarifa diaria':'Daily rate',isEs?'Días de uso':'Days used',isEs?'Costo total':'Total cost','',''].forEach((h,i) => {
+    ;[isEs?'Descripción':'Description',isEs?'Tipo':'Type',isEs?'Tarifa diaria':'Daily rate',isEs?'Días de uso':'Days used',isEs?'Costo total':'Total cost',isEs?'Estado':'Status',''].forEach((h,i) => {
       const c=ws.getCell(row,i+1); c.value=h; styleHeader(c)
     })
     row++
     eqs.forEach((e,i) => {
       ws.getRow(row).height=16
       const even=i%2===1
+      const costoFinal = (e.costo_real && (e.estado_equipo==='ajustado'||e.estado_equipo==='cerrado_parcial'))
+        ? parseFloat(e.costo_real) : parseFloat(e.costo_total)||0
+      const estadoLabel = isEs
+        ? { activo:'Activo', ajustado:'Ajustado', cerrado_parcial:'Cierre parcial', completado:'Completado' }[e.estado_equipo||'activo'] || 'Activo'
+        : { activo:'Active', ajustado:'Adjusted', cerrado_parcial:'Partial closure', completado:'Completed' }[e.estado_equipo||'activo'] || 'Active'
+      const desvLabel = e.origen_oc_id && !e.es_presupuestado ? (isEs?'⚠️ Desviación':'⚠️ Deviation') : ''
       const vals=[e.descripcion||'',e.tipo||'',parseFloat(e.tarifa_diaria)||0,
-        parseFloat(e.dias_uso)||0,parseFloat(e.costo_total)||0,'','']
-      vals.forEach((v,ci)=>{
+        parseFloat(e.dias_uso)||0, costoFinal, estadoLabel + (desvLabel?' '+desvLabel:''), '']
+      vals.forEach((v,ci)=>{\
         const c=ws.getCell(row,ci+1)
         const isNum=[2,3,4].includes(ci)
         styleData(c,{even,align:isNum?'right':'left',
@@ -1394,7 +1408,8 @@ export default function Reportes() {
       .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
     const totalSubAntiguo = subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
     const totalSub = totalSubNuevo + totalSubAntiguo
-    const totalEq  = eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
+    const costoEfectivoEq = (e) => (e.costo_real && (e.estado_equipo==='ajustado'||e.estado_equipo==='cerrado_parcial')) ? parseFloat(e.costo_real) : parseFloat(e.costo_total)||0
+    const totalEq  = eqs.reduce((s,e)=>s+costoEfectivoEq(e),0)
     const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
 
@@ -1853,7 +1868,8 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
     .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
   const totalSubAntiguo = subs.reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
   const totalSub = totalSubNuevo + totalSubAntiguo
-  const totalEq=eqs.reduce((s,e)=>s+(parseFloat(e.costo_total)||0),0)
+  const costoEfectivoEq = (e) => (e.costo_real && (e.estado_equipo==='ajustado'||e.estado_equipo==='cerrado_parcial')) ? parseFloat(e.costo_real) : parseFloat(e.costo_total)||0
+  const totalEq=eqs.reduce((s,e)=>s+costoEfectivoEq(e),0)
   const totalInd=inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalReal=totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
   const desviacion=totalReal-budget

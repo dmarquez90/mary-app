@@ -7,7 +7,7 @@ const INIT = {
   materiales: [], entradas: [], salidas: [],
   solicitudes: [], solicitud_items: [], ordenes_compra: [], ordenes_compra_items: [],
   costos_directos: [], nominas: [], subcontratos: [],
-  equipos: [], costos_indirectos: [],
+  equipos: [], equipos_ajustes: [], costos_indirectos: [],
   materiales_presupuestados: [],
   solicitudes_eliminacion: [],
   subcontratos_contratos: [], subcontratos_items: [],
@@ -182,6 +182,10 @@ function reducer(state, action) {
     case 'UPD_EQUIPO':          return { ...state, equipos: state.equipos.map(e => e.id === action.payload.id ? { ...e, ...action.payload } : e) }
     case 'DEL_EQUIPO':          return { ...state, equipos: state.equipos.filter(e => e.id !== action.payload) }
 
+    case 'ADD_AJUSTE_EQUIPO':   return { ...state, equipos_ajustes: [...state.equipos_ajustes, action.payload] }
+    case 'UPD_AJUSTE_EQUIPO':   return { ...state, equipos_ajustes: state.equipos_ajustes.map(a => a.id === action.payload.id ? { ...a, ...action.payload } : a) }
+    case 'DEL_AJUSTE_EQUIPO':   return { ...state, equipos_ajustes: state.equipos_ajustes.filter(a => a.id !== action.payload) }
+
     case 'ADD_COSTO_INDIRECTO': return { ...state, costos_indirectos: [...state.costos_indirectos, action.payload] }
     case 'UPD_COSTO_INDIRECTO': return { ...state, costos_indirectos: state.costos_indirectos.map(c => c.id === action.payload.id ? { ...c, ...action.payload } : c) }
     case 'DEL_COSTO_INDIRECTO': return { ...state, costos_indirectos: state.costos_indirectos.filter(c => c.id !== action.payload) }
@@ -269,7 +273,7 @@ export function StoreProvider({ children, tenantId }) {
       const tablasTenant = [
         'proyectos','fases','presupuesto','materiales','entradas','salidas',
         'solicitudes','solicitud_items','ordenes_compra','ordenes_compra_items',
-        'costos_directos','nominas','subcontratos','equipos','costos_indirectos',
+        'costos_directos','nominas','subcontratos','equipos','equipos_ajustes','costos_indirectos',
         'materiales_presupuestados','solicitudes_eliminacion',
         'subcontratos_contratos','subcontratos_items',
         'subcontratos_avaluos','subcontratos_avaluo_items',
@@ -311,7 +315,7 @@ useEffect(() => {
     'materiales',
     'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
-    'costos_directos', 'nominas', 'subcontratos', 'equipos', 'costos_indirectos',
+    'costos_directos', 'nominas', 'subcontratos', 'equipos', 'equipos_ajustes', 'costos_indirectos',
     'materiales_presupuestados', 'solicitudes_eliminacion',
     'subcontratos_contratos', 'subcontratos_items',
     'subcontratos_avaluos', 'subcontratos_avaluo_items',
@@ -1025,6 +1029,13 @@ useEffect(() => {
             subtotal, impuesto_pct: impPct,
             impuesto_monto:    r2(subtotal * (impPct / 100)),
             total:             r2(subtotal * (1 + impPct / 100)),
+            // Campos de equipo alquilado
+            tipo_item:         it.tipo_item         || 'material',
+            eq_tipo_propiedad: it.eq_tipo_propiedad || null,
+            eq_fecha_inicio:   it.eq_fecha_inicio   || null,
+            eq_fecha_fin:      it.eq_fecha_fin       || null,
+            eq_dias_uso:       it.eq_dias_uso        ? parseFloat(it.eq_dias_uso) : null,
+            actividad_id:      it.actividad_id       || null,
             tenant_id:         tenantId,
           }
         })
@@ -1040,25 +1051,85 @@ useEffect(() => {
       case 'UPD_OC_ESTADO': {
         await supabase.from('ordenes_compra').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
-        // Notificar según estado
+
         if (action.payload.estado === 'aprobada') {
           const oc = action.payload
+
+          // ── Registrar automáticamente equipos alquilados en Financiero ──
+          const ocItems = state.ordenes_compra_items.filter(i => i.oc_id === oc.id)
+          const itemsEquipo = ocItems.filter(i => i.tipo_item === 'equipo_alquilado')
+
+          if (itemsEquipo.length > 0) {
+            for (const it of itemsEquipo) {
+              // Verificar si el ítem está en materiales_presupuestados del proyecto
+              const ocRecord  = state.ordenes_compra.find(o => o.id === oc.id)
+              const proyId    = ocRecord?.proyecto_id || null
+              const esPres    = proyId
+                ? state.materiales_presupuestados.some(
+                    mp => mp.proyecto_id === proyId &&
+                          mp.material_id === it.material_id &&
+                          it.material_id != null
+                  )
+                : false
+
+              // Calcular días si tiene fechas
+              let diasUso = parseFloat(it.eq_dias_uso || 0)
+              if (!diasUso && it.eq_fecha_inicio && it.eq_fecha_fin) {
+                const ini = new Date(it.eq_fecha_inicio)
+                const fin = new Date(it.eq_fecha_fin)
+                diasUso   = Math.max(1, Math.ceil((fin - ini) / (1000 * 60 * 60 * 24)) + 1)
+              }
+
+              const tarifaDiaria = parseFloat(it.precio_unitario || 0)
+              const costoTotal   = diasUso > 0 && tarifaDiaria > 0
+                ? r2(diasUso * tarifaDiaria)
+                : r2(parseFloat(it.cantidad || 0) * tarifaDiaria)
+
+              const nuevoEquipo = {
+                id:                   uuid(),
+                tenant_id:            tenantId,
+                proyecto_id:          proyId,
+                descripcion:          it.descripcion || '',
+                tipo:                 it.eq_tipo_propiedad === 'propio_empresa' ? 'propio' : 'alquiler',
+                tarifa_diaria:        tarifaDiaria,
+                dias_uso:             diasUso || parseFloat(it.cantidad || 0),
+                costo_total:          costoTotal,
+                actividad_id:         it.actividad_id || null,
+                origen_oc_id:         oc.id,
+                origen_solicitud_id:  ocRecord?.solicitud_id || null,
+                es_presupuestado:     esPres,
+                mat_pres_id:          null,
+                estado_equipo:        'activo',
+                eq_fecha_inicio:      it.eq_fecha_inicio || null,
+                eq_fecha_fin:         it.eq_fecha_fin    || null,
+                created_at:           today(),
+              }
+
+              const { error: eqErr } = await supabase.from('equipos').insert(nuevoEquipo)
+              if (!eqErr) {
+                dispatch({ type: 'ADD_EQUIPO', payload: nuevoEquipo })
+              }
+            }
+          }
+
+          // Notificación de OC aprobada
           await notify({
-            tipo: 'aprobacion',
-            titulo: '✅ Orden de Compra aprobada',
-            mensaje: `La OC ha sido aprobada y está lista para recibir materiales.`,
-            modulo: 'compras',
+            tipo:         'aprobacion',
+            titulo:       '✅ Orden de Compra aprobada',
+            mensaje:      `La OC ha sido aprobada y está lista para recibir materiales.${itemsEquipo.length > 0 ? ` Los equipos han sido registrados en Financiero.` : ''}`,
+            modulo:       'compras',
             referencia_id: oc.id,
-            roles: ['residente', 'bodeguero', 'coordinador'],
+            roles:        ['residente', 'bodeguero', 'coordinador'],
           })
+
         } else if (action.payload.estado === 'rechazada') {
           await notify({
-            tipo: 'rechazo',
-            titulo: '❌ Orden de Compra rechazada',
-            mensaje: `La OC fue rechazada. Revisa los detalles.`,
-            modulo: 'compras',
+            tipo:         'rechazo',
+            titulo:       '❌ Orden de Compra rechazada',
+            mensaje:      `La OC fue rechazada. Revisa los detalles.`,
+            modulo:       'compras',
             referencia_id: action.payload.id,
-            roles: ['residente', 'coordinador'],
+            roles:        ['residente', 'coordinador'],
           })
         }
         break
@@ -1286,6 +1357,79 @@ useEffect(() => {
       case 'DEL_EQUIPO': {
         await supabase.from('equipos').delete().eq('id', action.payload)
         dispatch(action)
+        break
+      }
+
+      // ── AJUSTES DE EQUIPO ─────────────────────────────────────────
+      case 'ADD_AJUSTE_EQUIPO': {
+        // Cualquier usuario con acceso puede crear — requiere aprobación
+        const { solicitado_por, solicitado_nombre, ...ajusteRest } = action.payload
+        const ajuste = {
+          ...ajusteRest,
+          id:               uuid(),
+          tenant_id:        tenantId,
+          estado:           'pendiente',
+          solicitado_por:   solicitado_por   || null,
+          solicitado_nombre: solicitado_nombre || '',
+          fecha_solicitud:  new Date().toISOString(),
+          created_at:       new Date().toISOString(),
+        }
+        const { error } = await supabase.from('equipos_ajustes').insert(ajuste)
+        if (!error) dispatch({ type: 'ADD_AJUSTE_EQUIPO', payload: ajuste })
+        break
+      }
+
+      case 'UPD_AJUSTE_EQUIPO': {
+        // Solo Admin/Gerente pueden aprobar o rechazar
+        const { id, estado, aprobado_por, aprobado_nombre } = action.payload
+        const upd = {
+          estado,
+          aprobado_por:    aprobado_por    || null,
+          aprobado_nombre: aprobado_nombre || '',
+          fecha_aprobacion: new Date().toISOString(),
+        }
+        await supabase.from('equipos_ajustes').update(upd).eq('id', id)
+        dispatch({ type: 'UPD_AJUSTE_EQUIPO', payload: { id, ...upd } })
+
+        // Si se aprueba — actualizar el equipo con el costo/días reales
+        if (estado === 'aprobado') {
+          const ajuste  = state.equipos_ajustes.find(a => a.id === id)
+          if (ajuste) {
+            const equipoUpd = {
+              id:            ajuste.equipo_id,
+              dias_uso:      ajuste.dias_ajustados,
+              costo_total:   ajuste.costo_ajustado,
+              dias_reales:   ajuste.dias_ajustados,
+              costo_real:    ajuste.costo_ajustado,
+              eq_fecha_fin:  ajuste.fecha_fin_ajustada || null,
+              estado_equipo: ajuste.tipo_ajuste === 'extension'
+                ? 'ajustado'
+                : 'cerrado_parcial',
+              motivo_ajuste: ajuste.motivo,
+            }
+            await supabase.from('equipos').update({
+              dias_uso:      equipoUpd.dias_uso,
+              costo_total:   equipoUpd.costo_total,
+              dias_reales:   equipoUpd.dias_reales,
+              costo_real:    equipoUpd.costo_real,
+              eq_fecha_fin:  equipoUpd.eq_fecha_fin,
+              estado_equipo: equipoUpd.estado_equipo,
+              motivo_ajuste: equipoUpd.motivo_ajuste,
+            }).eq('id', ajuste.equipo_id)
+            dispatch({ type: 'UPD_EQUIPO', payload: equipoUpd })
+
+            // Si es cierre parcial — marcar OC origen como cerrada_parcial
+            if (ajuste.tipo_ajuste === 'cierre_parcial') {
+              const equipo = state.equipos.find(e => e.id === ajuste.equipo_id)
+              if (equipo?.origen_oc_id) {
+                await supabase.from('ordenes_compra')
+                  .update({ estado: 'cerrada_parcial' })
+                  .eq('id', equipo.origen_oc_id)
+                dispatch({ type: 'UPD_OC_ESTADO', payload: { id: equipo.origen_oc_id, estado: 'cerrada_parcial' } })
+              }
+            }
+          }
+        }
         break
       }
 
