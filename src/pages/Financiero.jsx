@@ -53,7 +53,8 @@ export default function Financiero() {
 
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
     equipos, equipos_ajustes = [], costos_indirectos, salidas, entradas,
-    presupuesto_indirectos = [], usuarios = [] } = state
+    ordenes_compra = [],
+    presupuesto_indirectos = [] } = state
 
   const [tab, setTab]       = useState(0)
   const [proyId, setProyId] = useState(proyectos[0]?.id || '')
@@ -216,21 +217,12 @@ export default function Financiero() {
     return t2>0&&d>0 ? t2*d : ''
   }
 
-  // Calcular días entre dos fechas
-  const calcDias = (inicio, fin) => {
-    if (!inicio || !fin) return 0
-    const ini = new Date(inicio)
-    const end = new Date(fin)
-    return Math.max(1, Math.ceil((end - ini) / (1000 * 60 * 60 * 24)) + 1)
-  }
-
   // Enviar solicitud de ajuste (cualquier usuario con acceso)
   const submitAjuste = () => {
     if (!ajusteModal || !ajusteForm.motivo?.trim()) return
     const { equipo, tipo } = ajusteModal
-    const diasAjustados  = parseFloat(ajusteForm.dias_ajustados || equipo.dias_uso || 0)
-    const costoAjustado  = r2(diasAjustados * parseFloat(equipo.tarifa_diaria || 0))
-    const currentUser    = usuarios.find(u => u.id === currentUserId)
+    const diasAjustados = parseFloat(ajusteForm.dias_ajustados || equipo.dias_uso || 0)
+    const costoAjustado = r2(diasAjustados * parseFloat(equipo.tarifa_diaria || 0))
     dispatch({
       type: 'ADD_AJUSTE_EQUIPO',
       payload: {
@@ -244,7 +236,7 @@ export default function Financiero() {
         fecha_fin_ajustada: ajusteForm.eq_fecha_fin_nueva   || null,
         motivo:             ajusteForm.motivo.trim(),
         solicitado_por:     currentUserId,
-        solicitado_nombre:  currentUser?.nombre             || '',
+        solicitado_nombre:  '',
       }
     })
     setAjusteModal(null)
@@ -253,14 +245,13 @@ export default function Financiero() {
 
   // Aprobar o rechazar ajuste (solo Admin/Gerente)
   const resolverAjuste = (ajuste, estado) => {
-    const currentUser = usuarios.find(u => u.id === currentUserId)
     dispatch({
       type: 'UPD_AJUSTE_EQUIPO',
       payload: {
         id:              ajuste.id,
         estado,
         aprobado_por:    currentUserId,
-        aprobado_nombre: currentUser?.nombre || '',
+        aprobado_nombre: '',
       }
     })
   }
@@ -471,7 +462,7 @@ export default function Financiero() {
                         const ajustePend = ajustesEq.find(a => a.estado === 'pendiente')
                         const desdeOC    = !!eq.origen_oc_id
                         const act        = presupuesto.find(b => b.id === eq.actividad_id)
-                        const ocNum      = state.ordenes_compra?.find(o => o.id === eq.origen_oc_id)?.oc_number
+                        const ocNum      = ordenes_compra.find(o => o.id === eq.origen_oc_id)?.oc_number
                         return (
                           <tr key={eq.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                             <td className={tdCls}>
