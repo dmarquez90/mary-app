@@ -316,7 +316,7 @@ useEffect(() => {
     'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
     'costos_directos', 'nominas', 'subcontratos', 'equipos', 'equipos_ajustes', 'costos_indirectos',
-    'materiales_presupuestados', 'solicitudes_eliminacion',
+    'solicitudes_eliminacion',
     'subcontratos_contratos', 'subcontratos_items',
     'subcontratos_avaluos', 'subcontratos_avaluo_items',
     'ordenes_pago_retencion',
@@ -339,12 +339,12 @@ useEffect(() => {
       .subscribe()
   )
 
-  // ── Listener especial para entradas y salidas ────────────────────
+  // ── Listener especial para tablas con DELETE ─────────────────────
   // El filtro tenant_id NO funciona para DELETE en Supabase Realtime
-  // (la fila ya no existe cuando el evento llega). Se escuchan DOS canales:
-  // uno filtrado para INSERT/UPDATE, y uno sin filtro para DELETE
-  // que recarga la tabla completa del tenant.
-  const TABLES_WITH_DELETE = ['entradas', 'salidas']
+  // (la fila ya no existe cuando el evento llega). Tampoco es confiable
+  // para INSERT con event:'*'. Se usan DOS canales por tabla:
+  // uno filtrado para INSERT/UPDATE, y uno sin filtro para DELETE.
+  const TABLES_WITH_DELETE = ['entradas', 'salidas', 'materiales_presupuestados']
   const deleteChannels = TABLES_WITH_DELETE.flatMap(table => [
     // Canal filtrado para INSERT y UPDATE
     supabase
