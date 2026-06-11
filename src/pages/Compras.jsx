@@ -278,7 +278,9 @@ export default function Compras() {
       items: itemsResueltos.map(it => ({
         material_id:       it.material_id || null,
         descripcion:       it.descripcion_libre || (activos.find(m=>m.id===it.material_id)?.descripcion) || '',
-        cantidad:          parseFloat(it.cantidad || 0),
+        cantidad:          it.tipo_item === 'equipo_alquilado' && it.eq_dias_uso
+                             ? parseFloat(it.eq_dias_uso)
+                             : parseFloat(it.cantidad || 0),
         unidad:            it.unidad || 'und',
         actividad_id:      it.actividad_id || null,
         es_adicional:      it.es_adicional || false,
@@ -390,9 +392,11 @@ export default function Compras() {
     })
     setOcItems(itemsParaOC.map(it => {
       const m = materiales.find(x => x.id === it.material_id)
-      const cantidadOC = it.flujo_item === 'stock_parcial'
-        ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
-        : parseFloat(it.cantidad || 0)
+      const cantidadOC = it.tipo_item === 'equipo_alquilado' && it.eq_dias_uso
+        ? parseFloat(it.eq_dias_uso)
+        : it.flujo_item === 'stock_parcial'
+          ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
+          : parseFloat(it.cantidad || 0)
       return {
         solicitud_item_id: it.id,
         material_id:       it.material_id || null,
@@ -1026,9 +1030,11 @@ export default function Compras() {
                 : allSolItems
               setOcItems(itemsParaOC.map(it => {
                 const m = materiales.find(x => x.id === it.material_id)
-                const cantidadOC = it.flujo_item === 'stock_parcial'
-                  ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
-                  : parseFloat(it.cantidad || 0)
+                const cantidadOC = it.tipo_item === 'equipo_alquilado' && it.eq_dias_uso
+                  ? parseFloat(it.eq_dias_uso)
+                  : it.flujo_item === 'stock_parcial'
+                    ? (parseFloat(it.cantidad_oc || 0) || parseFloat(it.cantidad || 0))
+                    : parseFloat(it.cantidad || 0)
                 return {
                   solicitud_item_id: it.id,
                   material_id:       it.material_id || null,
