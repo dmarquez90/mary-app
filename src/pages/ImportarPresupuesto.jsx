@@ -40,14 +40,12 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
         for (let i = 0; i < Math.min(data.length, 10); i++) {
           const row = data[i].map(c => String(c).toLowerCase())
           const nonEmpty = row.filter(c => c.trim() !== '')
-          // La fila de headers debe tener al menos 2 columnas con contenido
-          // y alguna debe coincidir exactamente con 'catego' o 'descrip'
           if (nonEmpty.length >= 2 && row.some(c => c.includes('catego') || c.includes('descrip'))) {
             headerRow = i; break
           }
         }
         if (headerRow === -1) {
-          setErrors([isEs ? 'No se encontró la fila de encabezados en el archivo.' : 'Header row not found in file.'])
+          setErrors([isEs ? 'No se encontro la fila de encabezados en el archivo.' : 'Header row not found in file.'])
           setStep('error'); return
         }
 
@@ -82,7 +80,6 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           const cat  = String(row[iCat]  || '').trim()
           const desc = String(row[iDesc] || '').trim()
           if (!cat && !desc) continue
-          // Saltar filas de notas/instrucciones
           if (cat.startsWith('*') || cat.length > 30) continue
 
           const qty  = parseFloat(row[iQty] || 0) || 0
@@ -91,9 +88,9 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           const eq   = parseFloat(row[iEq]  || 0) || 0
           const unit = String(row[iUnit] || 'und').trim() || 'und'
 
-          if (!desc) { errs.push(`Fila ${r + 1}: descripción vacía`); continue }
+          if (!desc) { errs.push(`Row ${r + 1}: empty description`); continue }
           if (cat && !VALID_CATS.includes(cat)) {
-            errs.push(`Fila ${r + 1}: categoría "${cat}" no válida. Usa: ${VALID_CATS.join(', ')}`)
+            errs.push(`Row ${r + 1}: category "${cat}" not valid. Use: ${VALID_CATS.join(', ')}`)
             continue
           }
 
@@ -101,38 +98,54 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           if (cat === 'Etapa'     || cat === 'Stage')     tipo = 'etapa'
           if (cat === 'Sub-etapa' || cat === 'Sub-stage') tipo = 'sub_etapa'
 
-          // Pre-generar UUID aquí mismo en el parse
-          // Así sabemos el id ANTES del dispatch y podemos construir el árbol correctamente
           const id = crypto.randomUUID()
-
           parsed.push({ id, tipo, desc, unit, qty, mo, mat, eq, rowNum: r + 1 })
         }
 
         if (parsed.length === 0) {
-          setErrors(errs.length ? errs : [isEs ? 'No se encontraron filas con datos válidos.' : 'No valid data rows found.'])
+          setErrors(errs.length ? errs : [isEs ? 'No se encontraron filas con datos validos.' : 'No valid data rows found.'])
           setStep('error'); return
         }
 
-        // Construir parent_ids usando los UUIDs pre-generados
+        // ── Construir parent_ids Y codigos en el mismo recorrido ──────────────
+        // El store genera codigos basandose en cuantos hermanos ya existen en DB,
+        // pero como los dispatches llegan casi simultaneos (80ms), el contador
+        // siempre ve 0 hermanos → todos quedan como "01.001".
+        // SOLUCION: pre-calcular los codigos aqui y pasarlos en el payload.
         let lastEtapaId    = null
         let lastSubEtapaId = null
+        let stageNum = 0
+        let subNum   = 0
+        let actNum   = 0
 
         const rowsConParent = parsed.map(row => {
           let parent_id = null
+          let code      = ''
+
           if (row.tipo === 'etapa') {
-            parent_id      = null
+            stageNum++
+            subNum    = 0
+            actNum    = 0
+            parent_id = null
+            code      = String(stageNum).padStart(2, '0')
             lastSubEtapaId = null
           } else if (row.tipo === 'sub_etapa') {
+            subNum++
+            actNum    = 0
             parent_id = lastEtapaId
+            code      = `${String(stageNum).padStart(2, '0')}.${String(subNum).padStart(2, '0')}`
           } else {
+            // actividad
+            actNum++
             parent_id = lastSubEtapaId || lastEtapaId
+            code      = `${String(stageNum).padStart(2, '0')}.${String(subNum).padStart(2, '0')}.${String(actNum).padStart(3, '0')}`
           }
 
-          // Actualizar referencias DESPUÉS de asignar parent_id
+          // Actualizar referencias DESPUES de asignar parent_id
           if (row.tipo === 'etapa')     { lastEtapaId = row.id;    lastSubEtapaId = null }
           if (row.tipo === 'sub_etapa') { lastSubEtapaId = row.id }
 
-          return { ...row, parent_id }
+          return { ...row, parent_id, code }
         })
 
         setRows(rowsConParent)
@@ -158,7 +171,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
         await dispatch({
           type: 'ADD_BUDGET',
           payload: {
-            id:               row.id,        // UUID pre-generado
+            id:               row.id,
             proyectoId:       proyId,
             tipo:             row.tipo,
             descripcion:      row.desc,
@@ -167,7 +180,8 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
             costo_mo:         row.mo,
             costo_materiales: row.mat,
             costo_equipos:    row.eq,
-            parent_id:        row.parent_id, // parent_id ya calculado
+            parent_id:        row.parent_id,
+            code:             row.code,    // ← codigo pre-calculado, evita race condition
           }
         })
         resolve()
@@ -243,7 +257,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
 
           {errors.length > 0 && (
             <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700">
-              <p className="font-medium mb-1">{isEs ? 'Filas con advertencias (serán omitidas):' : 'Rows with warnings (will be skipped):'}</p>
+              <p className="font-medium mb-1">{isEs ? 'Filas con advertencias (seran omitidas):' : 'Rows with warnings (will be skipped):'}</p>
               {errors.map((e, i) => <p key={i}>• {e}</p>)}
             </div>
           )}
@@ -252,7 +266,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
             <table className="w-full text-xs">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  {[isEs?'Tipo':'Type', isEs?'Descripción':'Description', isEs?'Unidad':'Unit',
+                  {[isEs?'Tipo':'Type', isEs?'Codigo':'Code', isEs?'Descripcion':'Description', isEs?'Unidad':'Unit',
                     isEs?'Cantidad':'Qty', 'M.O.', isEs?'Mat.':'Mat.', isEs?'Equip.':'Equip.'].map((h,i) => (
                     <th key={i} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>
                   ))}
@@ -266,6 +280,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
                         {tipoLabel(r.tipo)}
                       </span>
                     </td>
+                    <td className="px-2 py-1.5 font-mono text-gray-400 text-xs">{r.code}</td>
                     <td className="px-2 py-1.5 text-gray-700"
                       style={{ paddingLeft: r.tipo === 'actividad' ? 20 : r.tipo === 'sub_etapa' ? 12 : 8 }}>
                       {r.desc}
@@ -303,7 +318,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
         <div className="flex items-center gap-3 py-1">
           <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm">✓</div>
           <span className="text-sm text-green-700 font-medium">
-            {isEs ? `${rows.length} ítems importados correctamente.` : `${rows.length} items imported successfully.`}
+            {isEs ? `${rows.length} items importados correctamente.` : `${rows.length} items imported successfully.`}
           </span>
           <button onClick={reset} className="ml-auto text-xs text-gray-400 hover:text-gray-600">
             {isEs ? 'Importar otro' : 'Import another'}
