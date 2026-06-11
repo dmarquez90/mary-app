@@ -4,6 +4,7 @@ import { LangContext } from '../i18n'
 import { fmt, fmtNum, calcGrandTotal, r2 as round2 } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
+import { useAuth } from '../auth'
 
 const BRAND    = '#1B3A6B'
 const BRAND_HX = '1B3A6B'
@@ -88,7 +89,7 @@ function addHeaderBlock(ws, titulo, empresa, proyecto, periodo, fecha, cols) {
   // Fila 1 — Logo / Empresa
   ws.mergeCells(1, 1, 1, Math.floor(cols / 3))
   const c1 = ws.getCell(1, 1)
-  c1.value = 'Marquez Project Solutions LLC'
+  c1.value = nombreEmpresa
   c1.font  = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND_HX } }
   c1.alignment = { vertical: 'middle' }
   c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
@@ -152,10 +153,10 @@ function setCols(ws, widths) {
 }
 
 // ── EXPORT FINANCIERO ─────────────────────────────────────
-async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presupuesto, lang='ES' }) {
+async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presupuesto, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs = lang === 'ES'
   const wb  = new ExcelJS.Workbook()
-  wb.creator = 'MARY ERP — Marquez Project Solutions LLC'
+  wb.creator = `MARY ERP — ${nombreEmpresa}`
   wb.created = new Date()
 
   const proyLabel    = `${proy?.project_code} — ${proy?.nombre}`
@@ -167,7 +168,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   const ws1 = wb.addWorksheet(isEs?'Presupuesto vs Real':'Budget vs Actual')
   setCols(ws1, [32, 18, 14, 14, 14, 14, 12])
 
-  let row = addHeaderBlock(ws1, isEs?'Reporte Financiero':'Financial Report', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, COLS)
+  let row = addHeaderBlock(ws1, isEs?'Reporte Financiero':'Financial Report', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, COLS)
 
   // KPIs
   row = addSectionTitle(ws1, row, isEs?'RESUMEN EJECUTIVO':'EXECUTIVE SUMMARY', COLS)
@@ -245,7 +246,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   // ── HOJA 2: Detalle por categoría ──
   const ws2 = wb.addWorksheet(isEs?'Detalle por Categoría':'Detail by Category')
   setCols(ws2, [14, 20, 35, 22, 16, 16, 16])
-  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
+  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
 
   const addDetalle = (ws, rowRef, titulo, headers, rows, subtotal) => {
     rowRef = addSectionTitle(ws, rowRef, titulo, 7)
@@ -324,7 +325,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   if (data.avsProy?.length > 0) {
     const ws3 = wb.addWorksheet(isEs?'Avalúo Financiero':'Financial Valuation')
     setCols(ws3, [14, 36, 12, 14, 16, 16, 16, 16, 16])
-    let r3 = addHeaderBlock(ws3, isEs?'Avalúo Financiero Acumulado':'Accumulated Financial Valuation', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 9)
+    let r3 = addHeaderBlock(ws3, isEs?'Avalúo Financiero Acumulado':'Accumulated Financial Valuation', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 9)
     ws3.getRow(r3).height = 18
     ;[isEs?'Avalúo':'Valuation',isEs?'Actividad':'Activity',isEs?'Unidad':'Unit','P.U.',isEs?'Contrato $':'Contract $',isEs?'Ant. $':'Prev. $',isEs?'Periodo $':'Period $',isEs?'Acumulado $':'Accumulated $',isEs?'Saldo $':'Balance $'].forEach((h,i) => {
       const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
@@ -374,7 +375,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   if (data.comparacionInd?.length > 0) {
     const ws4 = wb.addWorksheet(isEs?'Indirectos Pres vs Ejec':'Indirect Costs Bud vs Act')
     setCols(ws4, [40, 20, 20, 20, 16])
-    let r4 = addHeaderBlock(ws4, isEs?'Costos Indirectos: Presupuestado vs Ejecutado':'Indirect Costs: Budgeted vs Executed', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 5)
+    let r4 = addHeaderBlock(ws4, isEs?'Costos Indirectos: Presupuestado vs Ejecutado':'Indirect Costs: Budgeted vs Executed', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 5)
     ws4.getRow(r4).height = 18
     ;[isEs?'Categoría':'Category',isEs?'Presupuestado':'Budgeted',isEs?'Ejecutado':'Executed',isEs?'Diferencia':'Difference',isEs?'Estado':'Status'].forEach((h,i) => {
       const c = ws4.getCell(r4,i+1); c.value=h; styleHeader(c)
@@ -406,7 +407,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   if (data.ocsDelProy?.length > 0) {
     const ws5 = wb.addWorksheet(isEs ? 'Órdenes de Cambio' : 'Change Orders')
     setCols(ws5, [16, 12, 14, 32, 16, 16, 12])
-    let r5 = addHeaderBlock(ws5, isEs ? 'Órdenes de Cambio' : 'Change Orders', 'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
+    let r5 = addHeaderBlock(ws5, isEs ? 'Órdenes de Cambio' : 'Change Orders', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
 
     // KPI resumen en la hoja
     ws5.getRow(r5).height = 20
@@ -467,7 +468,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     const ws6 = wb.addWorksheet(isEs ? 'Detalle Subcontratos' : 'Subcontract Detail')
     setCols(ws6, [28, 30, 16, 16, 16, 12, 16, 16])
     let r6 = addHeaderBlock(ws6, isEs ? 'Detalle de Subcontratos' : 'Subcontract Detail',
-      'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+      nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8)
     // Headers
     ws6.getRow(r6).height = 18
     ;[isEs?'Subcontratista':'Subcontractor',
@@ -572,7 +573,7 @@ export async function buildOPR({ orden, retenciones, contrato, proy, usuario, la
   ws.getRow(1).height = 34
   merge(1, 1, 1, 3)
   const h1 = cell(1, 1)
-  h1.value     = 'Marquez Project Solutions LLC'
+  h1.value     = nombreEmpresa
   h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
   h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
   h1.alignment = { vertical: 'middle' }
@@ -812,7 +813,7 @@ export async function buildOPR({ orden, retenciones, contrato, proy, usuario, la
   ws.getRow(row).height = 14
   merge(row, 1, row, COLS)
   const ft = cell(row, 1)
-  ft.value = `Marquez Project Solutions LLC  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+  ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
   ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
   ft.alignment = { horizontal: 'center', vertical: 'middle' }
 
@@ -821,7 +822,7 @@ export async function buildOPR({ orden, retenciones, contrato, proy, usuario, la
 }
 
 // ── EXPORT RETENCIONES ────────────────────────────────────
-async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
+async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs      = lang === 'ES'
   const wb        = new ExcelJS.Workbook()
   wb.creator      = 'MARY ERP'
@@ -833,7 +834,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
   const ws1 = wb.addWorksheet(isEs ? 'Subcontratos Resumen' : 'Subcontracts Summary')
   setCols(ws1, [28, 30, 16, 16, 12, 16, 16, 14])
   let r1 = addHeaderBlock(ws1, isEs ? 'Retenciones de Garantía — Subcontratos' : 'Retention Bonds — Subcontracts',
-    'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+    nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8)
   ws1.getRow(r1).height = 18
   ;[isEs?'Subcontratista':'Subcontractor',
     isEs?'Descripción':'Description',
@@ -893,7 +894,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
   const ws2 = wb.addWorksheet(isEs ? 'Detalle Retenciones' : 'Retention Detail')
   setCols(ws2, [28, 12, 14, 14, 16, 16, 16, 14])
   let r2 = addHeaderBlock(ws2, isEs ? 'Detalle de Retenciones por Avalúo' : 'Retention Detail by Valuation',
-    'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 8)
+    nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8)
   ws2.getRow(r2).height = 18
   ;[isEs?'Subcontratista':'Subcontractor',
     isEs?'Avalúo #':'Valuation #',
@@ -954,7 +955,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
     const ws3 = wb.addWorksheet(isEs ? 'Órdenes de Pago' : 'Payment Orders')
     setCols(ws3, [22, 22, 16, 14, 12, 16, 14])
     let r3 = addHeaderBlock(ws3, isEs ? 'Órdenes de Pago de Retención' : 'Retention Payment Orders',
-      'Marquez Project Solutions LLC', proyLabel, periodoLabel, fechaHoy, 7)
+      nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
     ws3.getRow(r3).height = 18
     ;[isEs?'Número Orden':'Order Number',
       isEs?'Subcontratista':'Subcontractor',
@@ -1003,7 +1004,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES' }) {
 }
 
 // ── EXPORT INVENTARIO ─────────────────────────────────────
-async function buildInventario({ data, materiales, proyectos, presupuesto, desde, hasta, lang='ES' }) {
+async function buildInventario({ data, materiales, proyectos, presupuesto, desde, hasta, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs = lang === 'ES'
   const wb       = new ExcelJS.Workbook()
   wb.creator     = 'MARY ERP'
@@ -1013,7 +1014,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   // HOJA 1: Stock
   const ws1 = wb.addWorksheet(isEs?'Stock Actual':'Current Stock')
   setCols(ws1, [14, 35, 10, 24, 14, 14, 10])
-  let r1 = addHeaderBlock(ws1, isEs?'Stock Actual de Materiales':'Current Material Stock', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 7)
+  let r1 = addHeaderBlock(ws1, isEs?'Stock Actual de Materiales':'Current Material Stock', nombreEmpresa, null, periodoLabel, fechaHoy, 7)
   ws1.getRow(r1).height = 18
   ;[isEs?'Código':'Code',isEs?'Descripción':'Description',isEs?'Unidad':'Unit',isEs?'Ubicación en bodega':'Warehouse location',isEs?'Stock actual':'Current stock',isEs?'Stock mínimo':'Min stock',isEs?'Estado':'Status'].forEach((h,i) => {
     const c = ws1.getCell(r1,i+1); c.value=h; styleHeader(c)
@@ -1038,7 +1039,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   // HOJA 2: Entradas
   const ws2 = wb.addWorksheet(isEs?'Entradas de Materiales':'Material Entries')
   setCols(ws2, [12, 12, 32, 12, 8, 14, 14, 14, 22, 12])
-  let r2 = addHeaderBlock(ws2, isEs?'Entradas de Materiales':'Material Entries', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 10)
+  let r2 = addHeaderBlock(ws2, isEs?'Entradas de Materiales':'Material Entries', nombreEmpresa, null, periodoLabel, fechaHoy, 10)
   ws2.getRow(r2).height = 18
   ;[isEs?'Fecha':'Date',isEs?'Código':'Code',isEs?'Material':'Material',isEs?'Cantidad':'Quantity',isEs?'Unidad':'Unit',isEs?'Precio unit.':'Unit price',isEs?'Total':'Total',isEs?'Factura':'Invoice',isEs?'Proveedor':'Supplier',isEs?'Proyecto':'Project'].forEach((h,i) => {
     const c = ws2.getCell(r2,i+1); c.value=h; styleHeader(c)
@@ -1070,7 +1071,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   // HOJA 3: Salidas
   const ws3 = wb.addWorksheet(isEs?'Salidas de Materiales':'Material Exits')
   setCols(ws3, [12, 12, 32, 12, 8, 14, 40])
-  let r3 = addHeaderBlock(ws3, isEs?'Salidas de Materiales':'Material Exits', 'Marquez Project Solutions LLC', null, periodoLabel, fechaHoy, 7)
+  let r3 = addHeaderBlock(ws3, isEs?'Salidas de Materiales':'Material Exits', nombreEmpresa, null, periodoLabel, fechaHoy, 7)
   ws3.getRow(r3).height = 18
   ;[isEs?'Fecha':'Date',isEs?'Código':'Code',isEs?'Material':'Material',isEs?'Cantidad':'Quantity',isEs?'Unidad':'Unit',isEs?'Proyecto':'Project',isEs?'Actividad':'Activity'].forEach((h,i) => {
     const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
@@ -1101,7 +1102,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
 // ── EXPORT RESUMEN GENERAL ────────────────────────────────
 async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
   subcontratos, subcontratos_contratos = [], subcontratos_avaluos = [],
-  equipos, costos_indirectos, salidas, entradas, budget, moneda, lang='ES' }) {
+  equipos, costos_indirectos, salidas, entradas, budget, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs = lang === 'ES'
 
   const wb       = new ExcelJS.Workbook()
@@ -1136,7 +1137,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 
   const ws = wb.addWorksheet(isEs?'Resumen General':'General Summary')
   setCols(ws, [28, 20, 32, 20, 16, 16, 16])
-  let row = addHeaderBlock(ws, isEs?'Resumen General del Proyecto':'General Project Summary', 'Marquez Project Solutions LLC', proyLabel, null, fechaHoy, COLS)
+  let row = addHeaderBlock(ws, isEs?'Resumen General del Proyecto':'General Project Summary', nombreEmpresa, proyLabel, null, fechaHoy, COLS)
 
   // Info proyecto
   row = addSectionTitle(ws, row, isEs?'INFORMACIÓN DEL PROYECTO':'PROJECT INFORMATION', COLS)
@@ -1339,7 +1340,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   row++
   ws.mergeCells(row,1,row,COLS)
   const footer=ws.getCell(row,1)
-  footer.value=isEs?'Marquez Project Solutions LLC · MARY ERP — Management And Resources Yield · Documento generado automáticamente':'Marquez Project Solutions LLC · MARY ERP — Management And Resources Yield · Automatically generated document'
+  footer.value=isEs?`${nombreEmpresa} · MARY ERP — Management And Resources Yield · Documento generado automáticamente`:`${nombreEmpresa} · MARY ERP — Management And Resources Yield · Automatically generated document`
   footer.font={ size:8, name:'Arial', color:{ argb:'FF9CA3AF' }, italic:true }
   footer.alignment={ horizontal:'center' }
 
@@ -1351,6 +1352,8 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 export default function Reportes() {
   const { state } = useStore()
   const { t, lang } = useContext(LangContext)
+  const { perfil } = useAuth()
+  const nombreEmpresa = perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'
   const isEs = lang === 'ES'
   const {
     proyectos, presupuesto, materiales, entradas, salidas,
@@ -1426,6 +1429,7 @@ export default function Reportes() {
         .reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))},0)
         +costos_directos.filter(c=>c.proyecto_id===proyId&&c.actividad_id===act.id).reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
         +realScNuevo+realScAntiguo
+        +eqs.filter(e=>e.actividad_id===act.id).reduce((s,e)=>s+costoEfectivoEq(e),0)
       const dev=real-pres
       return {code:act.code,descripcion:act.descripcion,pres,real,dev,devPct:pres>0?(dev/pres)*100:0}
     }).filter(a=>a.pres>0||a.real>0)
@@ -1498,15 +1502,15 @@ export default function Reportes() {
     try {
       if (reportType==='financiero' && datosFinanciero) {
         await buildFinanciero({ data:datosFinanciero, budget, moneda, proy, desde, hasta, presupuesto,
-          presupuesto_indirectos, avaluos_cliente, avaluos_cliente_items, lang })
+          presupuesto_indirectos, avaluos_cliente, avaluos_cliente_items, lang, nombreEmpresa })
       } else if (reportType==='inventario') {
-        await buildInventario({ data:datosInventario, materiales, proyectos, presupuesto, desde, hasta, lang })
+        await buildInventario({ data:datosInventario, materiales, proyectos, presupuesto, desde, hasta, lang, nombreEmpresa })
       } else if (reportType==='general' && proyId) {
         await buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
           subcontratos, subcontratos_contratos, subcontratos_avaluos,
-          equipos, costos_indirectos, salidas, entradas, budget, moneda, lang })
+          equipos, costos_indirectos, salidas, entradas, budget, moneda, lang, nombreEmpresa })
       } else if (reportType==='retenciones' && datosFinanciero) {
-        await buildRetenciones({ data: datosFinanciero, proy, moneda, lang })
+        await buildRetenciones({ data: datosFinanciero, proy, moneda, lang, nombreEmpresa })
       }
     } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
     setLoading(false)
