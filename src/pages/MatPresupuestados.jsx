@@ -18,7 +18,7 @@ export default function MatPresupuestados() {
   const { t, lang } = useContext(LangContext)
   const isEs = lang === 'ES'
   const { can } = usePermissions()
-  const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas, solicitud_items = [], solicitudes = [] } = state
+  const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas, solicitud_items = [], solicitudes = [], equipos = [] } = state
 
   const [proyId, setProyId]   = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer]   = useState(false)
@@ -130,9 +130,28 @@ export default function MatPresupuestados() {
   }
 
   const costoConsumido = (mp) => {
-    const qty  = cantConsumida(mp)
-    const prec = precioPromedio(mp.material_id)
-    return qty * prec
+    // Caso 1: material con salidas de inventario (materiales normales)
+    if (mp.material_id) {
+      const qty  = cantConsumida(mp)
+      const prec = precioPromedio(mp.material_id)
+      if (qty > 0) return qty * prec
+    }
+    // Caso 2: equipo — buscar costo en tabla equipos de Financiero
+    // Se identifica porque tiene origen_oc_id o porque la unidad es day/wk/mo/h
+    const equiposVinculados = equipos.filter(eq =>
+      eq.proyecto_id === proyId &&
+      (
+        // Vinculado por material_id si existe
+        (mp.material_id && eq.mat_pres_id === mp.id) ||
+        // Vinculado por descripción similar (fallback cuando no hay mat_pres_id)
+        (!mp.material_id && eq.descripcion?.toLowerCase().trim() === mp.nombre_libre?.toLowerCase().trim())
+      )
+    )
+    if (equiposVinculados.length > 0) {
+      return equiposVinculados.reduce((s, eq) => s + parseFloat(eq.costo_total || 0), 0)
+    }
+    // Caso 3: sin movimientos aún
+    return 0
   }
 
   const totalPresupuestado = useMemo(() =>

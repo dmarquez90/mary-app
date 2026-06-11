@@ -264,7 +264,7 @@ case 'LOAD_TABLE':
 const Ctx = createContext(null)
 export const useStore = () => useContext(Ctx)
 
-export function StoreProvider({ children, tenantId }) {
+export function StoreProvider({ children, tenantId, rol }) {
   const [state, dispatch] = useReducer(reducer, INIT)
 
   useEffect(() => {
@@ -316,7 +316,7 @@ useEffect(() => {
     'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
     'costos_directos', 'nominas', 'subcontratos', 'equipos', 'equipos_ajustes', 'costos_indirectos',
-    'solicitudes_eliminacion',
+    'materiales_presupuestados', 'solicitudes_eliminacion',
     'subcontratos_contratos', 'subcontratos_items',
     'subcontratos_avaluos', 'subcontratos_avaluo_items',
     'ordenes_pago_retencion',
@@ -339,12 +339,12 @@ useEffect(() => {
       .subscribe()
   )
 
-  // ── Listener especial para tablas con DELETE ─────────────────────
+  // ── Listener especial para entradas y salidas ────────────────────
   // El filtro tenant_id NO funciona para DELETE en Supabase Realtime
-  // (la fila ya no existe cuando el evento llega). Tampoco es confiable
-  // para INSERT con event:'*'. Se usan DOS canales por tabla:
-  // uno filtrado para INSERT/UPDATE, y uno sin filtro para DELETE.
-  const TABLES_WITH_DELETE = ['entradas', 'salidas', 'materiales_presupuestados']
+  // (la fila ya no existe cuando el evento llega). Se escuchan DOS canales:
+  // uno filtrado para INSERT/UPDATE, y uno sin filtro para DELETE
+  // que recarga la tabla completa del tenant.
+  const TABLES_WITH_DELETE = ['entradas', 'salidas']
   const deleteChannels = TABLES_WITH_DELETE.flatMap(table => [
     // Canal filtrado para INSERT y UPDATE
     supabase
@@ -991,6 +991,12 @@ useEffect(() => {
       }
 
       case 'ADD_OC': {
+        // Solo client_admin, gerente y super_admin pueden crear OC
+        const rolesOC = ['super_admin', 'client_admin', 'gerente']
+        if (!rolesOC.includes(rol)) {
+          console.warn('[MARY] ADD_OC bloqueado — rol sin permiso:', rol)
+          break
+        }
         const oc_number   = genOCCode(state.ordenes_compra)
         const monto_total = parseFloat(action.payload.monto_total || 0) ||
           (action.payload.items||[]).reduce((s, it) => s + r2(parseFloat(it.cantidad||0) * parseFloat(it.precio_unitario||0)), 0)
@@ -1049,6 +1055,14 @@ useEffect(() => {
         break
       }
       case 'UPD_OC_ESTADO': {
+        // Solo client_admin y super_admin pueden aprobar/rechazar OC
+        // gerente solo si tiene permiso condicional (oc_aprobar: 'cond')
+        // Solo client_admin, gerente y super_admin pueden aprobar/rechazar OC
+        const rolesAprobar = ['super_admin', 'client_admin', 'gerente']
+        if (!rolesAprobar.includes(rol)) {
+          console.warn('[MARY] UPD_OC_ESTADO bloqueado — rol sin permiso:', rol)
+          break
+        }
         await supabase.from('ordenes_compra').update({ estado: action.payload.estado }).eq('id', action.payload.id)
         dispatch(action)
 

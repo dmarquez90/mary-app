@@ -521,7 +521,7 @@ function AppContent() {
   }
 
   return (
-    <StoreProvider key={perfil?.tenant_id} tenantId={perfil?.tenant_id}>
+    <StoreProvider key={perfil?.tenant_id} tenantId={perfil?.tenant_id} rol={perfil?.rol}>
       <LangProvider>
         <Layout />
       </LangProvider>
