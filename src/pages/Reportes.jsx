@@ -14,6 +14,25 @@ const GRAY_HX  = 'F8FAFC'
 const GREEN_HX = '1D9E75'
 const RED_HX   = 'EF4444'
 
+// ── ESTADO LABELS (para funciones Excel donde t() no está disponible) ──────
+const ESTADO_LABELS = {
+  ES: {
+    planificado:    'Planificado',
+    en_ejecucion:   'En Ejecución',
+    pausado:        'Pausado',
+    completado:     'Completado',
+    cancelado:      'Cancelado',
+  },
+  EN: {
+    planificado:    'Planned',
+    en_ejecucion:   'In Progress',
+    pausado:        'On Hold',
+    completado:     'Completed',
+    cancelado:      'Cancelled',
+  },
+}
+const fmtEstado = (estado, lang) => ESTADO_LABELS[lang]?.[estado] || estado || '—'
+
 // ── HELPERS ───────────────────────────────────────────────
 const inPeriodo = (f, d, h) => {
   if (!f) return false
@@ -1143,7 +1162,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   row = addSectionTitle(ws, row, isEs?'INFORMACIÓN DEL PROYECTO':'PROJECT INFORMATION', COLS)
   const infoRows = [
     [isEs?'Código':'Code', proy?.project_code||''], [isEs?'Nombre':'Name', proy?.nombre||''],
-    [isEs?'Cliente':'Client', proy?.cliente_externo||'—'], [isEs?'Estado':'Status', proy?.estado||''],
+    [isEs?'Cliente':'Client', proy?.cliente_externo||'—'], [isEs?'Estado':'Status', fmtEstado(proy?.estado, lang)],
     [isEs?'Fecha inicio':'Start date', proy?.fecha_inicio||'—'], [isEs?'Fecha fin estimada':'Est. end date', proy?.fecha_fin_estimada||'—'],
     [isEs?'Ciudad / País':'City / Country', `${proy?.ciudad||''} ${proy?.pais||''}`.trim()||'—'], [isEs?'Moneda':'Currency', moneda],
   ]
