@@ -284,6 +284,10 @@ export const UNIDADES_CONFIG = [
   { value: '%',    es: '% — porcentaje',          en: '% — percentage'        },
   { value: 'lb',   es: 'lb — libra',              en: 'lb — pound'            },
   { value: 'ft²',  es: 'ft² — pie cuadrado',      en: 'ft² — square foot'    },
+  { value: 'ft³',  es: 'ft³ — pie cúbico',        en: 'ft³ — cubic foot'     },
+  { value: 'yd³',  es: 'yd³ — yarda cúbica',      en: 'yd³ — cubic yard'     },
+  { value: 'ft',   es: 'ft — pie',                en: 'ft — foot'            },
+  { value: 'in',   es: 'in — pulgada',            en: 'in — inch'            },
   { value: 'LF',   es: 'LF — pie lineal',         en: 'LF — linear foot'     },
 ]
 

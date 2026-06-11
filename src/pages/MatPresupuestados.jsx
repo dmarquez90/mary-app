@@ -2,7 +2,7 @@ import { useState, useContext, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { fmtNum, fmt } from '../utils'
+import { fmtNum, fmt, UNIDADES_CONFIG } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 import ImportarMatPresupuestados from './ImportarMatPresupuestados'
 
@@ -12,7 +12,6 @@ const emptyForm = () => ({
   material_id: '', es_adicional: false,
 })
 
-const UNIDADES = ['und','m','m2','m3','kg','ton','lt','gl','bolsa','saco','rollo','varilla','tubo','lamina','par','caja','juego']
 
 export default function MatPresupuestados() {
   const { state, dispatch } = useStore()
@@ -367,7 +366,11 @@ export default function MatPresupuestados() {
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('mp_col_unit')}>
               <select className={selectCls} value={form.unidad_libre || 'und'} onChange={set('unidad_libre')}>
-                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+                {UNIDADES_CONFIG.map(u => (
+                  <option key={u.value} value={u.value}>
+                    {isEs ? u.es : u.en}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label={t('mp_form_qty')} required>
