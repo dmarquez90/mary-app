@@ -5,6 +5,7 @@ import { today } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
 import { supabase } from '../supabase'
 import { usePermissions } from '../usePermissions'
+import { useAuth } from '../auth'
 
 const BRAND = '#1B3A6B'
 
@@ -214,6 +215,8 @@ export default function Compras() {
   const { state, dispatch } = useStore()
   const { t } = useContext(LangContext)
   const { can } = usePermissions()
+  const { perfil } = useAuth()
+  const nombreEmpresa = perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'
   const { solicitudes, solicitud_items, ordenes_compra, ordenes_compra_items = [], proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
 
   const [tab, setTab]       = useState(0)
@@ -546,8 +549,8 @@ export default function Compras() {
               </div>
             </div>
             <div id="print-area" className="p-8">
-              {printDoc.type === 'sol' && <PrintSolicitud doc={printDoc} materiales={materiales} presupuesto={presupuesto} t={t} />}
-              {printDoc.type === 'oc'  && <PrintOC doc={printDoc} materiales={materiales} presupuesto={presupuesto} t={t} />}
+              {printDoc.type === 'sol' && <PrintSolicitud doc={printDoc} materiales={materiales} presupuesto={presupuesto} t={t} nombreEmpresa={nombreEmpresa} />}
+              {printDoc.type === 'oc'  && <PrintOC doc={printDoc} materiales={materiales} presupuesto={presupuesto} t={t} nombreEmpresa={nombreEmpresa} />}
             </div>
           </div>
         </div>
@@ -1328,7 +1331,7 @@ export default function Compras() {
 }
 
 // ── PRINT: SOLICITUD ──────────────────────────────────────
-function PrintSolicitud({ doc, materiales, presupuesto, t }) {
+function PrintSolicitud({ doc, materiales, presupuesto, t, nombreEmpresa = 'Marquez Project Solutions LLC' }) {
   const { sol, items, proy } = doc
   const cell = { padding:'6px 8px', border:'1px solid #ccc', fontSize:'11px' }
   const hdr  = { ...cell, background:BRAND, color:'white', fontWeight:'bold', fontSize:'10px' }
@@ -1361,8 +1364,8 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
     received:    isEn ? 'RECEIVED BY' : 'RECIBIDO POR',
     date:        isEn ? 'Date' : 'Fecha',
     footer:      isEn
-      ? 'Marquez Project Solutions LLC · Format: F-ALM-001 · Rev. 2026 · Controlled document – Do not duplicate without authorization'
-      : 'Marquez Project Solutions LLC · Formato: F-ALM-001 · Rev. 2026 · Documento controlado – No duplicar sin autorización',
+      ? `${nombreEmpresa} · Format: F-ALM-001 · Rev. 2026 · Controlled document – Do not duplicate without authorization`
+      : `${nombreEmpresa} · Formato: F-ALM-001 · Rev. 2026 · Documento controlado – No duplicar sin autorización`,
     prioLabel:   sol.prioridad === 'normal' ? (isEn ? 'NORMAL' : 'NORMAL') : sol.prioridad === 'alta' ? (isEn ? 'HIGH' : 'ALTA') : (isEn ? 'URGENT' : 'URGENTE'),
   }
 
@@ -1374,7 +1377,7 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
       <table style={{ width:'100%', borderCollapse:'collapse', border:`2px solid ${BRAND}` }}>
         <tbody><tr>
           <td style={{ padding:'10px 14px', width:'40%', borderRight:`2px solid ${BRAND}` }}>
-            <p style={{ margin:0, fontSize:'16px', fontWeight:'bold', color:BRAND }}>Marquez Project Solutions LLC</p>
+            <p style={{ margin:0, fontSize:'16px', fontWeight:'bold', color:BRAND }}>{nombreEmpresa}</p>
             <p style={{ margin:'2px 0 0', fontSize:'10px', color:'#666' }}>MARY ERP — Management And Resources Yield</p>
           </td>
           <td style={{ padding:'10px 14px', width:'40%', borderRight:`2px solid ${BRAND}`, textAlign:'center' }}>
@@ -1493,7 +1496,7 @@ function PrintSolicitud({ doc, materiales, presupuesto, t }) {
 }
 
 // ── PRINT: ORDEN DE COMPRA ────────────────────────────────
-function PrintOC({ doc, materiales, presupuesto, t }) {
+function PrintOC({ doc, materiales, presupuesto, t, nombreEmpresa = 'Marquez Project Solutions LLC' }) {
   const { oc, items, proy } = doc
   const cell    = { padding:'6px 8px', border:'1px solid #ccc', fontSize:'11px' }
   const hdr     = { ...cell, background:BRAND, color:'white', fontWeight:'bold', fontSize:'10px' }
@@ -1556,8 +1559,8 @@ function PrintOC({ doc, materiales, presupuesto, t }) {
     taxLbl:      isEn ? `TAX (${oc.impuesto_pct||0}%)` : `IMPUESTO (${oc.impuesto_pct||0}%)`,
     totalLbl:    isEn ? 'GRAND TOTAL' : 'TOTAL GENERAL',
     footer:      isEn
-      ? 'Marquez Project Solutions LLC · Format: F-OC-001 · Rev. 2026 · Controlled document – Do not duplicate without authorization'
-      : 'Marquez Project Solutions LLC · Formato: F-OC-001 · Rev. 2026 · Documento controlado – No duplicar sin autorización',
+      ? `${nombreEmpresa} · Format: F-OC-001 · Rev. 2026 · Controlled document – Do not duplicate without authorization`
+      : `${nombreEmpresa} · Formato: F-OC-001 · Rev. 2026 · Documento controlado – No duplicar sin autorización`,
   }
 
   return (
@@ -1566,7 +1569,7 @@ function PrintOC({ doc, materiales, presupuesto, t }) {
       <table style={{ width:'100%', borderCollapse:'collapse', border:`2px solid ${BRAND}` }}>
         <tbody><tr>
           <td style={{ padding:'10px 14px', width:'40%', borderRight:`2px solid ${BRAND}` }}>
-            <p style={{ margin:0, fontSize:'16px', fontWeight:'bold', color:BRAND }}>Marquez Project Solutions LLC</p>
+            <p style={{ margin:0, fontSize:'16px', fontWeight:'bold', color:BRAND }}>{nombreEmpresa}</p>
             <p style={{ margin:'2px 0 0', fontSize:'10px', color:'#666' }}>MARY ERP — Management And Resources Yield</p>
           </td>
           <td style={{ padding:'10px 14px', width:'40%', borderRight:`2px solid ${BRAND}`, textAlign:'center' }}>

@@ -13,6 +13,7 @@ const emptyForm = () => ({
 })
 
 
+
 export default function MatPresupuestados() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
@@ -130,27 +131,23 @@ export default function MatPresupuestados() {
   }
 
   const costoConsumido = (mp) => {
-    // Caso 1: material con salidas de inventario (materiales normales)
+    // Caso 1: material con salidas de inventario
     if (mp.material_id) {
       const qty  = cantConsumida(mp)
       const prec = precioPromedio(mp.material_id)
       if (qty > 0) return qty * prec
     }
-    // Caso 2: equipo — buscar costo en tabla equipos de Financiero
-    // Se identifica porque tiene origen_oc_id o porque la unidad es day/wk/mo/h
+    // Caso 2: equipo — buscar en tabla equipos de Financiero
+    // Vincula por mat_pres_id, por material_id, o por nombre_libre == descripcion
     const equiposVinculados = equipos.filter(eq =>
-      eq.proyecto_id === proyId &&
-      (
-        // Vinculado por material_id si existe
-        (mp.material_id && eq.mat_pres_id === mp.id) ||
-        // Vinculado por descripción similar (fallback cuando no hay mat_pres_id)
+      eq.proyecto_id === proyId && (
+        eq.mat_pres_id === mp.id ||
+        (mp.material_id && eq.material_id === mp.material_id) ||
         (!mp.material_id && eq.descripcion?.toLowerCase().trim() === mp.nombre_libre?.toLowerCase().trim())
       )
     )
-    if (equiposVinculados.length > 0) {
+    if (equiposVinculados.length > 0)
       return equiposVinculados.reduce((s, eq) => s + parseFloat(eq.costo_total || 0), 0)
-    }
-    // Caso 3: sin movimientos aún
     return 0
   }
 
@@ -161,7 +158,7 @@ export default function MatPresupuestados() {
 
   const totalConsumido = useMemo(() =>
     matsPres.reduce((sum, mp) => sum + costoConsumido(mp), 0),
-    [matsPres, salidas, entradas]
+    [matsPres, salidas, entradas, equipos]
   )
 
   const totalAdicionales = matsPres.filter(mp => mp.es_adicional).length
@@ -386,9 +383,7 @@ export default function MatPresupuestados() {
             <Field label={t('mp_col_unit')}>
               <select className={selectCls} value={form.unidad_libre || 'und'} onChange={set('unidad_libre')}>
                 {UNIDADES_CONFIG.map(u => (
-                  <option key={u.value} value={u.value}>
-                    {isEs ? u.es : u.en}
-                  </option>
+                  <option key={u.value} value={u.value}>{isEs ? u.es : u.en}</option>
                 ))}
               </select>
             </Field>
