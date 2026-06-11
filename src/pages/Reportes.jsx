@@ -89,7 +89,7 @@ function addHeaderBlock(ws, titulo, empresa, proyecto, periodo, fecha, cols) {
   // Fila 1 — Logo / Empresa
   ws.mergeCells(1, 1, 1, Math.floor(cols / 3))
   const c1 = ws.getCell(1, 1)
-  c1.value = nombreEmpresa
+  c1.value = empresa
   c1.font  = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND_HX } }
   c1.alignment = { vertical: 'middle' }
   c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
@@ -533,7 +533,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
 }
 
 // ── EXPORT ORDEN DE PAGO DE RETENCIÓN (OPR) ──────────────
-export async function buildOPR({ orden, retenciones, contrato, proy, usuario, lang='ES' }) {
+export async function buildOPR({ orden, retenciones, contrato, proy, usuario, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs    = lang === 'ES'
   const COLS    = 7
   const wb      = new ExcelJS.Workbook()
