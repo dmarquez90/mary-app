@@ -565,8 +565,11 @@ useEffect(() => {
 
       case 'ADD_BUDGET': {
         const { proyectoId, ...rest } = action.payload
+        // Si el payload ya trae code pre-calculado (ej: import masivo), respetarlo.
+        // Esto evita la race condition del import donde genBudgetCode ve 0 hermanos
+        // porque el state local todavia no se actualizo entre dispatches secuenciales.
         const byProject = state.presupuesto.filter(b => b.proyecto_id === proyectoId)
-        const code = genBudgetCode(byProject, rest.tipo, rest.parent_id)
+        const code = rest.code || genBudgetCode(byProject, rest.tipo, rest.parent_id)
         const item = { ...rest, id: rest.id || uuid(), proyecto_id: proyectoId, code, created_at: today(), tenant_id: tenantId }
         await supabase.from('presupuesto').insert(item)
         dispatch({ type: 'ADD_BUDGET', payload: item })
