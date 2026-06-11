@@ -1044,8 +1044,15 @@ useEffect(() => {
             tenant_id:         tenantId,
           }
         })
-        await supabase.from('ordenes_compra').insert(oc)
-        if (ocItems.length) await supabase.from('ordenes_compra_items').insert(ocItems)
+        const { error: ocErr } = await supabase.from('ordenes_compra').insert(oc)
+        if (ocErr) {
+          console.error('[MARY] ADD_OC — insert ordenes_compra:', JSON.stringify(ocErr))
+          break
+        }
+        if (ocItems.length) {
+          const { error: ocItemsErr } = await supabase.from('ordenes_compra_items').insert(ocItems)
+          if (ocItemsErr) console.error('[MARY] ADD_OC — insert ordenes_compra_items:', JSON.stringify(ocItemsErr))
+        }
         if (oc.solicitud_id) {
           await supabase.from('solicitudes').update({ estado: 'oc_generada' }).eq('id', oc.solicitud_id)
           dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: { id: oc.solicitud_id, estado: 'oc_generada' } })
