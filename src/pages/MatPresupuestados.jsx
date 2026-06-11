@@ -138,12 +138,11 @@ export default function MatPresupuestados() {
       if (qty > 0) return qty * prec
     }
     // Caso 2: equipo — buscar en tabla equipos de Financiero
-    // Vincula por mat_pres_id, por material_id, o por nombre_libre == descripcion
+    // Vincula por mat_pres_id (directo) o por descripcion == nombre_libre (fallback)
     const equiposVinculados = equipos.filter(eq =>
       eq.proyecto_id === proyId && (
         eq.mat_pres_id === mp.id ||
-        (mp.material_id && eq.material_id === mp.material_id) ||
-        (!mp.material_id && eq.descripcion?.toLowerCase().trim() === mp.nombre_libre?.toLowerCase().trim())
+        eq.descripcion?.toLowerCase().trim() === mp.nombre_libre?.toLowerCase().trim()
       )
     )
     if (equiposVinculados.length > 0)

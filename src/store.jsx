@@ -1084,13 +1084,19 @@ useEffect(() => {
               // Verificar si el ítem está en materiales_presupuestados del proyecto
               const ocRecord  = state.ordenes_compra.find(o => o.id === oc.id)
               const proyId    = ocRecord?.proyecto_id || null
-              const esPres    = proyId
-                ? state.materiales_presupuestados.some(
-                    mp => mp.proyecto_id === proyId &&
-                          mp.material_id === it.material_id &&
-                          it.material_id != null
+
+              // Buscar el mat_pres correspondiente: por material_id o por nombre_libre == descripcion
+              const matPres = proyId
+                ? state.materiales_presupuestados.find(mp =>
+                    mp.proyecto_id === proyId && (
+                      (it.material_id && mp.material_id === it.material_id) ||
+                      (!it.material_id && mp.nombre_libre?.toLowerCase().trim() === (it.descripcion || '').toLowerCase().trim())
+                    )
                   )
-                : false
+                : null
+
+              const esPres   = !!matPres
+              const matPresId = matPres?.id || null
 
               // Calcular días si tiene fechas
               let diasUso = parseFloat(it.eq_dias_uso || 0)
@@ -1118,7 +1124,7 @@ useEffect(() => {
                 origen_oc_id:         oc.id,
                 origen_solicitud_id:  ocRecord?.solicitud_id || null,
                 es_presupuestado:     esPres,
-                mat_pres_id:          null,
+                mat_pres_id:          matPresId,
                 estado_equipo:        'activo',
                 eq_fecha_inicio:      it.eq_fecha_inicio || null,
                 eq_fecha_fin:         it.eq_fecha_fin    || null,
