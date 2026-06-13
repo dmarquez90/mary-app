@@ -512,6 +512,7 @@ useEffect(() => {
         await supabase.from('subcontratos').delete().eq('proyecto_id', pid)
         await supabase.from('equipos').delete().eq('proyecto_id', pid)
         await supabase.from('costos_indirectos').delete().eq('proyecto_id', pid)
+        await supabase.from('usuario_proyecto').delete().eq('proyecto_id', pid)
         const { data: sols } = await supabase.from('solicitudes').select('id').eq('proyecto_id', pid)
         if (sols?.length) {
           await supabase.from('solicitud_items').delete().in('solicitud_id', sols.map(s => s.id))
@@ -527,11 +528,20 @@ useEffect(() => {
           await supabase.from('ordenes_cambio_items').delete().in('oc_id', ocsC.map(o => o.id))
           await supabase.from('ordenes_cambio').delete().eq('proyecto_id', pid)
         }
+        // ── Retenciones y órdenes de pago de retención (FK NO ACTION — deben
+        // borrarse ANTES de subcontratos_avaluos / subcontratos_contratos / proyectos) ──
+        await supabase.from('subcontratos_retenciones').delete().eq('proyecto_id', pid)
+        await supabase.from('ordenes_pago_retencion').delete().eq('proyecto_id', pid)
         const { data: scs } = await supabase.from('subcontratos_contratos').select('id').eq('proyecto_id', pid)
         if (scs?.length) {
           const scIds = scs.map(s => s.id)
           const { data: avs } = await supabase.from('subcontratos_avaluos').select('id').in('subcontrato_id', scIds)
-          if (avs?.length) await supabase.from('subcontratos_avaluo_items').delete().in('avaluo_id', avs.map(a => a.id))
+          if (avs?.length) {
+            const avIds = avs.map(a => a.id)
+            await supabase.from('subcontratos_retenciones').delete().in('avaluo_id', avIds)
+            await supabase.from('subcontratos_avaluo_items').delete().in('avaluo_id', avIds)
+          }
+          await supabase.from('subcontratos_retenciones').delete().in('subcontrato_id', scIds)
           await supabase.from('subcontratos_avaluos').delete().in('subcontrato_id', scIds)
           await supabase.from('subcontratos_items').delete().in('subcontrato_id', scIds)
           await supabase.from('subcontratos_contratos').delete().eq('proyecto_id', pid)
@@ -541,7 +551,12 @@ useEffect(() => {
           await supabase.from('avaluos_cliente_items').delete().in('avaluo_id', avsCli.map(a => a.id))
           await supabase.from('avaluos_cliente').delete().eq('proyecto_id', pid)
         }
-        await supabase.from('proyectos').delete().eq('id', pid)
+        const { error: eP } = await supabase.from('proyectos').delete().eq('id', pid)
+        if (eP) {
+          console.error('DEL_PROYECTO — proyectos:', JSON.stringify(eP))
+          alert(`No se pudo eliminar el proyecto / Could not delete project: ${eP.message}`)
+          break
+        }
         dispatch(action)
         break
       }
