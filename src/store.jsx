@@ -356,16 +356,20 @@ useEffect(() => {
   // Tablas donde el filtro tenant_id funciona para todos los eventos (INSERT/UPDATE/DELETE)
   const REALTIME_TABLES = [
     'proyectos', 'fases', 'presupuesto', 'presupuesto_indirectos',
-    'materiales',
+    'materiales', 'entradas', 'salidas',
+    'solicitudes', 'solicitud_items',
     'ordenes_compra', 'ordenes_compra_items',
-    'costos_directos', 'nominas', 'subcontratos', 'equipos_ajustes', 'costos_indirectos',
+    'costos_directos', 'nominas', 'subcontratos', 'equipos', 'equipos_ajustes', 'costos_indirectos',
     'solicitudes_eliminacion',
     'subcontratos_contratos', 'subcontratos_items',
     'subcontratos_avaluos', 'subcontratos_avaluo_items',
+    'subcontratos_retenciones',
     'ordenes_pago_retencion',
     'ordenes_cambio', 'ordenes_cambio_items', 'ordenes_cambio_indirectos',
     'avaluos_cliente', 'avaluos_cliente_items',
+    'materiales_presupuestados',
     'cajas_chicas', 'gastos_caja_chica', 'liquidaciones_caja_chica', 'reembolsos_personal',
+    'usuarios',
   ]
 
   const channels = REALTIME_TABLES.map(table =>

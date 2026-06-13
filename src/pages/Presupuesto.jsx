@@ -145,10 +145,18 @@ export default function Presupuesto() {
 
   const saveInd = () => {
     if (!indForm.categoria || !indForm.monto_presupuestado) return
+    // Normalizar subcategoría a ES si fue seleccionada en EN
+    let subcategoria = indForm.subcategoria || ''
+    if (subcategoria && lang !== 'ES') {
+      const cat = CATEGORIAS_IND[indForm.categoria]
+      const idxEn = cat?.subs.en.indexOf(subcategoria)
+      if (idxEn >= 0) subcategoria = cat.subs.es[idxEn]
+    }
+    const payload = { ...indForm, subcategoria: subcategoria || null }
     if (indEdit) {
-      dispatch({ type: 'UPD_PRES_IND', payload: { ...indForm, id: indEdit, proyecto_id: proyId } })
+      dispatch({ type: 'UPD_PRES_IND', payload: { ...payload, id: indEdit, proyecto_id: proyId } })
     } else {
-      dispatch({ type: 'ADD_PRES_IND', payload: { ...indForm, proyecto_id: proyId } })
+      dispatch({ type: 'ADD_PRES_IND', payload: { ...payload, proyecto_id: proyId } })
     }
     setIndForm({ categoria: '', subcategoria: '', monto_presupuestado: '' })
     setIndEdit(null)
@@ -366,7 +374,15 @@ export default function Presupuesto() {
                         {!isSimple && g.items.map(ind => (
                           <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                             <td className="px-2 py-2 pl-7 text-xs text-gray-500">
-                              {ind.subcategoria || (isEs ? 'General / sin subcategoría' : 'General / no subcategory')}
+                              {(() => {
+                                const sub = ind.subcategoria
+                                if (!sub) return isEs ? 'General / sin subcategoría' : 'General / no subcategory'
+                                if (lang === 'ES') return sub
+                                // traducir ES→EN
+                                const cat = CATEGORIAS_IND[ind.categoria]
+                                const idxEs = cat?.subs.es.indexOf(sub)
+                                return (idxEs >= 0 && cat?.subs.en[idxEs]) ? cat.subs.en[idxEs] : sub
+                              })()}
                             </td>
                             <td className="px-2 py-2 text-sm font-mono text-right text-gray-600">{fmt(ind.monto_presupuestado, moneda)}</td>
                             {puedeEditar && (

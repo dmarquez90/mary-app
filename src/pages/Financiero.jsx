@@ -94,8 +94,10 @@ export default function Financiero() {
   const indsPresDelProy = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
   const comparacionIndirectos = CAT_KEYS.map(catKey => {
     const cat           = CATEGORIAS_IND[catKey]
-    const pres          = indsPresDelProy.find(p => p.categoria === catKey)
-    const presupuestado = parseFloat(pres?.monto_presupuestado || 0)
+    // SUMA todas las filas de esa categoría (incluyendo distintas subcategorías)
+    const presupuestado = indsPresDelProy
+      .filter(p => p.categoria === catKey)
+      .reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
     const ejecutado     = inds
       .filter(c => {
         const ck = CAT_KEYS.find(k =>
