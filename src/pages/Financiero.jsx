@@ -108,7 +108,7 @@ export default function Financiero() {
     t('fin_tab_subcontracts'),
     t('fin_tab_equipment'),
     t('rep_cat_admin'),
-    isEs ? 'Caja Chica' : 'Petty Cash',
+    t('cc_tab'),
   ]
 
   const proy   = proyectos.find(p => p.id === proyId)
@@ -2061,9 +2061,14 @@ function CajaChicaModule({
 }) {
   const thCls = 'px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap'
   const tdCls = 'px-4 py-3 text-sm text-gray-700'
-  const puedeAprobar = ['gerente','client_admin','super_admin'].includes(rol)
+  const puedeAprobar     = ['gerente','client_admin','super_admin'].includes(rol)
+  const puedeAbrirDirecto = ['client_admin','super_admin'].includes(rol)
+  const puedeSolicitar    = rol === 'gerente'
+  const puedeGestionarFondo = puedeAbrirDirecto || puedeSolicitar
 
-  const caja = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'activa')
+  const caja        = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'activa')
+  const cajaPendiente = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'pendiente_aprobacion')
+  const nombreUsuario = (id) => usuarios.find(u=>u.id===id)?.nombre || usuarios.find(u=>u.id===id)?.email || '—'
   const gastosCaja  = caja ? gastos_caja_chica.filter(g => g.caja_id === caja.id) : []
   const pendientes  = gastosCaja.filter(g => !g.liquidacion_id)
   const liquidsProy = liquidaciones_caja_chica.filter(l => l.proyecto_id === proyId).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))
@@ -2082,13 +2087,17 @@ function CajaChicaModule({
     const monto = parseFloat(montoNuevaCaja)||0
     if (monto <= 0) return
     if (presCCMonto > 0 && monto > disponibleCC) {
-      alert(isEs
-        ? `El monto excede el saldo disponible presupuestado para Caja Chica ($${disponibleCC.toFixed(2)}). Ajusta el presupuesto en la pestaña Administración.`
-        : `Amount exceeds the budgeted Petty Cash balance available ($${disponibleCC.toFixed(2)}). Adjust the budget in the Administration tab.`)
+      alert(t('cc_alert_exceeds_budget', { amount: `$${disponibleCC.toFixed(2)}` }))
       return
     }
     dispatch({ type:'ADD_CAJA_CHICA', payload: { proyecto_id: proyId, responsable_id: responsableNueva||null, monto_asignado: monto } })
     setMontoNuevaCaja('')
+  }
+
+  const aprobarCaja  = () => dispatch({ type:'APROBAR_CAJA_CHICA', payload: cajaPendiente.id })
+  const rechazarCaja = () => {
+    if (!confirm(t('cc_confirm_reject_fund'))) return
+    dispatch({ type:'RECHAZAR_CAJA_CHICA', payload: cajaPendiente.id })
   }
 
   // ── Formulario: nuevo gasto ──
@@ -2101,9 +2110,7 @@ function CajaChicaModule({
     const monto = parseFloat(gForm.monto)||0
     if (!gForm.descripcion || monto <= 0) return
     if (monto > parseFloat(caja.saldo_actual||0)) {
-      if (!confirm(isEs
-        ? `Este gasto ($${monto.toFixed(2)}) supera el saldo actual de la caja ($${parseFloat(caja.saldo_actual||0).toFixed(2)}). Esto significa que la persona puso dinero de su bolsillo. ¿Continuar?`
-        : `This expense ($${monto.toFixed(2)}) exceeds the current cash balance ($${parseFloat(caja.saldo_actual||0).toFixed(2)}). This means the person paid out of pocket. Continue?`)) return
+      if (!confirm(t('cc_confirm_overspend', { amount: `$${monto.toFixed(2)}`, balance: `$${parseFloat(caja.saldo_actual||0).toFixed(2)}` }))) return
     }
     dispatch({ type:'ADD_GASTO_CC', payload: {
       caja_id: caja.id,
@@ -2120,7 +2127,7 @@ function CajaChicaModule({
   }
 
   const eliminarGasto = (id) => {
-    if (!confirm(isEs?'¿Eliminar este gasto?':'Delete this expense?')) return
+    if (!confirm(t('cc_confirm_delete_expense'))) return
     dispatch({ type:'DEL_GASTO_CC', payload: id })
   }
 
@@ -2131,53 +2138,83 @@ function CajaChicaModule({
 
   const aprobarLiquidacion = (id) => dispatch({ type:'APROBAR_LIQUIDACION_CC', payload: { liquidacionId: id, usuarioId: currentUserId } })
   const rechazarLiquidacion = (id) => {
-    if (!confirm(isEs?'¿Rechazar esta liquidación? Los gastos volverán a estado pendiente.':'Reject this settlement? Expenses will return to pending status.')) return
+    if (!confirm(t('cc_confirm_reject_settlement'))) return
     dispatch({ type:'RECHAZAR_LIQUIDACION_CC', payload: id })
   }
   const pagarReembolso = (id) => dispatch({ type:'PAGAR_REEMBOLSO_CC', payload: id })
 
-  const nombreUsuario = (id) => usuarios.find(u=>u.id===id)?.nombre || usuarios.find(u=>u.id===id)?.email || '—'
-
   const TIPOS_COSTO = [
-    { v:'costos_directos', es:'Materiales / Imprevistos', en:'Materials / Contingencies' },
-    { v:'costos_indirectos', es:'Administración (indirectos)', en:'Administration (indirect)' },
-    { v:'equipos', es:'Equipos / Transporte', en:'Equipment / Transport' },
+    { v:'costos_directos', label: t('cc_type_direct') },
+    { v:'costos_indirectos', label: t('cc_type_indirect') },
+    { v:'equipos', label: t('cc_type_equipment') },
   ]
 
-  // ── Sin caja chica activa: formulario de apertura ──
+  // ── Solicitud de apertura pendiente de aprobación del Admin ──
+  if (cajaPendiente) {
+    return (
+      <div className="bg-white rounded-xl border border-amber-200 p-6 max-w-lg">
+        <h3 className="text-sm font-semibold text-amber-700 mb-1">
+          {t('cc_pending_title')}
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          {t('cc_pending_desc', { amount: fmt(cajaPendiente.monto_asignado, moneda), user: nombreUsuario(cajaPendiente.responsable_id) })}
+        </p>
+        {puedeAbrirDirecto ? (
+          <div className="flex gap-2">
+            <PrimaryBtn onClick={aprobarCaja}>{t('cc_approve_fund')}</PrimaryBtn>
+            <button onClick={rechazarCaja} className="text-xs px-3 py-2 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
+              {t('btn_reject')}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">{t('cc_waiting_admin')}</p>
+        )}
+      </div>
+    )
+  }
+
+  // ── Sin caja chica activa ──
   if (!caja) {
+    if (!puedeGestionarFondo) {
+      return (
+        <div className="bg-white rounded-xl border border-gray-100 p-6 max-w-lg">
+          <h3 className="text-sm font-semibold text-gray-700 mb-1">{t('cc_no_fund_title')}</h3>
+          <p className="text-xs text-gray-400">{t('cc_no_permission')}</p>
+        </div>
+      )
+    }
     return (
       <div className="bg-white rounded-xl border border-gray-100 p-6 max-w-lg">
-        <h3 className="text-sm font-semibold text-gray-700 mb-1">{isEs?'Abrir caja chica del proyecto':'Open project petty cash fund'}</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-1">
+          {puedeAbrirDirecto ? t('cc_open_title') : t('cc_request_title')}
+        </h3>
         <p className="text-xs text-gray-400 mb-4">
-          {isEs
-            ? 'Cada proyecto puede tener una caja chica activa. El monto asignado debe estar respaldado por el presupuesto de indirectos (categoría "Caja Chica").'
-            : 'Each project can have one active petty cash fund. The assigned amount must be backed by the indirect costs budget ("Petty Cash" category).'}
+          {puedeAbrirDirecto ? t('cc_open_desc') : t('cc_request_desc')}
         </p>
         {presCCMonto > 0 ? (
           <p className="text-xs text-gray-500 mb-3">
-            {isEs?'Disponible en presupuesto de Caja Chica: ':'Available in Petty Cash budget: '}
+            {t('cc_available_budget')}
             <span className="font-semibold" style={{color:'#1D9E75'}}>{fmt(disponibleCC, moneda)}</span> / {fmt(presCCMonto, moneda)}
           </p>
         ) : (
           <p className="text-xs text-amber-600 mb-3">
-            {isEs
-              ? '⚠️ No hay presupuesto definido para "Caja Chica" en Administración → Presupuesto de Indirectos. Puedes abrir el fondo igual, pero se recomienda presupuestarlo primero.'
-              : '⚠️ No budget defined for "Petty Cash" under Administration → Indirect Costs Budget. You can still open the fund, but budgeting it first is recommended.'}
+            {t('cc_no_budget_warning')}
           </p>
         )}
-        {puedeEditar && !closed && <div className="flex flex-col gap-3">
-          <Field label={isEs?'Monto a asignar':'Amount to assign'}>
+        <div className="flex flex-col gap-3">
+          <Field label={t('cc_amount_to_assign')}>
             <input type="number" className={inputCls} value={montoNuevaCaja} onChange={e=>setMontoNuevaCaja(e.target.value)} placeholder="0.00" min="0" step="0.01"/>
           </Field>
-          <Field label={isEs?'Responsable':'Responsible person'}>
+          <Field label={t('cc_responsible')}>
             <select className={selectCls} value={responsableNueva} onChange={e=>setResponsableNueva(e.target.value)}>
-              <option value="">{isEs?'— Seleccionar —':'— Select —'}</option>
+              <option value="">{t('lbl_select')}</option>
               {usuarios.map(u=><option key={u.id} value={u.id}>{u.nombre||u.email}</option>)}
             </select>
           </Field>
-          <PrimaryBtn onClick={abrirCaja}>{isEs?'Abrir caja chica':'Open petty cash fund'}</PrimaryBtn>
-        </div>}
+          <PrimaryBtn onClick={abrirCaja}>
+            {puedeAbrirDirecto ? t('cc_open_btn') : t('cc_request_btn')}
+          </PrimaryBtn>
+        </div>
       </div>
     )
   }
@@ -2186,72 +2223,72 @@ function CajaChicaModule({
     <div className="flex flex-col gap-5">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label={isEs?'Fondo asignado':'Assigned fund'} value={fmt(caja.monto_asignado, moneda)} color="#1B3A6B" />
-        <StatCard label={isEs?'Saldo actual':'Current balance'} value={fmt(caja.saldo_actual, moneda)}
-          sub={parseFloat(caja.saldo_actual)<=0 ? (isEs?'Sin efectivo disponible':'No cash available') : undefined} />
-        <StatCard label={isEs?'Gastos sin liquidar':'Unsettled expenses'} value={fmt(pendientes.reduce((s,g)=>s+parseFloat(g.monto||0),0), moneda)} sub={`${pendientes.length} ${isEs?'movimientos':'items'}`} />
-        <StatCard label={isEs?'Responsable':'Responsible'} value={nombreUsuario(caja.responsable_id)} />
+        <StatCard label={t('cc_assigned_fund')} value={fmt(caja.monto_asignado, moneda)} color="#1B3A6B" />
+        <StatCard label={t('cc_current_balance')} value={fmt(caja.saldo_actual, moneda)}
+          sub={parseFloat(caja.saldo_actual)<=0 ? t('cc_no_cash') : undefined} />
+        <StatCard label={t('cc_unsettled')} value={fmt(pendientes.reduce((s,g)=>s+parseFloat(g.monto||0),0), moneda)} sub={`${pendientes.length} ${t('cc_items')}`} />
+        <StatCard label={t('cc_responsible')} value={nombreUsuario(caja.responsable_id)} />
       </div>
 
       {/* Nuevo gasto */}
       {puedeEditar && !closed && (
         <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">{isEs?'Registrar gasto de caja chica':'Record petty cash expense'}</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">{t('cc_register_expense')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Field label={isEs?'Descripción':'Description'}>
-              <input className={inputCls} value={gForm.descripcion} onChange={setG('descripcion')} placeholder={isEs?'Ej. 1 lb de clavos':'E.g. 1 lb of nails'}/>
+            <Field label={t('cc_description')}>
+              <input className={inputCls} value={gForm.descripcion} onChange={setG('descripcion')} placeholder={t('cc_description_ph')}/>
             </Field>
-            <Field label={isEs?'Proveedor':'Supplier'}>
+            <Field label={t('cc_supplier')}>
               <input className={inputCls} value={gForm.proveedor} onChange={setG('proveedor')} />
             </Field>
-            <Field label={isEs?'No. factura':'Invoice #'}>
+            <Field label={t('cc_invoice_num')}>
               <input className={inputCls} value={gForm.numero_factura} onChange={setG('numero_factura')} placeholder="FAC-001"/>
             </Field>
-            <Field label={isEs?'Fecha':'Date'}>
+            <Field label={t('lbl_date')}>
               <input type="date" className={inputCls} value={gForm.fecha} onChange={setG('fecha')}/>
             </Field>
-            <Field label={isEs?'Monto':'Amount'} required>
+            <Field label={t('cc_amount')} required>
               <input type="number" className={inputCls} value={gForm.monto} onChange={setG('monto')} placeholder="0.00" min="0" step="0.01"/>
             </Field>
-            <Field label={isEs?'Se postea como':'Posts as'}>
+            <Field label={t('cc_posts_as')}>
               <select className={selectCls} value={gForm.tipo_costo} onChange={e=>setGForm(f=>({...f, tipo_costo:e.target.value, categoria_ind:'', subcategoria_ind:''}))}>
-                {TIPOS_COSTO.map(o=><option key={o.v} value={o.v}>{isEs?o.es:o.en}</option>)}
+                {TIPOS_COSTO.map(o=><option key={o.v} value={o.v}>{o.label}</option>)}
               </select>
             </Field>
             {gForm.tipo_costo==='costos_indirectos' ? (
               <>
-                <Field label={isEs?'Categoría indirecta':'Indirect category'}>
+                <Field label={t('cc_indirect_category')}>
                   <select className={selectCls} value={gForm.categoria_ind} onChange={e=>setGForm(f=>({...f, categoria_ind:e.target.value, subcategoria_ind:''}))}>
-                    <option value="">{isEs?'— Seleccionar —':'— Select —'}</option>
+                    <option value="">{t('lbl_select')}</option>
                     {CAT_KEYS.filter(k=>k!=='Caja Chica').map(k=><option key={k} value={k}>{isEs?CATEGORIAS_IND[k].es:CATEGORIAS_IND[k].en}</option>)}
                   </select>
                 </Field>
                 {subcatsG.length>0 && (
-                  <Field label={isEs?'Subcategoría':'Subcategory'}>
+                  <Field label={t('cc_subcategory')}>
                     <select className={selectCls} value={gForm.subcategoria_ind} onChange={setG('subcategoria_ind')}>
-                      <option value="">{isEs?'— Seleccionar —':'— Select —'}</option>
+                      <option value="">{t('lbl_select')}</option>
                       {subcatsG.map(s=><option key={s} value={s}>{s}</option>)}
                     </select>
                   </Field>
                 )}
               </>
             ) : (
-              <Field label={isEs?'Actividad (opcional)':'Activity (optional)'}>
+              <Field label={t('cc_activity_optional')}>
                 <select className={selectCls} value={gForm.actividad_id} onChange={setG('actividad_id')}>
-                  <option value="">{isEs?'— General / Multi-actividad —':'— General / Multi-activity —'}</option>
+                  <option value="">{t('cc_general_multi')}</option>
                   {acts.map(a=><option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
                 </select>
               </Field>
             )}
-            <Field label={isEs?'Impuesto pagado ($)':'Tax paid ($)'}>
+            <Field label={t('cc_tax_paid')}>
               <input type="number" className={inputCls} value={gForm.impuesto_monto} onChange={setG('impuesto_monto')} placeholder="0.00" min="0" step="0.01"/>
             </Field>
-            <Field label={isEs?'Descripción del impuesto':'Tax description'}>
-              <input className={inputCls} value={gForm.impuesto_descripcion} onChange={setG('impuesto_descripcion')} placeholder={isEs?'IVA, Sales Tax...':'VAT, Sales Tax...'}/>
+            <Field label={t('cc_tax_desc')}>
+              <input className={inputCls} value={gForm.impuesto_descripcion} onChange={setG('impuesto_descripcion')} placeholder={t('cc_tax_desc_ph')}/>
             </Field>
           </div>
           <div className="mt-3">
-            <PrimaryBtn onClick={guardarGasto}>+ {isEs?'Registrar gasto':'Record expense'}</PrimaryBtn>
+            <PrimaryBtn onClick={guardarGasto}>+ {t('cc_add_expense')}</PrimaryBtn>
           </div>
         </div>
       )}
@@ -2259,18 +2296,18 @@ function CajaChicaModule({
       {/* Gastos pendientes de liquidar */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-sm font-semibold text-gray-700">{isEs?'Gastos pendientes de liquidar':'Expenses pending settlement'}</h3>
+          <h3 className="text-sm font-semibold text-gray-700">{t('cc_pending_expenses')}</h3>
           {puedeEditar && !closed && pendientes.length>0 && (
-            <PrimaryBtn onClick={generarLiquidacion}>{isEs?'Generar liquidación':'Generate settlement'}</PrimaryBtn>
+            <PrimaryBtn onClick={generarLiquidacion}>{t('cc_generate_settlement')}</PrimaryBtn>
           )}
         </div>
         {pendientes.length===0 ? (
-          <p className="text-sm text-gray-400 px-5 py-4">{isEs?'Sin gastos pendientes.':'No pending expenses.'}</p>
+          <p className="text-sm text-gray-400 px-5 py-4">{t('cc_no_pending')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr>
-                {[t('inv_col_date'), isEs?'Descripción':'Description', isEs?'Proveedor':'Supplier', isEs?'Factura':'Invoice', isEs?'Tipo':'Type', isEs?'Monto':'Amount', '']
+                {[t('inv_col_date'), t('cc_description'), t('cc_supplier'), t('cc_col_invoice'), t('cc_col_type'), t('cc_col_amount'), '']
                   .map((h,i)=><th key={i} className={thCls}>{h}</th>)}
               </tr></thead>
               <tbody>
@@ -2281,7 +2318,7 @@ function CajaChicaModule({
                     <td className={tdCls+' text-xs text-gray-500'}>{g.proveedor||'—'}</td>
                     <td className={tdCls+' text-xs text-gray-500'}>{g.numero_factura||'—'}</td>
                     <td className={tdCls+' text-xs text-gray-500'}>
-                      {TIPOS_COSTO.find(o=>o.v===g.tipo_costo) ? (isEs?TIPOS_COSTO.find(o=>o.v===g.tipo_costo).es:TIPOS_COSTO.find(o=>o.v===g.tipo_costo).en) : g.tipo_costo}
+                      {TIPOS_COSTO.find(o=>o.v===g.tipo_costo)?.label || g.tipo_costo}
                       {g.categoria_ind ? ` — ${g.subcategoria_ind||g.categoria_ind}` : ''}
                     </td>
                     <td className={tdCls+' text-right font-mono font-medium'}>{fmt(g.monto, moneda)}</td>
@@ -2302,21 +2339,21 @@ function CajaChicaModule({
       {liquidsProy.length>0 && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">{isEs?'Liquidaciones (rendiciones de cuenta)':'Settlements (expense reports)'}</h3>
+            <h3 className="text-sm font-semibold text-gray-700">{t('cc_settlements')}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr>
-                {[t('inv_col_date'), isEs?'Total gastos':'Total expenses', isEs?'Reposición a caja':'Fund replenishment',
-                  isEs?'Reembolso a persona':'Personal reimbursement', isEs?'Estado':'Status', '']
+                {[t('inv_col_date'), t('cc_col_total_expenses'), t('cc_col_replenishment'),
+                  t('cc_col_personal_reimb'), t('lbl_status'), '']
                   .map((h,i)=><th key={i} className={thCls}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {liquidsProy.map(l=>{
                   const ESTADOS = {
-                    pendiente: { label: isEs?'Pendiente de aprobación':'Pending approval', color:'#F59E0B' },
-                    aprobada:  { label: isEs?'Aprobada':'Approved', color:'#1D9E75' },
-                    rechazada: { label: isEs?'Rechazada':'Rejected', color:'#ef4444' },
+                    pendiente: { label: t('cc_status_pending_approval'), color:'#F59E0B' },
+                    aprobada:  { label: t('cc_status_approved'), color:'#1D9E75' },
+                    rechazada: { label: t('cc_status_rejected'), color:'#ef4444' },
                   }
                   const e = ESTADOS[l.estado]||ESTADOS.pendiente
                   return (
@@ -2334,15 +2371,15 @@ function CajaChicaModule({
                         {l.estado==='pendiente' && puedeAprobar && !closed && (
                           <div className="flex gap-2">
                             <button onClick={()=>aprobarLiquidacion(l.id)} className="text-xs px-2 py-1 rounded-lg text-white font-medium" style={{background:'#1D9E75'}}>
-                              {isEs?'Aprobar':'Approve'}
+                              {t('btn_approve')}
                             </button>
                             <button onClick={()=>rechazarLiquidacion(l.id)} className="text-xs px-2 py-1 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
-                              {isEs?'Rechazar':'Reject'}
+                              {t('btn_reject')}
                             </button>
                           </div>
                         )}
                         {l.estado==='pendiente' && !puedeAprobar && (
-                          <span className="text-xs text-gray-400">{isEs?'Requiere aprobación de Gerencia/Admin':'Requires Manager/Admin approval'}</span>
+                          <span className="text-xs text-gray-400">{t('cc_requires_approval')}</span>
                         )}
                       </td>
                     </tr>
@@ -2358,13 +2395,13 @@ function CajaChicaModule({
       {reembolsosProy.length>0 && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">{isEs?'Reembolsos a personal':'Personnel reimbursements'}</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{isEs?'Dinero adelantado de su bolsillo por personal de campo, pendiente de pago.':'Money advanced out-of-pocket by field staff, pending payment.'}</p>
+            <h3 className="text-sm font-semibold text-gray-700">{t('cc_reimbursements')}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{t('cc_reimbursements_desc')}</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr>
-                {[isEs?'Persona':'Person', isEs?'Monto':'Amount', isEs?'Estado':'Status', isEs?'Fecha pago':'Payment date', '']
+                {[t('cc_person'), t('cc_amount'), t('lbl_status'), t('cc_payment_date'), '']
                   .map((h,i)=><th key={i} className={thCls}>{h}</th>)}
               </tr></thead>
               <tbody>
@@ -2376,13 +2413,13 @@ function CajaChicaModule({
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
                         background: r.estado==='pagado' ? '#1D9E751A' : '#F59E0B1A',
                         color: r.estado==='pagado' ? '#1D9E75' : '#F59E0B',
-                      }}>{r.estado==='pagado' ? (isEs?'Pagado':'Paid') : (isEs?'Pendiente':'Pending')}</span>
+                      }}>{r.estado==='pagado' ? t('cc_paid') : t('cc_pending')}</span>
                     </td>
                     <td className={tdCls+' text-xs text-gray-500'}>{r.fecha_pago||'—'}</td>
                     <td className={tdCls}>
                       {r.estado==='pendiente' && puedeEditar && !closed && (
                         <button onClick={()=>pagarReembolso(r.id)} className="text-xs px-2 py-1 rounded-lg text-white font-medium" style={{background:'#1B3A6B'}}>
-                          {isEs?'Marcar pagado':'Mark as paid'}
+                          {t('cc_mark_paid')}
                         </button>
                       )}
                     </td>

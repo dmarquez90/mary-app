@@ -253,6 +253,8 @@ function reducer(state, action) {
 
     // ── CAJA CHICA (v1.1) ──────────────────────────────────────────────
     case 'ADD_CAJA_CHICA': return { ...state, cajas_chicas: [...state.cajas_chicas, action.payload] }
+    case 'APROBAR_CAJA_CHICA': return { ...state, cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.id ? { ...c, estado:'activa', saldo_actual: action.payload.saldo_actual } : c) }
+    case 'RECHAZAR_CAJA_CHICA': return { ...state, cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload ? { ...c, estado:'rechazada' } : c) }
     case 'UPD_CAJA_CHICA': return { ...state, cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.id ? { ...c, ...action.payload } : c) }
     case 'ADD_GASTO_CC': return {
       ...state,
@@ -532,10 +534,31 @@ useEffect(() => {
 
       // ── CAJA CHICA (v1.1) ────────────────────────────────────────────
       case 'ADD_CAJA_CHICA': {
-        const item = { ...action.payload, id: uuid(), saldo_actual: parseFloat(action.payload.monto_asignado)||0, estado:'activa', created_at: today(), tenant_id: tenantId }
+        // Solo client_admin/super_admin pueden abrir el fondo directamente (queda 'activa').
+        // El gerente puede solicitarlo, pero queda 'pendiente_aprobacion' hasta que el admin lo apruebe.
+        const directo = ['client_admin','super_admin'].includes(rol)
+        const monto = parseFloat(action.payload.monto_asignado)||0
+        const item = {
+          ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId,
+          estado: directo ? 'activa' : 'pendiente_aprobacion',
+          saldo_actual: directo ? monto : 0,
+        }
         const { error } = await supabase.from('cajas_chicas').insert(item)
         if (error) { console.error('ADD_CAJA_CHICA:', JSON.stringify(error)); break }
         dispatch({ type: 'ADD_CAJA_CHICA', payload: item })
+        break
+      }
+      case 'APROBAR_CAJA_CHICA': {
+        const caja = state.cajas_chicas.find(c => c.id === action.payload)
+        if (!caja) break
+        const saldo_actual = parseFloat(caja.monto_asignado)||0
+        await supabase.from('cajas_chicas').update({ estado:'activa', saldo_actual }).eq('id', caja.id)
+        dispatch({ type:'APROBAR_CAJA_CHICA', payload: { id: caja.id, saldo_actual } })
+        break
+      }
+      case 'RECHAZAR_CAJA_CHICA': {
+        await supabase.from('cajas_chicas').update({ estado:'rechazada' }).eq('id', action.payload)
+        dispatch({ type:'RECHAZAR_CAJA_CHICA', payload: action.payload })
         break
       }
       case 'ADD_GASTO_CC': {
