@@ -1879,7 +1879,7 @@ Total: `)
   if (scView === 'avaluo' && scSelected) {
     const itemsContrato = subcontratos_items.filter(i => i.subcontrato_id === scSelected.id)
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setScView('detail')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <h2 className="text-base font-semibold text-gray-800">
