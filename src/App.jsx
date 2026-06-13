@@ -4,7 +4,7 @@ import { StoreProvider } from './store'
 import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
-import { MODULOS_PRO_PLUS, PLAN_INFO } from './plans'
+import { MODULOS_PRO_PLUS, MODULOS_ENTERPRISE, PLAN_INFO } from './plans'
 import { Icons } from './components'
 import { supabase } from './supabase'
 import AuthRouter from './pages/AuthRouter'
@@ -21,6 +21,7 @@ import AvaluosCliente from './pages/AvaluosCliente'
 import Financiero from './pages/Financiero'
 import CurvaS from './pages/CurvaS'
 import Reportes from './pages/Reportes'
+import Auditoria from './pages/Auditoria'
 import Chat from './pages/Chat'
 import NotificacionesPanel from './pages/NotificacionesPanel'
 import PagoExitoso from './pages/PagoExitoso'
@@ -43,6 +44,7 @@ const NAV = [
   { id: 'financiero',     labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',         labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
   { id: 'reportes',       labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
+  { id: 'auditoria',      labelEs: 'Auditoría',           labelEn: 'Audit Log',          icon: 'financial' },
   { id: 'chat',           labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]
 
@@ -59,6 +61,7 @@ const PAGES = {
   curvas:         CurvaS,
   configuracion:  Configuracion,
   reportes:       Reportes,
+  auditoria:      Auditoria,
   chat:           Chat,
 }
 
@@ -66,29 +69,58 @@ const PAGES = {
 function PlanUpgradeScreen({ moduloId, isEs }) {
   const navItem = NAV.find(n => n.id === moduloId)
   const nombre  = isEs ? navItem?.labelEs : navItem?.labelEn
+  const isEnterprise = MODULOS_ENTERPRISE.includes(moduloId)
+
+  const badgeBg    = isEnterprise ? PLAN_INFO.enterprise.bg    : '#EEEDFE'
+  const badgeColor = isEnterprise ? PLAN_INFO.enterprise.color : '#3C3489'
+  const badgeLabel = isEnterprise ? 'Enterprise' : 'Pro+'
 
   return (
     <div className="flex items-center justify-center min-h-full p-8">
       <div className="text-center max-w-sm">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style={{ background: '#EEEDFE' }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#534AB7" strokeWidth="2">
+          style={{ background: badgeBg }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={badgeColor} strokeWidth="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0110 0v4"/>
           </svg>
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-3"
-          style={{ background: '#EEEDFE', color: '#3C3489' }}>
-          <span>Pro+</span>
+          style={{ background: badgeBg, color: badgeColor }}>
+          <span>{badgeLabel}</span>
         </div>
         <h2 className="text-lg font-semibold text-gray-900 mb-2">
-          {isEs ? `${nombre} requiere plan Pro o superior` : `${nombre} requires Pro plan or higher`}
+          {isEnterprise
+            ? (isEs ? `${nombre} requiere plan Enterprise` : `${nombre} requires the Enterprise plan`)
+            : (isEs ? `${nombre} requiere plan Pro o superior` : `${nombre} requires Pro plan or higher`)}
         </h2>
         <p className="text-sm text-gray-500 mb-6" style={{ lineHeight: 1.6 }}>
-          {isEs
-            ? 'Este módulo no está disponible en el plan Starter. Actualiza tu plan para acceder a Órdenes de Cambio, Avalúos y más.'
-            : 'This module is not available on the Starter plan. Upgrade to access Change Orders, Valuations, and more.'}
+          {isEnterprise
+            ? (isEs
+                ? 'Este módulo está disponible exclusivamente en el plan Enterprise. Actualiza tu plan para acceder a la Auditoría y más.'
+                : 'This module is exclusively available on the Enterprise plan. Upgrade to access the Audit Log and more.')
+            : (isEs
+                ? 'Este módulo no está disponible en el plan Starter. Actualiza tu plan para acceder a Órdenes de Cambio, Avalúos y más.'
+                : 'This module is not available on the Starter plan. Upgrade to access Change Orders, Valuations, and more.')}
         </p>
+        {isEnterprise ? (
+          <div className="rounded-xl border p-4 text-left mb-4"
+            style={{ borderColor: PLAN_INFO.enterprise.color, background: PLAN_INFO.enterprise.bg }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: PLAN_INFO.enterprise.color }}>
+              {isEs ? `Plan Enterprise — $${PLAN_INFO.enterprise.precio_mes}/mes` : `Enterprise Plan — $${PLAN_INFO.enterprise.precio_mes}/mo`}
+            </p>
+            {[
+              isEs ? '5 usuarios · 10 proyectos' : '5 users · 10 projects',
+              isEs ? 'Auditoría completa de usuarios' : 'Full user audit log',
+              isEs ? 'Usuarios adicionales' : 'Additional users',
+              isEs ? 'Todos los módulos' : 'All modules',
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs mb-1" style={{ color: PLAN_INFO.enterprise.color }}>
+                <span style={{ color: '#0F6E56' }}>✓</span> {item}
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="rounded-xl border p-4 text-left mb-4"
           style={{ borderColor: '#AFA9EC', background: '#EEEDFE' }}>
           <p className="text-xs font-semibold mb-2" style={{ color: '#3C3489' }}>
@@ -105,6 +137,7 @@ function PlanUpgradeScreen({ moduloId, isEs }) {
             </div>
           ))}
         </div>
+        )}
         <p className="text-xs text-gray-400">
           {isEs
             ? 'Contacta a soporte para actualizar tu plan: soporte@appmary.com'
@@ -230,7 +263,7 @@ function Layout() {
   }, [page])
 
   // Si el módulo activo está bloqueado por plan, mostrar pantalla upgrade
-  const pageBlockedByPlan = MODULOS_PRO_PLUS.includes(page) && !canUsePlan(page)
+  const pageBlockedByPlan = [...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(page) && !canUsePlan(page)
 
   const Page = PAGES[page] || Dashboard
   const currentNav = NAV.find(n => n.id === page)
@@ -275,7 +308,7 @@ function Layout() {
         <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">
           {navFiltrado.map(item => {
             const active   = page === item.id
-            const bloqueado = MODULOS_PRO_PLUS.includes(item.id) && !canUsePlan(item.id)
+            const bloqueado = [...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(item.id) && !canUsePlan(item.id)
 
             return (
               <button key={item.id} onClick={() => setPage(item.id)}
@@ -306,11 +339,13 @@ function Layout() {
                   <span className="text-sm font-medium truncate flex-1 flex items-center justify-between">
                     <span>{isEs ? item.labelEs : item.labelEn}</span>
                     <span className="flex items-center gap-1">
-                      {/* Badge Pro+ para módulos bloqueados */}
+                      {/* Badge Pro+ / Enterprise para módulos bloqueados */}
                       {bloqueado && (
                         <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
-                          style={{ background: '#EEEDFE', color: '#534AB7', fontSize: '9px' }}>
-                          Pro+
+                          style={MODULOS_ENTERPRISE.includes(item.id)
+                            ? { background: PLAN_INFO.enterprise.bg, color: PLAN_INFO.enterprise.color, fontSize: '9px' }
+                            : { background: '#EEEDFE', color: '#534AB7', fontSize: '9px' }}>
+                          {MODULOS_ENTERPRISE.includes(item.id) ? 'Enterprise' : 'Pro+'}
                         </span>
                       )}
                       {item.id === 'chat' && chatUnread > 0 && sideOpen && (
@@ -395,7 +430,7 @@ function Layout() {
                   {isEs ? currentNav?.labelEs : currentNav?.labelEn}
                 </p>
                 {/* Badge Pro+ en el header si el módulo está bloqueado */}
-                {MODULOS_PRO_PLUS.includes(page) && !canUsePlan(page) && (
+                {[...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(page) && !canUsePlan(page) && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
                     style={{ background: '#EEEDFE', color: '#3C3489' }}>
                     Pro+

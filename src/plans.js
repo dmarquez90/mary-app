@@ -34,9 +34,13 @@ export const PLAN_LIMITES = {
 // Los módulos aquí listados solo están disponibles en los planes indicados
 export const MODULOS_PRO_PLUS = ['ordenes_cambio', 'avaluos']
 
+// Módulos exclusivos del plan Enterprise
+export const MODULOS_ENTERPRISE = ['auditoria']
+
 // Función helper: retorna true si el plan tiene acceso al módulo
 export function planTieneModulo(plan, moduloId) {
   if (!plan) return false
+  if (MODULOS_ENTERPRISE.includes(moduloId)) return plan === PLAN_IDS.ENTERPRISE
   if (!MODULOS_PRO_PLUS.includes(moduloId)) return true   // módulo disponible en todos los planes
   return plan === PLAN_IDS.PRO || plan === PLAN_IDS.ENTERPRISE
 }

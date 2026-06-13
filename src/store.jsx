@@ -507,6 +507,33 @@ useEffect(() => {
       } catch (e) { console.error('notifyUser error:', e) }
     }
 
+    // ── Auditoría (v1.2): registra toda acción de escritura del usuario ──
+    const AUDIT_SKIP = new Set([
+      'LOAD_ALL','LOAD_NOTIFS','LOAD_OC_ITEMS','LOAD_TABLE','FETCH_OC_ITEMS',
+      'REFRESH_PRESUPUESTO','REFRESH_PRES_IND','REFRESH_SOLICITUDES','RESET',
+      'MARK_NOTIF_READ','MARK_ALL_NOTIF_READ','ADD_NOTIF',
+      'DEL_ENTRADA_LOCAL','DEL_SALIDA_LOCAL',
+    ])
+    if (!AUDIT_SKIP.has(action.type)) {
+      try {
+        const { data: { user: auditUser } } = await supabase.auth.getUser()
+        const usuarioActual = (state.usuarios||[]).find(u => u.id === auditUser?.id)
+        const p = action.payload
+        const proyectoId = (p && typeof p === 'object')
+          ? (p.proyecto_id || p.proyecto?.id || p.contrato?.proyecto_id || p.liquidacion?.proyecto_id || null)
+          : null
+        await supabase.from('auditoria_log').insert({
+          tenant_id: tenantId,
+          usuario_id: auditUser?.id || null,
+          usuario_nombre: usuarioActual?.nombre || usuarioActual?.email || null,
+          usuario_rol: usuarioActual?.rol || rol || null,
+          accion: action.type,
+          proyecto_id: proyectoId,
+          payload: p ?? null,
+        })
+      } catch (e) { console.error('auditoria_log error:', e) }
+    }
+
     switch (action.type) {
 
       case 'ADD_PRES_IND': {

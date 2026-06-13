@@ -23,6 +23,7 @@ const MATRIX = {
   curvas_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
   configuracion:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   reportes_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: false },
+  auditoria_ver:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   // Módulos Pro+
   ordenes_cambio_ver:  { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
   ordenes_cambio_editar:{ client_admin: true, coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false },
@@ -31,8 +32,8 @@ const MATRIX = {
 }
 
 export const NAV_PERMISOS = {
-  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
-  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
+  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','auditoria','chat'],
+  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','auditoria','chat'],
   coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','ordenes_cambio','reportes','chat'],
   gerente:      ['dashboard','proyectos','presupuesto','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
   residente:    ['dashboard','compras','ordenes_cambio','avaluos','financiero','chat'],
