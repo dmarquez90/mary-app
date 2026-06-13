@@ -5,6 +5,7 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
+import { useAuth } from '../auth'
 import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc } from '../pages/Reportes'
 
 // ── CATEGORÍAS DE COSTOS INDIRECTOS ──────────────────────────────────────
@@ -49,6 +50,8 @@ export default function Financiero() {
   const { state, dispatch }     = useStore()
   const { t, lang }             = useContext(LangContext)
   const { can, rol }            = usePermissions()
+  const { perfil }              = useAuth()
+  const nombreEmpresa           = perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'
   const isEs                    = lang === 'ES'
 
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
@@ -421,6 +424,7 @@ export default function Financiero() {
             ordenes_pago_retencion={state.ordenes_pago_retencion||[]}
             dispatch={dispatch} fmt2={fmt2} fmt={fmt}
             can={can} rol={rol} currentUserId={currentUserId}
+            nombreEmpresa={nombreEmpresa}
             t={t}
           />}
 
@@ -1010,7 +1014,7 @@ function SubcontratosModule({ can, rol,
   subcontratos_retenciones,
   ordenes_pago_retencion = [],
   dispatch, fmt2, fmt, t,
-  currentUserId,
+  currentUserId, nombreEmpresa,
 }) {
   const BRAND = '#1B3A6B'
   const puedeRechazar = ['super_admin','client_admin','gerente'].includes(rol)
@@ -1477,6 +1481,7 @@ function SubcontratosModule({ can, rol,
               presupuesto,
               proy:           proyectos?.find(p => p.id === proyId),
               lang:           isEs ? 'ES' : 'EN',
+              nombreEmpresa,
             })}
             className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
             title={isEs ? 'Exportar contrato (Excel)' : 'Export contract (Excel)'}>
@@ -1704,6 +1709,7 @@ Total: `)
                                   proy:        proyectos?.find(p => p.id === proyId),
                                   usuario:     null,
                                   lang:        isEs ? 'ES' : 'EN',
+                                  nombreEmpresa,
                                 })
                               }}
                               className="text-xs px-2 py-0.5 rounded-lg text-white font-medium flex items-center gap-1"
@@ -1843,6 +1849,7 @@ Total: `)
                               presupuesto,
                               proy:         proyectos?.find(p => p.id === proyId),
                               lang:         isEs ? 'ES' : 'EN',
+                              nombreEmpresa,
                             })}
                             className="text-xs px-2 py-1 rounded-lg text-white font-medium flex items-center gap-1"
                             style={{ background: '#1D9E75' }}

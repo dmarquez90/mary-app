@@ -1403,6 +1403,99 @@ async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='
   saveAs(new Blob([buf]), `${isEs?'Reporte_Retenciones':'Retention_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
+// ── EXPORT IMPUESTOS (contable, transversal a proyectos) ───────────────────
+async function buildImpuestos({ data, scopeLabel, desde, hasta, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs = lang === 'ES'
+  const wb   = new ExcelJS.Workbook()
+  wb.creator = 'MARY ERP'
+  const fechaHoy     = new Date().toLocaleDateString(isEs?'es':'en-US')
+  const periodoLabel = desde || hasta ? `${desde||(isEs?'inicio':'start')} al ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
+  const COLS = 7
+
+  // ── HOJA 1: Resumen ──
+  const ws1 = wb.addWorksheet(isEs?'Resumen de Impuestos':'Tax Summary')
+  setCols(ws1, [30, 16, 16, 14, 14, 14, 14])
+  let row = addHeaderBlock(ws1, isEs?'Reporte de Impuestos':'Tax Report', nombreEmpresa, scopeLabel, periodoLabel, fechaHoy, COLS)
+
+  row = addSectionTitle(ws1, row, isEs?'RESUMEN GENERAL':'GENERAL SUMMARY', COLS)
+  ws1.getRow(row).height = 20
+  const lf = ws1.getCell(row,1); lf.value=isEs?'Impuesto a favor (pagado)':'Tax credit (paid)'; styleLabel(lf)
+  const vf = ws1.getCell(row,2); vf.value=data.totalFavor; vf.numFmt='"$"#,##0.00'; styleData(vf,{bold:true,align:'right'})
+  ws1.mergeCells(row,3,row,3)
+  const lp = ws1.getCell(row,4); lp.value=isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)'; styleLabel(lp)
+  const vp = ws1.getCell(row,5); vp.value=data.totalPagar; vp.numFmt='"$"#,##0.00'; styleData(vp,{bold:true,align:'right'})
+  ws1.mergeCells(row,6,row,COLS)
+  row++
+  ws1.getRow(row).height = 20
+  ws1.mergeCells(row,1,row,2)
+  const ls = ws1.getCell(row,1); ls.value=isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'; styleLabel(ls)
+  ws1.mergeCells(row,3,row,COLS)
+  const vs = ws1.getCell(row,3); vs.value=data.saldoNeto; vs.numFmt='"$"#,##0.00'
+  styleData(vs,{bold:true,align:'right',color:data.saldoNeto>0?RED_HX:GREEN_HX})
+  row += 2
+
+  row = addSectionTitle(ws1, row, isEs?'RESUMEN POR CATEGORÍA':'SUMMARY BY CATEGORY', COLS)
+  ws1.getRow(row).height = 18
+  ;[isEs?'Categoría':'Category', isEs?'Impuesto a favor':'Tax credit', isEs?'Impuesto a pagar':'Tax due','','','',''].forEach((h,i) => {
+    const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
+  })
+  row++
+  data.resumenCategoria.forEach((r,i) => {
+    ws1.getRow(row).height = 17
+    const even = i % 2 === 1
+    const c1 = ws1.getCell(row,1); c1.value=r.categoria; styleData(c1,{even})
+    const c2 = ws1.getCell(row,2); c2.value=r.favor; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
+    const c3 = ws1.getCell(row,3); c3.value=r.pagar; styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
+    ws1.mergeCells(row,4,row,COLS)
+    row++
+  })
+  row++
+
+  row = addSectionTitle(ws1, row, isEs?'RESUMEN POR PROYECTO':'SUMMARY BY PROJECT', COLS)
+  ws1.getRow(row).height = 18
+  ;[isEs?'Proyecto':'Project', isEs?'Impuesto a favor':'Tax credit', isEs?'Impuesto a pagar':'Tax due','','','',''].forEach((h,i) => {
+    const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
+  })
+  row++
+  data.resumenProyecto.forEach((r,i) => {
+    ws1.getRow(row).height = 17
+    const even = i % 2 === 1
+    const c1 = ws1.getCell(row,1); c1.value=r.proyecto; styleData(c1,{even})
+    const c2 = ws1.getCell(row,2); c2.value=r.favor; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
+    const c3 = ws1.getCell(row,3); c3.value=r.pagar; styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
+    ws1.mergeCells(row,4,row,COLS)
+    row++
+  })
+
+  // ── HOJA 2: Detalle de movimientos ──
+  const ws2 = wb.addWorksheet(isEs?'Detalle de Movimientos':'Movement Detail')
+  setCols(ws2, [12, 22, 26, 30, 12, 14, 14])
+  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Movimientos de Impuestos':'Tax Movement Detail', nombreEmpresa, scopeLabel, periodoLabel, fechaHoy, COLS)
+  ws2.getRow(r2).height = 18
+  ;[isEs?'Fecha':'Date', isEs?'Categoría':'Category', isEs?'Proyecto':'Project', isEs?'Descripción':'Description',
+    isEs?'Referencia':'Reference', isEs?'Tipo':'Type', isEs?'Monto':'Amount'].forEach((h,i) => {
+    const c = ws2.getCell(r2, i+1); c.value = h; styleHeader(c)
+  })
+  r2++
+  data.movimientos.forEach((m,i) => {
+    ws2.getRow(r2).height = 16
+    const even = i % 2 === 1
+    const vals = [m.fecha||'—', m.categoria, m.proyectoLabel, m.descripcion, m.referencia,
+      m.tipo==='favor' ? (isEs?'A favor':'Credit') : (isEs?'A pagar':'Due'), m.monto]
+    vals.forEach((v,ci) => {
+      const c = ws2.getCell(r2, ci+1)
+      const isNum = ci === 6
+      styleData(c, { even, align: isNum?'right':'left', numFmt: isNum?'"$"#,##0.00':undefined,
+        color: ci===5 ? (m.tipo==='favor'?GREEN_HX:'F59E0B') : '000000', bold: ci===5||ci===6 })
+      c.value = v
+    })
+    r2++
+  })
+
+  const buf = await wb.xlsx.writeBuffer()
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Impuestos':'Tax_Report'}_${new Date().toISOString().slice(0,10)}.xlsx`)
+}
+
 // ── EXPORT INVENTARIO ─────────────────────────────────────
 async function buildInventario({ data, materiales, proyectos, presupuesto, desde, hasta, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs = lang === 'ES'
@@ -1768,6 +1861,7 @@ export default function Reportes() {
 
   const [reportType, setReportType] = useState('financiero')
   const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
+  const [proyIdImp, setProyIdImp]   = useState('') // '' = todos, '__general__' = sin proyecto
   const [desde, setDesde]           = useState('')
   const [hasta, setHasta]           = useState('')
   const [loading, setLoading]       = useState(false)
@@ -1921,6 +2015,104 @@ export default function Reportes() {
     }
   }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
 
+  // ── Reporte de Impuestos (contable, transversal a proyectos, filtrable) ──
+  const datosImpuestos = useMemo(() => {
+    const filtro = f => inPeriodo(f, desde, hasta)
+    const matchProy = (pid) => {
+      if (!proyIdImp) return true
+      if (proyIdImp === '__general__') return !pid
+      return pid === proyIdImp
+    }
+    const proyName = (pid) => {
+      if (!pid) return isEs ? 'General / Sin proyecto' : 'General / No project'
+      const p = proyectos.find(x=>x.id===pid)
+      return p ? `${p.project_code} — ${p.nombre}` : '—'
+    }
+    const scMap = Object.fromEntries(subcontratos_contratos.map(sc=>[sc.id, sc]))
+
+    const movimientos = []
+
+    entradas
+      .filter(e=>matchProy(e.proyecto_id) && filtro(e.fecha_recepcion) && parseFloat(e.impuesto_monto||0)>0)
+      .forEach(e => movimientos.push({
+        fecha: e.fecha_recepcion, categoria: t('rep_cat_materiales'), proyecto_id: e.proyecto_id,
+        descripcion: e.impuesto_descripcion || (isEs?'Compra de material':'Material purchase'),
+        referencia: e.numero_factura||'—', tipo:'favor', monto: parseFloat(e.impuesto_monto||0),
+      }))
+
+    equipos
+      .filter(e=>matchProy(e.proyecto_id) && filtro(e.fecha||e.created_at?.slice(0,10)) && parseFloat(e.impuesto_monto||0)>0)
+      .forEach(e => movimientos.push({
+        fecha: e.fecha||e.created_at?.slice(0,10), categoria: isEs?'Equipos / Rentas':'Equipment / Rentals', proyecto_id: e.proyecto_id,
+        descripcion: e.impuesto_descripcion || e.descripcion || '—',
+        referencia: '—', tipo:'favor', monto: parseFloat(e.impuesto_monto||0),
+      }))
+
+    costos_directos
+      .filter(c=>matchProy(c.proyecto_id) && filtro(c.fecha||c.created_at?.slice(0,10)) && parseFloat(c.impuesto_monto||0)>0)
+      .forEach(c => movimientos.push({
+        fecha: c.fecha||c.created_at?.slice(0,10), categoria: isEs?'Servicios / Costos directos':'Services / Direct costs', proyecto_id: c.proyecto_id,
+        descripcion: c.impuesto_descripcion || c.descripcion || '—',
+        referencia: c.numero_documento||'—', tipo:'favor', monto: parseFloat(c.impuesto_monto||0),
+      }))
+
+    costos_indirectos
+      .filter(c=>matchProy(c.proyecto_id) && filtro(c.fecha||c.created_at?.slice(0,10)) && parseFloat(c.impuesto_monto||0)>0)
+      .forEach(c => movimientos.push({
+        fecha: c.fecha||c.created_at?.slice(0,10), categoria: t('rep_cat_admin'), proyecto_id: c.proyecto_id,
+        descripcion: c.impuesto_descripcion || c.descripcion || c.categoria || '—',
+        referencia: '—', tipo:'favor', monto: parseFloat(c.impuesto_monto||0),
+      }))
+
+    subcontratos_avaluos
+      .filter(a=>a.estado==='aprobado' && parseFloat(a.impuesto_monto||0)>0 &&
+        filtro(a.periodo_inicio||a.fecha_elaboracion||a.created_at?.slice(0,10)) &&
+        matchProy(scMap[a.subcontrato_id]?.proyecto_id))
+      .forEach(a => movimientos.push({
+        fecha: a.fecha_elaboracion||a.created_at?.slice(0,10), categoria: t('rep_cat_subcontratos'),
+        proyecto_id: scMap[a.subcontrato_id]?.proyecto_id,
+        descripcion: `${isEs?'Avalúo':'Valuation'} #${a.numero} — ${scMap[a.subcontrato_id]?.subcontratista||'—'}`,
+        referencia: `#${a.numero}`, tipo:'favor', monto: parseFloat(a.impuesto_monto||0),
+      }))
+
+    avaluos_cliente
+      .filter(a=>a.estado==='aprobado' && parseFloat(a.impuesto_monto||0)>0 &&
+        filtro(a.periodo_fin||a.fecha_elaboracion) && matchProy(a.proyecto_id))
+      .forEach(a => movimientos.push({
+        fecha: a.periodo_fin||a.fecha_elaboracion, categoria: isEs?'Avalúos a cliente':'Client billings', proyecto_id: a.proyecto_id,
+        descripcion: a.impuesto_descripcion || (isEs?`Avalúo #${a.numero}`:`Valuation #${a.numero}`),
+        referencia: `#${a.numero}`, tipo:'pagar', monto: parseFloat(a.impuesto_monto||0),
+      }))
+
+    movimientos.sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||''))
+
+    const CATS = [
+      t('rep_cat_materiales'), isEs?'Equipos / Rentas':'Equipment / Rentals',
+      isEs?'Servicios / Costos directos':'Services / Direct costs', t('rep_cat_admin'),
+      t('rep_cat_subcontratos'), isEs?'Avalúos a cliente':'Client billings',
+    ]
+    const resumenCategoria = CATS.map(cat => ({
+      categoria: cat,
+      favor: movimientos.filter(m=>m.categoria===cat&&m.tipo==='favor').reduce((s,m)=>s+m.monto,0),
+      pagar: movimientos.filter(m=>m.categoria===cat&&m.tipo==='pagar').reduce((s,m)=>s+m.monto,0),
+    })).filter(r=>r.favor>0||r.pagar>0)
+
+    const proyIdsUnicos = [...new Set(movimientos.map(m=>m.proyecto_id||null))]
+    const resumenProyecto = proyIdsUnicos.map(pid => ({
+      proyecto: proyName(pid),
+      favor: movimientos.filter(m=>(m.proyecto_id||null)===pid&&m.tipo==='favor').reduce((s,m)=>s+m.monto,0),
+      pagar: movimientos.filter(m=>(m.proyecto_id||null)===pid&&m.tipo==='pagar').reduce((s,m)=>s+m.monto,0),
+    })).sort((a,b)=> (b.favor+b.pagar) - (a.favor+a.pagar))
+
+    const totalFavor = movimientos.filter(m=>m.tipo==='favor').reduce((s,m)=>s+m.monto,0)
+    const totalPagar = movimientos.filter(m=>m.tipo==='pagar').reduce((s,m)=>s+m.monto,0)
+
+    return {
+      movimientos: movimientos.map(m=>({...m, proyectoLabel: proyName(m.proyecto_id)})),
+      resumenCategoria, resumenProyecto, totalFavor, totalPagar, saldoNeto: totalPagar - totalFavor,
+    }
+  }, [proyIdImp, desde, hasta, lang, isEs, t, proyectos, entradas, equipos, costos_directos, costos_indirectos, subcontratos_avaluos, subcontratos_contratos, avaluos_cliente])
+
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
     entradas: entradas.filter(e=>inPeriodo(e.fecha_recepcion,desde,hasta)),
@@ -1941,6 +2133,13 @@ export default function Reportes() {
           equipos, costos_indirectos, salidas, entradas, budget, moneda, lang, nombreEmpresa })
       } else if (reportType==='retenciones' && datosFinanciero) {
         await buildRetenciones({ data: datosFinanciero, proy, moneda, lang, nombreEmpresa })
+      } else if (reportType==='impuestos') {
+        const scopeLabel = !proyIdImp
+          ? (isEs?'Todos los proyectos':'All projects')
+          : proyIdImp==='__general__'
+            ? (isEs?'General / Sin proyecto':'General / No project')
+            : (() => { const p = proyectos.find(x=>x.id===proyIdImp); return p ? `${p.project_code} — ${p.nombre}` : '' })()
+        await buildImpuestos({ data: datosImpuestos, scopeLabel, desde, hasta, lang, nombreEmpresa })
       }
     } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
     setLoading(false)
@@ -1966,6 +2165,7 @@ export default function Reportes() {
             <label className="text-xs text-gray-500 block mb-1">{isEs?'Tipo de reporte':'Report type'}</label>
             <select className={inputCls+' w-full'} value={reportType} onChange={e=>setReportType(e.target.value)}>
               <option value="financiero">📊 {isEs?'Reporte Financiero':'Financial Report'}</option>
+              <option value="impuestos">🧾 {isEs?'Impuestos (contable)':'Taxes (accounting)'}</option>
               <option value="inventario">📦 {isEs?'Reporte de Inventario':'Inventory Report'}</option>
               <option value="general">📋 {isEs?'Resumen General del Proyecto':'General Project Summary'}</option>
               <option value="retenciones">🔒 {t('rep_type_retenciones')}</option>
@@ -1976,6 +2176,16 @@ export default function Reportes() {
               <label className="text-xs text-gray-500 block mb-1">{t('lbl_project')} *</label>
               <select className={inputCls+' w-full'} value={proyId} onChange={e=>setProyId(e.target.value)}>
                 <option value="">— {t('lbl_select')} —</option>
+                {proyectos.map(p=><option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
+              </select>
+            </div>
+          )}
+          {reportType==='impuestos' && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">{isEs?'Alcance':'Scope'}</label>
+              <select className={inputCls+' w-full'} value={proyIdImp} onChange={e=>setProyIdImp(e.target.value)}>
+                <option value="">— {isEs?'Todos los proyectos':'All projects'} —</option>
+                <option value="__general__">{isEs?'General / Sin proyecto':'General / No project'}</option>
                 {proyectos.map(p=><option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
               </select>
             </div>
@@ -2009,6 +2219,9 @@ export default function Reportes() {
       {/* Vista previa */}
       {reportType==='financiero' && proyId && datosFinanciero && (
         <VistaFinanciero data={datosFinanciero} budget={budget} moneda={moneda} proy={proy} desde={desde} hasta={hasta} fmt={fmt} />
+      )}
+      {reportType==='impuestos' && (
+        <VistaImpuestos data={datosImpuestos} fmt={fmt} moneda={moneda} />
       )}
       {reportType==='inventario' && (
         <VistaInventario data={datosInventario} materiales={materiales} proyectos={proyectos} presupuesto={presupuesto} fmtDate={fmtDate} fmtNum={fmtNum} />
@@ -2329,6 +2542,132 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function VistaImpuestos({ data, fmt, moneda }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
+  const thS = { background: BRAND }
+  const thC = 'px-4 py-2.5 text-left text-xs font-semibold text-white'
+  const tdC = 'px-4 py-2.5 text-sm text-gray-700'
+
+  if (data.totalFavor === 0 && data.totalPagar === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+        <p className="text-sm font-semibold text-gray-700 mb-1">{isEs?'Sin registros de impuestos':'No tax records'}</p>
+        <p className="text-xs text-gray-400 max-w-md mx-auto">
+          {isEs
+            ? 'Aún no hay impuestos registrados en este alcance/período. Captúralos en Compras (Inventario), Equipos, Costos Directos/Indirectos del módulo Financiero, o en los Avalúos a Cliente.'
+            : 'No taxes have been recorded yet for this scope/period. Record them in Purchases (Inventory), Equipment, Direct/Indirect Costs in the Financial module, or in Client Billings.'}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 mb-1">{isEs?'Impuesto a favor (pagado)':'Tax credit (paid)'}</p>
+          <p className="text-lg font-bold" style={{color:'#1D9E75'}}>{fmt(data.totalFavor,moneda)}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 mb-1">{isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)'}</p>
+          <p className="text-lg font-bold" style={{color:'#F59E0B'}}>{fmt(data.totalPagar,moneda)}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <p className="text-xs text-gray-400 mb-1">{isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'}</p>
+          <p className="text-lg font-bold" style={{color: data.saldoNeto>0?'#ef4444':'#1D9E75'}}>
+            {data.saldoNeto>=0?'+':''}{fmt(data.saldoNeto,moneda)}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+          <p className="text-sm font-semibold text-gray-700">{isEs?'Resumen por categoría':'Summary by category'}</p>
+        </div>
+        <table className="w-full">
+          <thead><tr style={thS}>
+            <th className={thC}>{isEs?'Categoría':'Category'}</th>
+            <th className={thC+' text-right'}>{isEs?'Impuesto a favor':'Tax credit'}</th>
+            <th className={thC+' text-right'}>{isEs?'Impuesto a pagar':'Tax due'}</th>
+          </tr></thead>
+          <tbody>
+            {data.resumenCategoria.map((r,i)=>(
+              <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                <td className={tdC}>{r.categoria}</td>
+                <td className={tdC+' text-right font-mono'}>{r.favor>0?fmt(r.favor,moneda):'—'}</td>
+                <td className={tdC+' text-right font-mono'}>{r.pagar>0?fmt(r.pagar,moneda):'—'}</td>
+              </tr>
+            ))}
+            <tr style={{background:'#EEF2F7'}}>
+              <td className={tdC+' font-bold'}>{isEs?'TOTAL':'TOTAL'}</td>
+              <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalFavor,moneda)}</td>
+              <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalPagar,moneda)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+          <p className="text-sm font-semibold text-gray-700">{isEs?'Resumen por proyecto':'Summary by project'}</p>
+        </div>
+        <table className="w-full">
+          <thead><tr style={thS}>
+            <th className={thC}>{isEs?'Proyecto':'Project'}</th>
+            <th className={thC+' text-right'}>{isEs?'Impuesto a favor':'Tax credit'}</th>
+            <th className={thC+' text-right'}>{isEs?'Impuesto a pagar':'Tax due'}</th>
+          </tr></thead>
+          <tbody>
+            {data.resumenProyecto.map((r,i)=>(
+              <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                <td className={tdC}>{r.proyecto}</td>
+                <td className={tdC+' text-right font-mono'}>{r.favor>0?fmt(r.favor,moneda):'—'}</td>
+                <td className={tdC+' text-right font-mono'}>{r.pagar>0?fmt(r.pagar,moneda):'—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+          <p className="text-sm font-semibold text-gray-700">{isEs?'Detalle de movimientos':'Movement detail'}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead><tr style={thS}>
+              {[isEs?'Fecha':'Date', isEs?'Categoría':'Category', isEs?'Proyecto':'Project',
+                isEs?'Descripción':'Description', isEs?'Referencia':'Reference', isEs?'Tipo':'Type', isEs?'Monto':'Amount'
+              ].map((h,i)=><th key={i} className={thC+(i===6?' text-right':'')}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {data.movimientos.map((m,i)=>(
+                <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                  <td className={tdC+' text-xs text-gray-500'}>{m.fecha||'—'}</td>
+                  <td className={tdC+' text-xs'}>{m.categoria}</td>
+                  <td className={tdC+' text-xs'}>{m.proyectoLabel}</td>
+                  <td className={tdC+' max-w-[200px] truncate'}>{m.descripcion}</td>
+                  <td className={tdC+' text-xs text-gray-400'}>{m.referencia}</td>
+                  <td className={tdC}>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                      background: m.tipo==='favor' ? '#1D9E751A' : '#F59E0B1A',
+                      color: m.tipo==='favor' ? '#1D9E75' : '#F59E0B',
+                    }}>
+                      {m.tipo==='favor' ? (isEs?'A favor':'Credit') : (isEs?'A pagar':'Due')}
+                    </span>
+                  </td>
+                  <td className={tdC+' text-right font-mono font-medium'}>{fmt(m.monto,moneda)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
