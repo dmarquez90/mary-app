@@ -42,6 +42,14 @@ const CATEGORIAS_IND = {
       en: ['Licenses','Permits','Consultancies'],
     }
   },
+  'Caja Chica': {
+    es: 'Caja Chica',
+    en: 'Petty Cash',
+    subs: {
+      es: ['Fondo asignado'],
+      en: ['Allocated fund'],
+    }
+  },
 }
 
 const CAT_KEYS = Object.keys(CATEGORIAS_IND)
@@ -57,6 +65,7 @@ export default function Financiero() {
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
     equipos, equipos_ajustes = [], costos_indirectos, salidas, entradas,
     ordenes_compra = [],
+    cajas_chicas = [], gastos_caja_chica = [], liquidaciones_caja_chica = [], reembolsos_personal = [], usuarios = [],
     presupuesto_indirectos = [] } = state
 
   const [tab, setTab]       = useState(0)
@@ -99,6 +108,7 @@ export default function Financiero() {
     t('fin_tab_subcontracts'),
     t('fin_tab_equipment'),
     t('rep_cat_admin'),
+    isEs ? 'Caja Chica' : 'Petty Cash',
   ]
 
   const proy   = proyectos.find(p => p.id === proyId)
@@ -275,7 +285,7 @@ export default function Financiero() {
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
-          {proyId && !closed && puedeEditar && tab !== 2 && <PrimaryBtn onClick={openDrawer}>+ {TABS[tab]}</PrimaryBtn>}
+          {proyId && !closed && puedeEditar && tab !== 2 && tab !== 5 && <PrimaryBtn onClick={openDrawer}>+ {TABS[tab]}</PrimaryBtn>}
         </div>
       </div>
 
@@ -293,7 +303,9 @@ export default function Financiero() {
           {/* TABS */}
           <div className="flex border-b border-gray-200 mb-5 overflow-x-auto">
             {TABS.map((tab_label, i) => {
-              const counts = [directs.length, noms.length, subs.length, eqs.length, inds.length]
+              const cajaProy = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'activa')
+              const gastosPend = cajaProy ? gastos_caja_chica.filter(g => g.caja_id === cajaProy.id && !g.liquidacion_id).length : 0
+              const counts = [directs.length, noms.length, subs.length, eqs.length, inds.length, gastosPend]
               return (
                 <button key={i} onClick={() => setTab(i)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap
@@ -696,6 +708,20 @@ export default function Financiero() {
               )}
             </>
           )}
+
+          {/* ── TAB 5: CAJA CHICA ─────────────────────────────────────── */}
+          {tab === 5 && <CajaChicaModule
+            proyId={proyId} moneda={moneda} puedeEditar={puedeEditar} closed={closed}
+            isEs={isEs} t={t} fmt={fmt}
+            acts={acts}
+            can={can} rol={rol}
+            currentUserId={currentUserId}
+            cajas_chicas={cajas_chicas} gastos_caja_chica={gastos_caja_chica}
+            liquidaciones_caja_chica={liquidaciones_caja_chica} reembolsos_personal={reembolsos_personal}
+            usuarios={usuarios}
+            presupuesto_indirectos={presupuesto_indirectos}
+            dispatch={dispatch}
+          />}
         </>
       )}
 
@@ -2025,5 +2051,349 @@ Total: `)
   }
 
   return null
+}
+
+// ── CAJA CHICA (v1.1) ────────────────────────────────────────────────────
+function CajaChicaModule({
+  proyId, moneda, puedeEditar, closed, isEs, t, fmt, acts, can, rol,
+  currentUserId, cajas_chicas, gastos_caja_chica, liquidaciones_caja_chica, reembolsos_personal,
+  usuarios, presupuesto_indirectos, dispatch,
+}) {
+  const thCls = 'px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap'
+  const tdCls = 'px-4 py-3 text-sm text-gray-700'
+  const puedeAprobar = ['gerente','client_admin','super_admin'].includes(rol)
+
+  const caja = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'activa')
+  const gastosCaja  = caja ? gastos_caja_chica.filter(g => g.caja_id === caja.id) : []
+  const pendientes  = gastosCaja.filter(g => !g.liquidacion_id)
+  const liquidsProy = liquidaciones_caja_chica.filter(l => l.proyecto_id === proyId).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))
+  const reembolsosProy = reembolsos_personal.filter(r => r.proyecto_id === proyId)
+
+  const presCC = presupuesto_indirectos.find(p => p.proyecto_id === proyId && (p.categoria === 'Caja Chica' || p.categoria === 'Petty Cash'))
+  const presCCMonto = parseFloat(presCC?.monto_presupuestado || 0)
+  const otrasCajas = cajas_chicas.filter(c => c.proyecto_id === proyId && c.estado === 'activa' && c.id !== caja?.id)
+  const disponibleCC = presCCMonto - otrasCajas.reduce((s,c)=>s+parseFloat(c.monto_asignado||0),0)
+
+  // ── Formulario: abrir caja chica ──
+  const [montoNuevaCaja, setMontoNuevaCaja] = useState('')
+  const [responsableNueva, setResponsableNueva] = useState(currentUserId || '')
+
+  const abrirCaja = () => {
+    const monto = parseFloat(montoNuevaCaja)||0
+    if (monto <= 0) return
+    if (presCCMonto > 0 && monto > disponibleCC) {
+      alert(isEs
+        ? `El monto excede el saldo disponible presupuestado para Caja Chica ($${disponibleCC.toFixed(2)}). Ajusta el presupuesto en la pestaña Administración.`
+        : `Amount exceeds the budgeted Petty Cash balance available ($${disponibleCC.toFixed(2)}). Adjust the budget in the Administration tab.`)
+      return
+    }
+    dispatch({ type:'ADD_CAJA_CHICA', payload: { proyecto_id: proyId, responsable_id: responsableNueva||null, monto_asignado: monto } })
+    setMontoNuevaCaja('')
+  }
+
+  // ── Formulario: nuevo gasto ──
+  const emptyGasto = () => ({ descripcion:'', proveedor:'', numero_factura:'', monto:'', fecha:today(), tipo_costo:'costos_directos', actividad_id:'', categoria_ind:'', subcategoria_ind:'', impuesto_monto:'', impuesto_descripcion:'' })
+  const [gForm, setGForm] = useState(emptyGasto())
+  const setG = k => e => setGForm(f => ({...f, [k]: e.target.value}))
+  const subcatsG = gForm.categoria_ind ? (isEs ? CATEGORIAS_IND[gForm.categoria_ind]?.subs.es : CATEGORIAS_IND[gForm.categoria_ind]?.subs.en) || [] : []
+
+  const guardarGasto = () => {
+    const monto = parseFloat(gForm.monto)||0
+    if (!gForm.descripcion || monto <= 0) return
+    if (monto > parseFloat(caja.saldo_actual||0)) {
+      if (!confirm(isEs
+        ? `Este gasto ($${monto.toFixed(2)}) supera el saldo actual de la caja ($${parseFloat(caja.saldo_actual||0).toFixed(2)}). Esto significa que la persona puso dinero de su bolsillo. ¿Continuar?`
+        : `This expense ($${monto.toFixed(2)}) exceeds the current cash balance ($${parseFloat(caja.saldo_actual||0).toFixed(2)}). This means the person paid out of pocket. Continue?`)) return
+    }
+    dispatch({ type:'ADD_GASTO_CC', payload: {
+      caja_id: caja.id,
+      descripcion: gForm.descripcion, proveedor: gForm.proveedor||'', numero_factura: gForm.numero_factura||'',
+      monto, fecha: gForm.fecha,
+      tipo_costo: gForm.tipo_costo,
+      actividad_id: gForm.actividad_id||null,
+      categoria_ind: gForm.tipo_costo==='costos_indirectos' ? gForm.categoria_ind : null,
+      subcategoria_ind: gForm.tipo_costo==='costos_indirectos' ? gForm.subcategoria_ind : null,
+      impuesto_monto: parseFloat(gForm.impuesto_monto)||0,
+      impuesto_descripcion: gForm.impuesto_descripcion||null,
+    }})
+    setGForm(emptyGasto())
+  }
+
+  const eliminarGasto = (id) => {
+    if (!confirm(isEs?'¿Eliminar este gasto?':'Delete this expense?')) return
+    dispatch({ type:'DEL_GASTO_CC', payload: id })
+  }
+
+  const generarLiquidacion = () => {
+    if (pendientes.length===0) return
+    dispatch({ type:'ADD_LIQUIDACION_CC', payload: { caja_id: caja.id, proyecto_id: proyId, gastoIds: pendientes.map(g=>g.id), usuarioId: currentUserId } })
+  }
+
+  const aprobarLiquidacion = (id) => dispatch({ type:'APROBAR_LIQUIDACION_CC', payload: { liquidacionId: id, usuarioId: currentUserId } })
+  const rechazarLiquidacion = (id) => {
+    if (!confirm(isEs?'¿Rechazar esta liquidación? Los gastos volverán a estado pendiente.':'Reject this settlement? Expenses will return to pending status.')) return
+    dispatch({ type:'RECHAZAR_LIQUIDACION_CC', payload: id })
+  }
+  const pagarReembolso = (id) => dispatch({ type:'PAGAR_REEMBOLSO_CC', payload: id })
+
+  const nombreUsuario = (id) => usuarios.find(u=>u.id===id)?.nombre || usuarios.find(u=>u.id===id)?.email || '—'
+
+  const TIPOS_COSTO = [
+    { v:'costos_directos', es:'Materiales / Imprevistos', en:'Materials / Contingencies' },
+    { v:'costos_indirectos', es:'Administración (indirectos)', en:'Administration (indirect)' },
+    { v:'equipos', es:'Equipos / Transporte', en:'Equipment / Transport' },
+  ]
+
+  // ── Sin caja chica activa: formulario de apertura ──
+  if (!caja) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 p-6 max-w-lg">
+        <h3 className="text-sm font-semibold text-gray-700 mb-1">{isEs?'Abrir caja chica del proyecto':'Open project petty cash fund'}</h3>
+        <p className="text-xs text-gray-400 mb-4">
+          {isEs
+            ? 'Cada proyecto puede tener una caja chica activa. El monto asignado debe estar respaldado por el presupuesto de indirectos (categoría "Caja Chica").'
+            : 'Each project can have one active petty cash fund. The assigned amount must be backed by the indirect costs budget ("Petty Cash" category).'}
+        </p>
+        {presCCMonto > 0 ? (
+          <p className="text-xs text-gray-500 mb-3">
+            {isEs?'Disponible en presupuesto de Caja Chica: ':'Available in Petty Cash budget: '}
+            <span className="font-semibold" style={{color:'#1D9E75'}}>{fmt(disponibleCC, moneda)}</span> / {fmt(presCCMonto, moneda)}
+          </p>
+        ) : (
+          <p className="text-xs text-amber-600 mb-3">
+            {isEs
+              ? '⚠️ No hay presupuesto definido para "Caja Chica" en Administración → Presupuesto de Indirectos. Puedes abrir el fondo igual, pero se recomienda presupuestarlo primero.'
+              : '⚠️ No budget defined for "Petty Cash" under Administration → Indirect Costs Budget. You can still open the fund, but budgeting it first is recommended.'}
+          </p>
+        )}
+        {puedeEditar && !closed && <div className="flex flex-col gap-3">
+          <Field label={isEs?'Monto a asignar':'Amount to assign'}>
+            <input type="number" className={inputCls} value={montoNuevaCaja} onChange={e=>setMontoNuevaCaja(e.target.value)} placeholder="0.00" min="0" step="0.01"/>
+          </Field>
+          <Field label={isEs?'Responsable':'Responsible person'}>
+            <select className={selectCls} value={responsableNueva} onChange={e=>setResponsableNueva(e.target.value)}>
+              <option value="">{isEs?'— Seleccionar —':'— Select —'}</option>
+              {usuarios.map(u=><option key={u.id} value={u.id}>{u.nombre||u.email}</option>)}
+            </select>
+          </Field>
+          <PrimaryBtn onClick={abrirCaja}>{isEs?'Abrir caja chica':'Open petty cash fund'}</PrimaryBtn>
+        </div>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label={isEs?'Fondo asignado':'Assigned fund'} value={fmt(caja.monto_asignado, moneda)} color="#1B3A6B" />
+        <StatCard label={isEs?'Saldo actual':'Current balance'} value={fmt(caja.saldo_actual, moneda)}
+          sub={parseFloat(caja.saldo_actual)<=0 ? (isEs?'Sin efectivo disponible':'No cash available') : undefined} />
+        <StatCard label={isEs?'Gastos sin liquidar':'Unsettled expenses'} value={fmt(pendientes.reduce((s,g)=>s+parseFloat(g.monto||0),0), moneda)} sub={`${pendientes.length} ${isEs?'movimientos':'items'}`} />
+        <StatCard label={isEs?'Responsable':'Responsible'} value={nombreUsuario(caja.responsable_id)} />
+      </div>
+
+      {/* Nuevo gasto */}
+      {puedeEditar && !closed && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">{isEs?'Registrar gasto de caja chica':'Record petty cash expense'}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Field label={isEs?'Descripción':'Description'}>
+              <input className={inputCls} value={gForm.descripcion} onChange={setG('descripcion')} placeholder={isEs?'Ej. 1 lb de clavos':'E.g. 1 lb of nails'}/>
+            </Field>
+            <Field label={isEs?'Proveedor':'Supplier'}>
+              <input className={inputCls} value={gForm.proveedor} onChange={setG('proveedor')} />
+            </Field>
+            <Field label={isEs?'No. factura':'Invoice #'}>
+              <input className={inputCls} value={gForm.numero_factura} onChange={setG('numero_factura')} placeholder="FAC-001"/>
+            </Field>
+            <Field label={isEs?'Fecha':'Date'}>
+              <input type="date" className={inputCls} value={gForm.fecha} onChange={setG('fecha')}/>
+            </Field>
+            <Field label={isEs?'Monto':'Amount'} required>
+              <input type="number" className={inputCls} value={gForm.monto} onChange={setG('monto')} placeholder="0.00" min="0" step="0.01"/>
+            </Field>
+            <Field label={isEs?'Se postea como':'Posts as'}>
+              <select className={selectCls} value={gForm.tipo_costo} onChange={e=>setGForm(f=>({...f, tipo_costo:e.target.value, categoria_ind:'', subcategoria_ind:''}))}>
+                {TIPOS_COSTO.map(o=><option key={o.v} value={o.v}>{isEs?o.es:o.en}</option>)}
+              </select>
+            </Field>
+            {gForm.tipo_costo==='costos_indirectos' ? (
+              <>
+                <Field label={isEs?'Categoría indirecta':'Indirect category'}>
+                  <select className={selectCls} value={gForm.categoria_ind} onChange={e=>setGForm(f=>({...f, categoria_ind:e.target.value, subcategoria_ind:''}))}>
+                    <option value="">{isEs?'— Seleccionar —':'— Select —'}</option>
+                    {CAT_KEYS.filter(k=>k!=='Caja Chica').map(k=><option key={k} value={k}>{isEs?CATEGORIAS_IND[k].es:CATEGORIAS_IND[k].en}</option>)}
+                  </select>
+                </Field>
+                {subcatsG.length>0 && (
+                  <Field label={isEs?'Subcategoría':'Subcategory'}>
+                    <select className={selectCls} value={gForm.subcategoria_ind} onChange={setG('subcategoria_ind')}>
+                      <option value="">{isEs?'— Seleccionar —':'— Select —'}</option>
+                      {subcatsG.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </Field>
+                )}
+              </>
+            ) : (
+              <Field label={isEs?'Actividad (opcional)':'Activity (optional)'}>
+                <select className={selectCls} value={gForm.actividad_id} onChange={setG('actividad_id')}>
+                  <option value="">{isEs?'— General / Multi-actividad —':'— General / Multi-activity —'}</option>
+                  {acts.map(a=><option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
+                </select>
+              </Field>
+            )}
+            <Field label={isEs?'Impuesto pagado ($)':'Tax paid ($)'}>
+              <input type="number" className={inputCls} value={gForm.impuesto_monto} onChange={setG('impuesto_monto')} placeholder="0.00" min="0" step="0.01"/>
+            </Field>
+            <Field label={isEs?'Descripción del impuesto':'Tax description'}>
+              <input className={inputCls} value={gForm.impuesto_descripcion} onChange={setG('impuesto_descripcion')} placeholder={isEs?'IVA, Sales Tax...':'VAT, Sales Tax...'}/>
+            </Field>
+          </div>
+          <div className="mt-3">
+            <PrimaryBtn onClick={guardarGasto}>+ {isEs?'Registrar gasto':'Record expense'}</PrimaryBtn>
+          </div>
+        </div>
+      )}
+
+      {/* Gastos pendientes de liquidar */}
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-semibold text-gray-700">{isEs?'Gastos pendientes de liquidar':'Expenses pending settlement'}</h3>
+          {puedeEditar && !closed && pendientes.length>0 && (
+            <PrimaryBtn onClick={generarLiquidacion}>{isEs?'Generar liquidación':'Generate settlement'}</PrimaryBtn>
+          )}
+        </div>
+        {pendientes.length===0 ? (
+          <p className="text-sm text-gray-400 px-5 py-4">{isEs?'Sin gastos pendientes.':'No pending expenses.'}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr>
+                {[t('inv_col_date'), isEs?'Descripción':'Description', isEs?'Proveedor':'Supplier', isEs?'Factura':'Invoice', isEs?'Tipo':'Type', isEs?'Monto':'Amount', '']
+                  .map((h,i)=><th key={i} className={thCls}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {pendientes.map(g=>(
+                  <tr key={g.id} className="border-b border-gray-50">
+                    <td className={tdCls+' text-xs text-gray-500'}>{g.fecha}</td>
+                    <td className={tdCls}>{g.descripcion}</td>
+                    <td className={tdCls+' text-xs text-gray-500'}>{g.proveedor||'—'}</td>
+                    <td className={tdCls+' text-xs text-gray-500'}>{g.numero_factura||'—'}</td>
+                    <td className={tdCls+' text-xs text-gray-500'}>
+                      {TIPOS_COSTO.find(o=>o.v===g.tipo_costo) ? (isEs?TIPOS_COSTO.find(o=>o.v===g.tipo_costo).es:TIPOS_COSTO.find(o=>o.v===g.tipo_costo).en) : g.tipo_costo}
+                      {g.categoria_ind ? ` — ${g.subcategoria_ind||g.categoria_ind}` : ''}
+                    </td>
+                    <td className={tdCls+' text-right font-mono font-medium'}>{fmt(g.monto, moneda)}</td>
+                    <td className={tdCls}>
+                      {puedeEditar && !closed && (
+                        <button onClick={()=>eliminarGasto(g.id)} className="text-xs text-red-500 hover:text-red-700">{t('btn_delete')}</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Liquidaciones */}
+      {liquidsProy.length>0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700">{isEs?'Liquidaciones (rendiciones de cuenta)':'Settlements (expense reports)'}</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr>
+                {[t('inv_col_date'), isEs?'Total gastos':'Total expenses', isEs?'Reposición a caja':'Fund replenishment',
+                  isEs?'Reembolso a persona':'Personal reimbursement', isEs?'Estado':'Status', '']
+                  .map((h,i)=><th key={i} className={thCls}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {liquidsProy.map(l=>{
+                  const ESTADOS = {
+                    pendiente: { label: isEs?'Pendiente de aprobación':'Pending approval', color:'#F59E0B' },
+                    aprobada:  { label: isEs?'Aprobada':'Approved', color:'#1D9E75' },
+                    rechazada: { label: isEs?'Rechazada':'Rejected', color:'#ef4444' },
+                  }
+                  const e = ESTADOS[l.estado]||ESTADOS.pendiente
+                  return (
+                    <tr key={l.id} className="border-b border-gray-50">
+                      <td className={tdCls+' text-xs text-gray-500'}>{l.fecha}</td>
+                      <td className={tdCls+' text-right font-mono'}>{fmt(l.total_gastos, moneda)}</td>
+                      <td className={tdCls+' text-right font-mono'}>{fmt(l.reposicion, moneda)}</td>
+                      <td className={tdCls+' text-right font-mono'} style={{color: l.reembolso_personal>0 ? '#F59E0B' : undefined}}>
+                        {l.reembolso_personal>0 ? fmt(l.reembolso_personal, moneda) : '—'}
+                      </td>
+                      <td className={tdCls}>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background:e.color+'1A', color:e.color}}>{e.label}</span>
+                      </td>
+                      <td className={tdCls}>
+                        {l.estado==='pendiente' && puedeAprobar && !closed && (
+                          <div className="flex gap-2">
+                            <button onClick={()=>aprobarLiquidacion(l.id)} className="text-xs px-2 py-1 rounded-lg text-white font-medium" style={{background:'#1D9E75'}}>
+                              {isEs?'Aprobar':'Approve'}
+                            </button>
+                            <button onClick={()=>rechazarLiquidacion(l.id)} className="text-xs px-2 py-1 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
+                              {isEs?'Rechazar':'Reject'}
+                            </button>
+                          </div>
+                        )}
+                        {l.estado==='pendiente' && !puedeAprobar && (
+                          <span className="text-xs text-gray-400">{isEs?'Requiere aprobación de Gerencia/Admin':'Requires Manager/Admin approval'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Reembolsos a personal */}
+      {reembolsosProy.length>0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700">{isEs?'Reembolsos a personal':'Personnel reimbursements'}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{isEs?'Dinero adelantado de su bolsillo por personal de campo, pendiente de pago.':'Money advanced out-of-pocket by field staff, pending payment.'}</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr>
+                {[isEs?'Persona':'Person', isEs?'Monto':'Amount', isEs?'Estado':'Status', isEs?'Fecha pago':'Payment date', '']
+                  .map((h,i)=><th key={i} className={thCls}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {reembolsosProy.map(r=>(
+                  <tr key={r.id} className="border-b border-gray-50">
+                    <td className={tdCls}>{nombreUsuario(r.usuario_id)}</td>
+                    <td className={tdCls+' text-right font-mono font-medium'}>{fmt(r.monto, moneda)}</td>
+                    <td className={tdCls}>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                        background: r.estado==='pagado' ? '#1D9E751A' : '#F59E0B1A',
+                        color: r.estado==='pagado' ? '#1D9E75' : '#F59E0B',
+                      }}>{r.estado==='pagado' ? (isEs?'Pagado':'Paid') : (isEs?'Pendiente':'Pending')}</span>
+                    </td>
+                    <td className={tdCls+' text-xs text-gray-500'}>{r.fecha_pago||'—'}</td>
+                    <td className={tdCls}>
+                      {r.estado==='pendiente' && puedeEditar && !closed && (
+                        <button onClick={()=>pagarReembolso(r.id)} className="text-xs px-2 py-1 rounded-lg text-white font-medium" style={{background:'#1B3A6B'}}>
+                          {isEs?'Marcar pagado':'Mark as paid'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 

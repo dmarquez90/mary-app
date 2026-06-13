@@ -1970,16 +1970,22 @@ export default function Reportes() {
       'Instalaciones y servicios generales',
       'Seguros, fianzas y garantías',
       'Servicios profesionales y legales',
+      'Caja Chica',
     ] : [
       'Construction Management',
       'General Installations and Services',
       'Insurance, Bonds and Guarantees',
       'Professional and Legal Services',
+      'Petty Cash',
     ]
+    const cajasProy = (state.cajas_chicas||[]).filter(c => c.proyecto_id === proyId && c.estado === 'activa')
     const comparacionInd = CATS_IND.map(cat => {
       const presupuestado = parseFloat(indsPres.find(p => p.categoria === cat)?.monto_presupuestado || 0)
-      const ejecutado     = inds.filter(c => c.categoria === cat || c.categoria?.includes(cat.split(' ')[0]))
-                               .reduce((s,c) => s + parseFloat(c.monto||0), 0)
+      const esCajaChica = cat === 'Caja Chica' || cat === 'Petty Cash'
+      const ejecutado = esCajaChica
+        ? cajasProy.reduce((s,c) => s + (parseFloat(c.monto_asignado)||0), 0)
+        : inds.filter(c => c.categoria === cat || c.categoria?.includes(cat.split(' ')[0]))
+              .reduce((s,c) => s + parseFloat(c.monto||0), 0)
       return { categoria: cat, presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
     }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
 
@@ -2013,7 +2019,7 @@ export default function Reportes() {
       scContratos, scAvaluosDetalle, retenciones, ordenesPago,
       resumenImpuestos, totalImpFavor, totalImpPagar, saldoNetoImpuestos,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, state.cajas_chicas, t])
 
   // ── Reporte de Impuestos (contable, transversal a proyectos, filtrable) ──
   const datosImpuestos = useMemo(() => {

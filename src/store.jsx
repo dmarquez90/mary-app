@@ -17,6 +17,8 @@ const INIT = {
   ordenes_cambio: [], ordenes_cambio_items: [], ordenes_cambio_indirectos: [],
   presupuesto_indirectos: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
+  cajas_chicas: [], gastos_caja_chica: [], liquidaciones_caja_chica: [], reembolsos_personal: [],
+  usuarios: [],
   notificaciones: [],
   loaded: false
 }
@@ -248,6 +250,44 @@ function reducer(state, action) {
     case 'UPD_PRES_IND': return { ...state, presupuesto_indirectos: (state.presupuesto_indirectos||[]).map(p => p.id === action.payload.id ? { ...p, ...action.payload } : p) }
     case 'DEL_PRES_IND': return { ...state, presupuesto_indirectos: (state.presupuesto_indirectos||[]).filter(p => p.id !== action.payload) }
     case 'REFRESH_PRES_IND': return { ...state, presupuesto_indirectos: action.payload }
+
+    // ── CAJA CHICA (v1.1) ──────────────────────────────────────────────
+    case 'ADD_CAJA_CHICA': return { ...state, cajas_chicas: [...state.cajas_chicas, action.payload] }
+    case 'UPD_CAJA_CHICA': return { ...state, cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.id ? { ...c, ...action.payload } : c) }
+    case 'ADD_GASTO_CC': return {
+      ...state,
+      gastos_caja_chica: [...state.gastos_caja_chica, action.payload.gasto],
+      cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.gasto.caja_id ? { ...c, saldo_actual: action.payload.nuevoSaldo } : c),
+    }
+    case 'DEL_GASTO_CC': return {
+      ...state,
+      gastos_caja_chica: state.gastos_caja_chica.filter(g => g.id !== action.payload.gastoId),
+      cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.cajaId ? { ...c, saldo_actual: action.payload.nuevoSaldo } : c),
+    }
+    case 'ADD_LIQUIDACION_CC': return {
+      ...state,
+      liquidaciones_caja_chica: [...state.liquidaciones_caja_chica, action.payload.liquidacion],
+      gastos_caja_chica: state.gastos_caja_chica.map(g => action.payload.gastoIds.includes(g.id) ? { ...g, liquidacion_id: action.payload.liquidacion.id } : g),
+      reembolsos_personal: action.payload.reembolso ? [...state.reembolsos_personal, action.payload.reembolso] : state.reembolsos_personal,
+    }
+    case 'RECHAZAR_LIQUIDACION_CC': return {
+      ...state,
+      liquidaciones_caja_chica: state.liquidaciones_caja_chica.map(l => l.id === action.payload.liquidacionId ? { ...l, estado: 'rechazada' } : l),
+      gastos_caja_chica: state.gastos_caja_chica.map(g => g.liquidacion_id === action.payload.liquidacionId ? { ...g, liquidacion_id: null } : g),
+      reembolsos_personal: state.reembolsos_personal.filter(r => r.liquidacion_id !== action.payload.liquidacionId),
+    }
+    case 'APROBAR_LIQUIDACION_CC': return {
+      ...state,
+      liquidaciones_caja_chica: state.liquidaciones_caja_chica.map(l => l.id === action.payload.liquidacion.id ? action.payload.liquidacion : l),
+      cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.liquidacion.caja_id ? { ...c, saldo_actual: action.payload.nuevoSaldo } : c),
+      costos_directos:   [...state.costos_directos,   ...action.payload.nuevosCostosDirectos],
+      costos_indirectos: [...state.costos_indirectos, ...action.payload.nuevosCostosIndirectos],
+      equipos:           [...state.equipos,           ...action.payload.nuevosEquipos],
+    }
+    case 'PAGAR_REEMBOLSO_CC': return {
+      ...state,
+      reembolsos_personal: state.reembolsos_personal.map(r => r.id === action.payload.id ? { ...r, estado:'pagado', fecha_pago: action.payload.fecha_pago } : r),
+    }
 case 'LOAD_TABLE':
   return { ...state, [action.payload.key]: action.payload.data }
 
@@ -282,6 +322,8 @@ export function StoreProvider({ children, tenantId, rol }) {
         'ordenes_cambio','ordenes_cambio_items','ordenes_cambio_indirectos',
         'avaluos_cliente','avaluos_cliente_items',
         'presupuesto_indirectos',
+        'cajas_chicas','gastos_caja_chica','liquidaciones_caja_chica','reembolsos_personal',
+        'usuarios',
       ]
       const tenantResults = await Promise.all(
         tablasTenant.map(t => supabase.from(t).select('*').eq('tenant_id', tenantId))
@@ -321,6 +363,7 @@ useEffect(() => {
     'ordenes_pago_retencion',
     'ordenes_cambio', 'ordenes_cambio_items', 'ordenes_cambio_indirectos',
     'avaluos_cliente', 'avaluos_cliente_items',
+    'cajas_chicas', 'gastos_caja_chica', 'liquidaciones_caja_chica', 'reembolsos_personal',
   ]
 
   const channels = REALTIME_TABLES.map(table =>
@@ -484,6 +527,118 @@ useEffect(() => {
       case 'REFRESH_PRES_IND': {
         const { data } = await supabase.from('presupuesto_indirectos').select('*').eq('proyecto_id', action.payload).eq('tenant_id', tenantId)
         dispatch({ type: 'REFRESH_PRES_IND', payload: data || [] })
+        break
+      }
+
+      // ── CAJA CHICA (v1.1) ────────────────────────────────────────────
+      case 'ADD_CAJA_CHICA': {
+        const item = { ...action.payload, id: uuid(), saldo_actual: parseFloat(action.payload.monto_asignado)||0, estado:'activa', created_at: today(), tenant_id: tenantId }
+        const { error } = await supabase.from('cajas_chicas').insert(item)
+        if (error) { console.error('ADD_CAJA_CHICA:', JSON.stringify(error)); break }
+        dispatch({ type: 'ADD_CAJA_CHICA', payload: item })
+        break
+      }
+      case 'ADD_GASTO_CC': {
+        const caja = state.cajas_chicas.find(c => c.id === action.payload.caja_id)
+        if (!caja) break
+        const monto = parseFloat(action.payload.monto)||0
+        const nuevoSaldo = Math.max(0, parseFloat(caja.saldo_actual||0) - monto)
+        const gasto = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId, liquidacion_id: null }
+        const { error: eG } = await supabase.from('gastos_caja_chica').insert(gasto)
+        if (eG) { console.error('ADD_GASTO_CC — gasto:', JSON.stringify(eG)); break }
+        const { error: eC } = await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
+        if (eC) console.error('ADD_GASTO_CC — caja:', JSON.stringify(eC))
+        dispatch({ type: 'ADD_GASTO_CC', payload: { gasto, nuevoSaldo } })
+        break
+      }
+      case 'DEL_GASTO_CC': {
+        const gasto = state.gastos_caja_chica.find(g => g.id === action.payload)
+        if (!gasto) break
+        const caja = state.cajas_chicas.find(c => c.id === gasto.caja_id)
+        const nuevoSaldo = parseFloat(caja?.saldo_actual||0) + parseFloat(gasto.monto||0)
+        await supabase.from('gastos_caja_chica').delete().eq('id', gasto.id)
+        if (caja) await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
+        dispatch({ type: 'DEL_GASTO_CC', payload: { gastoId: gasto.id, cajaId: caja?.id, nuevoSaldo } })
+        break
+      }
+      case 'ADD_LIQUIDACION_CC': {
+        const { caja_id, proyecto_id, gastoIds, usuarioId } = action.payload
+        const caja = state.cajas_chicas.find(c => c.id === caja_id)
+        if (!caja) break
+        const gastos = state.gastos_caja_chica.filter(g => gastoIds.includes(g.id))
+        const totalGastos = r2(gastos.reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
+        const montoAsignado = parseFloat(caja.monto_asignado)||0
+        const reposicion = r2(Math.min(totalGastos, montoAsignado))
+        const reembolsoMonto = r2(Math.max(totalGastos - montoAsignado, 0))
+
+        const liquidacion = {
+          id: uuid(), tenant_id: tenantId, caja_id, proyecto_id,
+          fecha: today(), total_gastos: totalGastos, reposicion, reembolso_personal: reembolsoMonto,
+          estado: 'pendiente', created_at: today(),
+        }
+        const { error: eL } = await supabase.from('liquidaciones_caja_chica').insert(liquidacion)
+        if (eL) { console.error('ADD_LIQUIDACION_CC — liquidacion:', JSON.stringify(eL)); break }
+
+        const { error: eG } = await supabase.from('gastos_caja_chica').update({ liquidacion_id: liquidacion.id }).in('id', gastoIds)
+        if (eG) console.error('ADD_LIQUIDACION_CC — gastos:', JSON.stringify(eG))
+
+        let reembolso = null
+        if (reembolsoMonto > 0) {
+          reembolso = { id: uuid(), tenant_id: tenantId, liquidacion_id: liquidacion.id, proyecto_id, usuario_id: usuarioId, monto: reembolsoMonto, estado: 'pendiente', created_at: today() }
+          const { error: eR } = await supabase.from('reembolsos_personal').insert(reembolso)
+          if (eR) console.error('ADD_LIQUIDACION_CC — reembolso:', JSON.stringify(eR))
+        }
+        dispatch({ type: 'ADD_LIQUIDACION_CC', payload: { liquidacion, gastoIds, reembolso } })
+        break
+      }
+      case 'RECHAZAR_LIQUIDACION_CC': {
+        const liquidacionId = action.payload
+        await supabase.from('liquidaciones_caja_chica').update({ estado: 'rechazada' }).eq('id', liquidacionId)
+        await supabase.from('gastos_caja_chica').update({ liquidacion_id: null }).eq('liquidacion_id', liquidacionId)
+        await supabase.from('reembolsos_personal').delete().eq('liquidacion_id', liquidacionId)
+        dispatch({ type: 'RECHAZAR_LIQUIDACION_CC', payload: { liquidacionId } })
+        break
+      }
+      case 'APROBAR_LIQUIDACION_CC': {
+        const { liquidacionId, usuarioId } = action.payload
+        const liquidacion = state.liquidaciones_caja_chica.find(l => l.id === liquidacionId)
+        if (!liquidacion) break
+        const caja   = state.cajas_chicas.find(c => c.id === liquidacion.caja_id)
+        const gastos = state.gastos_caja_chica.filter(g => g.liquidacion_id === liquidacionId)
+
+        const nuevosCostosDirectos   = []
+        const nuevosCostosIndirectos = []
+        const nuevosEquipos          = []
+        for (const g of gastos) {
+          const base = {
+            id: uuid(), tenant_id: tenantId, proyecto_id: liquidacion.proyecto_id,
+            descripcion: `${g.descripcion} (Caja Chica)`, fecha: g.fecha, created_at: today(),
+            impuesto_monto: parseFloat(g.impuesto_monto)||0, impuesto_descripcion: g.impuesto_descripcion||null,
+          }
+          if (g.tipo_costo === 'costos_indirectos') {
+            nuevosCostosIndirectos.push({ ...base, monto: parseFloat(g.monto)||0, categoria: g.categoria_ind, subcategoria: g.subcategoria_ind })
+          } else if (g.tipo_costo === 'equipos') {
+            nuevosEquipos.push({ ...base, costo_total: parseFloat(g.monto)||0, tipo: 'alquiler', actividad_id: g.actividad_id||null })
+          } else {
+            nuevosCostosDirectos.push({ ...base, monto: parseFloat(g.monto)||0, tipo: 'caja_chica', numero_documento: g.numero_factura||null, actividad_id: g.actividad_id||null })
+          }
+        }
+        if (nuevosCostosDirectos.length)   { const { error } = await supabase.from('costos_directos').insert(nuevosCostosDirectos);   if (error) console.error('APROBAR_LIQUIDACION_CC — costos_directos:', JSON.stringify(error)) }
+        if (nuevosCostosIndirectos.length) { const { error } = await supabase.from('costos_indirectos').insert(nuevosCostosIndirectos); if (error) console.error('APROBAR_LIQUIDACION_CC — costos_indirectos:', JSON.stringify(error)) }
+        if (nuevosEquipos.length)          { const { error } = await supabase.from('equipos').insert(nuevosEquipos);          if (error) console.error('APROBAR_LIQUIDACION_CC — equipos:', JSON.stringify(error)) }
+
+        const nuevoSaldo = parseFloat(caja?.saldo_actual||0) + parseFloat(liquidacion.reposicion||0)
+        const liquidacionAprobada = { ...liquidacion, estado: 'aprobada', aprobado_por: usuarioId || null, fecha_aprobacion: today() }
+        await supabase.from('liquidaciones_caja_chica').update({ estado: 'aprobada', aprobado_por: liquidacionAprobada.aprobado_por, fecha_aprobacion: liquidacionAprobada.fecha_aprobacion }).eq('id', liquidacionId)
+        if (caja) await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
+
+        dispatch({ type: 'APROBAR_LIQUIDACION_CC', payload: { liquidacion: liquidacionAprobada, nuevoSaldo, nuevosCostosDirectos, nuevosCostosIndirectos, nuevosEquipos } })
+        break
+      }
+      case 'PAGAR_REEMBOLSO_CC': {
+        const fecha_pago = today()
+        await supabase.from('reembolsos_personal').update({ estado:'pagado', fecha_pago }).eq('id', action.payload)
+        dispatch({ type: 'PAGAR_REEMBOLSO_CC', payload: { id: action.payload, fecha_pago } })
         break
       }
 
