@@ -5,7 +5,7 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
-import { buildOPR } from '../pages/Reportes'
+import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc } from '../pages/Reportes'
 
 // ── CATEGORÍAS DE COSTOS INDIRECTOS ──────────────────────────────────────
 const CATEGORIAS_IND = {
@@ -174,11 +174,11 @@ export default function Financiero() {
   const openDrawer = () => {
     setEditId(null)
     const base = { proyecto_id: proyId }
-    if (tab===0) setForm({...base, tipo:'factura_obra', descripcion:'', monto:'', numero_documento:'', actividad_id:'', fecha:today()})
+    if (tab===0) setForm({...base, tipo:'factura_obra', descripcion:'', monto:'', numero_documento:'', actividad_id:'', fecha:today(), impuesto_monto:'', impuesto_descripcion:''})
     if (tab===1) setForm({...base, trabajador:'', cargo:'', periodo_inicio:today(), periodo_fin:today(), tipo_pago:'dia', tarifa:'', salario_base:'', deducciones:'0'})
     if (tab===2) setForm({...base, subcontratista:'', descripcion_trabajo:'', monto_contrato:'', avance_porcentaje:'0', monto_pagado:'0', actividad_id:''})
-    if (tab===3) setForm({...base, descripcion:'', tipo:'alquiler', tarifa_diaria:'', dias_uso:'', costo_total:''})
-    if (tab===4) setForm({...base, categoria:'', subcategoria:'', descripcion:'', monto:'', fecha:today()})
+    if (tab===3) setForm({...base, descripcion:'', tipo:'alquiler', tarifa_diaria:'', dias_uso:'', costo_total:'', impuesto_monto:'', impuesto_descripcion:''})
+    if (tab===4) setForm({...base, categoria:'', subcategoria:'', descripcion:'', monto:'', fecha:today(), impuesto_monto:'', impuesto_descripcion:''})
     setDrawer(true)
   }
 
@@ -731,6 +731,14 @@ export default function Financiero() {
             <Field label={t('fin_form_doc')}>
               <input className={inputCls} value={form.numero_documento||''} onChange={set('numero_documento')} placeholder="FAC-001"/>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={isEs ? 'Impuesto pagado ($)' : 'Tax paid ($)'}>
+                <input type="number" className={inputCls} value={form.impuesto_monto||''} onChange={set('impuesto_monto')} placeholder="0.00" min="0" step="0.01"/>
+              </Field>
+              <Field label={isEs ? 'Descripción del impuesto' : 'Tax description'}>
+                <input className={inputCls} value={form.impuesto_descripcion||''} onChange={set('impuesto_descripcion')} placeholder={isEs ? 'IVA 15%, Sales Tax...' : 'VAT 15%, Sales Tax...'}/>
+              </Field>
+            </div>
           </>}
 
           {/* NÓMINA MEJORADA */}
@@ -838,6 +846,14 @@ export default function Financiero() {
             <Field label={t('fin_form_eq_total')} required>
               <input type="number" className={inputCls} value={form.costo_total||''} onChange={set('costo_total')} placeholder="0.00" min="0" step="0.01"/>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={isEs ? 'Impuesto pagado ($)' : 'Tax paid ($)'}>
+                <input type="number" className={inputCls} value={form.impuesto_monto||''} onChange={set('impuesto_monto')} placeholder="0.00" min="0" step="0.01"/>
+              </Field>
+              <Field label={isEs ? 'Descripción del impuesto' : 'Tax description'}>
+                <input className={inputCls} value={form.impuesto_descripcion||''} onChange={set('impuesto_descripcion')} placeholder={isEs ? 'IVA 15%, Sales Tax...' : 'VAT 15%, Sales Tax...'}/>
+              </Field>
+            </div>
           </>}
 
           {/* ADMINISTRACIÓN con categorías y subcategorías */}
@@ -871,6 +887,14 @@ export default function Financiero() {
               </Field>
               <Field label={t('fin_form_date')}>
                 <input type="date" className={inputCls} value={form.fecha||today()} onChange={set('fecha')}/>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={isEs ? 'Impuesto pagado ($)' : 'Tax paid ($)'}>
+                <input type="number" className={inputCls} value={form.impuesto_monto||''} onChange={set('impuesto_monto')} placeholder="0.00" min="0" step="0.01"/>
+              </Field>
+              <Field label={isEs ? 'Descripción del impuesto' : 'Tax description'}>
+                <input className={inputCls} value={form.impuesto_descripcion||''} onChange={set('impuesto_descripcion')} placeholder={isEs ? 'IVA 15%, Sales Tax...' : 'VAT 15%, Sales Tax...'}/>
               </Field>
             </div>
           </>}
@@ -1445,6 +1469,19 @@ function SubcontratosModule({ can, rol,
             <h2 className="text-base font-semibold text-gray-800">{scSelected.subcontratista}</h2>
             {scSelected.descripcion && <p className="text-xs text-gray-400">{scSelected.descripcion}</p>}
           </div>
+          <button onClick={() => buildSubcontratoDoc({
+              contrato:       scSelected,
+              itemsContrato,
+              avaluos:        subcontratos_avaluos,
+              avaluoItems:    subcontratos_avaluo_items,
+              presupuesto,
+              proy:           proyectos?.find(p => p.id === proyId),
+              lang:           isEs ? 'ES' : 'EN',
+            })}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+            title={isEs ? 'Exportar contrato (Excel)' : 'Export contract (Excel)'}>
+            📥 {isEs ? 'Exportar contrato' : 'Export contract'}
+          </button>
           {puedeEditar && !closed && (
             <button onClick={() => {
               setAvForm({
@@ -1796,6 +1833,22 @@ Total: `)
                               </button>
                             )}
                           </>
+                        )}
+                        {av.estado === 'aprobado' && (
+                          <button onClick={() => buildAvaluoComprobante({
+                              avaluo:       av,
+                              contrato:     scSelected,
+                              itemsContrato,
+                              avaluoItems:  subcontratos_avaluo_items,
+                              presupuesto,
+                              proy:         proyectos?.find(p => p.id === proyId),
+                              lang:         isEs ? 'ES' : 'EN',
+                            })}
+                            className="text-xs px-2 py-1 rounded-lg text-white font-medium flex items-center gap-1"
+                            style={{ background: '#1D9E75' }}
+                            title={isEs ? 'Descargar comprobante (Excel)' : 'Download voucher (Excel)'}>
+                            📥 {isEs ? 'Comprobante' : 'Voucher'}
+                          </button>
                         )}
                         {av.estado === 'aprobado' && puedeRechazar && (
                           <button onClick={() => eliminarAvaluoAprobado(av)}

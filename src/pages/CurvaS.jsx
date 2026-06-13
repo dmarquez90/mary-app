@@ -37,7 +37,7 @@ export default function CurvaS() {
   const { t } = useContext(LangContext)
   const { proyectos, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos,
     avaluos_cliente = [], avaluos_cliente_items = [], presupuesto_indirectos = [],
-    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [],
+    subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [], subcontratos_avaluo_items = [],
     ordenes_cambio = [] } = state
 
   const [proyId, setProyId]           = useState(proyectos[0]?.id || '')
@@ -241,8 +241,14 @@ export default function CurvaS() {
         return s + r2((parseFloat(sa.cantidad)||0) * (parseFloat(e?.precio_unitario)||0))
       }, 0)
       const dirCost = costos_directos.filter(c => c.proyecto_id===proyId && c.actividad_id===act.id).reduce((s,c) => s + (parseFloat(c.monto)||0), 0)
-      const scIdsNuevo = subcontratos_items.filter(si => si.actividad_id===act.id).map(si => si.subcontrato_id)
-      const subCostNuevo = subcontratos_avaluos.filter(a => scIdsNuevo.includes(a.subcontrato_id) && a.estado==='aprobado').reduce((s,a) => s + (parseFloat(a.monto_total)||0), 0)
+      // Costo real de subcontratos para ESTA actividad: se toma el monto_actual de cada
+      // item del avalúo cuyo subcontratos_items.actividad_id === act.id (no el monto_total
+      // completo del avalúo, que incluye otras actividades del mismo subcontrato).
+      const itemIdsActividad   = subcontratos_items.filter(si => si.actividad_id===act.id).map(si => si.id)
+      const avaluoIdsAprobados = subcontratos_avaluos.filter(a => a.estado==='aprobado').map(a => a.id)
+      const subCostNuevo = subcontratos_avaluo_items
+        .filter(ai => itemIdsActividad.includes(ai.subcontrato_item_id) && avaluoIdsAprobados.includes(ai.avaluo_id))
+        .reduce((s,ai) => s + (parseFloat(ai.monto_actual)||0), 0)
       const subCostAntiguo = subcontratos.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sc) => s + (parseFloat(sc.monto_pagado)||0), 0)
       const subCost = subCostNuevo + subCostAntiguo
       const eqCost  = equipos.filter(e => e.proyecto_id===proyId && e.actividad_id===act.id).reduce((s,e) => {
@@ -255,7 +261,7 @@ export default function CurvaS() {
       const dev  = real - presupuestado
       return { code: act.code, descripcion: act.descripcion, presupuestado, real, dev, devPct: presupuestado ? (dev/presupuestado)*100 : 0 }
     }).filter(a => a.presupuestado > 0 || a.real > 0)
-  }, [items, salidas, entradas, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, equipos, proyId])
+  }, [items, salidas, entradas, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, subcontratos_avaluo_items, equipos, proyId])
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null

@@ -9,7 +9,7 @@ import { useAuth } from '../auth'
 import ImportarCatalogo from './ImportarCatalogo'
 
 const emptyMat = () => ({ codigo:'', descripcion:'', categoria:'', unidad:'und', stock_actual:'0', stock_minimo:'0', ubicacion_bodega:'', precio_unitario:'' })
-const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today(), tipo_entrada:'compra_proyecto' })
+const emptyIn  = () => ({ proyecto_id:'', oc_id:'', material_id:'', cantidad:'', precio_unitario:'', numero_factura:'', proveedor:'', fecha_recepcion:today(), tipo_entrada:'compra_proyecto', impuesto_monto:'', impuesto_descripcion:'' })
 const emptyOut = () => ({ proyecto_id:'', actividad_id:'', material_id:'', cantidad:'', fecha_salida:today(), tipo_salida:'uso_directo', origen_proyecto_id:'' })
 
 const CATEGORIAS = [
@@ -250,6 +250,8 @@ export default function Inventario() {
             proveedor:       form.proveedor || '',
             fecha_recepcion: form.fecha_recepcion,
             tipo_entrada:    tipoEntrada,
+            impuesto_monto:       parseFloat(form.impuesto_monto || 0),
+            impuesto_descripcion: form.impuesto_descripcion || '',
           }
         }
       })
@@ -259,6 +261,8 @@ export default function Inventario() {
         material_id:  form.material_id,
         proyecto_id:  form.proyecto_id || null,
         tipo_entrada: tipoEntrada,
+        impuesto_monto:       parseFloat(form.impuesto_monto || 0),
+        impuesto_descripcion: form.impuesto_descripcion || '',
       }})
     }
     setDrawer(null)
@@ -508,7 +512,7 @@ export default function Inventario() {
               <thead><tr className="bg-gray-50 border-b border-gray-100">
                 {[
                   t('inv_col_date'), t('inv_col_material'), t('inv_col_qty'),
-                  t('inv_col_price'), t('inv_col_invoice'), t('inv_col_supplier'),
+                  t('inv_col_price'), isEs ? 'Impuesto' : 'Tax', t('inv_col_invoice'), t('inv_col_supplier'),
                   t('inv_col_project'), isEs ? 'Tipo' : 'Type',
                   puedeEditar ? '' : null
                 ].filter(h => h !== null).map(h => (
@@ -526,6 +530,11 @@ export default function Inventario() {
                       <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '---'}</td>
                       <td className="px-4 py-3 text-sm font-mono text-[#1D9E75]">+{fmtNum(e.cantidad)} {mat?.unidad}</td>
                       <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(e.precio_unitario, proy?.moneda)}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {parseFloat(e.impuesto_monto||0) > 0
+                          ? <span title={e.impuesto_descripcion||''}>{fmt(e.impuesto_monto, proy?.moneda)}</span>
+                          : '—'}
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {esStockInicial
                           ? <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{isEs ? 'Stock inicial' : 'Initial stock'}</span>
@@ -847,6 +856,14 @@ export default function Inventario() {
             </Field>
             <Field label={t('inv_form_supplier')}>
               <input className={inputCls} value={form.proveedor||''} onChange={set('proveedor')} placeholder={t('inv_form_supplier')} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={isEs ? 'Impuesto pagado ($)' : 'Tax paid ($)'}>
+              <input type="number" className={inputCls} value={form.impuesto_monto||''} onChange={set('impuesto_monto')} placeholder="0.00" min="0" step="0.01" />
+            </Field>
+            <Field label={isEs ? 'Descripción del impuesto' : 'Tax description'}>
+              <input className={inputCls} value={form.impuesto_descripcion||''} onChange={set('impuesto_descripcion')} placeholder={isEs ? 'IVA 15%, Sales Tax...' : 'VAT 15%, Sales Tax...'} />
             </Field>
           </div>
           <Field label={t('inv_form_date')} required>

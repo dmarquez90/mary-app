@@ -261,8 +261,74 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     const c7 = ws1.getCell(row,7); c7.value=status;        styleData(c7,{even,color:pctUsado<=100?GREEN_HX:RED_HX,bold:true})
     row++
   })
+  row += 2
 
-  // ── HOJA 2: Detalle por categoría ──
+  // ── Resumen de impuestos (v1.2) ──
+  if (data.totalImpFavor > 0 || data.totalImpPagar > 0) {
+    row = addSectionTitle(ws1, row, isEs?'RESUMEN DE IMPUESTOS':'TAX SUMMARY', COLS)
+    ws1.getRow(row).height = 18
+    ;[isEs?'Categoría':'Category', isEs?'Impuesto a favor (pagado)':'Tax credit (paid)', isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)','','','',''].forEach((h,i) => {
+      const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
+    })
+    row++
+    data.resumenImpuestos.filter(r=>r.favor>0||r.pagar>0).forEach((r,i) => {
+      ws1.getRow(row).height = 17
+      const even = i % 2 === 1
+      const c1 = ws1.getCell(row,1); c1.value=r.categoria; styleData(c1,{even})
+      const c2 = ws1.getCell(row,2); c2.value=r.favor; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
+      const c3 = ws1.getCell(row,3); c3.value=r.pagar; styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
+      ws1.mergeCells(row,4,row,COLS)
+      row++
+    })
+    ws1.getRow(row).height = 18
+    const tl = ws1.getCell(row,1); tl.value=isEs?'TOTAL':'TOTAL'; styleTotal(tl)
+    const tf = ws1.getCell(row,2); tf.value=data.totalImpFavor; tf.numFmt='"$"#,##0.00'; styleTotal(tf)
+    const tp = ws1.getCell(row,3); tp.value=data.totalImpPagar; tp.numFmt='"$"#,##0.00'; styleTotal(tp)
+    ws1.mergeCells(row,4,row,COLS)
+    row++
+    ws1.getRow(row).height = 17
+    ws1.mergeCells(row,1,row,2)
+    const sl = ws1.getCell(row,1); sl.value=isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'; styleLabel(sl)
+    const sv = ws1.getCell(row,3); sv.value=data.saldoNetoImpuestos; sv.numFmt='"$"#,##0.00'
+    styleData(sv,{bold:true,align:'right',color:data.saldoNetoImpuestos>0?RED_HX:GREEN_HX})
+    ws1.mergeCells(row,4,row,COLS)
+    row += 2
+  }
+
+  // ── Retenciones a subcontratistas (v1.2) ──
+  if (data.retenciones?.length > 0) {
+    row = addSectionTitle(ws1, row, isEs?'RETENCIONES A SUBCONTRATISTAS':'SUBCONTRACTOR RETENTIONS', COLS)
+    ws1.getRow(row).height = 18
+    ;[isEs?'Subcontratista':'Subcontractor', isEs?'Avalúo #':'Valuation #', isEs?'% Retención':'Retention %',
+      isEs?'Monto retenido':'Amount retained', isEs?'Fecha retención':'Retention date',
+      isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status'
+    ].forEach((h,i) => { const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c) })
+    row++
+    const STATUS_LBL = { retenida: isEs?'Retenida':'Retained', devuelta: isEs?'Devuelta':'Released', pagada: isEs?'Pagada':'Paid' }
+    let totRetenido = 0
+    data.retenciones.forEach((r,i) => {
+      ws1.getRow(row).height = 17
+      const even = i % 2 === 1
+      const vencida = r.fecha_devolucion_est && new Date(r.fecha_devolucion_est) <= new Date() && r.estado === 'retenida'
+      const monto = parseFloat(r.monto_retenido||0)
+      totRetenido += monto
+      const c1=ws1.getCell(row,1); c1.value=r.subcontratista||'—'; styleData(c1,{even})
+      const c2=ws1.getCell(row,2); c2.value=`#${r.numero_avaluo||'—'}`; styleData(c2,{even})
+      const c3=ws1.getCell(row,3); c3.value=parseFloat(r.retencion_pct||0)/100; styleData(c3,{even,numFmt:'0.0%',align:'right'})
+      const c4=ws1.getCell(row,4); c4.value=monto; styleData(c4,{even,numFmt:'"$"#,##0.00',align:'right',bold:true})
+      const c5=ws1.getCell(row,5); c5.value=r.fecha_retencion||'—'; styleData(c5,{even})
+      const c6=ws1.getCell(row,6); c6.value=r.fecha_devolucion_est||'—'; styleData(c6,{even})
+      const c7=ws1.getCell(row,7); c7.value=vencida?(isEs?'Vencida':'Overdue'):(STATUS_LBL[r.estado]||r.estado)
+      styleData(c7,{even,bold:true,color:vencida||r.estado==='retenida'?(vencida?RED_HX:'F59E0B'):GREEN_HX})
+      row++
+    })
+    ws1.getRow(row).height = 18
+    ws1.mergeCells(row,1,row,3)
+    const tl = ws1.getCell(row,1); tl.value=isEs?'TOTAL RETENIDO':'TOTAL RETAINED'; styleTotal(tl)
+    const tv = ws1.getCell(row,4); tv.value=totRetenido; tv.numFmt='"$"#,##0.00'; styleTotal(tv)
+    ws1.mergeCells(row,5,row,COLS)
+    const tve = ws1.getCell(row,5); tve.value=''; styleTotal(tve)
+  }
   const ws2 = wb.addWorksheet(isEs?'Detalle por Categoría':'Detail by Category')
   setCols(ws2, [14, 20, 35, 22, 16, 16, 16])
   let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
@@ -839,6 +905,321 @@ export async function buildOPR({ orden, retenciones, contrato, proy, usuario, la
   const buf = await wb.xlsx.writeBuffer()
   saveAs(new Blob([buf]), `OPR_${orden.numero_orden}_${orden.subcontratista.replace(/\s+/g,'_')}_${orden.fecha_orden}.xlsx`)
 }
+
+// ── HELPERS COMUNES: DESGLOSE POR ACTIVIDAD Y FIRMAS ──────────────────────
+function avaluoDesglose({ avaluo, avaluoItems, itemsContrato, presupuesto }) {
+  return avaluoItems
+    .filter(ai => ai.avaluo_id === avaluo.id)
+    .map(ai => {
+      const it  = itemsContrato.find(x => x.id === ai.subcontrato_item_id)
+      const act = presupuesto.find(p => p.id === it?.actividad_id)
+      return {
+        actividad:  act ? `${act.code} — ${act.descripcion}` : '—',
+        descripcion: it?.descripcion || '—',
+        unidad:      it?.unidad || 'und',
+        costo_unitario:     parseFloat(ai.costo_unitario||0),
+        cantidad_anterior:  parseFloat(ai.cantidad_anterior||0),
+        cantidad_actual:    parseFloat(ai.cantidad_actual||0),
+        cantidad_acumulada: parseFloat(ai.cantidad_acumulada||0),
+        monto_actual:       parseFloat(ai.monto_actual||0),
+      }
+    })
+}
+
+function addFirmasBlock(ws, row, COLS, isEs) {
+  ws.getRow(row).height = 18
+  ws.mergeCells(row, 1, row, COLS)
+  const sec = ws.getCell(row, 1)
+  sec.value = isEs ? 'AUTORIZACIONES Y FIRMAS' : 'AUTHORIZATIONS AND SIGNATURES'
+  styleSectionTitle(sec)
+  row++
+  const mid = Math.ceil(COLS/2)
+  const firmantes = [
+    { label: isEs ? 'Preparado por' : 'Prepared by',   cargo: isEs ? 'Administrador de Proyecto' : 'Project Administrator' },
+    { label: isEs ? 'Recibido por (Subcontratista)' : 'Received by (Subcontractor)', cargo: isEs ? 'Representante' : 'Representative' },
+  ]
+  ws.getRow(row).height = 24
+  ws.mergeCells(row, 1, row, mid)
+  const l1 = ws.getCell(row, 1); l1.value=''; l1.border = { bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } } }
+  ws.mergeCells(row, mid+1, row, COLS)
+  const l2 = ws.getCell(row, mid+1); l2.value=''; l2.border = { bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } } }
+  row++
+  ws.getRow(row).height = 16
+  firmantes.forEach((f, i) => {
+    const c1 = i===0 ? 1 : mid+1
+    const c2 = i===0 ? mid : COLS
+    ws.mergeCells(row, c1, row, c2)
+    const c = ws.getCell(row, c1)
+    c.value = `${f.label} — ${f.cargo}`
+    c.font  = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF1B3A6B' } }
+    c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
+    c.alignment = { horizontal: 'center', vertical: 'middle' }
+    c.border = border()
+  })
+  return row + 2
+}
+
+// ── EXPORT COMPROBANTE DE AVALÚO (individual) ─────────────────────────────
+export async function buildAvaluoComprobante({ avaluo, contrato, itemsContrato, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs = lang === 'ES'
+  const COLS = 8
+  const wb   = new ExcelJS.Workbook()
+  wb.creator = 'MARY ERP'
+  const fechaHoy  = new Date().toLocaleDateString(isEs?'es':'en-US')
+  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+  const moneda    = contrato.moneda || proy?.moneda || 'USD'
+
+  const ws = wb.addWorksheet(isEs?'Comprobante de Avalúo':'Valuation Voucher')
+  setCols(ws, [26, 24, 10, 12, 12, 12, 12, 14])
+  let row = addHeaderBlock(ws, isEs?`Comprobante de Avalúo #${avaluo.numero}`:`Valuation Voucher #${avaluo.numero}`,
+    nombreEmpresa, proyLabel, `${avaluo.periodo_inicio||'—'} → ${avaluo.periodo_fin||'—'}`, fechaHoy, COLS)
+
+  // Datos del subcontratista
+  row = addSectionTitle(ws, row, isEs?'DATOS DEL SUBCONTRATO':'SUBCONTRACT INFORMATION', COLS)
+  ;[
+    [isEs?'Subcontratista:':'Subcontractor:', contrato.subcontratista],
+    [isEs?'Descripción del contrato:':'Contract description:', contrato.descripcion||'—'],
+    [isEs?'Fecha de elaboración:':'Elaboration date:', avaluo.fecha_elaboracion||'—'],
+  ].forEach(([lbl,val]) => {
+    ws.getRow(row).height = 17
+    ws.mergeCells(row,1,row,2)
+    const lc = ws.getCell(row,1); lc.value = lbl; styleLabel(lc)
+    ws.mergeCells(row,3,row,COLS)
+    const vc = ws.getCell(row,3); vc.value = val; vc.font={size:10,name:'Arial'}; vc.border=border(); vc.alignment={vertical:'middle'}
+    row++
+  })
+  row++
+
+  // Desglose por actividad
+  row = addSectionTitle(ws, row, isEs?'DESGLOSE POR ACTIVIDAD':'BREAKDOWN BY ACTIVITY', COLS)
+  ws.getRow(row).height = 28
+  ;[isEs?'Actividad':'Activity', isEs?'Descripción del ítem':'Item description', isEs?'Unidad':'Unit',
+    isEs?'Costo unit.':'Unit cost', isEs?'Cant. anterior':'Prev. qty', isEs?'Cant. actual':'Current qty',
+    isEs?'Cant. acumulada':'Accum. qty', isEs?'Monto actual':'Current amount'
+  ].forEach((h,i) => { const c = ws.getCell(row,i+1); c.value=h; styleHeader(c) })
+  row++
+
+  const desglose = avaluoDesglose({ avaluo, avaluoItems, itemsContrato, presupuesto })
+  desglose.forEach((d, i) => {
+    ws.getRow(row).height = 17
+    const even = i % 2 === 1
+    const vals = [d.actividad, d.descripcion, d.unidad, d.costo_unitario, d.cantidad_anterior, d.cantidad_actual, d.cantidad_acumulada, d.monto_actual]
+    vals.forEach((v, ci) => {
+      const c = ws.getCell(row, ci+1)
+      const num = ci >= 3
+      styleData(c, { even, align: num?'right':'left', numFmt: ci===3||ci===7 ? '"$"#,##0.00' : ci>=4 ? '#,##0.00' : undefined, bold: ci===7 })
+      c.value = v
+    })
+    row++
+  })
+  ws.getRow(row).height = 18
+  ws.mergeCells(row,1,row,7)
+  const tl = ws.getCell(row,1); tl.value = isEs?'SUBTOTAL DEL AVALÚO':'VALUATION SUBTOTAL'; styleTotal(tl)
+  const tv = ws.getCell(row,8); tv.value = parseFloat(avaluo.subtotal||0); tv.numFmt='"$"#,##0.00'; styleTotal(tv)
+  row += 2
+
+  // Resumen del avalúo
+  row = addSectionTitle(ws, row, isEs?'RESUMEN DEL AVALÚO':'VALUATION SUMMARY', COLS)
+  const resumenRows = [
+    [isEs?'Subtotal':'Subtotal', parseFloat(avaluo.subtotal||0)],
+    [isEs?`Impuesto`:'Tax', parseFloat(avaluo.impuesto_monto||0)],
+    [isEs?'Total avalúo':'Valuation total', parseFloat(avaluo.monto_total||0)],
+    [isEs?`Retención (${parseFloat(avaluo.retencion_pct||0)}%)`:`Retention (${parseFloat(avaluo.retencion_pct||0)}%)`, -parseFloat(avaluo.retencion_monto||0)],
+    [isEs?'Monto a pagar':'Amount to pay', parseFloat(avaluo.monto_a_pagar||0)],
+  ]
+  resumenRows.forEach(([lbl,val], i) => {
+    ws.getRow(row).height = 17
+    const isLast = i === resumenRows.length-1
+    ws.mergeCells(row,1,row,6)
+    const lc = ws.getCell(row,1); lc.value=lbl; isLast ? styleTotal(lc) : styleLabel(lc)
+    if (isLast) ws.getCell(row,1).alignment = { horizontal:'right', vertical:'middle' }
+    ws.mergeCells(row,7,row,COLS)
+    const vc = ws.getCell(row,7); vc.value=val; vc.numFmt='"$"#,##0.00'
+    if (isLast) styleTotal(vc)
+    else styleData(vc, { bold:true, align:'right', color: val<0?RED_HX:'000000' })
+    row++
+  })
+  row++
+
+  // Estado
+  ws.getRow(row).height = 17
+  ws.mergeCells(row,1,row,3)
+  const el = ws.getCell(row,1); el.value = isEs?'Estado:':'Status:'; styleLabel(el)
+  ws.mergeCells(row,4,row,COLS)
+  const ev = ws.getCell(row,4)
+  ev.value = avaluo.estado === 'aprobado' ? (isEs?'Aprobado':'Approved') : avaluo.estado === 'rechazado' ? (isEs?'Rechazado':'Rejected') : (isEs?'Borrador':'Draft')
+  ev.font  = { bold:true, size:10, name:'Arial', color:{argb:'FF'+(avaluo.estado==='aprobado'?GREEN_HX:avaluo.estado==='rechazado'?RED_HX:'94A3B8')} }
+  ev.border = border(); ev.alignment = { vertical:'middle' }
+  row += 2
+
+  row = addFirmasBlock(ws, row, COLS, isEs)
+
+  ws.getRow(row).height = 14
+  ws.mergeCells(row,1,row,COLS)
+  const ft = ws.getCell(row,1)
+  ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+  ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
+  ft.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  const buf = await wb.xlsx.writeBuffer()
+  saveAs(new Blob([buf]), `Avaluo_${avaluo.numero}_${contrato.subcontratista.replace(/\s+/g,'_')}_${avaluo.fecha_elaboracion||fechaHoy}.xlsx`)
+}
+
+// ── EXPORT DOCUMENTO COMPLETO DE SUBCONTRATO ──────────────────────────────
+export async function buildSubcontratoDoc({ contrato, itemsContrato, avaluos, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs = lang === 'ES'
+  const COLS = 8
+  const wb   = new ExcelJS.Workbook()
+  wb.creator = 'MARY ERP'
+  const fechaHoy  = new Date().toLocaleDateString(isEs?'es':'en-US')
+  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+  const moneda    = contrato.moneda || proy?.moneda || 'USD'
+
+  const avaluosAprobados = avaluos.filter(a => a.subcontrato_id === contrato.id && a.estado === 'aprobado')
+                                   .sort((a,b) => a.numero - b.numero)
+  const totalValuado  = avaluosAprobados.reduce((s,a) => s + parseFloat(a.monto_total||0), 0)
+  const totalRetenido = avaluosAprobados.reduce((s,a) => s + parseFloat(a.retencion_monto||0), 0)
+
+  const ws = wb.addWorksheet(isEs?'Contrato':'Contract')
+  setCols(ws, [26, 24, 10, 12, 12, 12, 12, 14])
+  let row = addHeaderBlock(ws, isEs?'Contrato de Subcontratación':'Subcontract Agreement',
+    nombreEmpresa, proyLabel, null, fechaHoy, COLS)
+
+  // Datos generales
+  row = addSectionTitle(ws, row, isEs?'DATOS DEL SUBCONTRATISTA':'SUBCONTRACTOR INFORMATION', COLS)
+  ;[
+    [isEs?'Subcontratista:':'Subcontractor:', contrato.subcontratista],
+    [isEs?'Descripción:':'Description:', contrato.descripcion||'—'],
+    [isEs?'Fecha del contrato:':'Contract date:', contrato.fecha_contrato||'—'],
+    [isEs?'Vigencia:':'Term:', `${contrato.fecha_inicio||'—'} → ${contrato.fecha_fin||'—'}`],
+    [isEs?'Estado:':'Status:', contrato.estado === 'activo' ? (isEs?'Activo':'Active') : contrato.estado === 'completado' ? (isEs?'Completado':'Completed') : contrato.estado],
+  ].forEach(([lbl,val]) => {
+    ws.getRow(row).height = 17
+    ws.mergeCells(row,1,row,2)
+    const lc = ws.getCell(row,1); lc.value = lbl; styleLabel(lc)
+    ws.mergeCells(row,3,row,COLS)
+    const vc = ws.getCell(row,3); vc.value = val; vc.font={size:10,name:'Arial'}; vc.border=border(); vc.alignment={vertical:'middle'}
+    row++
+  })
+  row++
+
+  // KPIs
+  row = addSectionTitle(ws, row, isEs?'RESUMEN ECONÓMICO':'FINANCIAL SUMMARY', COLS)
+  const kpis = [
+    [isEs?'Monto del contrato':'Contract amount', parseFloat(contrato.monto_total||0)],
+    [isEs?'Avaluado (aprobado)':'Valued (approved)', totalValuado],
+    [isEs?'Saldo':'Balance', parseFloat(contrato.monto_total||0) - totalValuado],
+    [isEs?`Retención (${parseFloat(contrato.retencion_pct||0)}%)`:`Retention (${parseFloat(contrato.retencion_pct||0)}%)`, totalRetenido],
+  ]
+  kpis.forEach(([lbl,val], i) => {
+    ws.getRow(row).height = 17
+    const even = i % 2 === 1
+    ws.mergeCells(row,1,row,4)
+    const lc = ws.getCell(row,1); lc.value=lbl; styleLabel(lc)
+    ws.mergeCells(row,5,row,COLS)
+    const vc = ws.getCell(row,5); vc.value=val; vc.numFmt='"$"#,##0.00'; styleData(vc,{even,bold:true,align:'right',color:i===2&&val<0?RED_HX:'000000'})
+    row++
+  })
+  row++
+
+  // Items del contrato
+  row = addSectionTitle(ws, row, isEs?'ACTIVIDADES DEL CONTRATO':'CONTRACT ACTIVITIES', COLS)
+  ws.getRow(row).height = 18
+  ;[isEs?'Descripción':'Description', isEs?'Actividad presupuesto':'Budget activity', isEs?'Unidad':'Unit',
+    isEs?'Cant. contrato':'Contract qty', isEs?'Costo unit.':'Unit cost', isEs?'Total':'Total',
+    isEs?'Acumulado':'Accumulated', isEs?'Saldo':'Balance'
+  ].forEach((h,i) => { const c = ws.getCell(row,i+1); c.value=h; styleHeader(c) })
+  row++
+
+  itemsContrato.forEach((it, i) => {
+    const act = presupuesto.find(p => p.id === it.actividad_id)
+    const acumulado = avaluoItems
+      .filter(ai => ai.subcontrato_item_id === it.id && avaluosAprobados.some(a => a.id === ai.avaluo_id))
+      .reduce((s,ai) => s + (parseFloat(ai.monto_actual)||0), 0)
+    const total  = parseFloat(it.costo_total||0)
+    const saldo  = total - acumulado
+    ws.getRow(row).height = 17
+    const even = i % 2 === 1
+    const vals = [it.descripcion, act ? `${act.code} — ${act.descripcion}` : '—', it.unidad||'und',
+      parseFloat(it.cantidad_contrato||0), parseFloat(it.costo_unitario||0), total, acumulado, saldo]
+    vals.forEach((v, ci) => {
+      const c = ws.getCell(row, ci+1)
+      const num = ci >= 3
+      styleData(c, { even, align: num?'right':'left', numFmt: [4,5,6,7].includes(ci) ? '"$"#,##0.00' : ci===3 ? '#,##0.00' : undefined,
+        color: ci===7 ? (saldo<0?RED_HX:GREEN_HX) : '000000', bold: ci===7 })
+      c.value = v
+    })
+    row++
+  })
+  row++
+
+  // Historial de avalúos con desglose por actividad
+  if (avaluosAprobados.length > 0) {
+    row = addSectionTitle(ws, row, isEs?'HISTORIAL DE AVALÚOS — DESGLOSE POR ACTIVIDAD':'VALUATION HISTORY — BREAKDOWN BY ACTIVITY', COLS)
+    avaluosAprobados.forEach(av => {
+      ws.getRow(row).height = 18
+      ws.mergeCells(row,1,row,COLS)
+      const c = ws.getCell(row,1)
+      c.value = isEs
+        ? `Avalúo #${av.numero}  ·  Período ${av.periodo_inicio||'—'} → ${av.periodo_fin||'—'}  ·  Fecha ${av.fecha_elaboracion||'—'}`
+        : `Valuation #${av.numero}  ·  Period ${av.periodo_inicio||'—'} → ${av.periodo_fin||'—'}  ·  Date ${av.fecha_elaboracion||'—'}`
+      c.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF1B3A6B' } }
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
+      c.alignment = { vertical: 'middle' }
+      c.border = border()
+      row++
+
+      ws.getRow(row).height = 28
+      ;[isEs?'Actividad':'Activity', isEs?'Descripción del ítem':'Item description', isEs?'Unidad':'Unit',
+        isEs?'Costo unit.':'Unit cost', isEs?'Cant. anterior':'Prev. qty', isEs?'Cant. actual':'Current qty',
+        isEs?'Cant. acumulada':'Accum. qty', isEs?'Monto actual':'Current amount'
+      ].forEach((h,i) => { const c2 = ws.getCell(row,i+1); c2.value=h; styleHeader(c2) })
+      row++
+
+      const desglose = avaluoDesglose({ avaluo: av, avaluoItems, itemsContrato, presupuesto })
+      desglose.forEach((d, i) => {
+        ws.getRow(row).height = 16
+        const even = i % 2 === 1
+        const vals = [d.actividad, d.descripcion, d.unidad, d.costo_unitario, d.cantidad_anterior, d.cantidad_actual, d.cantidad_acumulada, d.monto_actual]
+        vals.forEach((v, ci) => {
+          const c2 = ws.getCell(row, ci+1)
+          const num = ci >= 3
+          styleData(c2, { even, align: num?'right':'left', numFmt: ci===3||ci===7 ? '"$"#,##0.00' : ci>=4 ? '#,##0.00' : undefined, bold: ci===7 })
+          c2.value = v
+        })
+        row++
+      })
+
+      // Totales del avalúo
+      ws.getRow(row).height = 17
+      ws.mergeCells(row,1,row,6)
+      const tl = ws.getCell(row,1)
+      tl.value = isEs
+        ? `Subtotal $${fmt2v(av.subtotal)}   ·   Impuesto $${fmt2v(av.impuesto_monto)}   ·   Total $${fmt2v(av.monto_total)}`
+        : `Subtotal $${fmt2v(av.subtotal)}   ·   Tax $${fmt2v(av.impuesto_monto)}   ·   Total $${fmt2v(av.monto_total)}`
+      tl.font = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+      tl.alignment = { vertical:'middle' }
+      ws.mergeCells(row,7,row,COLS)
+      const tv = ws.getCell(row,7)
+      tv.value = parseFloat(av.monto_a_pagar||0); tv.numFmt='"$"#,##0.00'; styleTotal(tv)
+      row += 2
+    })
+  }
+
+  row = addFirmasBlock(ws, row, COLS, isEs)
+
+  ws.getRow(row).height = 14
+  ws.mergeCells(row,1,row,COLS)
+  const ft = ws.getCell(row,1)
+  ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+  ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
+  ft.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  const buf = await wb.xlsx.writeBuffer()
+  saveAs(new Blob([buf]), `Subcontrato_${contrato.subcontratista.replace(/\s+/g,'_')}_${proy?.project_code||''}_${fechaHoy.replace(/\//g,'-')}.xlsx`)
+}
+
+function fmt2v(n) { return (parseFloat(n)||0).toFixed(2) }
 
 // ── EXPORT RETENCIONES ────────────────────────────────────
 async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
@@ -1435,13 +1816,42 @@ export default function Reportes() {
     const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
 
+    // ── Resumen de impuestos (v1.2) — impuesto a favor (pagado) vs a pagar (cobrado) ──
+    const entradasProy   = entradas.filter(e=>e.proyecto_id===proyId&&filtro(e.fecha_recepcion))
+    const impMateriales  = entradasProy.reduce((s,e)=>s+(parseFloat(e.impuesto_monto)||0),0)
+    const impSubcontratos = subcontratos_avaluos
+      .filter(a=>scIds.includes(a.subcontrato_id) && a.estado==='aprobado' &&
+        filtro(a.periodo_inicio || a.fecha_elaboracion || a.created_at?.slice(0,10)))
+      .reduce((s,a)=>s+(parseFloat(a.impuesto_monto)||0),0)
+    const impEquipos     = eqs.reduce((s,e)=>s+(parseFloat(e.impuesto_monto)||0),0)
+    const impServicios   = dirs.reduce((s,c)=>s+(parseFloat(c.impuesto_monto)||0),0)
+    const impIndirectos  = inds.reduce((s,c)=>s+(parseFloat(c.impuesto_monto)||0),0)
+    const totalImpFavor  = impMateriales+impSubcontratos+impEquipos+impServicios+impIndirectos
+
+    const avsProyImp  = avaluos_cliente.filter(a=>a.proyecto_id===proyId && a.estado==='aprobado' && filtro(a.periodo_fin||a.fecha_elaboracion))
+    const impCliente  = avsProyImp.reduce((s,a)=>s+(parseFloat(a.impuesto_monto)||0),0)
+    const totalImpPagar = impCliente
+
+    const resumenImpuestos = [
+      { categoria: t('rep_cat_materiales'),  favor: impMateriales,  pagar: 0 },
+      { categoria: t('rep_cat_subcontratos'), favor: impSubcontratos, pagar: 0 },
+      { categoria: isEs?'Equipos / Rentas':'Equipment / Rentals', favor: impEquipos, pagar: 0 },
+      { categoria: isEs?'Servicios / Costos directos':'Services / Direct costs', favor: impServicios, pagar: 0 },
+      { categoria: t('rep_cat_admin'), favor: impIndirectos, pagar: 0 },
+      { categoria: isEs?'Avalúos a cliente':'Client billings', favor: 0, pagar: impCliente },
+    ]
+    const saldoNetoImpuestos = totalImpPagar - totalImpFavor
+
     const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
       const pres=round2((act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)))
       // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
-      const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)
-      const realScNuevo = subcontratos_avaluos
-        .filter(a=>scActIds.includes(a.subcontrato_id)&&a.estado==='aprobado')
-        .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
+      // Sistema nuevo: usar monto_actual de subcontratos_avaluo_items para los items
+      // de subcontrato vinculados a ESTA actividad (no el monto_total del avalúo completo)
+      const itemIdsActividad   = subcontratos_items.filter(si=>si.actividad_id===act.id).map(si=>si.id)
+      const avaluoIdsAprobados = subcontratos_avaluos.filter(a=>a.estado==='aprobado').map(a=>a.id)
+      const realScNuevo = subcontratos_avaluo_items
+        .filter(ai=>itemIdsActividad.includes(ai.subcontrato_item_id)&&avaluoIdsAprobados.includes(ai.avaluo_id))
+        .reduce((s,ai)=>s+(parseFloat(ai.monto_actual)||0),0)
       const realScAntiguo = subcontratos.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
         .reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
       const real=salidas.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
@@ -1507,6 +1917,7 @@ export default function Reportes() {
       avsProy, avsItems, indsPres, comparacionInd,
       ocsDelProy, ocsAprobadas, deltaOCs, budgetRevisado, ocsItems,
       scContratos, scAvaluosDetalle, retenciones, ordenesPago,
+      resumenImpuestos, totalImpFavor, totalImpPagar, saldoNetoImpuestos,
     }
   }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
 
@@ -1828,6 +2239,91 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                 <td className={tdC+' text-right text-xs font-medium'} style={{color:'#1D9E75'}}>
                   {budget > 0 ? `${((data.deltaOCs / budget) * 100).toFixed(2)}%` : '—'}
                 </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── SECCIÓN: Resumen de Impuestos (v1.2) ── */}
+      {(data.totalImpFavor > 0 || data.totalImpPagar > 0) && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Resumen de impuestos' : 'Tax summary'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{isEs ? 'Impuesto a favor (pagado en compras/costos) vs. impuesto a pagar (cobrado al cliente)' : 'Tax credit (paid on purchases/costs) vs. tax due (collected from client)'}</p>
+          </div>
+          <table className="w-full">
+            <thead><tr style={thS}>
+              <th className={thC}>{isEs?'Categoría':'Category'}</th>
+              <th className={thC+' text-right'}>{isEs?'Impuesto a favor (pagado)':'Tax credit (paid)'}</th>
+              <th className={thC+' text-right'}>{isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)'}</th>
+            </tr></thead>
+            <tbody>
+              {data.resumenImpuestos.filter(r=>r.favor>0||r.pagar>0).map((r,i)=>(
+                <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                  <td className={tdC}>{r.categoria}</td>
+                  <td className={tdC+' text-right font-mono'}>{r.favor>0?fmt(r.favor,moneda):'—'}</td>
+                  <td className={tdC+' text-right font-mono'}>{r.pagar>0?fmt(r.pagar,moneda):'—'}</td>
+                </tr>
+              ))}
+              <tr style={{background:'#EEF2F7'}}>
+                <td className={tdC+' font-bold'}>{isEs?'TOTAL':'TOTAL'}</td>
+                <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalImpFavor,moneda)}</td>
+                <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalImpPagar,moneda)}</td>
+              </tr>
+              <tr>
+                <td colSpan={2} className={tdC+' font-bold text-xs'} style={{color:BRAND}}>{isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'}</td>
+                <td className={tdC+' text-right font-mono font-bold'} style={{color: data.saldoNetoImpuestos>0 ? '#ef4444' : '#1D9E75'}}>
+                  {data.saldoNetoImpuestos>=0?'+':''}{fmt(data.saldoNetoImpuestos,moneda)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── SECCIÓN: Retenciones a Subcontratistas ── */}
+      {data.retenciones?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
+            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Retenciones a subcontratistas' : 'Subcontractor retentions'}</p>
+          </div>
+          <table className="w-full">
+            <thead><tr style={thS}>
+              {[isEs?'Subcontratista':'Subcontractor', isEs?'Avalúo #':'Valuation #', isEs?'% Retención':'Retention %',
+                isEs?'Monto retenido':'Amount retained', isEs?'Fecha retención':'Retention date',
+                isEs?'Devolución est.':'Est. release', isEs?'Devolución real':'Actual release', isEs?'Estado':'Status'
+              ].map((h,i)=><th key={i} className={thC+(i>=2&&i<=3?' text-right':'')}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {data.retenciones.map((r,i)=>{
+                const STATUS = {
+                  retenida: isEs?'Retenida':'Retained',
+                  devuelta: isEs?'Devuelta':'Released',
+                  pagada:   isEs?'Pagada':'Paid',
+                }
+                const vencida = r.fecha_devolucion_est && new Date(r.fecha_devolucion_est) <= new Date() && r.estado === 'retenida'
+                const label   = vencida ? (isEs?'Vencida':'Overdue') : (STATUS[r.estado]||r.estado)
+                const color   = vencida ? '#ef4444' : r.estado==='retenida' ? '#F59E0B' : '#1D9E75'
+                return (
+                  <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
+                    <td className={tdC}>{r.subcontratista||'—'}</td>
+                    <td className={tdC+' text-xs'}>#{r.numero_avaluo||'—'}</td>
+                    <td className={tdC+' text-right'}>{parseFloat(r.retencion_pct||0)}%</td>
+                    <td className={tdC+' text-right font-mono font-medium'}>{fmt(r.monto_retenido,moneda)}</td>
+                    <td className={tdC+' text-xs text-gray-500'}>{r.fecha_retencion||'—'}</td>
+                    <td className={tdC+' text-xs text-gray-500'}>{r.fecha_devolucion_est||'—'}</td>
+                    <td className={tdC+' text-xs text-gray-500'}>{r.fecha_devolucion_real||'—'}</td>
+                    <td className={tdC}>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background:color+'1A', color}}>{label}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr style={{background:'#EEF2F7'}}>
+                <td colSpan={3} className={tdC+' font-bold text-xs'} style={{color:BRAND}}>{isEs?'TOTAL RETENIDO':'TOTAL RETAINED'}</td>
+                <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.retenciones.reduce((s,r)=>s+parseFloat(r.monto_retenido||0),0),moneda)}</td>
+                <td colSpan={4}></td>
               </tr>
             </tbody>
           </table>
