@@ -5,7 +5,7 @@ import { usePermissions } from '../usePermissions'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
-import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from '../categoriasIndirectos'
+import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from './categoriasIndirectos'
 
 const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unidad:'m²', cantidad:'', costo_mo:'', costo_materiales:'', costo_equipos:'' })
 

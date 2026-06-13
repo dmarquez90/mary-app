@@ -6,7 +6,7 @@ import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
 import { useAuth } from '../auth'
-import { CATEGORIAS_IND, CAT_KEYS } from '../categoriasIndirectos'
+import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
 import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc } from '../pages/Reportes'
 
 // ── CATEGORÍAS DE COSTOS INDIRECTOS ──────────────────────────────────────

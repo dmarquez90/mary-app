@@ -5,7 +5,7 @@ import { fmt, fmtNum, calcGrandTotal, r2 as round2 } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
-import { CAT_KEYS, getCategoriaLabel } from '../categoriasIndirectos'
+import { CAT_KEYS, getCategoriaLabel } from './categoriasIndirectos'
 
 const BRAND    = '#1B3A6B'
 const BRAND_HX = '1B3A6B'
