@@ -23,6 +23,29 @@ const INIT = {
   loaded: false
 }
 
+// Convierte gastos de caja chica liquidados en costos_directos / costos_indirectos / equipos.
+// Usado tanto en APROBAR_LIQUIDACION_CC como en el cierre con liquidación automática.
+function buildCostosFromGastosCC(gastos, proyecto_id, tenantId) {
+  const nuevosCostosDirectos   = []
+  const nuevosCostosIndirectos = []
+  const nuevosEquipos          = []
+  for (const g of gastos) {
+    const base = {
+      id: uuid(), tenant_id: tenantId, proyecto_id,
+      descripcion: `${g.descripcion} (Caja Chica)`, fecha: g.fecha, created_at: today(),
+      impuesto_monto: parseFloat(g.impuesto_monto)||0, impuesto_descripcion: g.impuesto_descripcion||null,
+    }
+    if (g.tipo_costo === 'costos_indirectos') {
+      nuevosCostosIndirectos.push({ ...base, monto: parseFloat(g.monto)||0, categoria: g.categoria_ind, subcategoria: g.subcategoria_ind })
+    } else if (g.tipo_costo === 'equipos') {
+      nuevosEquipos.push({ ...base, costo_total: parseFloat(g.monto)||0, tipo: 'alquiler', actividad_id: g.actividad_id||null })
+    } else {
+      nuevosCostosDirectos.push({ ...base, monto: parseFloat(g.monto)||0, tipo: 'caja_chica', numero_documento: g.numero_factura||null, actividad_id: g.actividad_id||null })
+    }
+  }
+  return { nuevosCostosDirectos, nuevosCostosIndirectos, nuevosEquipos }
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'LOAD_ALL': return { ...action.payload, loaded: true }
@@ -289,6 +312,25 @@ function reducer(state, action) {
     case 'PAGAR_REEMBOLSO_CC': return {
       ...state,
       reembolsos_personal: state.reembolsos_personal.map(r => r.id === action.payload.id ? { ...r, estado:'pagado', fecha_pago: action.payload.fecha_pago } : r),
+    }
+    case 'CERRAR_CAJA_CHICA': {
+      const p = action.payload
+      let next = {
+        ...state,
+        cajas_chicas: state.cajas_chicas.map(c => c.id === p.cajaId ? { ...c, estado: 'cerrada', saldo_actual: p.saldoFinal } : c),
+      }
+      if (p.liquidacionAuto) {
+        next = {
+          ...next,
+          liquidaciones_caja_chica: [...next.liquidaciones_caja_chica, p.liquidacionAuto],
+          gastos_caja_chica: next.gastos_caja_chica.map(g => p.gastoIds.includes(g.id) ? { ...g, liquidacion_id: p.liquidacionAuto.id } : g),
+          reembolsos_personal: p.reembolsoAuto ? [...next.reembolsos_personal, p.reembolsoAuto] : next.reembolsos_personal,
+          costos_directos:   [...next.costos_directos,   ...p.nuevosCostosDirectos],
+          costos_indirectos: [...next.costos_indirectos, ...p.nuevosCostosIndirectos],
+          equipos:           [...next.equipos,           ...p.nuevosEquipos],
+        }
+      }
+      return next
     }
 case 'LOAD_TABLE':
   return { ...state, [action.payload.key]: action.payload.data }
@@ -596,12 +638,17 @@ useEffect(() => {
         const caja = state.cajas_chicas.find(c => c.id === action.payload.caja_id)
         if (!caja) break
         const monto = parseFloat(action.payload.monto)||0
-        const nuevoSaldo = Math.max(0, parseFloat(caja.saldo_actual||0) - monto)
-        const gasto = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId, liquidacion_id: null }
+        const pagoPropio = !!action.payload.pago_propio
+        // Si el gasto fue pagado de fondos de la caja, descuenta el saldo (puede quedar negativo = sobregiro).
+        // Si fue pagado del bolsillo del responsable, no afecta el saldo de la caja.
+        const nuevoSaldo = pagoPropio ? parseFloat(caja.saldo_actual||0) : r2(parseFloat(caja.saldo_actual||0) - monto)
+        const gasto = { ...action.payload, pago_propio: pagoPropio, id: uuid(), created_at: today(), tenant_id: tenantId, liquidacion_id: null }
         const { error: eG } = await supabase.from('gastos_caja_chica').insert(gasto)
         if (eG) { console.error('ADD_GASTO_CC — gasto:', JSON.stringify(eG)); break }
-        const { error: eC } = await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
-        if (eC) console.error('ADD_GASTO_CC — caja:', JSON.stringify(eC))
+        if (!pagoPropio) {
+          const { error: eC } = await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
+          if (eC) console.error('ADD_GASTO_CC — caja:', JSON.stringify(eC))
+        }
         dispatch({ type: 'ADD_GASTO_CC', payload: { gasto, nuevoSaldo } })
         break
       }
@@ -609,9 +656,9 @@ useEffect(() => {
         const gasto = state.gastos_caja_chica.find(g => g.id === action.payload)
         if (!gasto) break
         const caja = state.cajas_chicas.find(c => c.id === gasto.caja_id)
-        const nuevoSaldo = parseFloat(caja?.saldo_actual||0) + parseFloat(gasto.monto||0)
+        const nuevoSaldo = gasto.pago_propio ? parseFloat(caja?.saldo_actual||0) : r2(parseFloat(caja?.saldo_actual||0) + parseFloat(gasto.monto||0))
         await supabase.from('gastos_caja_chica').delete().eq('id', gasto.id)
-        if (caja) await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
+        if (caja && !gasto.pago_propio) await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
         dispatch({ type: 'DEL_GASTO_CC', payload: { gastoId: gasto.id, cajaId: caja?.id, nuevoSaldo } })
         break
       }
@@ -621,9 +668,10 @@ useEffect(() => {
         if (!caja) break
         const gastos = state.gastos_caja_chica.filter(g => gastoIds.includes(g.id))
         const totalGastos = r2(gastos.reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
-        const montoAsignado = parseFloat(caja.monto_asignado)||0
-        const reposicion = r2(Math.min(totalGastos, montoAsignado))
-        const reembolsoMonto = r2(Math.max(totalGastos - montoAsignado, 0))
+        // Reposición: gastos pagados con fondos de la caja (la empresa repone el total, incluso si excede el monto_asignado).
+        // Reembolso personal: gastos que el responsable pagó de su bolsillo (se le debe aparte, no afecta la caja).
+        const reposicion    = r2(gastos.filter(g => !g.pago_propio).reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
+        const reembolsoMonto = r2(gastos.filter(g => g.pago_propio).reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
 
         const liquidacion = {
           id: uuid(), tenant_id: tenantId, caja_id, proyecto_id,
@@ -660,28 +708,14 @@ useEffect(() => {
         const caja   = state.cajas_chicas.find(c => c.id === liquidacion.caja_id)
         const gastos = state.gastos_caja_chica.filter(g => g.liquidacion_id === liquidacionId)
 
-        const nuevosCostosDirectos   = []
-        const nuevosCostosIndirectos = []
-        const nuevosEquipos          = []
-        for (const g of gastos) {
-          const base = {
-            id: uuid(), tenant_id: tenantId, proyecto_id: liquidacion.proyecto_id,
-            descripcion: `${g.descripcion} (Caja Chica)`, fecha: g.fecha, created_at: today(),
-            impuesto_monto: parseFloat(g.impuesto_monto)||0, impuesto_descripcion: g.impuesto_descripcion||null,
-          }
-          if (g.tipo_costo === 'costos_indirectos') {
-            nuevosCostosIndirectos.push({ ...base, monto: parseFloat(g.monto)||0, categoria: g.categoria_ind, subcategoria: g.subcategoria_ind })
-          } else if (g.tipo_costo === 'equipos') {
-            nuevosEquipos.push({ ...base, costo_total: parseFloat(g.monto)||0, tipo: 'alquiler', actividad_id: g.actividad_id||null })
-          } else {
-            nuevosCostosDirectos.push({ ...base, monto: parseFloat(g.monto)||0, tipo: 'caja_chica', numero_documento: g.numero_factura||null, actividad_id: g.actividad_id||null })
-          }
-        }
+        const { nuevosCostosDirectos, nuevosCostosIndirectos, nuevosEquipos } = buildCostosFromGastosCC(gastos, liquidacion.proyecto_id, tenantId)
         if (nuevosCostosDirectos.length)   { const { error } = await supabase.from('costos_directos').insert(nuevosCostosDirectos);   if (error) console.error('APROBAR_LIQUIDACION_CC — costos_directos:', JSON.stringify(error)) }
         if (nuevosCostosIndirectos.length) { const { error } = await supabase.from('costos_indirectos').insert(nuevosCostosIndirectos); if (error) console.error('APROBAR_LIQUIDACION_CC — costos_indirectos:', JSON.stringify(error)) }
         if (nuevosEquipos.length)          { const { error } = await supabase.from('equipos').insert(nuevosEquipos);          if (error) console.error('APROBAR_LIQUIDACION_CC — equipos:', JSON.stringify(error)) }
 
-        const nuevoSaldo = parseFloat(caja?.saldo_actual||0) + parseFloat(liquidacion.reposicion||0)
+        // La reposición devuelve a la caja exactamente lo gastado con sus fondos (corrige el sobregiro si lo hubo).
+        // El reembolso personal NO toca el saldo de la caja: es deuda de la empresa hacia el responsable, pagada aparte.
+        const nuevoSaldo = r2(parseFloat(caja?.saldo_actual||0) + parseFloat(liquidacion.reposicion||0))
         const liquidacionAprobada = { ...liquidacion, estado: 'aprobada', aprobado_por: usuarioId || null, fecha_aprobacion: today() }
         await supabase.from('liquidaciones_caja_chica').update({ estado: 'aprobada', aprobado_por: liquidacionAprobada.aprobado_por, fecha_aprobacion: liquidacionAprobada.fecha_aprobacion }).eq('id', liquidacionId)
         if (caja) await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
@@ -693,6 +727,61 @@ useEffect(() => {
         const fecha_pago = today()
         await supabase.from('reembolsos_personal').update({ estado:'pagado', fecha_pago }).eq('id', action.payload)
         dispatch({ type: 'PAGAR_REEMBOLSO_CC', payload: { id: action.payload, fecha_pago } })
+        break
+      }
+      case 'CERRAR_CAJA_CHICA': {
+        // Solo client_admin/super_admin. Si hay gastos pendientes de liquidar, se liquidan
+        // y aprueban automáticamente antes de cerrar la caja.
+        if (!['client_admin','super_admin'].includes(rol)) break
+        const caja = state.cajas_chicas.find(c => c.id === action.payload.cajaId)
+        if (!caja) break
+        const pendientes = state.gastos_caja_chica.filter(g => g.caja_id === caja.id && !g.liquidacion_id)
+
+        let saldoFinal = parseFloat(caja.saldo_actual||0)
+        let liquidacionAuto = null, reembolsoAuto = null, gastoIds = []
+        let nuevosCostosDirectos = [], nuevosCostosIndirectos = [], nuevosEquipos = []
+
+        if (pendientes.length > 0) {
+          gastoIds = pendientes.map(g => g.id)
+          const totalGastos    = r2(pendientes.reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
+          const reposicion     = r2(pendientes.filter(g => !g.pago_propio).reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
+          const reembolsoMonto = r2(pendientes.filter(g =>  g.pago_propio).reduce((s,g) => s + (parseFloat(g.monto)||0), 0))
+
+          liquidacionAuto = {
+            id: uuid(), tenant_id: tenantId, caja_id: caja.id, proyecto_id: caja.proyecto_id,
+            fecha: today(), total_gastos: totalGastos, reposicion, reembolso_personal: reembolsoMonto,
+            estado: 'aprobada', aprobado_por: action.payload.usuarioId || null, fecha_aprobacion: today(), created_at: today(),
+          }
+          const { error: eL } = await supabase.from('liquidaciones_caja_chica').insert(liquidacionAuto)
+          if (eL) { console.error('CERRAR_CAJA_CHICA — liquidacion:', JSON.stringify(eL)); break }
+
+          const { error: eG } = await supabase.from('gastos_caja_chica').update({ liquidacion_id: liquidacionAuto.id }).in('id', gastoIds)
+          if (eG) console.error('CERRAR_CAJA_CHICA — gastos:', JSON.stringify(eG))
+
+          if (reembolsoMonto > 0) {
+            reembolsoAuto = { id: uuid(), tenant_id: tenantId, liquidacion_id: liquidacionAuto.id, proyecto_id: caja.proyecto_id, usuario_id: action.payload.usuarioId || caja.responsable_id, monto: reembolsoMonto, estado: 'pendiente', created_at: today() }
+            const { error: eR } = await supabase.from('reembolsos_personal').insert(reembolsoAuto)
+            if (eR) console.error('CERRAR_CAJA_CHICA — reembolso:', JSON.stringify(eR))
+          }
+
+          const built = buildCostosFromGastosCC(pendientes, caja.proyecto_id, tenantId)
+          nuevosCostosDirectos   = built.nuevosCostosDirectos
+          nuevosCostosIndirectos = built.nuevosCostosIndirectos
+          nuevosEquipos          = built.nuevosEquipos
+          if (nuevosCostosDirectos.length)   { const { error } = await supabase.from('costos_directos').insert(nuevosCostosDirectos);     if (error) console.error('CERRAR_CAJA_CHICA — costos_directos:', JSON.stringify(error)) }
+          if (nuevosCostosIndirectos.length) { const { error } = await supabase.from('costos_indirectos').insert(nuevosCostosIndirectos); if (error) console.error('CERRAR_CAJA_CHICA — costos_indirectos:', JSON.stringify(error)) }
+          if (nuevosEquipos.length)          { const { error } = await supabase.from('equipos').insert(nuevosEquipos);                    if (error) console.error('CERRAR_CAJA_CHICA — equipos:', JSON.stringify(error)) }
+
+          saldoFinal = r2(saldoFinal + reposicion)
+        }
+
+        const { error: eC } = await supabase.from('cajas_chicas').update({ estado: 'cerrada', saldo_actual: saldoFinal }).eq('id', caja.id)
+        if (eC) { console.error('CERRAR_CAJA_CHICA — caja:', JSON.stringify(eC)); break }
+
+        dispatch({ type: 'CERRAR_CAJA_CHICA', payload: {
+          cajaId: caja.id, saldoFinal, liquidacionAuto, reembolsoAuto, gastoIds,
+          nuevosCostosDirectos, nuevosCostosIndirectos, nuevosEquipos,
+        }})
         break
       }
 

@@ -2059,7 +2059,7 @@ function CajaChicaModule({
   }
 
   // ── Formulario: nuevo gasto ──
-  const emptyGasto = () => ({ descripcion:'', proveedor:'', numero_factura:'', monto:'', fecha:today(), tipo_costo:'costos_directos', actividad_id:'', categoria_ind:'', subcategoria_ind:'', impuesto_monto:'', impuesto_descripcion:'' })
+  const emptyGasto = () => ({ descripcion:'', proveedor:'', numero_factura:'', monto:'', fecha:today(), tipo_costo:'costos_directos', actividad_id:'', categoria_ind:'', subcategoria_ind:'', impuesto_monto:'', impuesto_descripcion:'', pago_propio:false })
   const [gForm, setGForm] = useState(emptyGasto())
   const setG = k => e => setGForm(f => ({...f, [k]: e.target.value}))
   const subcatsG = gForm.categoria_ind ? (isEs ? CATEGORIAS_IND[gForm.categoria_ind]?.subs.es : CATEGORIAS_IND[gForm.categoria_ind]?.subs.en) || [] : []
@@ -2067,7 +2067,7 @@ function CajaChicaModule({
   const guardarGasto = () => {
     const monto = parseFloat(gForm.monto)||0
     if (!gForm.descripcion || monto <= 0) return
-    if (monto > parseFloat(caja.saldo_actual||0)) {
+    if (!gForm.pago_propio && monto > parseFloat(caja.saldo_actual||0)) {
       if (!confirm(t('cc_confirm_overspend', { amount: `$${monto.toFixed(2)}`, balance: `$${parseFloat(caja.saldo_actual||0).toFixed(2)}` }))) return
     }
     dispatch({ type:'ADD_GASTO_CC', payload: {
@@ -2080,6 +2080,7 @@ function CajaChicaModule({
       subcategoria_ind: gForm.tipo_costo==='costos_indirectos' ? gForm.subcategoria_ind : null,
       impuesto_monto: parseFloat(gForm.impuesto_monto)||0,
       impuesto_descripcion: gForm.impuesto_descripcion||null,
+      pago_propio: !!gForm.pago_propio,
     }})
     setGForm(emptyGasto())
   }
@@ -2093,6 +2094,17 @@ function CajaChicaModule({
     if (pendientes.length===0) return
     dispatch({ type:'ADD_LIQUIDACION_CC', payload: { caja_id: caja.id, proyecto_id: proyId, gastoIds: pendientes.map(g=>g.id), usuarioId: currentUserId } })
   }
+
+  const puedeCerrar = ['client_admin','super_admin'].includes(rol)
+  const cerrarCaja = () => {
+    if (!caja) return
+    const msg = pendientes.length > 0
+      ? t('cc_confirm_close_with_pending', { count: pendientes.length })
+      : t('cc_confirm_close_fund')
+    if (!confirm(msg)) return
+    dispatch({ type:'CERRAR_CAJA_CHICA', payload: { cajaId: caja.id, usuarioId: currentUserId } })
+  }
+
 
   const aprobarLiquidacion = (id) => dispatch({ type:'APROBAR_LIQUIDACION_CC', payload: { liquidacionId: id, usuarioId: currentUserId } })
   const rechazarLiquidacion = (id) => {
@@ -2183,10 +2195,19 @@ function CajaChicaModule({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label={t('cc_assigned_fund')} value={fmt(caja.monto_asignado, moneda)} color="#1B3A6B" />
         <StatCard label={t('cc_current_balance')} value={fmt(caja.saldo_actual, moneda)}
-          sub={parseFloat(caja.saldo_actual)<=0 ? t('cc_no_cash') : undefined} />
+          color={parseFloat(caja.saldo_actual) < 0 ? '#ef4444' : undefined}
+          sub={parseFloat(caja.saldo_actual) < 0 ? t('cc_overspent') : parseFloat(caja.saldo_actual)===0 ? t('cc_no_cash') : undefined} />
         <StatCard label={t('cc_unsettled')} value={fmt(pendientes.reduce((s,g)=>s+parseFloat(g.monto||0),0), moneda)} sub={`${pendientes.length} ${t('cc_items')}`} />
         <StatCard label={t('cc_responsible')} value={nombreUsuario(caja.responsable_id)} />
       </div>
+
+      {puedeCerrar && !closed && (
+        <div className="flex justify-end">
+          <button onClick={cerrarCaja} className="text-xs px-3 py-2 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
+            {t('cc_close_fund')}
+          </button>
+        </div>
+      )}
 
       {/* Nuevo gasto */}
       {puedeEditar && !closed && (
@@ -2245,10 +2266,16 @@ function CajaChicaModule({
               <input className={inputCls} value={gForm.impuesto_descripcion} onChange={setG('impuesto_descripcion')} placeholder={t('cc_tax_desc_ph')}/>
             </Field>
           </div>
+          <label className="flex items-center gap-2 mt-3 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={!!gForm.pago_propio} onChange={e=>setGForm(f=>({...f, pago_propio: e.target.checked}))}/>
+            {t('cc_pago_propio_label')}
+          </label>
+          <p className="text-xs text-gray-400 mt-1">{t('cc_pago_propio_desc')}</p>
           <div className="mt-3">
             <PrimaryBtn onClick={guardarGasto}>+ {t('cc_add_expense')}</PrimaryBtn>
           </div>
         </div>
+
       )}
 
       {/* Gastos pendientes de liquidar */}
@@ -2278,6 +2305,11 @@ function CajaChicaModule({
                     <td className={tdCls+' text-xs text-gray-500'}>
                       {TIPOS_COSTO.find(o=>o.v===g.tipo_costo)?.label || g.tipo_costo}
                       {g.categoria_ind ? ` — ${g.subcategoria_ind||g.categoria_ind}` : ''}
+                      {g.pago_propio && (
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-medium" style={{background:'#F59E0B1A', color:'#F59E0B'}}>
+                          {t('cc_pago_propio_badge')}
+                        </span>
+                      )}
                     </td>
                     <td className={tdCls+' text-right font-mono font-medium'}>{fmt(g.monto, moneda)}</td>
                     <td className={tdCls}>
