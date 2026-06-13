@@ -1,4 +1,4 @@
-import { useState, useMemo, useContext } from 'react'
+import { useState, useMemo, useContext, Fragment } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
@@ -119,6 +119,22 @@ export default function Presupuesto() {
 
   const indsDelProy   = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
   const totalIndirecto = indsDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+
+  // Agrupar por categoría: una fila por categoría (con su total), y debajo
+  // una fila por cada subcategoría/registro individual (editable).
+  const indsAgrupados = useMemo(() => {
+    const groups = {}
+    indsDelProy.forEach(ind => {
+      if (!groups[ind.categoria]) groups[ind.categoria] = []
+      groups[ind.categoria].push(ind)
+    })
+    return Object.keys(groups).map(cat => ({
+      categoria: cat,
+      label: CATS_IND.find(c => c.key === cat)?.label ?? cat,
+      items: groups[cat],
+      total: groups[cat].reduce((s,i) => s + parseFloat(i.monto_presupuestado||0), 0),
+    }))
+  }, [indsDelProy, lang])
   const subtotalPres   = grandTotal + totalIndirecto
   const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
   const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
@@ -328,23 +344,44 @@ export default function Presupuesto() {
                   {puedeEditar && <th className="px-2 py-2"></th>}
                 </tr></thead>
                 <tbody>
-                  {indsDelProy.map(ind => (
-                    <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-2 py-2 text-sm text-gray-700">
-                        {CATS_IND.find(c => c.key === ind.categoria)?.label ?? ind.categoria}
-                        {ind.subcategoria && <span className="text-xs text-gray-400 block">{ind.subcategoria}</span>}
-                      </td>
-                      <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{color:'#1B3A6B'}}>{fmt(ind.monto_presupuestado, moneda)}</td>
-                      {puedeEditar && (
-                        <td className="px-2 py-2">
-                          <div className="flex gap-1">
-                            <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria||'', monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
-                            <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: ind.id })}>{t('btn_delete')}</TBtn>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
+                  {indsAgrupados.map(g => {
+                    const isSimple = g.items.length === 1 && !g.items[0].subcategoria
+                    const item0 = g.items[0]
+                    return (
+                      <Fragment key={g.categoria}>
+                        <tr className={isSimple ? 'border-b border-gray-50 hover:bg-gray-50/50' : 'bg-gray-50/70 border-b border-gray-100'}>
+                          <td className={`px-2 py-2 text-sm ${isSimple ? 'text-gray-700' : 'font-semibold text-gray-700'}`}>{g.label}</td>
+                          <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{color:'#1B3A6B'}}>{fmt(g.total, moneda)}</td>
+                          {puedeEditar && (
+                            <td className="px-2 py-2">
+                              {isSimple && (
+                                <div className="flex gap-1">
+                                  <TBtn onClick={() => { setIndForm({ categoria: item0.categoria, subcategoria: item0.subcategoria||'', monto_presupuestado: item0.monto_presupuestado }); setIndEdit(item0.id) }}>{t('btn_edit')}</TBtn>
+                                  <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: item0.id })}>{t('btn_delete')}</TBtn>
+                                </div>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                        {!isSimple && g.items.map(ind => (
+                          <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <td className="px-2 py-2 pl-7 text-xs text-gray-500">
+                              {ind.subcategoria || (isEs ? 'General / sin subcategoría' : 'General / no subcategory')}
+                            </td>
+                            <td className="px-2 py-2 text-sm font-mono text-right text-gray-600">{fmt(ind.monto_presupuestado, moneda)}</td>
+                            {puedeEditar && (
+                              <td className="px-2 py-2">
+                                <div className="flex gap-1">
+                                  <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria||'', monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
+                                  <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: ind.id })}>{t('btn_delete')}</TBtn>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </Fragment>
+                    )
+                  })}
                   <tr className="bg-gray-50">
                     <td className="px-2 py-2 text-xs font-semibold text-gray-500 text-right">{t('pres_indirect_total')}</td>
                     <td className="px-2 py-2 text-sm font-mono font-bold text-right" style={{color:'#1B3A6B'}}>{fmt(totalIndirecto, moneda)}</td>
