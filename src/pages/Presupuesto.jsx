@@ -5,6 +5,7 @@ import { usePermissions } from '../usePermissions'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
+import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from '../categoriasIndirectos'
 
 const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unidad:'m²', cantidad:'', costo_mo:'', costo_materiales:'', costo_equipos:'' })
 
@@ -24,16 +25,11 @@ export default function Presupuesto() {
   const isEs = lang === 'ES'
   const puedeEditar = can('presupuesto_editar')
 
-  const [indForm, setIndForm]   = useState({ categoria: '', monto_presupuestado: '' })
+  const [indForm, setIndForm]   = useState({ categoria: '', subcategoria: '', monto_presupuestado: '' })
   const [indEdit, setIndEdit]   = useState(null)
   const setIndF = k => e => setIndForm(f => ({ ...f, [k]: e.target.value }))
 
-  const CATS_IND = [
-    { key: 'Administración de obra',              label: t('pres_cat_admin') },
-    { key: 'Instalaciones y servicios generales', label: t('pres_cat_facilities') },
-    { key: 'Seguros, fianzas y garantías',        label: t('pres_cat_insurance') },
-    { key: 'Servicios profesionales y legales',   label: t('pres_cat_professional') },
-  ]
+  const CATS_IND = CAT_KEYS.map(key => ({ key, label: getCategoriaLabel(key, lang) }))
 
   // Auto-sync desde Supabase al seleccionar un proyecto
   // Evita mostrar datos desincronizados del store local
@@ -138,7 +134,7 @@ export default function Presupuesto() {
     } else {
       dispatch({ type: 'ADD_PRES_IND', payload: { ...indForm, proyecto_id: proyId } })
     }
-    setIndForm({ categoria: '', monto_presupuestado: '' })
+    setIndForm({ categoria: '', subcategoria: '', monto_presupuestado: '' })
     setIndEdit(null)
   }
   const tipoLabel = (tipo) => {
@@ -297,10 +293,17 @@ export default function Presupuesto() {
             {puedeEditar && !closed && (
               <div className="flex gap-2 mb-4 flex-wrap">
                 <select className={selectCls + ' flex-1 min-w-[220px]'}
-                  value={indForm.categoria} onChange={setIndF('categoria')}>
+                  value={indForm.categoria} onChange={e=>setIndForm(f=>({...f, categoria: e.target.value, subcategoria: ''}))}>
                   <option value="">{t('pres_indirect_select_cat')}</option>
                   {CATS_IND.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
+                {indForm.categoria && (
+                  <select className={selectCls + ' flex-1 min-w-[200px]'}
+                    value={indForm.subcategoria} onChange={setIndF('subcategoria')}>
+                    <option value="">{isEs?'— Subcategoría (opcional) —':'— Subcategory (optional) —'}</option>
+                    {getSubcategorias(indForm.categoria, lang).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                )}
                 <input type="number" className={inputCls + ' w-36'}
                   placeholder={t('pres_indirect_budget_ph')}
                   value={indForm.monto_presupuestado} onChange={setIndF('monto_presupuestado')}
@@ -309,7 +312,7 @@ export default function Presupuesto() {
                   {indEdit ? t('btn_save') : t('btn_add')}
                 </PrimaryBtn>
                 {indEdit && (
-                  <SecondaryBtn onClick={() => { setIndForm({ categoria: '', monto_presupuestado: '' }); setIndEdit(null) }}>
+                  <SecondaryBtn onClick={() => { setIndForm({ categoria: '', subcategoria: '', monto_presupuestado: '' }); setIndEdit(null) }}>
                     {t('btn_cancel')}
                   </SecondaryBtn>
                 )}
@@ -329,12 +332,13 @@ export default function Presupuesto() {
                     <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                       <td className="px-2 py-2 text-sm text-gray-700">
                         {CATS_IND.find(c => c.key === ind.categoria)?.label ?? ind.categoria}
+                        {ind.subcategoria && <span className="text-xs text-gray-400 block">{ind.subcategoria}</span>}
                       </td>
                       <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{color:'#1B3A6B'}}>{fmt(ind.monto_presupuestado, moneda)}</td>
                       {puedeEditar && (
                         <td className="px-2 py-2">
                           <div className="flex gap-1">
-                            <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
+                            <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria||'', monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
                             <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: ind.id })}>{t('btn_delete')}</TBtn>
                           </div>
                         </td>

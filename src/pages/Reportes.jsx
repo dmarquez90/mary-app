@@ -5,6 +5,7 @@ import { fmt, fmtNum, calcGrandTotal, r2 as round2 } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
+import { CAT_KEYS, getCategoriaLabel } from '../categoriasIndirectos'
 
 const BRAND    = '#1B3A6B'
 const BRAND_HX = '1B3A6B'
@@ -472,7 +473,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
       const even   = idx%2===1
       const status = r.diferencia < 0 ? (isEs?'Sobrecosto':'Overrun') : r.diferencia === 0 ? (isEs?'En punto':'On target') : (isEs?'Ahorro':'Saving')
       const clr    = r.diferencia < 0 ? RED_HX : GREEN_HX
-      const c1=ws4.getCell(r4,1); c1.value=r.categoria; styleData(c1,{even})
+      const c1=ws4.getCell(r4,1); c1.value=r.label; styleData(c1,{even})
       const c2=ws4.getCell(r4,2); c2.value=r.presupuestado; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
       const c3=ws4.getCell(r4,3); c3.value=r.ejecutado;    styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
       const c4=ws4.getCell(r4,4); c4.value=r.diferencia;   styleData(c4,{even,numFmt:'"$"#,##0.00',align:'right',color:clr,bold:true})
@@ -1965,28 +1966,15 @@ export default function Reportes() {
     const indsPres = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
 
     // Comparación indirectos
-    const CATS_IND = isEs ? [
-      'Administración de obra',
-      'Instalaciones y servicios generales',
-      'Seguros, fianzas y garantías',
-      'Servicios profesionales y legales',
-      'Caja Chica',
-    ] : [
-      'Construction Management',
-      'General Installations and Services',
-      'Insurance, Bonds and Guarantees',
-      'Professional and Legal Services',
-      'Petty Cash',
-    ]
     const cajasProy = (state.cajas_chicas||[]).filter(c => c.proyecto_id === proyId && c.estado === 'activa')
-    const comparacionInd = CATS_IND.map(cat => {
-      const presupuestado = parseFloat(indsPres.find(p => p.categoria === cat)?.monto_presupuestado || 0)
-      const esCajaChica = cat === 'Caja Chica' || cat === 'Petty Cash'
+    const comparacionInd = CAT_KEYS.map(cat => {
+      const presupuestado = indsPres.filter(p => p.categoria === cat).reduce((s,p) => s + parseFloat(p.monto_presupuestado||0), 0)
+      const esCajaChica = cat === 'Caja Chica'
       const ejecutado = esCajaChica
         ? cajasProy.reduce((s,c) => s + (parseFloat(c.monto_asignado)||0), 0)
-        : inds.filter(c => c.categoria === cat || c.categoria?.includes(cat.split(' ')[0]))
+        : inds.filter(c => c.categoria === cat)
               .reduce((s,c) => s + parseFloat(c.monto||0), 0)
-      return { categoria: cat, presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
+      return { categoria: cat, label: getCategoriaLabel(cat, lang), presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
     }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
 
     // Órdenes de Cambio del proyecto
@@ -2382,7 +2370,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                 const clr    = r.diferencia < 0 ? '#ef4444' : '#1D9E75'
                 return (
                   <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                    <td className={tdC}>{r.categoria}</td>
+                    <td className={tdC}>{r.label}</td>
                     <td className={tdC+' text-right font-mono'}>{fmt(r.presupuestado,moneda)}</td>
                     <td className={tdC+' text-right font-mono'}>{fmt(r.ejecutado,moneda)}</td>
                     <td className={tdC+' text-right font-mono font-bold'} style={{color:clr}}>{r.diferencia>=0?'+':''}{fmt(r.diferencia,moneda)}</td>
