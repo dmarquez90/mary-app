@@ -867,6 +867,11 @@ useEffect(() => {
           await supabase.from('avaluos_cliente_items').delete().in('avaluo_id', avsCli.map(a => a.id))
           await supabase.from('avaluos_cliente').delete().eq('proyecto_id', pid)
         }
+        // ── Caja Chica (v1.1) — reembolsos_personal.proyecto_id es NO ACTION,
+        // se borra explícito; gastos_caja_chica / liquidaciones_caja_chica /
+        // reembolsos_personal (via liquidacion_id) caen en cascada al borrar cajas_chicas ──
+        await supabase.from('reembolsos_personal').delete().eq('proyecto_id', pid)
+        await supabase.from('cajas_chicas').delete().eq('proyecto_id', pid)
         const { error: eP } = await supabase.from('proyectos').delete().eq('id', pid)
         if (eP) {
           console.error('DEL_PROYECTO — proyectos:', JSON.stringify(eP))
