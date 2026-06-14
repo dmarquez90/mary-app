@@ -595,6 +595,11 @@ useEffect(() => {
         break
       }
       case 'DEL_PRES_IND': {
+        const item = state.presupuesto_indirectos.find(p => p.id === action.payload)
+        if (item && (item.categoria === 'Caja Chica' || item.categoria === 'Petty Cash')) {
+          const cajaActiva = state.cajas_chicas.find(c => c.proyecto_id === item.proyecto_id && c.estado === 'activa')
+          if (cajaActiva) { console.warn('[MARY] DEL_PRES_IND bloqueado — caja chica activa en el proyecto'); break }
+        }
         await supabase.from('presupuesto_indirectos').delete().eq('id', action.payload)
         dispatch({ type: 'DEL_PRES_IND', payload: action.payload })
         break
@@ -787,14 +792,27 @@ useEffect(() => {
 
       case 'ADD_PROYECTO': {
         const code = genProjectCode(state.proyectos)
-        const item = { ...action.payload, id: uuid(), project_code: code, created_at: today(), tenant_id: tenantId }
-        await supabase.from('proyectos').insert(item)
+        const item = {
+          ...action.payload, id: uuid(), project_code: code, created_at: today(), tenant_id: tenantId,
+          utilidad_pct: parseFloat(action.payload.utilidad_pct) || 0,
+          impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
+          fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
+        }
+        const { error } = await supabase.from('proyectos').insert(item)
+        if (error) { console.error('ADD_PROYECTO:', JSON.stringify(error)); break }
         dispatch({ type: 'ADD_PROYECTO', payload: item })
         break
       }
       case 'UPD_PROYECTO': {
-        await supabase.from('proyectos').update(action.payload).eq('id', action.payload.id)
-        dispatch(action)
+        const fields = {
+          ...action.payload,
+          utilidad_pct: parseFloat(action.payload.utilidad_pct) || 0,
+          impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
+          fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
+        }
+        const { error } = await supabase.from('proyectos').update(fields).eq('id', fields.id)
+        if (error) { console.error('UPD_PROYECTO:', JSON.stringify(error)); break }
+        dispatch({ type: 'UPD_PROYECTO', payload: fields })
         break
       }
       case 'DEL_PROYECTO': {

@@ -7,7 +7,7 @@ import { today, fmt, fmtNum, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
 import { useAuth } from '../auth'
 import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
-import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc } from '../pages/Reportes'
+import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc, buildPettyCashReceipt } from '../pages/Reportes'
 
 // ── CATEGORÍAS DE COSTOS INDIRECTOS ──────────────────────────────────────
 export default function Financiero() {
@@ -669,8 +669,8 @@ export default function Financiero() {
 
           {/* ── TAB 5: CAJA CHICA ─────────────────────────────────────── */}
           {tab === 5 && <CajaChicaModule
-            proyId={proyId} moneda={moneda} puedeEditar={puedeEditar} closed={closed}
-            isEs={isEs} t={t} fmt={fmt}
+            proyId={proyId} proy={proy} moneda={moneda} puedeEditar={puedeEditar} closed={closed}
+            isEs={isEs} lang={lang} t={t} fmt={fmt}
             acts={acts}
             can={can} rol={rol}
             currentUserId={currentUserId}
@@ -678,6 +678,7 @@ export default function Financiero() {
             liquidaciones_caja_chica={liquidaciones_caja_chica} reembolsos_personal={reembolsos_personal}
             usuarios={usuarios}
             presupuesto_indirectos={presupuesto_indirectos}
+            nombreEmpresa={nombreEmpresa}
             dispatch={dispatch}
           />}
         </>
@@ -2013,9 +2014,9 @@ Total: `)
 
 // ── CAJA CHICA (v1.1) ────────────────────────────────────────────────────
 function CajaChicaModule({
-  proyId, moneda, puedeEditar, closed, isEs, t, fmt, acts, can, rol,
+  proyId, proy, moneda, puedeEditar, closed, isEs, lang, t, fmt, acts, can, rol,
   currentUserId, cajas_chicas, gastos_caja_chica, liquidaciones_caja_chica, reembolsos_personal,
-  usuarios, presupuesto_indirectos, dispatch,
+  usuarios, presupuesto_indirectos, nombreEmpresa, dispatch,
 }) {
   const thCls = 'px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap'
   const tdCls = 'px-4 py-3 text-sm text-gray-700'
@@ -2038,8 +2039,11 @@ function CajaChicaModule({
   const disponibleCC = presCCMonto - otrasCajas.reduce((s,c)=>s+parseFloat(c.monto_asignado||0),0)
 
   // ── Formulario: abrir caja chica ──
-  const [montoNuevaCaja, setMontoNuevaCaja] = useState('')
+  // Si hay presupuesto de Caja Chica con saldo disponible, se sugiere ese monto por defecto.
+  const [montoNuevaCaja, setMontoNuevaCaja] = useState(() => disponibleCC > 0 ? String(disponibleCC) : '')
   const [responsableNueva, setResponsableNueva] = useState(currentUserId || '')
+  const [metodoEntrega, setMetodoEntrega] = useState('efectivo')
+  const [referenciaEntrega, setReferenciaEntrega] = useState('')
 
   const abrirCaja = () => {
     const monto = parseFloat(montoNuevaCaja)||0
@@ -2048,8 +2052,23 @@ function CajaChicaModule({
       alert(t('cc_alert_exceeds_budget', { amount: `$${disponibleCC.toFixed(2)}` }))
       return
     }
-    dispatch({ type:'ADD_CAJA_CHICA', payload: { proyecto_id: proyId, responsable_id: responsableNueva||null, monto_asignado: monto } })
+    dispatch({ type:'ADD_CAJA_CHICA', payload: {
+      proyecto_id: proyId, responsable_id: responsableNueva||null, monto_asignado: monto,
+      metodo_entrega: metodoEntrega, referencia_entrega: referenciaEntrega||null,
+    }})
+
+    // Genera el comprobante de entrega del fondo (Excel, según idioma activo)
+    const responsableUsr = usuarios.find(u => u.id === responsableNueva)
+    buildPettyCashReceipt({
+      caja: { monto_asignado: monto, metodo_entrega: metodoEntrega, referencia_entrega: referenciaEntrega },
+      proy,
+      responsable: responsableUsr ? { nombre: responsableUsr.nombre, email: responsableUsr.email, rol: responsableUsr.rol } : null,
+      lang,
+      nombreEmpresa,
+    }).catch(e => console.error('buildPettyCashReceipt:', e))
+
     setMontoNuevaCaja('')
+    setReferenciaEntrega('')
   }
 
   const aprobarCaja  = () => dispatch({ type:'APROBAR_CAJA_CHICA', payload: cajaPendiente.id })
@@ -2181,6 +2200,18 @@ function CajaChicaModule({
               {usuarios.map(u=><option key={u.id} value={u.id}>{u.nombre||u.email}</option>)}
             </select>
           </Field>
+          <Field label={t('cc_delivery_method')}>
+            <select className={selectCls} value={metodoEntrega} onChange={e=>setMetodoEntrega(e.target.value)}>
+              <option value="efectivo">{t('cc_method_cash')}</option>
+              <option value="cheque">{t('cc_method_check')}</option>
+              <option value="transferencia">{t('cc_method_transfer')}</option>
+            </select>
+          </Field>
+          {metodoEntrega !== 'efectivo' && (
+            <Field label={t('cc_delivery_reference')}>
+              <input className={inputCls} value={referenciaEntrega} onChange={e=>setReferenciaEntrega(e.target.value)} placeholder={t('cc_delivery_reference_ph')}/>
+            </Field>
+          )}
           <PrimaryBtn onClick={abrirCaja}>
             {puedeAbrirDirecto ? t('cc_open_btn') : t('cc_request_btn')}
           </PrimaryBtn>
@@ -2201,11 +2232,23 @@ function CajaChicaModule({
         <StatCard label={t('cc_responsible')} value={nombreUsuario(caja.responsable_id)} />
       </div>
 
-      {puedeCerrar && !closed && (
-        <div className="flex justify-end">
-          <button onClick={cerrarCaja} className="text-xs px-3 py-2 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
-            {t('cc_close_fund')}
+      {(puedeCerrar || puedeAbrirDirecto) && (
+        <div className="flex justify-end gap-2">
+          <button onClick={()=>{
+            const responsableUsr = usuarios.find(u => u.id === caja.responsable_id)
+            buildPettyCashReceipt({
+              caja, proy,
+              responsable: responsableUsr ? { nombre: responsableUsr.nombre, email: responsableUsr.email, rol: responsableUsr.rol } : null,
+              lang, nombreEmpresa,
+            }).catch(e => console.error('buildPettyCashReceipt:', e))
+          }} className="text-xs px-3 py-2 rounded-lg text-[#1B3A6B] border border-[#D6E4F0] hover:bg-[#EEF2F7]">
+            {t('cc_generate_receipt')}
           </button>
+          {puedeCerrar && !closed && (
+            <button onClick={cerrarCaja} className="text-xs px-3 py-2 rounded-lg text-red-500 border border-red-200 hover:bg-red-50">
+              {t('cc_close_fund')}
+            </button>
+          )}
         </div>
       )}
 

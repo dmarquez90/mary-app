@@ -13,7 +13,7 @@ export default function Presupuesto() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
   const { can } = usePermissions()
-  const { proyectos, presupuesto, presupuesto_indirectos = [] } = state
+  const { proyectos, presupuesto, presupuesto_indirectos = [], cajas_chicas = [] } = state
 
   const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
   const [drawer, setDrawer]         = useState(false)
@@ -28,6 +28,19 @@ export default function Presupuesto() {
   const [indForm, setIndForm]   = useState({ categoria: '', subcategoria: '', monto_presupuestado: '' })
   const [indEdit, setIndEdit]   = useState(null)
   const setIndF = k => e => setIndForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Bloquea eliminar el indirecto "Caja Chica" mientras haya un fondo activo en este proyecto.
+  const eliminarPresInd = (item) => {
+    const esCajaChica = item.categoria === 'Caja Chica' || item.categoria === 'Petty Cash'
+    if (esCajaChica) {
+      const cajaActiva = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'activa')
+      if (cajaActiva) {
+        alert(t('pres_ind_alert_cc_active'))
+        return
+      }
+    }
+    dispatch({ type: 'DEL_PRES_IND', payload: item.id })
+  }
 
   const CATS_IND = CAT_KEYS.map(key => ({ key, label: getCategoriaLabel(key, lang) }))
 
@@ -365,7 +378,7 @@ export default function Presupuesto() {
                               {isSimple && (
                                 <div className="flex gap-1">
                                   <TBtn onClick={() => { setIndForm({ categoria: item0.categoria, subcategoria: item0.subcategoria||'', monto_presupuestado: item0.monto_presupuestado }); setIndEdit(item0.id) }}>{t('btn_edit')}</TBtn>
-                                  <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: item0.id })}>{t('btn_delete')}</TBtn>
+                                  <TBtn danger onClick={() => eliminarPresInd(item0)}>{t('btn_delete')}</TBtn>
                                 </div>
                               )}
                             </td>
@@ -389,7 +402,7 @@ export default function Presupuesto() {
                               <td className="px-2 py-2">
                                 <div className="flex gap-1">
                                   <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria||'', monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
-                                  <TBtn danger onClick={() => dispatch({ type: 'DEL_PRES_IND', payload: ind.id })}>{t('btn_delete')}</TBtn>
+                                  <TBtn danger onClick={() => eliminarPresInd(ind)}>{t('btn_delete')}</TBtn>
                                 </div>
                               </td>
                             )}

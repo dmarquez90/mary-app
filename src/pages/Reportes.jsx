@@ -5,7 +5,6 @@ import { fmt, fmtNum, calcGrandTotal, r2 as round2 } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
-import { CAT_KEYS, getCategoriaLabel } from './categoriasIndirectos'
 
 const BRAND    = '#1B3A6B'
 const BRAND_HX = '1B3A6B'
@@ -262,74 +261,8 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     const c7 = ws1.getCell(row,7); c7.value=status;        styleData(c7,{even,color:pctUsado<=100?GREEN_HX:RED_HX,bold:true})
     row++
   })
-  row += 2
 
-  // ── Resumen de impuestos (v1.2) ──
-  if (data.totalImpFavor > 0 || data.totalImpPagar > 0) {
-    row = addSectionTitle(ws1, row, isEs?'RESUMEN DE IMPUESTOS':'TAX SUMMARY', COLS)
-    ws1.getRow(row).height = 18
-    ;[isEs?'Categoría':'Category', isEs?'Impuesto a favor (pagado)':'Tax credit (paid)', isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)','','','',''].forEach((h,i) => {
-      const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
-    })
-    row++
-    data.resumenImpuestos.filter(r=>r.favor>0||r.pagar>0).forEach((r,i) => {
-      ws1.getRow(row).height = 17
-      const even = i % 2 === 1
-      const c1 = ws1.getCell(row,1); c1.value=r.categoria; styleData(c1,{even})
-      const c2 = ws1.getCell(row,2); c2.value=r.favor; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
-      const c3 = ws1.getCell(row,3); c3.value=r.pagar; styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
-      ws1.mergeCells(row,4,row,COLS)
-      row++
-    })
-    ws1.getRow(row).height = 18
-    const tl = ws1.getCell(row,1); tl.value=isEs?'TOTAL':'TOTAL'; styleTotal(tl)
-    const tf = ws1.getCell(row,2); tf.value=data.totalImpFavor; tf.numFmt='"$"#,##0.00'; styleTotal(tf)
-    const tp = ws1.getCell(row,3); tp.value=data.totalImpPagar; tp.numFmt='"$"#,##0.00'; styleTotal(tp)
-    ws1.mergeCells(row,4,row,COLS)
-    row++
-    ws1.getRow(row).height = 17
-    ws1.mergeCells(row,1,row,2)
-    const sl = ws1.getCell(row,1); sl.value=isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'; styleLabel(sl)
-    const sv = ws1.getCell(row,3); sv.value=data.saldoNetoImpuestos; sv.numFmt='"$"#,##0.00'
-    styleData(sv,{bold:true,align:'right',color:data.saldoNetoImpuestos>0?RED_HX:GREEN_HX})
-    ws1.mergeCells(row,4,row,COLS)
-    row += 2
-  }
-
-  // ── Retenciones a subcontratistas (v1.2) ──
-  if (data.retenciones?.length > 0) {
-    row = addSectionTitle(ws1, row, isEs?'RETENCIONES A SUBCONTRATISTAS':'SUBCONTRACTOR RETENTIONS', COLS)
-    ws1.getRow(row).height = 18
-    ;[isEs?'Subcontratista':'Subcontractor', isEs?'Avalúo #':'Valuation #', isEs?'% Retención':'Retention %',
-      isEs?'Monto retenido':'Amount retained', isEs?'Fecha retención':'Retention date',
-      isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status'
-    ].forEach((h,i) => { const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c) })
-    row++
-    const STATUS_LBL = { retenida: isEs?'Retenida':'Retained', devuelta: isEs?'Devuelta':'Released', pagada: isEs?'Pagada':'Paid' }
-    let totRetenido = 0
-    data.retenciones.forEach((r,i) => {
-      ws1.getRow(row).height = 17
-      const even = i % 2 === 1
-      const vencida = r.fecha_devolucion_est && new Date(r.fecha_devolucion_est) <= new Date() && r.estado === 'retenida'
-      const monto = parseFloat(r.monto_retenido||0)
-      totRetenido += monto
-      const c1=ws1.getCell(row,1); c1.value=r.subcontratista||'—'; styleData(c1,{even})
-      const c2=ws1.getCell(row,2); c2.value=`#${r.numero_avaluo||'—'}`; styleData(c2,{even})
-      const c3=ws1.getCell(row,3); c3.value=parseFloat(r.retencion_pct||0)/100; styleData(c3,{even,numFmt:'0.0%',align:'right'})
-      const c4=ws1.getCell(row,4); c4.value=monto; styleData(c4,{even,numFmt:'"$"#,##0.00',align:'right',bold:true})
-      const c5=ws1.getCell(row,5); c5.value=r.fecha_retencion||'—'; styleData(c5,{even})
-      const c6=ws1.getCell(row,6); c6.value=r.fecha_devolucion_est||'—'; styleData(c6,{even})
-      const c7=ws1.getCell(row,7); c7.value=vencida?(isEs?'Vencida':'Overdue'):(STATUS_LBL[r.estado]||r.estado)
-      styleData(c7,{even,bold:true,color:vencida||r.estado==='retenida'?(vencida?RED_HX:'F59E0B'):GREEN_HX})
-      row++
-    })
-    ws1.getRow(row).height = 18
-    ws1.mergeCells(row,1,row,3)
-    const tl = ws1.getCell(row,1); tl.value=isEs?'TOTAL RETENIDO':'TOTAL RETAINED'; styleTotal(tl)
-    const tv = ws1.getCell(row,4); tv.value=totRetenido; tv.numFmt='"$"#,##0.00'; styleTotal(tv)
-    ws1.mergeCells(row,5,row,COLS)
-    const tve = ws1.getCell(row,5); tve.value=''; styleTotal(tve)
-  }
+  // ── HOJA 2: Detalle por categoría ──
   const ws2 = wb.addWorksheet(isEs?'Detalle por Categoría':'Detail by Category')
   setCols(ws2, [14, 20, 35, 22, 16, 16, 16])
   let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
@@ -473,7 +406,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
       const even   = idx%2===1
       const status = r.diferencia < 0 ? (isEs?'Sobrecosto':'Overrun') : r.diferencia === 0 ? (isEs?'En punto':'On target') : (isEs?'Ahorro':'Saving')
       const clr    = r.diferencia < 0 ? RED_HX : GREEN_HX
-      const c1=ws4.getCell(r4,1); c1.value=r.label; styleData(c1,{even})
+      const c1=ws4.getCell(r4,1); c1.value=r.categoria; styleData(c1,{even})
       const c2=ws4.getCell(r4,2); c2.value=r.presupuestado; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
       const c3=ws4.getCell(r4,3); c3.value=r.ejecutado;    styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
       const c4=ws4.getCell(r4,4); c4.value=r.diferencia;   styleData(c4,{even,numFmt:'"$"#,##0.00',align:'right',color:clr,bold:true})
@@ -907,320 +840,212 @@ export async function buildOPR({ orden, retenciones, contrato, proy, usuario, la
   saveAs(new Blob([buf]), `OPR_${orden.numero_orden}_${orden.subcontratista.replace(/\s+/g,'_')}_${orden.fecha_orden}.xlsx`)
 }
 
-// ── HELPERS COMUNES: DESGLOSE POR ACTIVIDAD Y FIRMAS ──────────────────────
-function avaluoDesglose({ avaluo, avaluoItems, itemsContrato, presupuesto }) {
-  return avaluoItems
-    .filter(ai => ai.avaluo_id === avaluo.id)
-    .map(ai => {
-      const it  = itemsContrato.find(x => x.id === ai.subcontrato_item_id)
-      const act = presupuesto.find(p => p.id === it?.actividad_id)
-      return {
-        actividad:  act ? `${act.code} — ${act.descripcion}` : '—',
-        descripcion: it?.descripcion || '—',
-        unidad:      it?.unidad || 'und',
-        costo_unitario:     parseFloat(ai.costo_unitario||0),
-        cantidad_anterior:  parseFloat(ai.cantidad_anterior||0),
-        cantidad_actual:    parseFloat(ai.cantidad_actual||0),
-        cantidad_acumulada: parseFloat(ai.cantidad_acumulada||0),
-        monto_actual:       parseFloat(ai.monto_actual||0),
-      }
-    })
-}
+// ── COMPROBANTE DE ENTREGA DE FONDO DE CAJA CHICA ──────────────────────────
+export async function buildPettyCashReceipt({ caja, proy, responsable, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs  = lang === 'ES'
+  const COLS  = 6
+  const wb    = new ExcelJS.Workbook()
+  wb.creator  = `MARY ERP — ${nombreEmpresa}`
+  wb.created  = new Date()
 
-function addFirmasBlock(ws, row, COLS, isEs) {
-  ws.getRow(row).height = 18
-  ws.mergeCells(row, 1, row, COLS)
-  const sec = ws.getCell(row, 1)
-  sec.value = isEs ? 'AUTORIZACIONES Y FIRMAS' : 'AUTHORIZATIONS AND SIGNATURES'
-  styleSectionTitle(sec)
-  row++
-  const mid = Math.ceil(COLS/2)
-  const firmantes = [
-    { label: isEs ? 'Preparado por' : 'Prepared by',   cargo: isEs ? 'Administrador de Proyecto' : 'Project Administrator' },
-    { label: isEs ? 'Recibido por (Subcontratista)' : 'Received by (Subcontractor)', cargo: isEs ? 'Representante' : 'Representative' },
-  ]
-  ws.getRow(row).height = 24
-  ws.mergeCells(row, 1, row, mid)
-  const l1 = ws.getCell(row, 1); l1.value=''; l1.border = { bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } } }
-  ws.mergeCells(row, mid+1, row, COLS)
-  const l2 = ws.getCell(row, mid+1); l2.value=''; l2.border = { bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } } }
-  row++
-  ws.getRow(row).height = 16
-  firmantes.forEach((f, i) => {
-    const c1 = i===0 ? 1 : mid+1
-    const c2 = i===0 ? mid : COLS
-    ws.mergeCells(row, c1, row, c2)
-    const c = ws.getCell(row, c1)
-    c.value = `${f.label} — ${f.cargo}`
-    c.font  = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF1B3A6B' } }
-    c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
-    c.alignment = { horizontal: 'center', vertical: 'middle' }
-    c.border = border()
+  const BRAND = '1B3A6B'
+  const GREEN = '1D9E75'
+  const LIGHT = 'EEF2F7'
+
+  const bord = () => ({
+    top:    { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    bottom: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    left:   { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    right:  { style: 'thin', color: { argb: 'FFD0D7DE' } },
   })
-  return row + 2
-}
+  const thickB = () => ({
+    top:    { style: 'medium', color: { argb: 'FF' + BRAND } },
+    bottom: { style: 'medium', color: { argb: 'FF' + BRAND } },
+    left:   { style: 'medium', color: { argb: 'FF' + BRAND } },
+    right:  { style: 'medium', color: { argb: 'FF' + BRAND } },
+  })
 
-// ── EXPORT COMPROBANTE DE AVALÚO (individual) ─────────────────────────────
-export async function buildAvaluoComprobante({ avaluo, contrato, itemsContrato, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
-  const isEs = lang === 'ES'
-  const COLS = 8
-  const wb   = new ExcelJS.Workbook()
-  wb.creator = 'MARY ERP'
-  const fechaHoy  = new Date().toLocaleDateString(isEs?'es':'en-US')
+  const fechaHoy  = new Date().toLocaleDateString(isEs ? 'es' : 'en-US')
   const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
-  const moneda    = contrato.moneda || proy?.moneda || 'USD'
+  const moneda    = proy?.moneda || 'USD'
 
-  const ws = wb.addWorksheet(isEs?'Comprobante de Avalúo':'Valuation Voucher')
-  setCols(ws, [26, 24, 10, 12, 12, 12, 12, 14])
-  let row = addHeaderBlock(ws, isEs?`Comprobante de Avalúo #${avaluo.numero}`:`Valuation Voucher #${avaluo.numero}`,
-    nombreEmpresa, proyLabel, `${avaluo.periodo_inicio||'—'} → ${avaluo.periodo_fin||'—'}`, fechaHoy, COLS)
+  const ws = wb.addWorksheet(isEs ? 'Comprobante Caja Chica' : 'Petty Cash Receipt')
+  setCols(ws, [20, 20, 14, 16, 14, 16])
 
-  // Datos del subcontratista
-  row = addSectionTitle(ws, row, isEs?'DATOS DEL SUBCONTRATO':'SUBCONTRACT INFORMATION', COLS)
-  ;[
-    [isEs?'Subcontratista:':'Subcontractor:', contrato.subcontratista],
-    [isEs?'Descripción del contrato:':'Contract description:', contrato.descripcion||'—'],
-    [isEs?'Fecha de elaboración:':'Elaboration date:', avaluo.fecha_elaboracion||'—'],
-  ].forEach(([lbl,val]) => {
-    ws.getRow(row).height = 17
-    ws.mergeCells(row,1,row,2)
-    const lc = ws.getCell(row,1); lc.value = lbl; styleLabel(lc)
-    ws.mergeCells(row,3,row,COLS)
-    const vc = ws.getCell(row,3); vc.value = val; vc.font={size:10,name:'Arial'}; vc.border=border(); vc.alignment={vertical:'middle'}
-    row++
-  })
-  row++
+  const cell  = (r, c) => ws.getCell(r, c)
+  const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
 
-  // Desglose por actividad
-  row = addSectionTitle(ws, row, isEs?'DESGLOSE POR ACTIVIDAD':'BREAKDOWN BY ACTIVITY', COLS)
-  ws.getRow(row).height = 28
-  ;[isEs?'Actividad':'Activity', isEs?'Descripción del ítem':'Item description', isEs?'Unidad':'Unit',
-    isEs?'Costo unit.':'Unit cost', isEs?'Cant. anterior':'Prev. qty', isEs?'Cant. actual':'Current qty',
-    isEs?'Cant. acumulada':'Accum. qty', isEs?'Monto actual':'Current amount'
-  ].forEach((h,i) => { const c = ws.getCell(row,i+1); c.value=h; styleHeader(c) })
-  row++
+  // ── HEADER ──────────────────────────────────────────────────────────────
+  ws.getRow(1).height = 34
+  merge(1, 1, 1, 2)
+  const h1 = cell(1, 1)
+  h1.value     = nombreEmpresa
+  h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h1.alignment = { vertical: 'middle' }
+  h1.border    = thickB()
 
-  const desglose = avaluoDesglose({ avaluo, avaluoItems, itemsContrato, presupuesto })
-  desglose.forEach((d, i) => {
-    ws.getRow(row).height = 17
-    const even = i % 2 === 1
-    const vals = [d.actividad, d.descripcion, d.unidad, d.costo_unitario, d.cantidad_anterior, d.cantidad_actual, d.cantidad_acumulada, d.monto_actual]
-    vals.forEach((v, ci) => {
-      const c = ws.getCell(row, ci+1)
-      const num = ci >= 3
-      styleData(c, { even, align: num?'right':'left', numFmt: ci===3||ci===7 ? '"$"#,##0.00' : ci>=4 ? '#,##0.00' : undefined, bold: ci===7 })
-      c.value = v
-    })
-    row++
-  })
+  merge(1, 3, 1, 4)
+  const h2 = cell(1, 3)
+  h2.value     = isEs ? 'COMPROBANTE DE ENTREGA DE FONDO — CAJA CHICA' : 'PETTY CASH FUND DELIVERY RECEIPT'
+  h2.font      = { bold: true, size: 12, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  h2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+  h2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h2.border    = thickB()
+
+  merge(1, 5, 1, COLS)
+  const h3 = cell(1, 5)
+  h3.value     = `MARY ERP\n${fechaHoy}`
+  h3.font      = { size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h3.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h3.border    = thickB()
+
+  // ── INFO GENERAL ────────────────────────────────────────────────────────
+  ws.getRow(2).height = 18
+  merge(2, 1, 2, 3)
+  const i1 = cell(2, 1); i1.value = `${isEs?'Proyecto':'Project'}: ${proyLabel}`
+  i1.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i1.alignment = { vertical: 'middle' }; i1.border = thickB()
+
+  merge(2, 4, 2, COLS)
+  const i2 = cell(2, 4); i2.value = `${isEs?'Fecha de entrega':'Delivery date'}: ${fechaHoy}`
+  i2.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i2.alignment = { vertical: 'middle' }; i2.border = thickB()
+
+  // ── SECCIÓN: DATOS DEL FONDO ────────────────────────────────────────────
+  let row = 4
   ws.getRow(row).height = 18
-  ws.mergeCells(row,1,row,7)
-  const tl = ws.getCell(row,1); tl.value = isEs?'SUBTOTAL DEL AVALÚO':'VALUATION SUBTOTAL'; styleTotal(tl)
-  const tv = ws.getCell(row,8); tv.value = parseFloat(avaluo.subtotal||0); tv.numFmt='"$"#,##0.00'; styleTotal(tv)
-  row += 2
-
-  // Resumen del avalúo
-  row = addSectionTitle(ws, row, isEs?'RESUMEN DEL AVALÚO':'VALUATION SUMMARY', COLS)
-  const resumenRows = [
-    [isEs?'Subtotal':'Subtotal', parseFloat(avaluo.subtotal||0)],
-    [isEs?`Impuesto`:'Tax', parseFloat(avaluo.impuesto_monto||0)],
-    [isEs?'Total avalúo':'Valuation total', parseFloat(avaluo.monto_total||0)],
-    [isEs?`Retención (${parseFloat(avaluo.retencion_pct||0)}%)`:`Retention (${parseFloat(avaluo.retencion_pct||0)}%)`, -parseFloat(avaluo.retencion_monto||0)],
-    [isEs?'Monto a pagar':'Amount to pay', parseFloat(avaluo.monto_a_pagar||0)],
-  ]
-  resumenRows.forEach(([lbl,val], i) => {
-    ws.getRow(row).height = 17
-    const isLast = i === resumenRows.length-1
-    ws.mergeCells(row,1,row,6)
-    const lc = ws.getCell(row,1); lc.value=lbl; isLast ? styleTotal(lc) : styleLabel(lc)
-    if (isLast) ws.getCell(row,1).alignment = { horizontal:'right', vertical:'middle' }
-    ws.mergeCells(row,7,row,COLS)
-    const vc = ws.getCell(row,7); vc.value=val; vc.numFmt='"$"#,##0.00'
-    if (isLast) styleTotal(vc)
-    else styleData(vc, { bold:true, align:'right', color: val<0?RED_HX:'000000' })
-    row++
-  })
+  merge(row, 1, row, COLS)
+  let sec = cell(row, 1)
+  sec.value = isEs ? 'DATOS DEL FONDO' : 'FUND INFORMATION'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
   row++
 
-  // Estado
-  ws.getRow(row).height = 17
-  ws.mergeCells(row,1,row,3)
-  const el = ws.getCell(row,1); el.value = isEs?'Estado:':'Status:'; styleLabel(el)
-  ws.mergeCells(row,4,row,COLS)
-  const ev = ws.getCell(row,4)
-  ev.value = avaluo.estado === 'aprobado' ? (isEs?'Aprobado':'Approved') : avaluo.estado === 'rechazado' ? (isEs?'Rechazado':'Rejected') : (isEs?'Borrador':'Draft')
-  ev.font  = { bold:true, size:10, name:'Arial', color:{argb:'FF'+(avaluo.estado==='aprobado'?GREEN_HX:avaluo.estado==='rechazado'?RED_HX:'94A3B8')} }
-  ev.border = border(); ev.alignment = { vertical:'middle' }
-  row += 2
-
-  row = addFirmasBlock(ws, row, COLS, isEs)
-
-  ws.getRow(row).height = 14
-  ws.mergeCells(row,1,row,COLS)
-  const ft = ws.getCell(row,1)
-  ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
-  ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
-  ft.alignment = { horizontal: 'center', vertical: 'middle' }
-
-  const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `Avaluo_${avaluo.numero}_${contrato.subcontratista.replace(/\s+/g,'_')}_${avaluo.fecha_elaboracion||fechaHoy}.xlsx`)
-}
-
-// ── EXPORT DOCUMENTO COMPLETO DE SUBCONTRATO ──────────────────────────────
-export async function buildSubcontratoDoc({ contrato, itemsContrato, avaluos, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
-  const isEs = lang === 'ES'
-  const COLS = 8
-  const wb   = new ExcelJS.Workbook()
-  wb.creator = 'MARY ERP'
-  const fechaHoy  = new Date().toLocaleDateString(isEs?'es':'en-US')
-  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
-  const moneda    = contrato.moneda || proy?.moneda || 'USD'
-
-  const avaluosAprobados = avaluos.filter(a => a.subcontrato_id === contrato.id && a.estado === 'aprobado')
-                                   .sort((a,b) => a.numero - b.numero)
-  const totalValuado  = avaluosAprobados.reduce((s,a) => s + parseFloat(a.monto_total||0), 0)
-  const totalRetenido = avaluosAprobados.reduce((s,a) => s + parseFloat(a.retencion_monto||0), 0)
-
-  const ws = wb.addWorksheet(isEs?'Contrato':'Contract')
-  setCols(ws, [26, 24, 10, 12, 12, 12, 12, 14])
-  let row = addHeaderBlock(ws, isEs?'Contrato de Subcontratación':'Subcontract Agreement',
-    nombreEmpresa, proyLabel, null, fechaHoy, COLS)
-
-  // Datos generales
-  row = addSectionTitle(ws, row, isEs?'DATOS DEL SUBCONTRATISTA':'SUBCONTRACTOR INFORMATION', COLS)
-  ;[
-    [isEs?'Subcontratista:':'Subcontractor:', contrato.subcontratista],
-    [isEs?'Descripción:':'Description:', contrato.descripcion||'—'],
-    [isEs?'Fecha del contrato:':'Contract date:', contrato.fecha_contrato||'—'],
-    [isEs?'Vigencia:':'Term:', `${contrato.fecha_inicio||'—'} → ${contrato.fecha_fin||'—'}`],
-    [isEs?'Estado:':'Status:', contrato.estado === 'activo' ? (isEs?'Activo':'Active') : contrato.estado === 'completado' ? (isEs?'Completado':'Completed') : contrato.estado],
-  ].forEach(([lbl,val]) => {
-    ws.getRow(row).height = 17
-    ws.mergeCells(row,1,row,2)
-    const lc = ws.getCell(row,1); lc.value = lbl; styleLabel(lc)
-    ws.mergeCells(row,3,row,COLS)
-    const vc = ws.getCell(row,3); vc.value = val; vc.font={size:10,name:'Arial'}; vc.border=border(); vc.alignment={vertical:'middle'}
-    row++
-  })
-  row++
-
-  // KPIs
-  row = addSectionTitle(ws, row, isEs?'RESUMEN ECONÓMICO':'FINANCIAL SUMMARY', COLS)
-  const kpis = [
-    [isEs?'Monto del contrato':'Contract amount', parseFloat(contrato.monto_total||0)],
-    [isEs?'Avaluado (aprobado)':'Valued (approved)', totalValuado],
-    [isEs?'Saldo':'Balance', parseFloat(contrato.monto_total||0) - totalValuado],
-    [isEs?`Retención (${parseFloat(contrato.retencion_pct||0)}%)`:`Retention (${parseFloat(contrato.retencion_pct||0)}%)`, totalRetenido],
-  ]
-  kpis.forEach(([lbl,val], i) => {
-    ws.getRow(row).height = 17
-    const even = i % 2 === 1
-    ws.mergeCells(row,1,row,4)
-    const lc = ws.getCell(row,1); lc.value=lbl; styleLabel(lc)
-    ws.mergeCells(row,5,row,COLS)
-    const vc = ws.getCell(row,5); vc.value=val; vc.numFmt='"$"#,##0.00'; styleData(vc,{even,bold:true,align:'right',color:i===2&&val<0?RED_HX:'000000'})
-    row++
-  })
-  row++
-
-  // Items del contrato
-  row = addSectionTitle(ws, row, isEs?'ACTIVIDADES DEL CONTRATO':'CONTRACT ACTIVITIES', COLS)
-  ws.getRow(row).height = 18
-  ;[isEs?'Descripción':'Description', isEs?'Actividad presupuesto':'Budget activity', isEs?'Unidad':'Unit',
-    isEs?'Cant. contrato':'Contract qty', isEs?'Costo unit.':'Unit cost', isEs?'Total':'Total',
-    isEs?'Acumulado':'Accumulated', isEs?'Saldo':'Balance'
-  ].forEach((h,i) => { const c = ws.getCell(row,i+1); c.value=h; styleHeader(c) })
-  row++
-
-  itemsContrato.forEach((it, i) => {
-    const act = presupuesto.find(p => p.id === it.actividad_id)
-    const acumulado = avaluoItems
-      .filter(ai => ai.subcontrato_item_id === it.id && avaluosAprobados.some(a => a.id === ai.avaluo_id))
-      .reduce((s,ai) => s + (parseFloat(ai.monto_actual)||0), 0)
-    const total  = parseFloat(it.costo_total||0)
-    const saldo  = total - acumulado
-    ws.getRow(row).height = 17
-    const even = i % 2 === 1
-    const vals = [it.descripcion, act ? `${act.code} — ${act.descripcion}` : '—', it.unidad||'und',
-      parseFloat(it.cantidad_contrato||0), parseFloat(it.costo_unitario||0), total, acumulado, saldo]
-    vals.forEach((v, ci) => {
-      const c = ws.getCell(row, ci+1)
-      const num = ci >= 3
-      styleData(c, { even, align: num?'right':'left', numFmt: [4,5,6,7].includes(ci) ? '"$"#,##0.00' : ci===3 ? '#,##0.00' : undefined,
-        color: ci===7 ? (saldo<0?RED_HX:GREEN_HX) : '000000', bold: ci===7 })
-      c.value = v
-    })
-    row++
-  })
-  row++
-
-  // Historial de avalúos con desglose por actividad
-  if (avaluosAprobados.length > 0) {
-    row = addSectionTitle(ws, row, isEs?'HISTORIAL DE AVALÚOS — DESGLOSE POR ACTIVIDAD':'VALUATION HISTORY — BREAKDOWN BY ACTIVITY', COLS)
-    avaluosAprobados.forEach(av => {
-      ws.getRow(row).height = 18
-      ws.mergeCells(row,1,row,COLS)
-      const c = ws.getCell(row,1)
-      c.value = isEs
-        ? `Avalúo #${av.numero}  ·  Período ${av.periodo_inicio||'—'} → ${av.periodo_fin||'—'}  ·  Fecha ${av.fecha_elaboracion||'—'}`
-        : `Valuation #${av.numero}  ·  Period ${av.periodo_inicio||'—'} → ${av.periodo_fin||'—'}  ·  Date ${av.fecha_elaboracion||'—'}`
-      c.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF1B3A6B' } }
-      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
-      c.alignment = { vertical: 'middle' }
-      c.border = border()
-      row++
-
-      ws.getRow(row).height = 28
-      ;[isEs?'Actividad':'Activity', isEs?'Descripción del ítem':'Item description', isEs?'Unidad':'Unit',
-        isEs?'Costo unit.':'Unit cost', isEs?'Cant. anterior':'Prev. qty', isEs?'Cant. actual':'Current qty',
-        isEs?'Cant. acumulada':'Accum. qty', isEs?'Monto actual':'Current amount'
-      ].forEach((h,i) => { const c2 = ws.getCell(row,i+1); c2.value=h; styleHeader(c2) })
-      row++
-
-      const desglose = avaluoDesglose({ avaluo: av, avaluoItems, itemsContrato, presupuesto })
-      desglose.forEach((d, i) => {
-        ws.getRow(row).height = 16
-        const even = i % 2 === 1
-        const vals = [d.actividad, d.descripcion, d.unidad, d.costo_unitario, d.cantidad_anterior, d.cantidad_actual, d.cantidad_acumulada, d.monto_actual]
-        vals.forEach((v, ci) => {
-          const c2 = ws.getCell(row, ci+1)
-          const num = ci >= 3
-          styleData(c2, { even, align: num?'right':'left', numFmt: ci===3||ci===7 ? '"$"#,##0.00' : ci>=4 ? '#,##0.00' : undefined, bold: ci===7 })
-          c2.value = v
-        })
-        row++
-      })
-
-      // Totales del avalúo
-      ws.getRow(row).height = 17
-      ws.mergeCells(row,1,row,6)
-      const tl = ws.getCell(row,1)
-      tl.value = isEs
-        ? `Subtotal $${fmt2v(av.subtotal)}   ·   Impuesto $${fmt2v(av.impuesto_monto)}   ·   Total $${fmt2v(av.monto_total)}`
-        : `Subtotal $${fmt2v(av.subtotal)}   ·   Tax $${fmt2v(av.impuesto_monto)}   ·   Total $${fmt2v(av.monto_total)}`
-      tl.font = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
-      tl.alignment = { vertical:'middle' }
-      ws.mergeCells(row,7,row,COLS)
-      const tv = ws.getCell(row,7)
-      tv.value = parseFloat(av.monto_a_pagar||0); tv.numFmt='"$"#,##0.00'; styleTotal(tv)
-      row += 2
-    })
+  const METODOS = {
+    efectivo:     { es: 'Efectivo',          en: 'Cash' },
+    cheque:       { es: 'Cheque',            en: 'Check' },
+    transferencia:{ es: 'Transferencia bancaria', en: 'Bank transfer' },
   }
+  const metodoLabel = METODOS[caja.metodo_entrega]?.[isEs ? 'es' : 'en'] || (isEs ? 'No especificado' : 'Not specified')
 
-  row = addFirmasBlock(ws, row, COLS, isEs)
+  const montoFmt = new Intl.NumberFormat(isEs ? 'es' : 'en-US', { style: 'currency', currency: moneda }).format(parseFloat(caja.monto_asignado)||0)
 
+  const infoRows = [
+    [isEs ? 'Monto entregado:' : 'Amount delivered:', montoFmt],
+    [isEs ? 'Método de entrega:' : 'Delivery method:', metodoLabel],
+    [isEs ? 'No. de cheque / referencia:' : 'Check no. / reference:', caja.referencia_entrega || '—'],
+    [isEs ? 'Responsable del fondo:' : 'Fund responsible:', responsable?.nombre || responsable?.email || '—'],
+    [isEs ? 'Rol:' : 'Role:', responsable?.rol || '—'],
+  ]
+  infoRows.forEach(([lbl, val]) => {
+    ws.getRow(row).height = 17
+    merge(row, 1, row, 2)
+    const lc = cell(row, 1)
+    lc.value = lbl; lc.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    lc.border = bord(); lc.alignment = { vertical: 'middle' }
+    merge(row, 3, row, COLS)
+    const vc = cell(row, 3)
+    vc.value = val; vc.font = { size: 10, name: 'Arial' }
+    vc.border = bord(); vc.alignment = { vertical: 'middle' }
+    row++
+  })
+  row++ // espaciado
+
+  // ── DECLARACIÓN ─────────────────────────────────────────────────────────
+  ws.getRow(row).height = 30
+  merge(row, 1, row, COLS)
+  const decl = cell(row, 1)
+  decl.value = isEs
+    ? `Se hace constar que la persona arriba indicada recibió el monto detallado, mediante el método de entrega señalado, en calidad de fondo de caja chica para el proyecto mencionado. El responsable se compromete a administrar dichos fondos conforme a las políticas de la empresa y a presentar las rendiciones de cuenta correspondientes.`
+    : `This document certifies that the person named above received the amount detailed, through the delivery method indicated, as a petty cash fund for the project mentioned. The responsible party agrees to manage these funds in accordance with company policy and to submit the corresponding expense settlements.`
+  decl.font  = { size: 9, name: 'Arial', color: { argb: 'FF475569' } }
+  decl.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
+  row += 2
+
+  // ── SECCIÓN: FIRMAS ─────────────────────────────────────────────────────
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  sec = cell(row, 1)
+  sec.value = isEs ? 'FIRMAS' : 'SIGNATURES'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row += 2
+
+  const firmantes = [
+    { label: isEs ? 'Entregado por' : 'Delivered by', nombre: '___________________________', cargo: isEs ? 'Administrador / Gerente' : 'Administrator / Manager' },
+    { label: isEs ? 'Recibido por' : 'Received by',   nombre: responsable?.nombre || responsable?.email || '___________________________', cargo: responsable?.rol || (isEs ? 'Responsable del fondo' : 'Fund responsible') },
+  ]
+
+  const left  = firmantes[0]
+  const right = firmantes[1]
+
+  ws.getRow(row).height = 22
+  merge(row, 1, row, 3)
+  const fl = cell(row, 1)
+  fl.value = left.nombre
+  fl.font  = { size: 10, name: 'Arial' }
+  fl.border = { bottom: { style: 'medium', color: { argb: 'FF' + BRAND } } }
+  fl.alignment = { horizontal: 'center', vertical: 'bottom' }
+
+  merge(row, 4, row, COLS)
+  const fr = cell(row, 4)
+  fr.value = right.nombre
+  fr.font  = { size: 10, name: 'Arial' }
+  fr.border = { bottom: { style: 'medium', color: { argb: 'FF' + BRAND } } }
+  fr.alignment = { horizontal: 'center', vertical: 'bottom' }
+  row++
+
+  ws.getRow(row).height = 16
+  merge(row, 1, row, 3)
+  const ll = cell(row, 1)
+  ll.value = left.label
+  ll.font  = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  ll.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  ll.alignment = { horizontal: 'center', vertical: 'middle' }
+  ll.border = bord()
+
+  merge(row, 4, row, COLS)
+  const lr = cell(row, 4)
+  lr.value = right.label
+  lr.font  = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  lr.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  lr.alignment = { horizontal: 'center', vertical: 'middle' }
+  lr.border = bord()
+  row++
+
+  ws.getRow(row).height = 15
+  merge(row, 1, row, 3)
+  const cl = cell(row, 1)
+  cl.value = left.cargo
+  cl.font  = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+  cl.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  merge(row, 4, row, COLS)
+  const cr = cell(row, 4)
+  cr.value = right.cargo
+  cr.font  = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+  cr.alignment = { horizontal: 'center', vertical: 'middle' }
+  row += 2
+
+  // ── FOOTER ──────────────────────────────────────────────────────────────
   ws.getRow(row).height = 14
-  ws.mergeCells(row,1,row,COLS)
-  const ft = ws.getCell(row,1)
+  merge(row, 1, row, COLS)
+  const ft = cell(row, 1)
   ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
   ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
   ft.alignment = { horizontal: 'center', vertical: 'middle' }
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `Subcontrato_${contrato.subcontratista.replace(/\s+/g,'_')}_${proy?.project_code||''}_${fechaHoy.replace(/\//g,'-')}.xlsx`)
+  const respSlug = (responsable?.nombre || responsable?.email || 'responsable').replace(/\s+/g, '_')
+  saveAs(new Blob([buf]), `${isEs ? 'Comprobante_Caja_Chica' : 'Petty_Cash_Receipt'}_${proy?.project_code || ''}_${respSlug}_${fechaHoy.replace(/\//g,'-')}.xlsx`)
 }
-
-function fmt2v(n) { return (parseFloat(n)||0).toFixed(2) }
 
 // ── EXPORT RETENCIONES ────────────────────────────────────
 async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
@@ -1402,99 +1227,6 @@ async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='
 
   const buf = await wb.xlsx.writeBuffer()
   saveAs(new Blob([buf]), `${isEs?'Reporte_Retenciones':'Retention_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
-}
-
-// ── EXPORT IMPUESTOS (contable, transversal a proyectos) ───────────────────
-async function buildImpuestos({ data, scopeLabel, desde, hasta, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
-  const isEs = lang === 'ES'
-  const wb   = new ExcelJS.Workbook()
-  wb.creator = 'MARY ERP'
-  const fechaHoy     = new Date().toLocaleDateString(isEs?'es':'en-US')
-  const periodoLabel = desde || hasta ? `${desde||(isEs?'inicio':'start')} al ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
-  const COLS = 7
-
-  // ── HOJA 1: Resumen ──
-  const ws1 = wb.addWorksheet(isEs?'Resumen de Impuestos':'Tax Summary')
-  setCols(ws1, [30, 16, 16, 14, 14, 14, 14])
-  let row = addHeaderBlock(ws1, isEs?'Reporte de Impuestos':'Tax Report', nombreEmpresa, scopeLabel, periodoLabel, fechaHoy, COLS)
-
-  row = addSectionTitle(ws1, row, isEs?'RESUMEN GENERAL':'GENERAL SUMMARY', COLS)
-  ws1.getRow(row).height = 20
-  const lf = ws1.getCell(row,1); lf.value=isEs?'Impuesto a favor (pagado)':'Tax credit (paid)'; styleLabel(lf)
-  const vf = ws1.getCell(row,2); vf.value=data.totalFavor; vf.numFmt='"$"#,##0.00'; styleData(vf,{bold:true,align:'right'})
-  ws1.mergeCells(row,3,row,3)
-  const lp = ws1.getCell(row,4); lp.value=isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)'; styleLabel(lp)
-  const vp = ws1.getCell(row,5); vp.value=data.totalPagar; vp.numFmt='"$"#,##0.00'; styleData(vp,{bold:true,align:'right'})
-  ws1.mergeCells(row,6,row,COLS)
-  row++
-  ws1.getRow(row).height = 20
-  ws1.mergeCells(row,1,row,2)
-  const ls = ws1.getCell(row,1); ls.value=isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'; styleLabel(ls)
-  ws1.mergeCells(row,3,row,COLS)
-  const vs = ws1.getCell(row,3); vs.value=data.saldoNeto; vs.numFmt='"$"#,##0.00'
-  styleData(vs,{bold:true,align:'right',color:data.saldoNeto>0?RED_HX:GREEN_HX})
-  row += 2
-
-  row = addSectionTitle(ws1, row, isEs?'RESUMEN POR CATEGORÍA':'SUMMARY BY CATEGORY', COLS)
-  ws1.getRow(row).height = 18
-  ;[isEs?'Categoría':'Category', isEs?'Impuesto a favor':'Tax credit', isEs?'Impuesto a pagar':'Tax due','','','',''].forEach((h,i) => {
-    const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
-  })
-  row++
-  data.resumenCategoria.forEach((r,i) => {
-    ws1.getRow(row).height = 17
-    const even = i % 2 === 1
-    const c1 = ws1.getCell(row,1); c1.value=r.categoria; styleData(c1,{even})
-    const c2 = ws1.getCell(row,2); c2.value=r.favor; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
-    const c3 = ws1.getCell(row,3); c3.value=r.pagar; styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
-    ws1.mergeCells(row,4,row,COLS)
-    row++
-  })
-  row++
-
-  row = addSectionTitle(ws1, row, isEs?'RESUMEN POR PROYECTO':'SUMMARY BY PROJECT', COLS)
-  ws1.getRow(row).height = 18
-  ;[isEs?'Proyecto':'Project', isEs?'Impuesto a favor':'Tax credit', isEs?'Impuesto a pagar':'Tax due','','','',''].forEach((h,i) => {
-    const c = ws1.getCell(row, i+1); c.value = h; styleHeader(c)
-  })
-  row++
-  data.resumenProyecto.forEach((r,i) => {
-    ws1.getRow(row).height = 17
-    const even = i % 2 === 1
-    const c1 = ws1.getCell(row,1); c1.value=r.proyecto; styleData(c1,{even})
-    const c2 = ws1.getCell(row,2); c2.value=r.favor; styleData(c2,{even,numFmt:'"$"#,##0.00',align:'right'})
-    const c3 = ws1.getCell(row,3); c3.value=r.pagar; styleData(c3,{even,numFmt:'"$"#,##0.00',align:'right'})
-    ws1.mergeCells(row,4,row,COLS)
-    row++
-  })
-
-  // ── HOJA 2: Detalle de movimientos ──
-  const ws2 = wb.addWorksheet(isEs?'Detalle de Movimientos':'Movement Detail')
-  setCols(ws2, [12, 22, 26, 30, 12, 14, 14])
-  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Movimientos de Impuestos':'Tax Movement Detail', nombreEmpresa, scopeLabel, periodoLabel, fechaHoy, COLS)
-  ws2.getRow(r2).height = 18
-  ;[isEs?'Fecha':'Date', isEs?'Categoría':'Category', isEs?'Proyecto':'Project', isEs?'Descripción':'Description',
-    isEs?'Referencia':'Reference', isEs?'Tipo':'Type', isEs?'Monto':'Amount'].forEach((h,i) => {
-    const c = ws2.getCell(r2, i+1); c.value = h; styleHeader(c)
-  })
-  r2++
-  data.movimientos.forEach((m,i) => {
-    ws2.getRow(r2).height = 16
-    const even = i % 2 === 1
-    const vals = [m.fecha||'—', m.categoria, m.proyectoLabel, m.descripcion, m.referencia,
-      m.tipo==='favor' ? (isEs?'A favor':'Credit') : (isEs?'A pagar':'Due'), m.monto]
-    vals.forEach((v,ci) => {
-      const c = ws2.getCell(r2, ci+1)
-      const isNum = ci === 6
-      styleData(c, { even, align: isNum?'right':'left', numFmt: isNum?'"$"#,##0.00':undefined,
-        color: ci===5 ? (m.tipo==='favor'?GREEN_HX:'F59E0B') : '000000', bold: ci===5||ci===6 })
-      c.value = v
-    })
-    r2++
-  })
-
-  const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `${isEs?'Reporte_Impuestos':'Tax_Report'}_${new Date().toISOString().slice(0,10)}.xlsx`)
 }
 
 // ── EXPORT INVENTARIO ─────────────────────────────────────
@@ -1862,7 +1594,6 @@ export default function Reportes() {
 
   const [reportType, setReportType] = useState('financiero')
   const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
-  const [proyIdImp, setProyIdImp]   = useState('') // '' = todos, '__general__' = sin proyecto
   const [desde, setDesde]           = useState('')
   const [hasta, setHasta]           = useState('')
   const [loading, setLoading]       = useState(false)
@@ -1911,42 +1642,13 @@ export default function Reportes() {
     const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
 
-    // ── Resumen de impuestos (v1.2) — impuesto a favor (pagado) vs a pagar (cobrado) ──
-    const entradasProy   = entradas.filter(e=>e.proyecto_id===proyId&&filtro(e.fecha_recepcion))
-    const impMateriales  = entradasProy.reduce((s,e)=>s+(parseFloat(e.impuesto_monto)||0),0)
-    const impSubcontratos = subcontratos_avaluos
-      .filter(a=>scIds.includes(a.subcontrato_id) && a.estado==='aprobado' &&
-        filtro(a.periodo_inicio || a.fecha_elaboracion || a.created_at?.slice(0,10)))
-      .reduce((s,a)=>s+(parseFloat(a.impuesto_monto)||0),0)
-    const impEquipos     = eqs.reduce((s,e)=>s+(parseFloat(e.impuesto_monto)||0),0)
-    const impServicios   = dirs.reduce((s,c)=>s+(parseFloat(c.impuesto_monto)||0),0)
-    const impIndirectos  = inds.reduce((s,c)=>s+(parseFloat(c.impuesto_monto)||0),0)
-    const totalImpFavor  = impMateriales+impSubcontratos+impEquipos+impServicios+impIndirectos
-
-    const avsProyImp  = avaluos_cliente.filter(a=>a.proyecto_id===proyId && a.estado==='aprobado' && filtro(a.periodo_fin||a.fecha_elaboracion))
-    const impCliente  = avsProyImp.reduce((s,a)=>s+(parseFloat(a.impuesto_monto)||0),0)
-    const totalImpPagar = impCliente
-
-    const resumenImpuestos = [
-      { categoria: t('rep_cat_materiales'),  favor: impMateriales,  pagar: 0 },
-      { categoria: t('rep_cat_subcontratos'), favor: impSubcontratos, pagar: 0 },
-      { categoria: isEs?'Equipos / Rentas':'Equipment / Rentals', favor: impEquipos, pagar: 0 },
-      { categoria: isEs?'Servicios / Costos directos':'Services / Direct costs', favor: impServicios, pagar: 0 },
-      { categoria: t('rep_cat_admin'), favor: impIndirectos, pagar: 0 },
-      { categoria: isEs?'Avalúos a cliente':'Client billings', favor: 0, pagar: impCliente },
-    ]
-    const saldoNetoImpuestos = totalImpPagar - totalImpFavor
-
     const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
       const pres=round2((act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)))
       // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
-      // Sistema nuevo: usar monto_actual de subcontratos_avaluo_items para los items
-      // de subcontrato vinculados a ESTA actividad (no el monto_total del avalúo completo)
-      const itemIdsActividad   = subcontratos_items.filter(si=>si.actividad_id===act.id).map(si=>si.id)
-      const avaluoIdsAprobados = subcontratos_avaluos.filter(a=>a.estado==='aprobado').map(a=>a.id)
-      const realScNuevo = subcontratos_avaluo_items
-        .filter(ai=>itemIdsActividad.includes(ai.subcontrato_item_id)&&avaluoIdsAprobados.includes(ai.avaluo_id))
-        .reduce((s,ai)=>s+(parseFloat(ai.monto_actual)||0),0)
+      const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)
+      const realScNuevo = subcontratos_avaluos
+        .filter(a=>scActIds.includes(a.subcontrato_id)&&a.estado==='aprobado')
+        .reduce((s,a)=>s+(parseFloat(a.monto_total)||0),0)
       const realScAntiguo = subcontratos.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
         .reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
       const real=salidas.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
@@ -1966,15 +1668,22 @@ export default function Reportes() {
     const indsPres = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
 
     // Comparación indirectos
-    const cajasProy = (state.cajas_chicas||[]).filter(c => c.proyecto_id === proyId && c.estado === 'activa')
-    const comparacionInd = CAT_KEYS.map(cat => {
-      const presupuestado = indsPres.filter(p => p.categoria === cat).reduce((s,p) => s + parseFloat(p.monto_presupuestado||0), 0)
-      const esCajaChica = cat === 'Caja Chica'
-      const ejecutado = esCajaChica
-        ? cajasProy.reduce((s,c) => s + (parseFloat(c.monto_asignado)||0), 0)
-        : inds.filter(c => c.categoria === cat)
-              .reduce((s,c) => s + parseFloat(c.monto||0), 0)
-      return { categoria: cat, label: getCategoriaLabel(cat, lang), presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
+    const CATS_IND = isEs ? [
+      'Administración de obra',
+      'Instalaciones y servicios generales',
+      'Seguros, fianzas y garantías',
+      'Servicios profesionales y legales',
+    ] : [
+      'Construction Management',
+      'General Installations and Services',
+      'Insurance, Bonds and Guarantees',
+      'Professional and Legal Services',
+    ]
+    const comparacionInd = CATS_IND.map(cat => {
+      const presupuestado = parseFloat(indsPres.find(p => p.categoria === cat)?.monto_presupuestado || 0)
+      const ejecutado     = inds.filter(c => c.categoria === cat || c.categoria?.includes(cat.split(' ')[0]))
+                               .reduce((s,c) => s + parseFloat(c.monto||0), 0)
+      return { categoria: cat, presupuestado, ejecutado, diferencia: presupuestado - ejecutado }
     }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
 
     // Órdenes de Cambio del proyecto
@@ -2005,107 +1714,8 @@ export default function Reportes() {
       avsProy, avsItems, indsPres, comparacionInd,
       ocsDelProy, ocsAprobadas, deltaOCs, budgetRevisado, ocsItems,
       scContratos, scAvaluosDetalle, retenciones, ordenesPago,
-      resumenImpuestos, totalImpFavor, totalImpPagar, saldoNetoImpuestos,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, state.cajas_chicas, t])
-
-  // ── Reporte de Impuestos (contable, transversal a proyectos, filtrable) ──
-  const datosImpuestos = useMemo(() => {
-    const filtro = f => inPeriodo(f, desde, hasta)
-    const matchProy = (pid) => {
-      if (!proyIdImp) return true
-      if (proyIdImp === '__general__') return !pid
-      return pid === proyIdImp
-    }
-    const proyName = (pid) => {
-      if (!pid) return isEs ? 'General / Sin proyecto' : 'General / No project'
-      const p = proyectos.find(x=>x.id===pid)
-      return p ? `${p.project_code} — ${p.nombre}` : '—'
-    }
-    const scMap = Object.fromEntries(subcontratos_contratos.map(sc=>[sc.id, sc]))
-
-    const movimientos = []
-
-    entradas
-      .filter(e=>matchProy(e.proyecto_id) && filtro(e.fecha_recepcion) && parseFloat(e.impuesto_monto||0)>0)
-      .forEach(e => movimientos.push({
-        fecha: e.fecha_recepcion, categoria: t('rep_cat_materiales'), proyecto_id: e.proyecto_id,
-        descripcion: e.impuesto_descripcion || (isEs?'Compra de material':'Material purchase'),
-        referencia: e.numero_factura||'—', tipo:'favor', monto: parseFloat(e.impuesto_monto||0),
-      }))
-
-    equipos
-      .filter(e=>matchProy(e.proyecto_id) && filtro(e.fecha||e.created_at?.slice(0,10)) && parseFloat(e.impuesto_monto||0)>0)
-      .forEach(e => movimientos.push({
-        fecha: e.fecha||e.created_at?.slice(0,10), categoria: isEs?'Equipos / Rentas':'Equipment / Rentals', proyecto_id: e.proyecto_id,
-        descripcion: e.impuesto_descripcion || e.descripcion || '—',
-        referencia: '—', tipo:'favor', monto: parseFloat(e.impuesto_monto||0),
-      }))
-
-    costos_directos
-      .filter(c=>matchProy(c.proyecto_id) && filtro(c.fecha||c.created_at?.slice(0,10)) && parseFloat(c.impuesto_monto||0)>0)
-      .forEach(c => movimientos.push({
-        fecha: c.fecha||c.created_at?.slice(0,10), categoria: isEs?'Servicios / Costos directos':'Services / Direct costs', proyecto_id: c.proyecto_id,
-        descripcion: c.impuesto_descripcion || c.descripcion || '—',
-        referencia: c.numero_documento||'—', tipo:'favor', monto: parseFloat(c.impuesto_monto||0),
-      }))
-
-    costos_indirectos
-      .filter(c=>matchProy(c.proyecto_id) && filtro(c.fecha||c.created_at?.slice(0,10)) && parseFloat(c.impuesto_monto||0)>0)
-      .forEach(c => movimientos.push({
-        fecha: c.fecha||c.created_at?.slice(0,10), categoria: t('rep_cat_admin'), proyecto_id: c.proyecto_id,
-        descripcion: c.impuesto_descripcion || c.descripcion || c.categoria || '—',
-        referencia: '—', tipo:'favor', monto: parseFloat(c.impuesto_monto||0),
-      }))
-
-    subcontratos_avaluos
-      .filter(a=>a.estado==='aprobado' && parseFloat(a.impuesto_monto||0)>0 &&
-        filtro(a.periodo_inicio||a.fecha_elaboracion||a.created_at?.slice(0,10)) &&
-        matchProy(scMap[a.subcontrato_id]?.proyecto_id))
-      .forEach(a => movimientos.push({
-        fecha: a.fecha_elaboracion||a.created_at?.slice(0,10), categoria: t('rep_cat_subcontratos'),
-        proyecto_id: scMap[a.subcontrato_id]?.proyecto_id,
-        descripcion: `${isEs?'Avalúo':'Valuation'} #${a.numero} — ${scMap[a.subcontrato_id]?.subcontratista||'—'}`,
-        referencia: `#${a.numero}`, tipo:'favor', monto: parseFloat(a.impuesto_monto||0),
-      }))
-
-    avaluos_cliente
-      .filter(a=>a.estado==='aprobado' && parseFloat(a.impuesto_monto||0)>0 &&
-        filtro(a.periodo_fin||a.fecha_elaboracion) && matchProy(a.proyecto_id))
-      .forEach(a => movimientos.push({
-        fecha: a.periodo_fin||a.fecha_elaboracion, categoria: isEs?'Avalúos a cliente':'Client billings', proyecto_id: a.proyecto_id,
-        descripcion: a.impuesto_descripcion || (isEs?`Avalúo #${a.numero}`:`Valuation #${a.numero}`),
-        referencia: `#${a.numero}`, tipo:'pagar', monto: parseFloat(a.impuesto_monto||0),
-      }))
-
-    movimientos.sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||''))
-
-    const CATS = [
-      t('rep_cat_materiales'), isEs?'Equipos / Rentas':'Equipment / Rentals',
-      isEs?'Servicios / Costos directos':'Services / Direct costs', t('rep_cat_admin'),
-      t('rep_cat_subcontratos'), isEs?'Avalúos a cliente':'Client billings',
-    ]
-    const resumenCategoria = CATS.map(cat => ({
-      categoria: cat,
-      favor: movimientos.filter(m=>m.categoria===cat&&m.tipo==='favor').reduce((s,m)=>s+m.monto,0),
-      pagar: movimientos.filter(m=>m.categoria===cat&&m.tipo==='pagar').reduce((s,m)=>s+m.monto,0),
-    })).filter(r=>r.favor>0||r.pagar>0)
-
-    const proyIdsUnicos = [...new Set(movimientos.map(m=>m.proyecto_id||null))]
-    const resumenProyecto = proyIdsUnicos.map(pid => ({
-      proyecto: proyName(pid),
-      favor: movimientos.filter(m=>(m.proyecto_id||null)===pid&&m.tipo==='favor').reduce((s,m)=>s+m.monto,0),
-      pagar: movimientos.filter(m=>(m.proyecto_id||null)===pid&&m.tipo==='pagar').reduce((s,m)=>s+m.monto,0),
-    })).sort((a,b)=> (b.favor+b.pagar) - (a.favor+a.pagar))
-
-    const totalFavor = movimientos.filter(m=>m.tipo==='favor').reduce((s,m)=>s+m.monto,0)
-    const totalPagar = movimientos.filter(m=>m.tipo==='pagar').reduce((s,m)=>s+m.monto,0)
-
-    return {
-      movimientos: movimientos.map(m=>({...m, proyectoLabel: proyName(m.proyecto_id)})),
-      resumenCategoria, resumenProyecto, totalFavor, totalPagar, saldoNeto: totalPagar - totalFavor,
-    }
-  }, [proyIdImp, desde, hasta, lang, isEs, t, proyectos, entradas, equipos, costos_directos, costos_indirectos, subcontratos_avaluos, subcontratos_contratos, avaluos_cliente])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -2127,13 +1737,6 @@ export default function Reportes() {
           equipos, costos_indirectos, salidas, entradas, budget, moneda, lang, nombreEmpresa })
       } else if (reportType==='retenciones' && datosFinanciero) {
         await buildRetenciones({ data: datosFinanciero, proy, moneda, lang, nombreEmpresa })
-      } else if (reportType==='impuestos') {
-        const scopeLabel = !proyIdImp
-          ? (isEs?'Todos los proyectos':'All projects')
-          : proyIdImp==='__general__'
-            ? (isEs?'General / Sin proyecto':'General / No project')
-            : (() => { const p = proyectos.find(x=>x.id===proyIdImp); return p ? `${p.project_code} — ${p.nombre}` : '' })()
-        await buildImpuestos({ data: datosImpuestos, scopeLabel, desde, hasta, lang, nombreEmpresa })
       }
     } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
     setLoading(false)
@@ -2159,7 +1762,6 @@ export default function Reportes() {
             <label className="text-xs text-gray-500 block mb-1">{isEs?'Tipo de reporte':'Report type'}</label>
             <select className={inputCls+' w-full'} value={reportType} onChange={e=>setReportType(e.target.value)}>
               <option value="financiero">📊 {isEs?'Reporte Financiero':'Financial Report'}</option>
-              <option value="impuestos">🧾 {isEs?'Impuestos (contable)':'Taxes (accounting)'}</option>
               <option value="inventario">📦 {isEs?'Reporte de Inventario':'Inventory Report'}</option>
               <option value="general">📋 {isEs?'Resumen General del Proyecto':'General Project Summary'}</option>
               <option value="retenciones">🔒 {t('rep_type_retenciones')}</option>
@@ -2170,16 +1772,6 @@ export default function Reportes() {
               <label className="text-xs text-gray-500 block mb-1">{t('lbl_project')} *</label>
               <select className={inputCls+' w-full'} value={proyId} onChange={e=>setProyId(e.target.value)}>
                 <option value="">— {t('lbl_select')} —</option>
-                {proyectos.map(p=><option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
-              </select>
-            </div>
-          )}
-          {reportType==='impuestos' && (
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">{isEs?'Alcance':'Scope'}</label>
-              <select className={inputCls+' w-full'} value={proyIdImp} onChange={e=>setProyIdImp(e.target.value)}>
-                <option value="">— {isEs?'Todos los proyectos':'All projects'} —</option>
-                <option value="__general__">{isEs?'General / Sin proyecto':'General / No project'}</option>
                 {proyectos.map(p=><option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
               </select>
             </div>
@@ -2213,9 +1805,6 @@ export default function Reportes() {
       {/* Vista previa */}
       {reportType==='financiero' && proyId && datosFinanciero && (
         <VistaFinanciero data={datosFinanciero} budget={budget} moneda={moneda} proy={proy} desde={desde} hasta={hasta} fmt={fmt} />
-      )}
-      {reportType==='impuestos' && (
-        <VistaImpuestos data={datosImpuestos} fmt={fmt} moneda={moneda} />
       )}
       {reportType==='inventario' && (
         <VistaInventario data={datosInventario} materiales={materiales} proyectos={proyectos} presupuesto={presupuesto} fmtDate={fmtDate} fmtNum={fmtNum} />
@@ -2370,7 +1959,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                 const clr    = r.diferencia < 0 ? '#ef4444' : '#1D9E75'
                 return (
                   <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                    <td className={tdC}>{r.label}</td>
+                    <td className={tdC}>{r.categoria}</td>
                     <td className={tdC+' text-right font-mono'}>{fmt(r.presupuestado,moneda)}</td>
                     <td className={tdC+' text-right font-mono'}>{fmt(r.ejecutado,moneda)}</td>
                     <td className={tdC+' text-right font-mono font-bold'} style={{color:clr}}>{r.diferencia>=0?'+':''}{fmt(r.diferencia,moneda)}</td>
@@ -2451,217 +2040,6 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
           </table>
         </div>
       )}
-
-      {/* ── SECCIÓN: Resumen de Impuestos (v1.2) ── */}
-      {(data.totalImpFavor > 0 || data.totalImpPagar > 0) && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
-            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Resumen de impuestos' : 'Tax summary'}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{isEs ? 'Impuesto a favor (pagado en compras/costos) vs. impuesto a pagar (cobrado al cliente)' : 'Tax credit (paid on purchases/costs) vs. tax due (collected from client)'}</p>
-          </div>
-          <table className="w-full">
-            <thead><tr style={thS}>
-              <th className={thC}>{isEs?'Categoría':'Category'}</th>
-              <th className={thC+' text-right'}>{isEs?'Impuesto a favor (pagado)':'Tax credit (paid)'}</th>
-              <th className={thC+' text-right'}>{isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)'}</th>
-            </tr></thead>
-            <tbody>
-              {data.resumenImpuestos.filter(r=>r.favor>0||r.pagar>0).map((r,i)=>(
-                <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                  <td className={tdC}>{r.categoria}</td>
-                  <td className={tdC+' text-right font-mono'}>{r.favor>0?fmt(r.favor,moneda):'—'}</td>
-                  <td className={tdC+' text-right font-mono'}>{r.pagar>0?fmt(r.pagar,moneda):'—'}</td>
-                </tr>
-              ))}
-              <tr style={{background:'#EEF2F7'}}>
-                <td className={tdC+' font-bold'}>{isEs?'TOTAL':'TOTAL'}</td>
-                <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalImpFavor,moneda)}</td>
-                <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalImpPagar,moneda)}</td>
-              </tr>
-              <tr>
-                <td colSpan={2} className={tdC+' font-bold text-xs'} style={{color:BRAND}}>{isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'}</td>
-                <td className={tdC+' text-right font-mono font-bold'} style={{color: data.saldoNetoImpuestos>0 ? '#ef4444' : '#1D9E75'}}>
-                  {data.saldoNetoImpuestos>=0?'+':''}{fmt(data.saldoNetoImpuestos,moneda)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ── SECCIÓN: Retenciones a Subcontratistas ── */}
-      {data.retenciones?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
-            <p className="text-sm font-semibold text-gray-700">{isEs ? 'Retenciones a subcontratistas' : 'Subcontractor retentions'}</p>
-          </div>
-          <table className="w-full">
-            <thead><tr style={thS}>
-              {[isEs?'Subcontratista':'Subcontractor', isEs?'Avalúo #':'Valuation #', isEs?'% Retención':'Retention %',
-                isEs?'Monto retenido':'Amount retained', isEs?'Fecha retención':'Retention date',
-                isEs?'Devolución est.':'Est. release', isEs?'Devolución real':'Actual release', isEs?'Estado':'Status'
-              ].map((h,i)=><th key={i} className={thC+(i>=2&&i<=3?' text-right':'')}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {data.retenciones.map((r,i)=>{
-                const STATUS = {
-                  retenida: isEs?'Retenida':'Retained',
-                  devuelta: isEs?'Devuelta':'Released',
-                  pagada:   isEs?'Pagada':'Paid',
-                }
-                const vencida = r.fecha_devolucion_est && new Date(r.fecha_devolucion_est) <= new Date() && r.estado === 'retenida'
-                const label   = vencida ? (isEs?'Vencida':'Overdue') : (STATUS[r.estado]||r.estado)
-                const color   = vencida ? '#ef4444' : r.estado==='retenida' ? '#F59E0B' : '#1D9E75'
-                return (
-                  <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                    <td className={tdC}>{r.subcontratista||'—'}</td>
-                    <td className={tdC+' text-xs'}>#{r.numero_avaluo||'—'}</td>
-                    <td className={tdC+' text-right'}>{parseFloat(r.retencion_pct||0)}%</td>
-                    <td className={tdC+' text-right font-mono font-medium'}>{fmt(r.monto_retenido,moneda)}</td>
-                    <td className={tdC+' text-xs text-gray-500'}>{r.fecha_retencion||'—'}</td>
-                    <td className={tdC+' text-xs text-gray-500'}>{r.fecha_devolucion_est||'—'}</td>
-                    <td className={tdC+' text-xs text-gray-500'}>{r.fecha_devolucion_real||'—'}</td>
-                    <td className={tdC}>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background:color+'1A', color}}>{label}</span>
-                    </td>
-                  </tr>
-                )
-              })}
-              <tr style={{background:'#EEF2F7'}}>
-                <td colSpan={3} className={tdC+' font-bold text-xs'} style={{color:BRAND}}>{isEs?'TOTAL RETENIDO':'TOTAL RETAINED'}</td>
-                <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.retenciones.reduce((s,r)=>s+parseFloat(r.monto_retenido||0),0),moneda)}</td>
-                <td colSpan={4}></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function VistaImpuestos({ data, fmt, moneda }) {
-  const { lang } = useContext(LangContext)
-  const isEs = lang === 'ES'
-  const thS = { background: BRAND }
-  const thC = 'px-4 py-2.5 text-left text-xs font-semibold text-white'
-  const tdC = 'px-4 py-2.5 text-sm text-gray-700'
-
-  if (data.totalFavor === 0 && data.totalPagar === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
-        <p className="text-sm font-semibold text-gray-700 mb-1">{isEs?'Sin registros de impuestos':'No tax records'}</p>
-        <p className="text-xs text-gray-400 max-w-md mx-auto">
-          {isEs
-            ? 'Aún no hay impuestos registrados en este alcance/período. Captúralos en Compras (Inventario), Equipos, Costos Directos/Indirectos del módulo Financiero, o en los Avalúos a Cliente.'
-            : 'No taxes have been recorded yet for this scope/period. Record them in Purchases (Inventory), Equipment, Direct/Indirect Costs in the Financial module, or in Client Billings.'}
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">{isEs?'Impuesto a favor (pagado)':'Tax credit (paid)'}</p>
-          <p className="text-lg font-bold" style={{color:'#1D9E75'}}>{fmt(data.totalFavor,moneda)}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">{isEs?'Impuesto a pagar (cobrado)':'Tax due (collected)'}</p>
-          <p className="text-lg font-bold" style={{color:'#F59E0B'}}>{fmt(data.totalPagar,moneda)}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <p className="text-xs text-gray-400 mb-1">{isEs?'Saldo neto (a pagar − a favor)':'Net balance (due − credit)'}</p>
-          <p className="text-lg font-bold" style={{color: data.saldoNeto>0?'#ef4444':'#1D9E75'}}>
-            {data.saldoNeto>=0?'+':''}{fmt(data.saldoNeto,moneda)}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
-          <p className="text-sm font-semibold text-gray-700">{isEs?'Resumen por categoría':'Summary by category'}</p>
-        </div>
-        <table className="w-full">
-          <thead><tr style={thS}>
-            <th className={thC}>{isEs?'Categoría':'Category'}</th>
-            <th className={thC+' text-right'}>{isEs?'Impuesto a favor':'Tax credit'}</th>
-            <th className={thC+' text-right'}>{isEs?'Impuesto a pagar':'Tax due'}</th>
-          </tr></thead>
-          <tbody>
-            {data.resumenCategoria.map((r,i)=>(
-              <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                <td className={tdC}>{r.categoria}</td>
-                <td className={tdC+' text-right font-mono'}>{r.favor>0?fmt(r.favor,moneda):'—'}</td>
-                <td className={tdC+' text-right font-mono'}>{r.pagar>0?fmt(r.pagar,moneda):'—'}</td>
-              </tr>
-            ))}
-            <tr style={{background:'#EEF2F7'}}>
-              <td className={tdC+' font-bold'}>{isEs?'TOTAL':'TOTAL'}</td>
-              <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalFavor,moneda)}</td>
-              <td className={tdC+' text-right font-mono font-bold'}>{fmt(data.totalPagar,moneda)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
-          <p className="text-sm font-semibold text-gray-700">{isEs?'Resumen por proyecto':'Summary by project'}</p>
-        </div>
-        <table className="w-full">
-          <thead><tr style={thS}>
-            <th className={thC}>{isEs?'Proyecto':'Project'}</th>
-            <th className={thC+' text-right'}>{isEs?'Impuesto a favor':'Tax credit'}</th>
-            <th className={thC+' text-right'}>{isEs?'Impuesto a pagar':'Tax due'}</th>
-          </tr></thead>
-          <tbody>
-            {data.resumenProyecto.map((r,i)=>(
-              <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                <td className={tdC}>{r.proyecto}</td>
-                <td className={tdC+' text-right font-mono'}>{r.favor>0?fmt(r.favor,moneda):'—'}</td>
-                <td className={tdC+' text-right font-mono'}>{r.pagar>0?fmt(r.pagar,moneda):'—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
-          <p className="text-sm font-semibold text-gray-700">{isEs?'Detalle de movimientos':'Movement detail'}</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr style={thS}>
-              {[isEs?'Fecha':'Date', isEs?'Categoría':'Category', isEs?'Proyecto':'Project',
-                isEs?'Descripción':'Description', isEs?'Referencia':'Reference', isEs?'Tipo':'Type', isEs?'Monto':'Amount'
-              ].map((h,i)=><th key={i} className={thC+(i===6?' text-right':'')}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {data.movimientos.map((m,i)=>(
-                <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}>
-                  <td className={tdC+' text-xs text-gray-500'}>{m.fecha||'—'}</td>
-                  <td className={tdC+' text-xs'}>{m.categoria}</td>
-                  <td className={tdC+' text-xs'}>{m.proyectoLabel}</td>
-                  <td className={tdC+' max-w-[200px] truncate'}>{m.descripcion}</td>
-                  <td className={tdC+' text-xs text-gray-400'}>{m.referencia}</td>
-                  <td className={tdC}>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
-                      background: m.tipo==='favor' ? '#1D9E751A' : '#F59E0B1A',
-                      color: m.tipo==='favor' ? '#1D9E75' : '#F59E0B',
-                    }}>
-                      {m.tipo==='favor' ? (isEs?'A favor':'Credit') : (isEs?'A pagar':'Due')}
-                    </span>
-                  </td>
-                  <td className={tdC+' text-right font-mono font-medium'}>{fmt(m.monto,moneda)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   )
 }
