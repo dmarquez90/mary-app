@@ -198,6 +198,8 @@ export default function CurvaS() {
     let presRevAcum = 0
     let realAcum    = 0
     let ingresoAcum = 0
+    let realStarted    = false
+    let ingresoStarted = false
 
     return periodos.map(({ key, label }) => {
       const montoPres    = presPorPeriodo[key] || 0
@@ -209,6 +211,12 @@ export default function CurvaS() {
       presRevAcum += montoPresRev
       realAcum    += (realPorPeriodo[key] || 0)
       ingresoAcum += (ingresoPorPeriodo[key] || 0)
+
+      // La curva "nace" en el primer período con actividad real; antes de eso
+      // se emite null para que Recharts no dibuje un tramo plano desde 0.
+      if (!realStarted && (realPorPeriodo[key] || 0) > 0) realStarted = true
+      if (!ingresoStarted && (ingresoPorPeriodo[key] || 0) > 0) ingresoStarted = true
+
       return {
         periodo:        label,
         pres_periodo:   Math.round(montoPres * 100) / 100,
@@ -216,8 +224,8 @@ export default function CurvaS() {
         ingreso_periodo:Math.round((ingresoPorPeriodo[key] || 0) * 100) / 100,
         presAcum:       Math.round(Math.min(presAcum, budget) * 100) / 100,
         presRevAcum:    deltaOCs > 0 ? Math.round(Math.min(presRevAcum, budgetRevisado) * 100) / 100 : undefined,
-        realAcum:       Math.round(realAcum * 100) / 100,
-        ingresoAcum:    Math.round(ingresoAcum * 100) / 100,
+        realAcum:       realStarted    ? Math.round(realAcum * 100) / 100    : null,
+        ingresoAcum:    ingresoStarted ? Math.round(ingresoAcum * 100) / 100 : null,
       }
     })
   }, [allCosts, budget, budgetRevisado, deltaOCs, granularity, proy, avaluos_cliente, proyId])
@@ -284,7 +292,7 @@ export default function CurvaS() {
           <span style={{ color: '#F59E0B' }}>● {isEs ? 'Pres. revisado' : 'Revised budget'}</span>
           <span className="font-mono font-medium">{fmt(presRev.value, moneda)}</span>
         </div>}
-        {real && <div className="flex justify-between gap-4 mb-1">
+        {real && real.value != null && <div className="flex justify-between gap-4 mb-1">
           <span style={{ color: '#1D9E75' }}>● {isEs ? 'Real ejecutado' : 'Real executed'}</span>
           <span className="font-mono font-medium">{fmt(real.value, moneda)}</span>
         </div>}
@@ -455,6 +463,7 @@ export default function CurvaS() {
                     stroke="#1D9E75"
                     strokeWidth={2.5}
                     fill="url(#gradReal)"
+                    connectNulls={false}
                     dot={(props) => {
                       const { cx, cy, payload } = props
                       if (!payload.real_periodo || payload.real_periodo === 0) return null
@@ -469,7 +478,12 @@ export default function CurvaS() {
                     stroke="#7C3AED"
                     strokeWidth={2}
                     strokeDasharray="6 3"
-                    dot={false}
+                    connectNulls={false}
+                    dot={(props) => {
+                      const { cx, cy, payload } = props
+                      if (!payload.ingreso_periodo || payload.ingreso_periodo === 0) return null
+                      return <Dot key={props.key} cx={cx} cy={cy} r={4} fill="#7C3AED" stroke="#fff" strokeWidth={2} />
+                    }}
                     activeDot={{ r:5, strokeWidth:0 }}
                   />
                 </ComposedChart>
