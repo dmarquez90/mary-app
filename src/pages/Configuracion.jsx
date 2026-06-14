@@ -69,7 +69,7 @@ export default function Configuracion() {
     try {
       // Calls the portal API to validate against Stripe
       const res = await fetch(
-        `https://mary-portal.vercel.app/api/stripe/validate-coupon?code=${promoCode.trim().toUpperCase()}`
+        `https://mary-sales-portal.vercel.app/api/stripe/validate-coupon?code=${promoCode.trim().toUpperCase()}`
       )
       const data = await res.json()
       if (data.valid) {
