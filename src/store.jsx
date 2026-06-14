@@ -872,6 +872,8 @@ useEffect(() => {
         // reembolsos_personal (via liquidacion_id) caen en cascada al borrar cajas_chicas ──
         await supabase.from('reembolsos_personal').delete().eq('proyecto_id', pid)
         await supabase.from('cajas_chicas').delete().eq('proyecto_id', pid)
+        // ── Log de auditoría (v1.2) — proyecto_id es NO ACTION ──
+        await supabase.from('auditoria_log').delete().eq('proyecto_id', pid)
         const { error: eP } = await supabase.from('proyectos').delete().eq('id', pid)
         if (eP) {
           console.error('DEL_PROYECTO — proyectos:', JSON.stringify(eP))
