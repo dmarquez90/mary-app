@@ -1047,6 +1047,620 @@ export async function buildPettyCashReceipt({ caja, proy, responsable, lang='ES'
   saveAs(new Blob([buf]), `${isEs ? 'Comprobante_Caja_Chica' : 'Petty_Cash_Receipt'}_${proy?.project_code || ''}_${respSlug}_${fechaHoy.replace(/\//g,'-')}.xlsx`)
 }
 
+// ── COMPROBANTE DE PAGO DE AVALÚO DE SUBCONTRATO ────────────────────────────
+export async function buildAvaluoComprobante({ avaluo, contrato, itemsContrato, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs  = lang === 'ES'
+  const COLS  = 7
+  const wb    = new ExcelJS.Workbook()
+  wb.creator  = `MARY ERP — ${nombreEmpresa}`
+  wb.created  = new Date()
+
+  const BRAND = '1B3A6B'
+  const GREEN = '1D9E75'
+  const AMBER = 'F59E0B'
+  const LIGHT = 'EEF2F7'
+
+  const bord = () => ({
+    top:    { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    bottom: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    left:   { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    right:  { style: 'thin', color: { argb: 'FFD0D7DE' } },
+  })
+  const thickB = () => ({
+    top:    { style: 'medium', color: { argb: 'FF' + BRAND } },
+    bottom: { style: 'medium', color: { argb: 'FF' + BRAND } },
+    left:   { style: 'medium', color: { argb: 'FF' + BRAND } },
+    right:  { style: 'medium', color: { argb: 'FF' + BRAND } },
+  })
+
+  const fechaHoy  = new Date().toLocaleDateString(isEs ? 'es' : 'en-US')
+  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+  const moneda    = contrato?.moneda || proy?.moneda || 'USD'
+  const money = (v) => new Intl.NumberFormat(isEs ? 'es' : 'en-US', { style: 'currency', currency: moneda }).format(parseFloat(v)||0)
+
+  const ws = wb.addWorksheet(isEs ? `Avalúo ${avaluo.numero}` : `Valuation ${avaluo.numero}`)
+  setCols(ws, [26, 12, 12, 14, 14, 14, 14])
+
+  const cell  = (r, c) => ws.getCell(r, c)
+  const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
+
+  // ── HEADER ──────────────────────────────────────────────────────────────
+  ws.getRow(1).height = 34
+  merge(1, 1, 1, 3)
+  const h1 = cell(1, 1)
+  h1.value     = nombreEmpresa
+  h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h1.alignment = { vertical: 'middle' }
+  h1.border    = thickB()
+
+  merge(1, 4, 1, 5)
+  const h2 = cell(1, 4)
+  h2.value     = isEs ? 'COMPROBANTE DE PAGO — AVALÚO' : 'PAYMENT VOUCHER — VALUATION'
+  h2.font      = { bold: true, size: 12, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  h2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+  h2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h2.border    = thickB()
+
+  merge(1, 6, 1, COLS)
+  const h3 = cell(1, 6)
+  h3.value     = `MARY ERP\n${fechaHoy}`
+  h3.font      = { size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h3.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h3.border    = thickB()
+
+  // ── INFO GENERAL ────────────────────────────────────────────────────────
+  ws.getRow(2).height = 18
+  merge(2, 1, 2, 3)
+  const i1 = cell(2, 1); i1.value = `${isEs?'Proyecto':'Project'}: ${proyLabel}`
+  i1.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i1.alignment = { vertical: 'middle' }; i1.border = thickB()
+
+  merge(2, 4, 2, 5)
+  const i2 = cell(2, 4); i2.value = `${isEs?'Avalúo N°':'Valuation No.'}: ${avaluo.numero}`
+  i2.font = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  i2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + GREEN } }
+  i2.alignment = { horizontal: 'center', vertical: 'middle' }; i2.border = thickB()
+
+  merge(2, 6, 2, COLS)
+  const i3 = cell(2, 6); i3.value = `${isEs?'Fecha':'Date'}: ${avaluo.fecha_elaboracion || fechaHoy}`
+  i3.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i3.alignment = { vertical: 'middle' }; i3.border = thickB()
+
+  // ── SECCIÓN: DATOS DEL SUBCONTRATO ──────────────────────────────────────
+  let row = 4
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  let sec = cell(row, 1)
+  sec.value = isEs ? 'DATOS DEL SUBCONTRATO' : 'SUBCONTRACT INFORMATION'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row++
+
+  const periodoLabel = avaluo.periodo_inicio && avaluo.periodo_fin
+    ? `${avaluo.periodo_inicio} → ${avaluo.periodo_fin}`
+    : '—'
+
+  const infoRows = [
+    [isEs?'Subcontratista:':'Subcontractor:', contrato?.subcontratista || '—'],
+    [isEs?'Descripción del contrato:':'Contract description:', contrato?.descripcion || '—'],
+    [isEs?'Período del avalúo:':'Valuation period:', periodoLabel],
+    [isEs?'Monto total del contrato:':'Total contract amount:', money(contrato?.monto_total)],
+  ]
+  infoRows.forEach(([lbl, val]) => {
+    ws.getRow(row).height = 17
+    merge(row, 1, row, 2)
+    const lc = cell(row, 1)
+    lc.value = lbl; lc.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    lc.border = bord(); lc.alignment = { vertical: 'middle' }
+    merge(row, 3, row, COLS)
+    const vc = cell(row, 3)
+    vc.value = val; vc.font = { size: 10, name: 'Arial' }
+    vc.border = bord(); vc.alignment = { vertical: 'middle' }
+    row++
+  })
+  row++ // espaciado
+
+  // ── SECCIÓN: DETALLE DEL AVALÚO ──────────────────────────────────────────
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  sec = cell(row, 1)
+  sec.value = isEs ? 'DETALLE DEL AVALÚO' : 'VALUATION DETAIL'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row++
+
+  // Headers tabla
+  ws.getRow(row).height = 28
+  const tHeaders = isEs
+    ? ['Descripción', 'Cant. Anterior', 'Cant. Actual', 'Cant. Acumulada', 'Costo Unitario', '% Avance', 'Monto Avalúo']
+    : ['Description', 'Previous Qty', 'Current Qty', 'Accumulated Qty', 'Unit Cost', '% Progress', 'Valuation Amount']
+  tHeaders.forEach((h, i) => {
+    const c2 = cell(row, i + 1)
+    c2.value = h
+    c2.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Arial' }
+    c2.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+    c2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    c2.border = bord()
+  })
+  row++
+
+  itemsContrato.forEach((it, idx) => {
+    const ai = avaluoItems.find(x => x.avaluo_id === avaluo.id && x.subcontrato_item_id === it.id)
+    if (!ai) return
+    const even = idx % 2 === 1
+    const bg   = even ? 'FFF8FAFC' : 'FFFFFFFF'
+    const cantContrato  = parseFloat(it.cantidad_contrato)||0
+    const cantAcum      = parseFloat(ai.cantidad_acumulada)||0
+    const pctAvance     = cantContrato > 0 ? (cantAcum / cantContrato) * 100 : 0
+
+    ws.getRow(row).height = 17
+    const c1 = cell(row, 1); c1.value = it.descripcion; c1.font = { size: 9, name: 'Arial' }
+    const c2 = cell(row, 2); c2.value = parseFloat(ai.cantidad_anterior)||0
+    const c3 = cell(row, 3); c3.value = parseFloat(ai.cantidad_actual)||0
+    const c4 = cell(row, 4); c4.value = cantAcum
+    const c5 = cell(row, 5); c5.value = parseFloat(ai.costo_unitario)||0
+    const c6 = cell(row, 6); c6.value = pctAvance / 100
+    const c7 = cell(row, 7); c7.value = parseFloat(ai.monto_actual)||0
+
+    ;[c2,c3,c4].forEach(c => { c.numFmt = '#,##0.00' })
+    ;[c5,c7].forEach(c => { c.numFmt = '"' + moneda + '" #,##0.00' })
+    c6.numFmt = '0.0%'
+
+    ;[c1,c2,c3,c4,c5,c6,c7].forEach(c => {
+      c.font = c.font || { size: 9, name: 'Arial' }
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      c.border = bord()
+      c.alignment = { vertical: 'middle', horizontal: c === c1 ? 'left' : 'right' }
+    })
+    row++
+  })
+
+  // ── TOTALES ─────────────────────────────────────────────────────────────
+  const totalRows = [
+    [isEs?'Subtotal':'Subtotal', money(avaluo.subtotal)],
+    [`${isEs?'Impuesto':'Tax'} (${contrato?.impuesto_pct||0}%)`, money(avaluo.impuesto_monto)],
+    [isEs?'Total Avalúo':'Valuation Total', money(avaluo.monto_total)],
+  ]
+  if (parseFloat(avaluo.retencion_monto||0) > 0) {
+    totalRows.push([`${isEs?'Retención':'Retention'} (${avaluo.retencion_pct||0}%)`, `-${money(avaluo.retencion_monto)}`])
+  }
+  totalRows.push([isEs?'MONTO A PAGAR':'AMOUNT DUE', money(avaluo.monto_a_pagar ?? avaluo.monto_total)])
+
+  totalRows.forEach(([lbl, val], i) => {
+    const isLast = i === totalRows.length - 1
+    ws.getRow(row).height = isLast ? 22 : 17
+    merge(row, 1, row, 5)
+    const lc = cell(row, 1)
+    lc.value = lbl
+    lc.font  = isLast ? { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } } : { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: isLast ? 'FF' + GREEN : 'FF' + LIGHT } }
+    lc.alignment = { horizontal: 'right', vertical: 'middle' }; lc.border = bord()
+
+    merge(row, 6, row, COLS)
+    const vc = cell(row, 6)
+    vc.value = val
+    vc.font  = isLast ? { bold: true, size: 12, name: 'Arial', color: { argb: 'FFFFFFFF' } } : { bold: true, size: 10, name: 'Arial' }
+    vc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: isLast ? 'FF' + GREEN : 'FFFFFFFF' } }
+    vc.alignment = { horizontal: 'right', vertical: 'middle' }; vc.border = bord()
+    row++
+  })
+  row++
+
+  if (avaluo.notas) {
+    ws.getRow(row).height = 28
+    merge(row, 1, row, COLS)
+    const n = cell(row, 1)
+    n.value = `${isEs?'Notas:':'Notes:'} ${avaluo.notas}`
+    n.font  = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+    n.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
+    row += 2
+  }
+
+  // ── SECCIÓN: FIRMAS ─────────────────────────────────────────────────────
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  sec = cell(row, 1)
+  sec.value = isEs ? 'AUTORIZACIONES Y FIRMAS' : 'AUTHORIZATIONS AND SIGNATURES'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row += 2
+
+  const firmantes = [
+    { label: isEs ? 'Aprobado por' : 'Approved by',  nombre: '___________________________', cargo: isEs ? 'Administrador / Gerente' : 'Administrator / Manager' },
+    { label: isEs ? 'Recibido por' : 'Received by',  nombre: '___________________________', cargo: contrato?.subcontratista || (isEs ? 'Subcontratista' : 'Subcontractor') },
+  ]
+  const left  = firmantes[0]
+  const right = firmantes[1]
+
+  ws.getRow(row).height = 22
+  merge(row, 1, row, 3)
+  let fl = cell(row, 1)
+  fl.value = left.nombre; fl.font = { size: 10, name: 'Arial' }
+  fl.border = { bottom: { style: 'medium', color: { argb: 'FF' + BRAND } } }
+  fl.alignment = { horizontal: 'center', vertical: 'bottom' }
+
+  merge(row, 5, row, COLS)
+  let fr = cell(row, 5)
+  fr.value = right.nombre; fr.font = { size: 10, name: 'Arial' }
+  fr.border = { bottom: { style: 'medium', color: { argb: 'FF' + BRAND } } }
+  fr.alignment = { horizontal: 'center', vertical: 'bottom' }
+  row++
+
+  ws.getRow(row).height = 16
+  merge(row, 1, row, 3)
+  let ll = cell(row, 1)
+  ll.value = left.label; ll.font = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  ll.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  ll.alignment = { horizontal: 'center', vertical: 'middle' }; ll.border = bord()
+
+  merge(row, 5, row, COLS)
+  let lr = cell(row, 5)
+  lr.value = right.label; lr.font = { bold: true, size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  lr.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  lr.alignment = { horizontal: 'center', vertical: 'middle' }; lr.border = bord()
+  row++
+
+  ws.getRow(row).height = 15
+  merge(row, 1, row, 3)
+  let cl = cell(row, 1)
+  cl.value = left.cargo; cl.font = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+  cl.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  merge(row, 5, row, COLS)
+  let cr = cell(row, 5)
+  cr.value = right.cargo; cr.font = { italic: true, size: 9, name: 'Arial', color: { argb: 'FF64748B' } }
+  cr.alignment = { horizontal: 'center', vertical: 'middle' }
+  row += 2
+
+  // ── FOOTER ──────────────────────────────────────────────────────────────
+  ws.getRow(row).height = 14
+  merge(row, 1, row, COLS)
+  const ft = cell(row, 1)
+  ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+  ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
+  ft.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  const buf = await wb.xlsx.writeBuffer()
+  const subSlug = (contrato?.subcontratista || 'subcontrato').replace(/\s+/g, '_')
+  saveAs(new Blob([buf]), `${isEs ? 'Avaluo' : 'Valuation'}_${avaluo.numero}_${subSlug}_${proy?.project_code || ''}.xlsx`)
+}
+
+// ── EXPORTAR CONTRATO DE SUBCONTRATO (con historial de avalúos) ─────────────
+export async function buildSubcontratoDoc({ contrato, itemsContrato, avaluos, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs  = lang === 'ES'
+  const COLS  = 7
+  const wb    = new ExcelJS.Workbook()
+  wb.creator  = `MARY ERP — ${nombreEmpresa}`
+  wb.created  = new Date()
+
+  const BRAND = '1B3A6B'
+  const GREEN = '1D9E75'
+  const AMBER = 'F59E0B'
+  const LIGHT = 'EEF2F7'
+
+  const bord = () => ({
+    top:    { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    bottom: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    left:   { style: 'thin', color: { argb: 'FFD0D7DE' } },
+    right:  { style: 'thin', color: { argb: 'FFD0D7DE' } },
+  })
+  const thickB = () => ({
+    top:    { style: 'medium', color: { argb: 'FF' + BRAND } },
+    bottom: { style: 'medium', color: { argb: 'FF' + BRAND } },
+    left:   { style: 'medium', color: { argb: 'FF' + BRAND } },
+    right:  { style: 'medium', color: { argb: 'FF' + BRAND } },
+  })
+
+  const fechaHoy  = new Date().toLocaleDateString(isEs ? 'es' : 'en-US')
+  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+  const moneda    = contrato?.moneda || proy?.moneda || 'USD'
+  const money = (v) => new Intl.NumberFormat(isEs ? 'es' : 'en-US', { style: 'currency', currency: moneda }).format(parseFloat(v)||0)
+
+  const avaluosSc = (avaluos||[]).filter(a => a.subcontrato_id === contrato.id).sort((a,b) => a.numero - b.numero)
+  const totalValorado = avaluosSc.filter(a => a.estado === 'aprobado').reduce((s,a) => s + (parseFloat(a.monto_total)||0), 0)
+  const totalPagar    = avaluosSc.filter(a => a.estado === 'aprobado').reduce((s,a) => s + (parseFloat(a.monto_a_pagar ?? a.monto_total)||0), 0)
+
+  // ── HOJA 1: RESUMEN DEL CONTRATO ─────────────────────────────────────────
+  const ws = wb.addWorksheet(isEs ? 'Contrato' : 'Contract')
+  setCols(ws, [26, 14, 14, 14, 14, 14, 14])
+
+  const cell  = (r, c) => ws.getCell(r, c)
+  const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
+
+  // Header
+  ws.getRow(1).height = 34
+  merge(1, 1, 1, 3)
+  const h1 = cell(1, 1)
+  h1.value     = nombreEmpresa
+  h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h1.alignment = { vertical: 'middle' }
+  h1.border    = thickB()
+
+  merge(1, 4, 1, 5)
+  const h2 = cell(1, 4)
+  h2.value     = isEs ? 'CONTRATO DE SUBCONTRATO' : 'SUBCONTRACT AGREEMENT'
+  h2.font      = { bold: true, size: 12, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  h2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+  h2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h2.border    = thickB()
+
+  merge(1, 6, 1, COLS)
+  const h3 = cell(1, 6)
+  h3.value     = `MARY ERP\n${fechaHoy}`
+  h3.font      = { size: 9, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  h3.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  h3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  h3.border    = thickB()
+
+  // Info general
+  ws.getRow(2).height = 18
+  merge(2, 1, 2, 3)
+  const i1 = cell(2, 1); i1.value = `${isEs?'Proyecto':'Project'}: ${proyLabel}`
+  i1.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i1.alignment = { vertical: 'middle' }; i1.border = thickB()
+
+  merge(2, 4, 2, COLS)
+  const i2 = cell(2, 4); i2.value = `${isEs?'Fecha de exportación':'Export date'}: ${fechaHoy}`
+  i2.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  i2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  i2.alignment = { vertical: 'middle' }; i2.border = thickB()
+
+  // Sección: datos del subcontrato
+  let row = 4
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  let sec = cell(row, 1)
+  sec.value = isEs ? 'DATOS DEL SUBCONTRATO' : 'SUBCONTRACT INFORMATION'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row++
+
+  const ESTADOS_LABEL = {
+    activo: { es: 'Activo', en: 'Active' },
+    completado: { es: 'Completado', en: 'Completed' },
+    cancelado: { es: 'Cancelado', en: 'Cancelled' },
+  }
+  const estadoLbl = ESTADOS_LABEL[contrato.estado]?.[isEs?'es':'en'] || contrato.estado || '—'
+
+  const infoRows = [
+    [isEs?'Subcontratista:':'Subcontractor:', contrato.subcontratista || '—'],
+    [isEs?'Descripción:':'Description:', contrato.descripcion || '—'],
+    [isEs?'Fecha de contrato:':'Contract date:', contrato.fecha_contrato || '—'],
+    [isEs?'Vigencia:':'Term:', (contrato.fecha_inicio && contrato.fecha_fin) ? `${contrato.fecha_inicio} → ${contrato.fecha_fin}` : '—'],
+    [isEs?'Estado:':'Status:', estadoLbl],
+    [isEs?'% Retención:':'Retention %:', `${contrato.retencion_pct || 0}%`],
+    [isEs?'Plazo de garantía (meses):':'Warranty period (months):', contrato.plazo_garantia_meses || '—'],
+    [isEs?'% de impuesto:':'Tax %:', `${contrato.impuesto_pct || 0}%`],
+  ]
+  infoRows.forEach(([lbl, val]) => {
+    ws.getRow(row).height = 17
+    merge(row, 1, row, 2)
+    const lc = cell(row, 1)
+    lc.value = lbl; lc.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    lc.border = bord(); lc.alignment = { vertical: 'middle' }
+    merge(row, 3, row, COLS)
+    const vc = cell(row, 3)
+    vc.value = val; vc.font = { size: 10, name: 'Arial' }
+    vc.border = bord(); vc.alignment = { vertical: 'middle' }
+    row++
+  })
+  row++
+
+  // Sección: items del contrato
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  sec = cell(row, 1)
+  sec.value = isEs ? 'ACTIVIDADES DEL CONTRATO' : 'CONTRACT ACTIVITIES'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row++
+
+  ws.getRow(row).height = 28
+  const tHeaders = isEs
+    ? ['Descripción', 'Unidad', 'Cant. Contrato', 'Costo Unitario', 'Total Contrato', 'Acumulado', 'Saldo']
+    : ['Description', 'Unit', 'Contract Qty', 'Unit Cost', 'Contract Total', 'Accumulated', 'Balance']
+  tHeaders.forEach((h, i) => {
+    const c2 = cell(row, i + 1)
+    c2.value = h
+    c2.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Arial' }
+    c2.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+    c2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    c2.border = bord()
+  })
+  row++
+
+  let totalContrato = 0, totalAcumMonto = 0
+  itemsContrato.forEach((it, idx) => {
+    // Acumulado = suma de cantidad_actual de avalúos aprobados para este item
+    const acum = avaluosSc.filter(a => a.estado === 'aprobado').reduce((s, av) => {
+      const ai = (avaluoItems||[]).find(x => x.avaluo_id === av.id && x.subcontrato_item_id === it.id)
+      return s + (parseFloat(ai?.cantidad_actual)||0)
+    }, 0)
+    const cantContrato = parseFloat(it.cantidad_contrato)||0
+    const costoUnit     = parseFloat(it.costo_unitario)||0
+    const costoTotal    = parseFloat(it.costo_total)||0
+    const saldo         = cantContrato - acum
+    const acumMonto     = r2(acum * costoUnit)
+    const saldoMonto    = r2(saldo * costoUnit)
+    totalContrato  += costoTotal
+    totalAcumMonto += acumMonto
+
+    const even = idx % 2 === 1
+    const bg   = even ? 'FFF8FAFC' : 'FFFFFFFF'
+    ws.getRow(row).height = 17
+    const c1 = cell(row, 1); c1.value = it.descripcion
+    const c2 = cell(row, 2); c2.value = it.unidad || ''
+    const c3 = cell(row, 3); c3.value = cantContrato
+    const c4 = cell(row, 4); c4.value = costoUnit
+    const c5 = cell(row, 5); c5.value = costoTotal
+    const c6 = cell(row, 6); c6.value = acumMonto
+    const c7 = cell(row, 7); c7.value = saldoMonto
+
+    c3.numFmt = '#,##0.00'
+    ;[c4,c5,c6,c7].forEach(c => { c.numFmt = '"' + moneda + '" #,##0.00' })
+
+    ;[c1,c2,c3,c4,c5,c6,c7].forEach((c, i) => {
+      c.font = { size: 9, name: 'Arial', color: i === 5 ? { argb: 'FF' + GREEN } : (i === 6 ? { argb: saldo < 0 ? 'FFEF4444' : 'FF' + AMBER } : undefined) }
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+      c.border = bord()
+      c.alignment = { vertical: 'middle', horizontal: i === 0 ? 'left' : 'right' }
+    })
+    row++
+  })
+
+  // Total row
+  ws.getRow(row).height = 18
+  merge(row, 1, row, 4)
+  const tl = cell(row, 1)
+  tl.value = isEs ? 'TOTAL CONTRATO' : 'CONTRACT TOTAL'
+  tl.font  = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+  tl.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+  tl.alignment = { horizontal: 'right', vertical: 'middle' }; tl.border = bord()
+
+  const tv = cell(row, 5)
+  tv.value = totalContrato; tv.numFmt = '"' + moneda + '" #,##0.00'
+  tv.font  = { bold: true, size: 10, name: 'Arial' }
+  tv.alignment = { horizontal: 'right', vertical: 'middle' }; tv.border = bord()
+
+  const tav = cell(row, 6)
+  tav.value = totalAcumMonto; tav.numFmt = '"' + moneda + '" #,##0.00'
+  tav.font  = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + GREEN } }
+  tav.alignment = { horizontal: 'right', vertical: 'middle' }; tav.border = bord()
+
+  const tsv = cell(row, 7)
+  tsv.value = r2(totalContrato - totalAcumMonto); tsv.numFmt = '"' + moneda + '" #,##0.00'
+  tsv.font  = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + AMBER } }
+  tsv.alignment = { horizontal: 'right', vertical: 'middle' }; tsv.border = bord()
+  row += 2
+
+  // Sección: resumen financiero
+  ws.getRow(row).height = 18
+  merge(row, 1, row, COLS)
+  sec = cell(row, 1)
+  sec.value = isEs ? 'RESUMEN FINANCIERO' : 'FINANCIAL SUMMARY'
+  sec.font  = { bold: true, size: 11, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+  sec.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E5FA3' } }
+  sec.alignment = { vertical: 'middle' }; sec.border = bord()
+  row++
+
+  const resumenRows = [
+    [isEs?'Monto total del contrato:':'Total contract amount:', money(contrato.monto_total)],
+    [isEs?'Total valorado (avalúos aprobados):':'Total valued (approved valuations):', money(totalValorado)],
+    [isEs?'Total pagado/a pagar:':'Total paid/payable:', money(totalPagar)],
+    [isEs?'Saldo por valorar:':'Balance to value:', money(r2((parseFloat(contrato.monto_total)||0) - totalValorado))],
+  ]
+  resumenRows.forEach(([lbl, val]) => {
+    ws.getRow(row).height = 17
+    merge(row, 1, row, 4)
+    const lc = cell(row, 1)
+    lc.value = lbl; lc.font = { bold: true, size: 10, name: 'Arial', color: { argb: 'FF' + BRAND } }
+    lc.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
+    lc.border = bord(); lc.alignment = { vertical: 'middle' }
+    merge(row, 5, row, COLS)
+    const vc = cell(row, 5)
+    vc.value = val; vc.font = { bold: true, size: 10, name: 'Arial' }
+    vc.border = bord(); vc.alignment = { horizontal: 'right', vertical: 'middle' }
+    row++
+  })
+  row += 2
+
+  // Footer hoja 1
+  ws.getRow(row).height = 14
+  merge(row, 1, row, COLS)
+  const ft = cell(row, 1)
+  ft.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+  ft.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
+  ft.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  // ── HOJA 2: HISTORIAL DE AVALÚOS ─────────────────────────────────────────
+  if (avaluosSc.length > 0) {
+    const ws2 = wb.addWorksheet(isEs ? 'Historial de Avalúos' : 'Valuation History')
+    setCols(ws2, [10, 22, 14, 14, 14, 14, 14, 14])
+
+    const cell2  = (r, c) => ws2.getCell(r, c)
+    const merge2 = (r1, c1, r2, c2) => ws2.mergeCells(r1, c1, r2, c2)
+
+    ws2.getRow(1).height = 30
+    merge2(1, 1, 1, 8)
+    const t1 = cell2(1, 1)
+    t1.value = isEs ? `Historial de Avalúos — ${contrato.subcontratista}` : `Valuation History — ${contrato.subcontratista}`
+    t1.font  = { bold: true, size: 12, name: 'Arial', color: { argb: 'FFFFFFFF' } }
+    t1.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+    t1.alignment = { horizontal: 'center', vertical: 'middle' }
+    t1.border = thickB()
+
+    let r2row = 3
+    ws2.getRow(r2row).height = 24
+    const histHeaders = isEs
+      ? ['#', 'Período', 'Fecha', 'Subtotal', 'Impuesto', 'Retención', 'Total Avalúo', 'Estado']
+      : ['#', 'Period', 'Date', 'Subtotal', 'Tax', 'Retention', 'Valuation Total', 'Status']
+    histHeaders.forEach((h, i) => {
+      const c = cell2(r2row, i + 1)
+      c.value = h
+      c.font  = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Arial' }
+      c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
+      c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      c.border = bord()
+    })
+    r2row++
+
+    const ESTADOS_AV = {
+      aprobado: { es: 'Aprobado', en: 'Approved' },
+      borrador: { es: 'Borrador', en: 'Draft' },
+      rechazado: { es: 'Rechazado', en: 'Rejected' },
+    }
+
+    avaluosSc.forEach((av, idx) => {
+      const even = idx % 2 === 1
+      const bg   = even ? 'FFF8FAFC' : 'FFFFFFFF'
+      const periodo = av.periodo_inicio && av.periodo_fin ? `${av.periodo_inicio} → ${av.periodo_fin}` : '—'
+      const estLbl  = ESTADOS_AV[av.estado]?.[isEs?'es':'en'] || av.estado || '—'
+
+      ws2.getRow(r2row).height = 17
+      const vals = [
+        `#${av.numero}`, periodo, av.fecha_elaboracion || '—',
+        money(av.subtotal), money(av.impuesto_monto),
+        parseFloat(av.retencion_monto||0) > 0 ? money(av.retencion_monto) : '—',
+        money(av.monto_total), estLbl,
+      ]
+      vals.forEach((v, i) => {
+        const c = cell2(r2row, i + 1)
+        c.value = v
+        c.font  = { size: 9, name: 'Arial', bold: i === 0 || i === 6 }
+        c.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+        c.border = bord()
+        c.alignment = { horizontal: i <= 2 ? 'left' : (i === 7 ? 'center' : 'right'), vertical: 'middle' }
+      })
+      r2row++
+    })
+
+    r2row++
+    ws2.getRow(r2row).height = 14
+    merge2(r2row, 1, r2row, 8)
+    const ft2 = cell2(r2row, 1)
+    ft2.value = `${nombreEmpresa}  ·  appmary.com  ·  ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'}  ·  ${fechaHoy}`
+    ft2.font  = { italic: true, size: 8, name: 'Arial', color: { argb: 'FF94A3B8' } }
+    ft2.alignment = { horizontal: 'center', vertical: 'middle' }
+  }
+
+  const buf = await wb.xlsx.writeBuffer()
+  const subSlug = (contrato.subcontratista || 'subcontrato').replace(/\s+/g, '_')
+  saveAs(new Blob([buf]), `${isEs ? 'Contrato_Subcontrato' : 'Subcontract'}_${subSlug}_${proy?.project_code || ''}.xlsx`)
+}
+
 // ── EXPORT RETENCIONES ────────────────────────────────────
 async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs      = lang === 'ES'
