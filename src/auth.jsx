@@ -58,9 +58,22 @@ export function AuthProvider({ children }) {
     if (tenant?.es_trial && tenant?.trial_fin) {
       const trialFin = new Date(tenant.trial_fin)
       if (trialFin < new Date() && data.rol !== 'super_admin') {
+        // Calcular duracion real del trial en dias
+        const trialInicio = tenant.trial_inicio ? new Date(tenant.trial_inicio) : null
+        const trialDias = trialInicio
+          ? Math.round((trialFin - trialInicio) / (1000 * 60 * 60 * 24))
+          : null
+
         await supabase.auth.signOut()
         setPerfil(null)
-        setBlockedReason('trial_expired')
+        setBlockedReason({
+          reason:       'trial_expired',
+          trialDias,
+          trialFin:     tenant.trial_fin,
+          email:        data.email,
+          tenant_id:    data.tenant_id,
+          tenantNombre: tenant.nombre_empresa || '',
+        })
         return
       }
     }
