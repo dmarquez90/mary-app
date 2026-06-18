@@ -118,102 +118,232 @@ const T = {
   }
 }
 
-// ── ESTILOS COMPARTIDOS ───────────────────────────────────────────────────
-const BG = { background: '#000000' }
-const BG_RADIAL = {
-  background: 'radial-gradient(ellipse at 70% 20%, rgba(26,94,180,0.10) 0%, transparent 55%), radial-gradient(ellipse at 20% 80%, rgba(36,185,100,0.07) 0%, transparent 50%), #000000'
+// ── DESIGN TOKENS (matching landing page) ─────────────────────────────────
+const NAVY_900  = '#0B1C36'
+const NAVY_800  = '#122848'
+const NAVY_700  = '#1B3A6B'
+const NAVY_600  = '#2E5FA3'
+const BLUE_500  = '#1A5EB4'
+const BLUE_400  = '#2E78D6'
+const BLUE_200  = '#93B8D8'
+const BLUE_100  = '#D6E4F0'
+const WHITE     = '#FFFFFF'
+const GRAY_100  = '#F3F4F6'
+const GRAY_400  = '#9CA3AF'
+const GRAY_500  = '#6B7280'
+const GRAY_600  = '#4B5563'
+const GRAY_700  = '#374151'
+const GRAY_900  = '#111827'
+const GREEN_500 = '#1A9E5C'
+const RED_FG    = '#f08080'
+const RED_BG    = 'rgba(220,60,60,0.08)'
+const RED_BD    = 'rgba(220,80,80,0.25)'
+
+// ── SHARED STYLES ─────────────────────────────────────────────────────────
+
+// Background matching landing hero: dark navy + blueprint grid + radial glow
+const bgStyle = {
+  minHeight: '100vh',
+  background: `linear-gradient(180deg, ${NAVY_900} 0%, ${NAVY_800} 100%)`,
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '1.5rem 1rem',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif',
 }
 
+// Blueprint grid overlay (from landing hero)
+const blueprintGridStyle = {
+  position: 'fixed',
+  inset: 0,
+  backgroundImage: `
+    linear-gradient(rgba(127,168,212,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127,168,212,0.05) 1px, transparent 1px)
+  `,
+  backgroundSize: '48px 48px',
+  WebkitMaskImage: 'radial-gradient(ellipse 80% 70% at 50% 30%, #000 30%, transparent 75%)',
+  maskImage: 'radial-gradient(ellipse 80% 70% at 50% 30%, #000 30%, transparent 75%)',
+  pointerEvents: 'none',
+  zIndex: 0,
+}
+
+// Radial glow (from landing hero)
+const radialGlowStyle = {
+  position: 'fixed',
+  top: '-10%',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  width: 900,
+  height: 600,
+  background: `radial-gradient(ellipse at center, rgba(46,95,163,0.28) 0%, transparent 65%)`,
+  pointerEvents: 'none',
+  zIndex: 0,
+}
+
+// Card container — matches landing's glass-card style on dark
+const cardStyle = {
+  position: 'relative',
+  zIndex: 1,
+  width: '100%',
+  background: 'rgba(18, 40, 72, 0.72)',
+  border: `1px solid rgba(127,168,212,0.18)`,
+  borderRadius: 16,
+  backdropFilter: 'saturate(140%) blur(16px)',
+  boxShadow: '0 24px 64px rgba(0,0,0,0.45), 0 0 0 1px rgba(46,95,163,0.12)',
+  padding: '2rem 1.75rem',
+}
+
+// Input base — same as landing's form inputs
 const inputBase = {
   width: '100%',
   boxSizing: 'border-box',
-  background: 'rgba(255,255,255,0.04)',
-  border: '0.5px solid rgba(150,180,220,0.18)',
-  borderRadius: '10px',
-  padding: '13px 14px 13px 42px',
+  background: 'rgba(11,28,54,0.55)',
+  border: `1px solid rgba(127,168,212,0.22)`,
+  borderRadius: 10,
+  padding: '12px 14px 12px 42px',
   fontFamily: 'inherit',
-  fontSize: '14px',
-  color: '#ffffff',
+  fontSize: 14,
+  color: WHITE,
   outline: 'none',
+  transition: 'border-color 160ms, background 160ms',
 }
 
-const inputBaseNoIcon = {
-  ...inputBase,
-  padding: '13px 14px',
-}
+const inputBaseNoIcon = { ...inputBase, padding: '12px 14px' }
+const inputBaseWithEye = { ...inputBase, paddingRight: '42px' }
 
-const inputBaseWithEye = {
-  ...inputBase,
-  paddingRight: '42px',
-}
-
+// Primary button — matches landing's Button variant="primary"
 const btnPrimary = {
   width: '100%',
-  padding: '14px',
-  borderRadius: '10px',
+  padding: '13px',
+  borderRadius: 10,
   border: 'none',
-  background: '#1a5eb4',
-  color: '#ffffff',
+  background: `linear-gradient(135deg, ${BLUE_500} 0%, ${BLUE_400} 100%)`,
+  color: WHITE,
   fontFamily: 'inherit',
-  fontSize: '15px',
-  fontWeight: '700',
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
+  fontSize: 15,
+  fontWeight: 700,
+  letterSpacing: '0.04em',
   cursor: 'pointer',
-  boxShadow: '0 0 0 1px rgba(80,150,255,0.3), 0 4px 20px rgba(26,94,180,0.4)',
+  boxShadow: `0 0 0 1px rgba(46,120,214,0.4), 0 4px 20px rgba(26,94,180,0.45)`,
+  transition: 'opacity 160ms, transform 80ms',
 }
 
-// ── LOGO SVG ──────────────────────────────────────────────────────────────
+// Secondary / outline button
+const btnSecondary = {
+  width: '100%',
+  padding: '13px',
+  borderRadius: 10,
+  border: `1.5px solid rgba(46,120,214,0.55)`,
+  background: 'rgba(26,94,180,0.10)',
+  color: BLUE_200,
+  fontFamily: 'inherit',
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'background 160ms, border-color 160ms',
+  letterSpacing: '0.02em',
+}
+
+// ── LOGO SVG (matching exact landing logo) ────────────────────────────────
 const MaryLogoSVG = () => (
   <svg
     viewBox="0 0 320 90"
     xmlns="http://www.w3.org/2000/svg"
-    style={{ width: '380px', height: 'auto', display: 'block', margin: '0 auto', filter: 'drop-shadow(0 2px 20px rgba(26,94,180,0.35))' }}
+    style={{
+      width: 360,
+      height: 'auto',
+      display: 'block',
+      margin: '0 auto',
+      filter: `drop-shadow(0 2px 24px rgba(26,94,180,0.40))`,
+    }}
     aria-label="MARY"
   >
+    {/* Construction-themed mark — bars + S-curve trend + arrow */}
     <g transform="translate(10,5)">
-      <rect x="28" y="48" width="14" height="26" rx="2" fill="#7a8fa6" opacity="0.7"/>
-      <rect x="44" y="38" width="14" height="36" rx="2" fill="#a0b4c8" opacity="0.7"/>
-      <rect x="60" y="28" width="14" height="46" rx="2" fill="#c0d0e0" opacity="0.7"/>
-      <ellipse cx="51" cy="54" rx="30" ry="9" fill="none" stroke="#3a8adc" strokeWidth="2.5" opacity="0.8"/>
-      <ellipse cx="51" cy="54" rx="24" ry="7" fill="none" stroke="#2a6ab8" strokeWidth="1.5" opacity="0.5"/>
-      <rect x="46" y="28" width="16" height="16" rx="3" fill="#3bb876" opacity="0.95"/>
-      <rect x="62" y="18" width="13" height="13" rx="3" fill="#26d4ff" opacity="0.85"/>
-      <line x1="62" y1="32" x2="80" y2="10" stroke="#3bb876" strokeWidth="2.5" opacity="0.9"/>
-      <polygon points="80,5 85,14 75,14" fill="#3bb876" opacity="0.9"/>
+      <rect x="28" y="48" width="14" height="26" rx="2" fill={BLUE_200} opacity="0.65"/>
+      <rect x="44" y="38" width="14" height="36" rx="2" fill={BLUE_200} opacity="0.75"/>
+      <rect x="60" y="28" width="14" height="46" rx="2" fill={BLUE_200} opacity="0.85"/>
+      <ellipse cx="51" cy="54" rx="30" ry="9" fill="none" stroke={BLUE_400} strokeWidth="2.5" opacity="0.75"/>
+      <ellipse cx="51" cy="54" rx="24" ry="7" fill="none" stroke={NAVY_600} strokeWidth="1.5" opacity="0.45"/>
+      <rect x="46" y="28" width="16" height="16" rx="3" fill={GREEN_500} opacity="0.95"/>
+      <rect x="62" y="18" width="13" height="13" rx="3" fill="#26d4ff" opacity="0.80"/>
+      <line x1="62" y1="32" x2="80" y2="10" stroke={GREEN_500} strokeWidth="2.5" opacity="0.90"/>
+      <polygon points="80,5 85,14 75,14" fill={GREEN_500} opacity="0.90"/>
     </g>
-    <text x="110" y="60" fontFamily="'Arial Black', Arial, sans-serif" fontWeight="900" fontSize="52" fill="#ffffff" letterSpacing="2">MARY</text>
-    <text x="110" y="78" fontFamily="Arial, sans-serif" fontWeight="500" fontSize="11" fill="rgba(180,210,255,0.45)" letterSpacing="4">MANAGEMENT &amp; RESOURCES YIELD</text>
+    {/* MARY wordmark */}
+    <text
+      x="110" y="60"
+      fontFamily="'Arial Black', Arial, sans-serif"
+      fontWeight="900"
+      fontSize="52"
+      fill={WHITE}
+      letterSpacing="2"
+    >MARY</text>
+    {/* Tagline */}
+    <text
+      x="110" y="78"
+      fontFamily="Arial, sans-serif"
+      fontWeight="500"
+      fontSize="10"
+      fill={`rgba(147,184,216,0.50)`}
+      letterSpacing="4"
+    >MANAGEMENT &amp; RESOURCES YIELD</text>
   </svg>
 )
 
-// ── LOGO + ACENTO ─────────────────────────────────────────────────────────
-const Logo = () => (
-  <div style={{ textAlign: 'center', marginBottom: '1.25rem', marginTop: '-1.5rem' }}>
-    <MaryLogoSVG />
-    <div style={{ width: '40px', height: '3px', background: 'linear-gradient(90deg, #1a9e5c, #1a5eb4)', borderRadius: '2px', margin: '0.5rem auto 0' }} />
+// Blue accent divider (from landing)
+const AccentDivider = () => (
+  <div style={{
+    width: 40,
+    height: 3,
+    background: `linear-gradient(90deg, ${GREEN_500}, ${BLUE_500})`,
+    borderRadius: 2,
+    margin: '0.6rem auto 0',
+  }} />
+)
+
+// Pill badge (from landing hero)
+const PillBadge = ({ children }) => (
+  <div style={{
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '5px 14px',
+    borderRadius: 9999,
+    background: 'rgba(46,120,214,0.14)',
+    border: `1px solid rgba(46,120,214,0.36)`,
+    marginBottom: 20,
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#8FB8E8',
+    letterSpacing: '0.04em',
+  }}>
+    <span style={{ width: 7, height: 7, borderRadius: '50%', background: BLUE_400, flexShrink: 0 }} />
+    {children}
   </div>
 )
 
-// ── TOGGLE IDIOMA ─────────────────────────────────────────────────────────
+// ── LANG TOGGLE ───────────────────────────────────────────────────────────
 const LangToggle = ({ lang, setLang }) => (
   <button
     onClick={() => setLang(l => l === 'ES' ? 'EN' : 'ES')}
     style={{
-      position: 'absolute', top: '1rem', right: '1rem',
-      fontSize: '11px', fontWeight: '600',
-      color: 'rgba(200,220,255,0.7)',
-      background: 'rgba(255,255,255,0.05)',
-      border: '0.5px solid rgba(200,220,255,0.2)',
-      borderRadius: '6px', padding: '5px 10px',
-      cursor: 'pointer', letterSpacing: '0.05em',
+      position: 'absolute', top: '1rem', right: '1rem', zIndex: 2,
+      fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+      color: 'rgba(255,255,255,0.75)',
+      background: 'rgba(255,255,255,0.06)',
+      border: `1px solid rgba(255,255,255,0.14)`,
+      borderRadius: 6,
+      padding: '5px 11px',
+      cursor: 'pointer',
     }}
   >
     🌐 {lang === 'ES' ? 'EN' : 'ES'}
   </button>
 )
 
-// ── ICONO OJO ─────────────────────────────────────────────────────────────
+// ── EYE ICON ──────────────────────────────────────────────────────────────
 const EyeIcon = ({ visible }) => visible ? (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
@@ -227,9 +357,9 @@ const EyeIcon = ({ visible }) => visible ? (
   </svg>
 )
 
-// ── MODAL LEGAL ───────────────────────────────────────────────────────────
+// ── LEGAL MODAL ───────────────────────────────────────────────────────────
 function LegalModal({ type, lang, onClose }) {
-  const t    = T[lang]
+  const t = T[lang]
   const isEs = lang === 'ES'
 
   const TOS_ES = `
@@ -376,34 +506,26 @@ No vendemos, alquilamos ni compartimos su información personal con terceros con
 
 5. SEGURIDAD DE LOS DATOS
 
-Implementamos medidas técnicas y organizativas razonables para proteger su información contra acceso no autorizado, pérdida, alteración o divulgación. Esto incluye cifrado de contraseñas, comunicaciones cifradas mediante TLS/HTTPS y control de acceso basado en roles. Sin embargo, ningún sistema de seguridad es completamente infalible. Marquez Project Solutions LLC no garantiza seguridad absoluta frente a ataques externos o brechas causadas por terceros. En caso de una brecha de seguridad que afecte sus datos, le notificaremos en el menor tiempo posible.
+Implementamos medidas técnicas y organizativas razonables para proteger su información contra acceso no autorizado, pérdida, alteración o divulgación. Esto incluye cifrado de contraseñas, comunicaciones cifradas mediante TLS/HTTPS y control de acceso basado en roles. Sin embargo, ningún sistema de seguridad es completamente infalible.
 
 6. SUS DERECHOS
 
-Usted tiene derecho a:
-
-- Acceder a los datos personales que tenemos sobre usted
-- Solicitar la corrección de información incorrecta o desactualizada
-- Solicitar la eliminación de su cuenta y datos personales
-- Retirar su consentimiento en cualquier momento
-
-Para ejercer cualquiera de estos derechos, escríbanos a: deybi@marquezprojectsolutions.com. Responderemos en un plazo máximo de 30 días hábiles.
+Usted tiene derecho a acceder, corregir o eliminar sus datos personales. Para ejercer estos derechos, escríbanos a: deybi@marquezprojectsolutions.com.
 
 7. COOKIES
 
-MARY utiliza únicamente cookies técnicas estrictamente necesarias para el funcionamiento del sistema, como el mantenimiento de su sesión activa y preferencias de idioma. No utilizamos cookies de publicidad, seguimiento ni análisis de comportamiento de terceros.
+MARY utiliza únicamente cookies técnicas estrictamente necesarias para el funcionamiento del sistema. No utilizamos cookies de publicidad ni seguimiento de terceros.
 
 8. RETENCIÓN DE DATOS
 
-Sus datos se conservan mientras su cuenta esté activa. Al cancelar su cuenta, sus datos serán eliminados permanentemente después de un período de retención de 30 días, salvo que la ley aplicable exija su conservación por un período mayor.
+Sus datos se conservan mientras su cuenta esté activa. Al cancelar su cuenta, sus datos serán eliminados permanentemente después de un período de retención de 30 días.
 
 9. CAMBIOS A ESTA POLÍTICA
 
-Podemos actualizar esta Política de Privacidad periódicamente. Le notificaremos por correo electrónico ante cambios significativos. El uso continuado del servicio después de la notificación constituye su aceptación de la política actualizada.
+Le notificaremos por correo electrónico ante cambios significativos. El uso continuado del servicio después de la notificación constituye su aceptación de la política actualizada.
 
 10. CONTACTO
 
-Para preguntas sobre esta Política de Privacidad:
 Marquez Project Solutions LLC
 deybi@marquezprojectsolutions.com
 www.marquezprojectsolutions.com
@@ -434,48 +556,40 @@ We use your information to:
 - Operate and maintain the MARY service
 - Manage your account and subscription
 - Send you communications related to your account, service updates and important notifications
-- Generate anonymous and aggregated statistics about platform usage (without identifying specific persons or companies)
+- Generate anonymous and aggregated statistics about platform usage
 - Improve system functionalities
 - Comply with applicable legal obligations
 
 3. STATISTICS AND PUBLIC MENTIONS
 
-Marquez Project Solutions LLC may publicly mention general platform usage metrics, such as the total number of registered companies or countries where MARY operates. Under no circumstances will company names, users, financial data or operational information of any client be revealed without their express written authorization.
+Marquez Project Solutions LLC may publicly mention general platform usage metrics. Under no circumstances will company names, users, financial data or operational information of any client be revealed without their express written authorization.
 
 4. SHARING INFORMATION WITH THIRD PARTIES
 
-We do not sell, rent or share your personal information with third parties for commercial purposes. We only share information with technology infrastructure providers necessary to operate the service (cloud storage, authentication and service delivery), who are contractually obligated to protect your information and not use it for any other purpose.
+We do not sell, rent or share your personal information with third parties for commercial purposes. We only share information with technology infrastructure providers necessary to operate the service.
 
 5. DATA SECURITY
 
-We implement reasonable technical and organizational measures to protect your information against unauthorized access, loss, alteration or disclosure. This includes password encryption, encrypted communications via TLS/HTTPS and role-based access control. However, no security system is completely infallible. Marquez Project Solutions LLC does not guarantee absolute security against external attacks or breaches caused by third parties. In the event of a security breach affecting your data, we will notify you as soon as possible.
+We implement reasonable technical and organizational measures to protect your information against unauthorized access, loss, alteration or disclosure.
 
 6. YOUR RIGHTS
 
-You have the right to:
-
-- Access the personal data we hold about you
-- Request correction of incorrect or outdated information
-- Request deletion of your account and personal data
-- Withdraw your consent at any time
-
-To exercise any of these rights, write to us at: deybi@marquezprojectsolutions.com. We will respond within a maximum of 30 business days.
+You have the right to access, correct or delete your personal data. Write to us at: deybi@marquezprojectsolutions.com.
 
 7. COOKIES
 
-MARY uses only strictly necessary technical cookies for the system to function, such as maintaining your active session and language preferences. We do not use advertising, tracking or third-party behavioral analysis cookies.
+MARY uses only strictly necessary technical cookies. We do not use advertising or third-party tracking cookies.
 
 8. DATA RETENTION
 
-Your data is retained while your account is active. Upon cancellation of your account, your data will be permanently deleted after a 30-day retention period, unless applicable law requires its retention for a longer period.
+Your data is retained while your account is active. Upon cancellation, your data will be permanently deleted after a 30-day retention period.
 
 9. CHANGES TO THIS POLICY
 
-We may update this Privacy Policy periodically. We will notify you by email of significant changes. Continued use of the service after notification constitutes your acceptance of the updated policy.
+We will notify you by email of significant changes. Continued use of the service after notification constitutes your acceptance of the updated policy.
 
 10. CONTACT
 
-For questions about this Privacy Policy:
 Marquez Project Solutions LLC
 deybi@marquezprojectsolutions.com
 www.marquezprojectsolutions.com
@@ -486,41 +600,73 @@ California, United States
   const title   = type === 'tos' ? t.tos_title : t.pp_title
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.80)' }}>
-      <div style={{ width: '100%', maxWidth: '640px', background: '#0d0d0d', border: '0.5px solid rgba(150,180,220,0.15)', borderRadius: '16px', boxShadow: '0 20px 60px rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderBottom: '0.5px solid rgba(150,180,220,0.1)' }}>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1rem',
+      background: 'rgba(0,0,0,0.75)',
+      backdropFilter: 'blur(4px)',
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 640,
+        background: NAVY_800,
+        border: `1px solid rgba(127,168,212,0.18)`,
+        borderRadius: 16,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.65)',
+        display: 'flex', flexDirection: 'column',
+        maxHeight: '90vh',
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '1rem 1.5rem',
+          borderBottom: `1px solid rgba(127,168,212,0.12)`,
+        }}>
           <div>
-            <p style={{ color: '#ffffff', fontWeight: '700', fontSize: '15px', margin: 0 }}>{title}</p>
-            <p style={{ color: 'rgba(150,180,220,0.4)', fontSize: '11px', margin: '2px 0 0' }}>{t.last_updated} · Marquez Project Solutions LLC</p>
+            <p style={{ color: WHITE, fontWeight: 700, fontSize: 15, margin: 0 }}>{title}</p>
+            <p style={{ color: `rgba(147,184,216,0.45)`, fontSize: 11, margin: '2px 0 0' }}>
+              {t.last_updated} · Marquez Project Solutions LLC
+            </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(150,180,220,0.6)', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '4px 8px' }}>✕</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none', border: 'none',
+              color: `rgba(147,184,216,0.6)`,
+              cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 8px',
+            }}
+          >✕</button>
         </div>
+        {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem' }}>
           {content.trim().split('\n').map((line, i) => {
             const trimmed = line.trim()
             if (!trimmed) return <div key={i} style={{ height: '8px' }} />
             if (/^\d+\./.test(trimmed) && trimmed.length < 60)
-              return <p key={i} style={{ color: '#6fa8e0', fontWeight: '700', fontSize: '13px', marginTop: '16px', marginBottom: '4px' }}>{trimmed}</p>
+              return <p key={i} style={{ color: BLUE_200, fontWeight: 700, fontSize: 13, marginTop: 16, marginBottom: 4 }}>{trimmed}</p>
             if (trimmed.startsWith('TÉRMINOS') || trimmed.startsWith('POLÍTICA') || trimmed.startsWith('TERMS') || trimmed.startsWith('PRIVACY'))
-              return <p key={i} style={{ color: '#ffffff', fontWeight: '900', fontSize: '15px', margin: 0 }}>{trimmed}</p>
+              return <p key={i} style={{ color: WHITE, fontWeight: 900, fontSize: 15, margin: 0 }}>{trimmed}</p>
             if (trimmed.startsWith('Marquez Project') && i < 5)
-              return <p key={i} style={{ color: 'rgba(150,180,220,0.5)', fontSize: '11px', margin: 0 }}>{trimmed}</p>
+              return <p key={i} style={{ color: `rgba(147,184,216,0.55)`, fontSize: 11, margin: 0 }}>{trimmed}</p>
             if (trimmed.startsWith('Última actualización') || trimmed.startsWith('Last updated'))
-              return <p key={i} style={{ color: 'rgba(150,180,220,0.35)', fontSize: '11px', marginBottom: '12px' }}>{trimmed}</p>
+              return <p key={i} style={{ color: `rgba(147,184,216,0.38)`, fontSize: 11, marginBottom: 12 }}>{trimmed}</p>
             if (trimmed.startsWith('-'))
-              return <p key={i} style={{ color: 'rgba(200,220,255,0.75)', fontSize: '13px', paddingLeft: '16px', marginBottom: '4px' }}>• {trimmed.slice(1).trim()}</p>
-            return <p key={i} style={{ color: 'rgba(200,220,255,0.75)', fontSize: '13px', lineHeight: '1.7', marginBottom: '8px' }}>{trimmed}</p>
+              return <p key={i} style={{ color: `rgba(200,220,255,0.72)`, fontSize: 13, paddingLeft: 16, marginBottom: 4 }}>• {trimmed.slice(1).trim()}</p>
+            return <p key={i} style={{ color: `rgba(200,220,255,0.72)`, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>{trimmed}</p>
           })}
         </div>
-        <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid rgba(150,180,220,0.1)' }}>
-          <button onClick={onClose} style={{ ...btnPrimary, fontSize: '14px', padding: '12px' }}>{t.close}</button>
+        {/* Footer */}
+        <div style={{ padding: '1rem 1.5rem', borderTop: `1px solid rgba(127,168,212,0.12)` }}>
+          <button onClick={onClose} style={{ ...btnPrimary, fontSize: 14, padding: '12px' }}>
+            {t.close}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-// ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────
+// ── HELPER: detect lang ───────────────────────────────────────────────────
 function detectLang() {
   const saved = localStorage.getItem('mary_lang')
   if (saved === 'ES' || saved === 'EN') return saved
@@ -528,6 +674,33 @@ function detectLang() {
   return browser.startsWith('es') ? 'ES' : 'EN'
 }
 
+// ── FIELD ICON WRAPPER ────────────────────────────────────────────────────
+const FieldIcon = ({ children }) => (
+  <span style={{
+    position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+    color: `rgba(147,184,216,0.50)`,
+    pointerEvents: 'none', display: 'flex', alignItems: 'center',
+  }}>
+    {children}
+  </span>
+)
+
+// ── ERROR BOX ─────────────────────────────────────────────────────────────
+const ErrorBox = ({ msg }) => (
+  <div style={{
+    background: RED_BG,
+    border: `0.5px solid ${RED_BD}`,
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 12,
+    color: RED_FG,
+    textAlign: 'center',
+  }}>
+    {msg}
+  </div>
+)
+
+// ── MAIN COMPONENT ────────────────────────────────────────────────────────
 export default function Login({ onNavigate }) {
   const { login }                   = useAuth()
   const [lang, setLangState]        = useState(detectLang)
@@ -543,24 +716,24 @@ export default function Login({ onNavigate }) {
     })
   }
 
-  // Login
+  // Login state
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
-  // Register
-  const [reg, setReg]               = useState({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'', ref_code:'' })
+  // Register state
+  const [reg, setReg]                 = useState({ nombre:'', empresa:'', telefono:'', email:'', password:'', pais:'', ref_code:'' })
   const [showRegPass, setShowRegPass] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
-  const [regError, setRegError]     = useState('')
-  const [regSuccess, setRegSuccess] = useState(false)
-  const [regLoading, setRegLoading] = useState(false)
+  const [regError, setRegError]       = useState('')
+  const [regSuccess, setRegSuccess]   = useState(false)
+  const [regLoading, setRegLoading]   = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('')
   const setR = k => e => setReg(f => ({ ...f, [k]: e.target.value }))
 
-  // Forgot
+  // Forgot state
   const [forgotEmail, setForgotEmail]     = useState('')
   const [forgotSent, setForgotSent]       = useState(false)
   const [forgotLoading, setForgotLoading] = useState(false)
@@ -598,8 +771,18 @@ export default function Login({ onNavigate }) {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-trial`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono, email: reg.email, password: reg.password, pais: reg.pais, plan: selectedPlan, ref_code: reg.ref_code.trim().toUpperCase() || undefined, lang })
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            nombre: reg.nombre, empresa: reg.empresa, telefono: reg.telefono,
+            email: reg.email, password: reg.password, pais: reg.pais,
+            plan: selectedPlan,
+            ref_code: reg.ref_code.trim().toUpperCase() || undefined,
+            lang,
+          })
         }
       )
       const result = await res.json()
@@ -626,78 +809,75 @@ export default function Login({ onNavigate }) {
         redirectTo: `${window.location.origin}/reset-password`
       })
       setForgotSent(true)
-    } catch { }
+    } catch {}
     setForgotLoading(false)
   }
 
-  // ── Estilos inline reutilizables ────────────────────────────────────────
-  const screenWrap = {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '1rem',
-    position: 'relative',
-    ...BG_RADIAL,
-  }
-
-  const fieldIconStyle = {
-    position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
-    color: 'rgba(150,180,220,0.45)', pointerEvents: 'none', display: 'flex', alignItems: 'center',
-  }
-
-  const eyeBtnStyle = {
-    position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+  // Shared eye button style
+  const eyeBtn = {
+    position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
     background: 'none', border: 'none', cursor: 'pointer',
-    color: 'rgba(150,180,220,0.5)', display: 'flex', alignItems: 'center', padding: 0,
+    color: `rgba(147,184,216,0.55)`, display: 'flex', alignItems: 'center', padding: 0,
   }
 
-  const labelStyle = { fontSize: '12px', color: 'rgba(180,200,240,0.6)', display: 'block', marginBottom: '4px' }
-
-  const inputNoIconStyle = {
-    ...inputBaseNoIcon,
-    border: '0.5px solid rgba(150,180,220,0.18)',
+  const labelStyle = {
+    fontSize: 12,
+    color: `rgba(180,210,255,0.60)`,
+    display: 'block',
+    marginBottom: 4,
+    fontWeight: 500,
+    letterSpacing: '0.02em',
   }
 
   const selectStyle = {
     ...inputBaseNoIcon,
-    border: '0.5px solid rgba(150,180,220,0.18)',
     cursor: 'pointer',
-    color: '#ffffff',
-    backgroundColor: '#0d1117',
+    color: WHITE,
+    backgroundColor: NAVY_900,
   }
 
   const footerStyle = {
     marginTop: '2rem', textAlign: 'center',
-    borderTop: '0.5px solid rgba(150,180,220,0.07)', paddingTop: '1rem',
+    borderTop: `1px solid rgba(127,168,212,0.08)`,
+    paddingTop: '1rem',
   }
 
   const footerTextStyle = {
-    fontSize: '10px', fontWeight: '600', letterSpacing: '0.25em',
-    color: 'rgba(150,180,220,0.28)', textTransform: 'uppercase', margin: 0,
+    fontSize: 10, fontWeight: 600, letterSpacing: '0.25em',
+    color: `rgba(147,184,216,0.30)`,
+    textTransform: 'uppercase', margin: 0,
   }
 
   return (
     <>
+      {/* Global background layers */}
+      <div style={blueprintGridStyle} />
+      <div style={radialGlowStyle} />
+
+      {/* Legal modal */}
       {legalModal && (
         <LegalModal type={legalModal} lang={lang} onClose={() => setLegalModal(null)} />
       )}
 
       {/* ── LOGIN ─────────────────────────────────────────────────────────── */}
       {view === 'login' && (
-        <div style={screenWrap}>
+        <div style={bgStyle}>
           <LangToggle lang={lang} setLang={setLang} />
-          <div style={{ width: '100%', maxWidth: '380px' }}>
-            <Logo />
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ ...cardStyle, maxWidth: 400 }}>
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+              <MaryLogoSVG />
+              <AccentDivider />
+            </div>
 
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: '1.5rem' }}>
               {/* Email */}
               <div style={{ position: 'relative' }}>
-                <span style={fieldIconStyle}>
+                <FieldIcon>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                   </svg>
-                </span>
+                </FieldIcon>
                 <input
                   type="email"
                   placeholder={t.email}
@@ -708,13 +888,13 @@ export default function Login({ onNavigate }) {
                 />
               </div>
 
-              {/* Password con ojo */}
+              {/* Password */}
               <div style={{ position: 'relative' }}>
-                <span style={fieldIconStyle}>
+                <FieldIcon>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                </span>
+                </FieldIcon>
                 <input
                   type={showPass ? 'text' : 'password'}
                   placeholder={t.password}
@@ -723,42 +903,41 @@ export default function Login({ onNavigate }) {
                   onChange={e => setPassword(e.target.value)}
                   required
                 />
-                <button
-                  type="button"
-                  style={eyeBtnStyle}
-                  onClick={() => setShowPass(v => !v)}
-                  aria-label={showPass ? t.hide_pass : t.show_pass}
-                >
+                <button type="button" style={eyeBtn} onClick={() => setShowPass(v => !v)} aria-label={showPass ? t.hide_pass : t.show_pass}>
                   <EyeIcon visible={showPass} />
                 </button>
               </div>
 
-              {error && (
-                <div style={{ background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,80,80,0.25)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#f08080', textAlign: 'center' }}>
-                  {error}
-                </div>
-              )}
+              {error && <ErrorBox msg={error} />}
 
               <button
                 type="submit"
                 disabled={loading}
-                style={{ ...btnPrimary, marginTop: '4px', opacity: loading ? 0.6 : 1 }}
+                style={{ ...btnPrimary, marginTop: 4, opacity: loading ? 0.6 : 1 }}
               >
                 {loading ? t.loading : t.enter}
               </button>
             </form>
 
-            <div style={{ textAlign: 'center', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ textAlign: 'center', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <button
                 onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail('') }}
-                style={{ background: 'none', border: 'none', fontSize: '13px', fontWeight: '500', color: 'rgba(200,220,255,0.75)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'rgba(200,220,255,0.25)' }}
+                style={{
+                  background: 'none', border: 'none',
+                  fontSize: 13, fontWeight: 500,
+                  color: `rgba(200,220,255,0.72)`,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                  textDecorationColor: `rgba(200,220,255,0.22)`,
+                }}
               >
                 {t.forgot}
               </button>
-              <div style={{ borderTop: '0.5px solid rgba(150,180,220,0.1)', paddingTop: '12px' }}>
+              <div style={{ borderTop: `1px solid rgba(127,168,212,0.10)`, paddingTop: 12 }}>
                 <button
                   onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false); setSelectedPlan('') }}
-                  style={{ width: '100%', padding: '13px', borderRadius: '10px', border: '1px solid rgba(80,150,255,0.55)', background: 'rgba(26,94,180,0.12)', color: '#a8ccf8', fontSize: '14px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.01em' }}
+                  style={{ ...btnSecondary }}
                 >
                   ✨ {t.try}
                 </button>
@@ -772,20 +951,33 @@ export default function Login({ onNavigate }) {
         </div>
       )}
 
-      {/* ── REGISTRO ──────────────────────────────────────────────────────── */}
+      {/* ── REGISTER ──────────────────────────────────────────────────────── */}
       {view === 'register' && (
-        <div style={screenWrap}>
+        <div style={bgStyle}>
           <LangToggle lang={lang} setLang={setLang} />
-          <div style={{ width: '100%', maxWidth: '460px' }}>
-            <Logo />
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{t.reg_title}</h2>
-              <p style={{ color: 'rgba(180,200,240,0.6)', fontSize: '13px', margin: '0 0 16px' }}>{t.reg_sub}</p>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ ...cardStyle, maxWidth: 500 }}>
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+              <MaryLogoSVG />
+              <AccentDivider />
+            </div>
+
+            {/* Heading */}
+            <div style={{ textAlign: 'center', margin: '1.25rem 0 1rem' }}>
+              <PillBadge>
+                {lang === 'ES' ? 'ERP de construcción · 22 países' : 'Construction ERP · 22 countries'}
+              </PillBadge>
+              <h2 style={{ color: WHITE, fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>
+                {t.reg_title}
+              </h2>
+              <p style={{ color: `rgba(180,210,255,0.60)`, fontSize: 13, margin: '0 0 16px' }}>{t.reg_sub}</p>
+
+              {/* Plan selector */}
+              <div style={{ display: 'flex', gap: 8 }}>
                 {[
-                  { id: 'starter',    labelEs: 'Starter',    labelEn: 'Starter',    users: 1, projects: 2,  price: '$29.99/m' },
-                  { id: 'pro',        labelEs: 'Pro',        labelEn: 'Pro',        users: 3, projects: 5,  price: '$49.99/m' },
-                  { id: 'enterprise', labelEs: 'Enterprise', labelEn: 'Enterprise', users: 5, projects: 10, price: '$69.99/m' },
+                  { id: 'starter',    name: 'Starter',    users: 1, projects: 2,  price: '$29.99/m', fg: '#5F5E5A', bg: 'rgba(95,94,90,0.15)' },
+                  { id: 'pro',        name: 'Pro',         users: 3, projects: 5,  price: '$49.99/m', fg: BLUE_200, bg: `rgba(46,120,214,0.18)` },
+                  { id: 'enterprise', name: 'Enterprise',  users: 5, projects: 10, price: '$69.99/m', fg: '#B4B0FF', bg: 'rgba(60,52,137,0.22)' },
                 ].map(plan => {
                   const active = selectedPlan === plan.id
                   return (
@@ -794,23 +986,27 @@ export default function Login({ onNavigate }) {
                       type="button"
                       onClick={() => setSelectedPlan(plan.id)}
                       style={{
-                        flex: 1, minWidth: '120px',
-                        padding: '10px 8px',
-                        borderRadius: '10px',
-                        border: active ? '1.5px solid #3a8adc' : '0.5px solid rgba(150,180,220,0.2)',
-                        background: active ? 'rgba(26,94,180,0.22)' : 'rgba(255,255,255,0.03)',
+                        flex: 1, minWidth: 0,
+                        padding: '10px 6px',
+                        borderRadius: 10,
+                        border: active
+                          ? `1.5px solid ${BLUE_400}`
+                          : `1px solid rgba(127,168,212,0.20)`,
+                        background: active ? 'rgba(46,120,214,0.20)' : 'rgba(11,28,54,0.45)',
                         cursor: 'pointer',
                         textAlign: 'center',
-                        transition: 'all 0.15s',
+                        transition: 'all 150ms',
                       }}
                     >
-                      <p style={{ color: active ? '#ffffff' : 'rgba(200,220,255,0.75)', fontWeight: '700', fontSize: '13px', margin: '0 0 4px' }}>
-                        {lang === 'ES' ? plan.labelEs : plan.labelEn}
+                      <p style={{ color: active ? WHITE : `rgba(200,220,255,0.72)`, fontWeight: 700, fontSize: 13, margin: '0 0 3px' }}>
+                        {plan.name}
                       </p>
-                      <p style={{ color: active ? 'rgba(180,210,255,0.8)' : 'rgba(150,180,220,0.5)', fontSize: '11px', margin: '0 0 2px' }}>
-                        {lang === 'ES' ? `${plan.users} usuario${plan.users > 1 ? 's' : ''} · ${plan.projects} proyectos` : `${plan.users} user${plan.users > 1 ? 's' : ''} · ${plan.projects} projects`}
+                      <p style={{ color: active ? BLUE_200 : `rgba(147,184,216,0.50)`, fontSize: 11, margin: '0 0 2px' }}>
+                        {lang === 'ES'
+                          ? `${plan.users} usuario${plan.users > 1 ? 's' : ''} · ${plan.projects} proyectos`
+                          : `${plan.users} user${plan.users > 1 ? 's' : ''} · ${plan.projects} projects`}
                       </p>
-                      <p style={{ color: active ? '#6fa8e0' : 'rgba(100,150,200,0.45)', fontSize: '11px', margin: 0 }}>
+                      <p style={{ color: active ? BLUE_200 : `rgba(100,150,200,0.45)`, fontSize: 11, margin: 0 }}>
                         {plan.price}
                       </p>
                     </button>
@@ -820,39 +1016,47 @@ export default function Login({ onNavigate }) {
             </div>
 
             {regSuccess ? (
-              <div style={{ background: 'rgba(36,185,100,0.08)', border: '0.5px solid rgba(36,185,100,0.25)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🎉</div>
-                <p style={{ color: '#3bb876', fontWeight: '600', fontSize: '14px', margin: '0 0 12px' }}>{t.reg_success}</p>
-                <button onClick={() => { setView('login'); setRegSuccess(false) }}
-                  style={{ background: 'none', border: 'none', color: '#6fa8e0', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
+              <div style={{
+                background: 'rgba(26,158,92,0.10)',
+                border: `1px solid rgba(26,158,92,0.30)`,
+                borderRadius: 12, padding: '1.5rem', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎉</div>
+                <p style={{ color: GREEN_500, fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>{t.reg_success}</p>
+                <button
+                  onClick={() => { setView('login'); setRegSuccess(false) }}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: BLUE_200, fontSize: 13, cursor: 'pointer', textDecoration: 'underline',
+                  }}
+                >
                   {t.reg_back}
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label style={labelStyle}>{t.reg_name} *</label>
-                    <input style={inputNoIconStyle} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
+                    <input style={inputBaseNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
                   </div>
                   <div>
                     <label style={labelStyle}>{t.reg_company} *</label>
-                    <input style={inputNoIconStyle} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
+                    <input style={inputBaseNoIcon} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label style={labelStyle}>{t.reg_phone} *</label>
-                    <input style={inputNoIconStyle} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
+                    <input style={inputBaseNoIcon} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
                   </div>
                   <div>
                     <label style={labelStyle}>{t.reg_country} *</label>
                     <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
-                      <option value="" style={{ backgroundColor: '#0d1117', color: '#ffffff' }}>{t.reg_select}</option>
+                      <option value="" style={{ backgroundColor: NAVY_900, color: WHITE }}>{t.reg_select}</option>
                       {PAISES[lang].map(p => (
-                        <option key={p} value={p} style={{ backgroundColor: '#0d1117', color: '#ffffff' }}>{p}</option>
+                        <option key={p} value={p} style={{ backgroundColor: NAVY_900, color: WHITE }}>{p}</option>
                       ))}
                     </select>
                   </div>
@@ -860,87 +1064,81 @@ export default function Login({ onNavigate }) {
 
                 <div>
                   <label style={labelStyle}>{t.reg_email} *</label>
-                  <input type="email" style={inputNoIconStyle} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
+                  <input type="email" style={inputBaseNoIcon} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
                 </div>
 
-                {/* Password con ojo */}
                 <div>
                   <label style={labelStyle}>{t.reg_password} *</label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type={showRegPass ? 'text' : 'password'}
-                      style={{ ...inputNoIconStyle, paddingRight: '42px' }}
+                      style={{ ...inputBaseNoIcon, paddingRight: '42px' }}
                       value={reg.password}
                       onChange={setR('password')}
                       placeholder="••••••••"
                     />
-                    <button
-                      type="button"
-                      style={eyeBtnStyle}
-                      onClick={() => setShowRegPass(v => !v)}
-                      aria-label={showRegPass ? t.hide_pass : t.show_pass}
-                    >
+                    <button type="button" style={eyeBtn} onClick={() => setShowRegPass(v => !v)} aria-label={showRegPass ? t.hide_pass : t.show_pass}>
                       <EyeIcon visible={showRegPass} />
                     </button>
                   </div>
                 </div>
 
-                {/* Código de referido — opcional */}
+                {/* Referral code */}
                 <div>
-                  <label style={{ fontSize: '12px', color: 'rgba(180,200,240,0.5)', display: 'block', marginBottom: '5px', letterSpacing: '0.03em' }}>
-                    {t.reg_ref_code}
-                  </label>
+                  <label style={{ ...labelStyle, color: `rgba(180,200,240,0.50)` }}>{t.reg_ref_code}</label>
                   <input
                     type="text"
-                    style={{ ...inputNoIconStyle, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                    style={{ ...inputBaseNoIcon, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
                     value={reg.ref_code}
                     onChange={e => setReg(f => ({ ...f, ref_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
                     maxLength={20}
                     placeholder={t.reg_ref_code_ph}
                   />
                   {reg.ref_code && (
-                    <p style={{ fontSize: '11px', color: '#3bb876', marginTop: '4px' }}>
+                    <p style={{ fontSize: 11, color: GREEN_500, marginTop: 4 }}>
                       ✓ {t.reg_ref_applied}: {reg.ref_code}
                     </p>
                   )}
                 </div>
 
-                {/* Términos */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', paddingTop: '4px' }}>
+                {/* Terms */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingTop: 4 }}>
                   <input
                     type="checkbox"
                     id="terms"
                     checked={termsAccepted}
                     onChange={e => setTermsAccepted(e.target.checked)}
-                    style={{ marginTop: '2px', width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
+                    style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, accentColor: BLUE_500 }}
                   />
-                  <label htmlFor="terms" style={{ fontSize: '12px', color: 'rgba(180,200,240,0.6)', lineHeight: '1.5', cursor: 'pointer' }}>
+                  <label htmlFor="terms" style={{ fontSize: 12, color: `rgba(180,200,240,0.62)`, lineHeight: 1.5, cursor: 'pointer' }}>
                     {t.reg_terms}{' '}
                     <button type="button" onClick={() => setLegalModal('tos')}
-                      style={{ background: 'none', border: 'none', color: '#6fa8e0', cursor: 'pointer', textDecoration: 'underline', fontSize: '12px', padding: 0 }}>
+                      style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
                       {t.reg_terms_link}
                     </button>
                     {' '}{t.reg_and}{' '}
                     <button type="button" onClick={() => setLegalModal('pp')}
-                      style={{ background: 'none', border: 'none', color: '#6fa8e0', cursor: 'pointer', textDecoration: 'underline', fontSize: '12px', padding: 0 }}>
+                      style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
                       {t.reg_privacy_link}
                     </button>
                     {' '}de MARY.
                   </label>
                 </div>
 
-                {regError && (
-                  <div style={{ background: 'rgba(220,60,60,0.08)', border: '0.5px solid rgba(220,80,80,0.25)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#f08080', textAlign: 'center' }}>
-                    {regError}
-                  </div>
-                )}
+                {regError && <ErrorBox msg={regError} />}
 
-                <button type="submit" disabled={regLoading} style={{ ...btnPrimary, marginTop: '4px', opacity: regLoading ? 0.6 : 1 }}>
+                <button type="submit" disabled={regLoading} style={{ ...btnPrimary, marginTop: 4, opacity: regLoading ? 0.6 : 1 }}>
                   {regLoading ? t.reg_loading : t.reg_btn}
                 </button>
 
                 <button type="button" onClick={() => setView('login')}
-                  style={{ background: 'none', border: 'none', color: 'rgba(200,220,255,0.75)', fontSize: '13px', cursor: 'pointer', padding: '8px', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'rgba(200,220,255,0.25)' }}>
+                  style={{
+                    background: 'none', border: 'none',
+                    color: `rgba(200,220,255,0.72)`,
+                    fontSize: 13, cursor: 'pointer', padding: '8px',
+                    textDecoration: 'underline', textUnderlineOffset: '3px',
+                    textDecorationColor: `rgba(200,220,255,0.22)`,
+                  }}>
                   {t.reg_back}
                 </button>
               </form>
@@ -955,29 +1153,38 @@ export default function Login({ onNavigate }) {
 
       {/* ── FORGOT PASSWORD ───────────────────────────────────────────────── */}
       {view === 'forgot' && (
-        <div style={screenWrap}>
+        <div style={bgStyle}>
           <LangToggle lang={lang} setLang={setLang} />
-          <div style={{ width: '100%', maxWidth: '380px' }}>
-            <Logo />
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{t.forgot_title}</h2>
-              <p style={{ color: 'rgba(180,200,240,0.6)', fontSize: '13px', margin: 0 }}>{t.forgot_sub}</p>
+          <div style={{ ...cardStyle, maxWidth: 400 }}>
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+              <MaryLogoSVG />
+              <AccentDivider />
+            </div>
+
+            <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+              <h2 style={{ color: WHITE, fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>{t.forgot_title}</h2>
+              <p style={{ color: `rgba(180,210,255,0.60)`, fontSize: 13, margin: 0 }}>{t.forgot_sub}</p>
             </div>
 
             {forgotSent ? (
-              <div style={{ background: 'rgba(36,185,100,0.08)', border: '0.5px solid rgba(36,185,100,0.25)', borderRadius: '12px', padding: '1.5rem', textAlign: 'center' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📧</div>
-                <p style={{ color: '#3bb876', fontWeight: '600', fontSize: '13px', margin: 0 }}>{t.forgot_sent}</p>
+              <div style={{
+                background: 'rgba(26,158,92,0.10)',
+                border: `1px solid rgba(26,158,92,0.30)`,
+                borderRadius: 12, padding: '1.5rem', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📧</div>
+                <p style={{ color: GREEN_500, fontWeight: 600, fontSize: 13, margin: 0 }}>{t.forgot_sent}</p>
               </div>
             ) : (
-              <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ position: 'relative' }}>
-                  <span style={fieldIconStyle}>
+                  <FieldIcon>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                       <polyline points="22,6 12,13 2,6"/>
                     </svg>
-                  </span>
+                  </FieldIcon>
                   <input
                     type="email"
                     placeholder={t.email}
@@ -993,8 +1200,17 @@ export default function Login({ onNavigate }) {
               </form>
             )}
 
-            <button onClick={() => setView('login')}
-              style={{ display: 'block', width: '100%', textAlign: 'center', background: 'none', border: 'none', color: 'rgba(200,220,255,0.75)', fontSize: '13px', cursor: 'pointer', padding: '12px', marginTop: '8px', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: 'rgba(200,220,255,0.25)' }}>
+            <button
+              onClick={() => setView('login')}
+              style={{
+                display: 'block', width: '100%', textAlign: 'center',
+                background: 'none', border: 'none',
+                color: `rgba(200,220,255,0.72)`,
+                fontSize: 13, cursor: 'pointer', padding: '12px', marginTop: 8,
+                textDecoration: 'underline', textUnderlineOffset: '3px',
+                textDecorationColor: `rgba(200,220,255,0.22)`,
+              }}
+            >
               {t.forgot_back}
             </button>
 
