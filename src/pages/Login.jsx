@@ -36,7 +36,7 @@ const T = {
     reg_email:         'Correo electrónico',
     reg_password:      'Contraseña (mín. 8 caracteres)',
     reg_country:       'País',
-    reg_select:        '— Seleccionar país —',
+    reg_select:        'Seleccionar país',
     reg_btn:           'Crear cuenta gratis',
     reg_loading:       'Creando cuenta...',
     reg_back:          '← Volver al inicio de sesión',
@@ -65,6 +65,24 @@ const T = {
     reg_ref_code:      '¿Tienes un código de referido? (opcional)',
     reg_ref_code_ph:   'Ej: GABR202601',
     reg_ref_applied:   'Código aplicado',
+    // Panel izquierdo
+    left_badge:        'ERP de construcción · 22 países',
+    left_headline_login:   'Construye con control, no con hojas de cálculo',
+    left_headline_reg:     '7 días gratis. Sin tarjeta de crédito.',
+    left_headline_forgot:  'Tu contraseña, recuperada en minutos.',
+    left_sub_login:    'Presupuestos, inventario, compras y avance de obra en una sola plataforma.',
+    left_sub_reg:      'Crea tu cuenta en minutos y empieza a gestionar tu primer proyecto hoy.',
+    left_sub_forgot:   'Te enviamos un enlace seguro a tu correo para que puedas restablecer tu acceso.',
+    left_bullet1:      'Curva S automática: presupuesto vs. real en tiempo real',
+    left_bullet2:      'Flujo completo integrado: Compras, Bodega y Obra',
+    left_bullet3:      'Multi-tenant seguro: tus datos, solo tus datos',
+    left_bullet4:      'Bilingüe ES / EN para equipos de toda América',
+    left_trial_title:  'Incluye en el trial',
+    left_trial1:       'Todos los módulos desbloqueados',
+    left_trial2:       'Hasta 5 usuarios de prueba',
+    left_trial3:       'Soporte por email incluido',
+    left_trial4:       'Exportación de reportes Excel',
+    who_we_are:        'Quiénes somos',
   },
   EN: {
     tagline:           'MANAGEMENT & RESOURCES YIELD',
@@ -86,7 +104,7 @@ const T = {
     reg_email:         'Email address',
     reg_password:      'Password (min. 8 characters)',
     reg_country:       'Country',
-    reg_select:        '— Select country —',
+    reg_select:        'Select country',
     reg_btn:           'Create free account',
     reg_loading:       'Creating account...',
     reg_back:          '← Back to sign in',
@@ -115,10 +133,28 @@ const T = {
     reg_ref_code:      'Do you have a referral code? (optional)',
     reg_ref_code_ph:   'E.g.: GABR202601',
     reg_ref_applied:   'Code applied',
+    // Left panel
+    left_badge:        'Construction ERP · 22 countries',
+    left_headline_login:   'Build under control, not under spreadsheets',
+    left_headline_reg:     '7 days free. No credit card required.',
+    left_headline_forgot:  'Your password, recovered in minutes.',
+    left_sub_login:    'Budgets, inventory, purchasing and project progress in one platform.',
+    left_sub_reg:      'Set up your account in minutes and start managing your first project today.',
+    left_sub_forgot:   "We'll send you a secure link so you can reset your access right away.",
+    left_bullet1:      'Automatic S-Curve: budget vs. actual in real time',
+    left_bullet2:      'Integrated flow: Purchasing, Warehouse and Field',
+    left_bullet3:      'Secure multi-tenant: your data, yours only',
+    left_bullet4:      'Bilingual ES / EN for teams across the Americas',
+    left_trial_title:  'Included in the trial',
+    left_trial1:       'All modules unlocked',
+    left_trial2:       'Up to 5 trial users',
+    left_trial3:       'Email support included',
+    left_trial4:       'Excel report exports',
+    who_we_are:        'About us',
   }
 }
 
-// ── DESIGN TOKENS (matching landing page) ─────────────────────────────────
+// ── DESIGN TOKENS ─────────────────────────────────────────────────────────
 const NAVY_900  = '#0B1C36'
 const NAVY_800  = '#122848'
 const NAVY_700  = '#1B3A6B'
@@ -139,62 +175,73 @@ const RED_FG    = '#f08080'
 const RED_BG    = 'rgba(220,60,60,0.08)'
 const RED_BD    = 'rgba(220,80,80,0.25)'
 
-// ── SHARED STYLES ─────────────────────────────────────────────────────────
-
-// Background matching landing hero: dark navy + blueprint grid + radial glow
-const bgStyle = {
+// ── LAYOUT WRAPPER (split) ────────────────────────────────────────────────
+const splitWrapStyle = {
   minHeight: '100vh',
-  background: `linear-gradient(180deg, ${NAVY_900} 0%, ${NAVY_800} 100%)`,
-  position: 'relative',
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '1.5rem 1rem',
   fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif',
+  position: 'relative',
 }
 
-// Blueprint grid overlay (from landing hero)
-const blueprintGridStyle = {
-  position: 'fixed',
+// ── LEFT PANEL ────────────────────────────────────────────────────────────
+const leftPanelStyle = {
+  width: '42%',
+  minWidth: 340,
+  background: NAVY_900,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  padding: '2.5rem 2.25rem',
+  position: 'relative',
+  overflow: 'hidden',
+  flexShrink: 0,
+}
+
+// Blueprint grid overlay (left panel)
+const leftGridStyle = {
+  position: 'absolute',
   inset: 0,
   backgroundImage: `
-    linear-gradient(rgba(127,168,212,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(127,168,212,0.05) 1px, transparent 1px)
+    linear-gradient(rgba(127,168,212,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127,168,212,0.07) 1px, transparent 1px)
   `,
-  backgroundSize: '48px 48px',
-  WebkitMaskImage: 'radial-gradient(ellipse 80% 70% at 50% 30%, #000 30%, transparent 75%)',
-  maskImage: 'radial-gradient(ellipse 80% 70% at 50% 30%, #000 30%, transparent 75%)',
+  backgroundSize: '36px 36px',
+  WebkitMaskImage: 'radial-gradient(ellipse 90% 80% at 30% 40%, #000 20%, transparent 80%)',
+  maskImage: 'radial-gradient(ellipse 90% 80% at 30% 40%, #000 20%, transparent 80%)',
   pointerEvents: 'none',
-  zIndex: 0,
 }
 
-// Radial glow (from landing hero)
-const radialGlowStyle = {
-  position: 'fixed',
-  top: '-10%',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  width: 900,
-  height: 600,
-  background: `radial-gradient(ellipse at center, rgba(46,95,163,0.28) 0%, transparent 65%)`,
+// Radial glow (left panel)
+const leftGlowStyle = {
+  position: 'absolute',
+  top: '-20%',
+  left: '-10%',
+  width: '120%',
+  height: '70%',
+  background: `radial-gradient(ellipse at 30% 30%, rgba(26,94,180,0.32) 0%, transparent 65%)`,
   pointerEvents: 'none',
-  zIndex: 0,
 }
 
-// Card container — matches landing's glass-card style on dark
-const cardStyle = {
+// ── RIGHT PANEL ───────────────────────────────────────────────────────────
+const rightPanelStyle = {
+  flex: 1,
+  background: '#0F1E38',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  padding: '2.5rem 2.25rem',
   position: 'relative',
-  zIndex: 1,
-  width: '100%',
-  background: 'rgba(18, 40, 72, 0.72)',
-  border: `1px solid rgba(127,168,212,0.18)`,
-  borderRadius: 16,
-  backdropFilter: 'saturate(140%) blur(16px)',
-  boxShadow: '0 24px 64px rgba(0,0,0,0.45), 0 0 0 1px rgba(46,95,163,0.12)',
-  padding: '2rem 1.75rem',
+  overflowY: 'auto',
 }
 
-// Input base — same as landing's form inputs
+// ── CARD (right panel inner) ──────────────────────────────────────────────
+const cardInnerStyle = {
+  width: '100%',
+  maxWidth: 420,
+  margin: '0 auto',
+}
+
+// ── INPUTS ────────────────────────────────────────────────────────────────
 const inputBase = {
   width: '100%',
   boxSizing: 'border-box',
@@ -212,7 +259,7 @@ const inputBase = {
 const inputBaseNoIcon = { ...inputBase, padding: '12px 14px' }
 const inputBaseWithEye = { ...inputBase, paddingRight: '42px' }
 
-// Primary button — matches landing's Button variant="primary"
+// ── BUTTONS ───────────────────────────────────────────────────────────────
 const btnPrimary = {
   width: '100%',
   padding: '13px',
@@ -229,13 +276,12 @@ const btnPrimary = {
   transition: 'opacity 160ms, transform 80ms',
 }
 
-// Secondary / outline button
 const btnSecondary = {
   width: '100%',
   padding: '13px',
   borderRadius: 10,
-  border: `1.5px solid rgba(46,120,214,0.55)`,
-  background: 'rgba(26,94,180,0.10)',
+  border: `1.5px solid ${BLUE_500}`,
+  background: `rgba(26,94,180,0.12)`,
   color: BLUE_200,
   fontFamily: 'inherit',
   fontSize: 14,
@@ -245,21 +291,35 @@ const btnSecondary = {
   letterSpacing: '0.02em',
 }
 
-// ── LOGO SVG (matching exact landing logo) ────────────────────────────────
+// ── MARK SVG (icon only, for left panel) ─────────────────────────────────
+const MaryMarkSVG = () => (
+  <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg"
+    style={{ width: 36, height: 36, display: 'block' }} aria-hidden="true">
+    <g transform="translate(5,5)">
+      <rect x="14" y="38" width="12" height="22" rx="2" fill={BLUE_200} opacity="0.65"/>
+      <rect x="28" y="28" width="12" height="32" rx="2" fill={BLUE_200} opacity="0.75"/>
+      <rect x="42" y="18" width="12" height="42" rx="2" fill={BLUE_200} opacity="0.85"/>
+      <rect x="30" y="18" width="14" height="14" rx="3" fill={GREEN_500} opacity="0.95"/>
+      <rect x="45" y="10" width="11" height="11" rx="3" fill="#26d4ff" opacity="0.80"/>
+      <line x1="45" y1="22" x2="62" y2="3" stroke={GREEN_500} strokeWidth="2.5" opacity="0.90"/>
+      <polygon points="62,0 67,8 57,8" fill={GREEN_500} opacity="0.90"/>
+    </g>
+  </svg>
+)
+
+// ── LOGO SVG (full, for right panel) ─────────────────────────────────────
 const MaryLogoSVG = () => (
   <svg
     viewBox="0 0 320 90"
     xmlns="http://www.w3.org/2000/svg"
     style={{
-      width: 360,
+      width: 260,
       height: 'auto',
       display: 'block',
-      margin: '0 auto',
       filter: `drop-shadow(0 2px 24px rgba(26,94,180,0.40))`,
     }}
     aria-label="MARY"
   >
-    {/* Construction-themed mark — bars + S-curve trend + arrow */}
     <g transform="translate(10,5)">
       <rect x="28" y="48" width="14" height="26" rx="2" fill={BLUE_200} opacity="0.65"/>
       <rect x="44" y="38" width="14" height="36" rx="2" fill={BLUE_200} opacity="0.75"/>
@@ -271,56 +331,59 @@ const MaryLogoSVG = () => (
       <line x1="62" y1="32" x2="80" y2="10" stroke={GREEN_500} strokeWidth="2.5" opacity="0.90"/>
       <polygon points="80,5 85,14 75,14" fill={GREEN_500} opacity="0.90"/>
     </g>
-    {/* MARY wordmark */}
-    <text
-      x="110" y="60"
+    <text x="110" y="60"
       fontFamily="'Arial Black', Arial, sans-serif"
-      fontWeight="900"
-      fontSize="52"
-      fill={WHITE}
-      letterSpacing="2"
-    >MARY</text>
-    {/* Tagline */}
-    <text
-      x="110" y="78"
+      fontWeight="900" fontSize="52" fill={WHITE} letterSpacing="2">MARY</text>
+    <text x="110" y="78"
       fontFamily="Arial, sans-serif"
-      fontWeight="500"
-      fontSize="10"
-      fill={`rgba(147,184,216,0.50)`}
-      letterSpacing="4"
-    >MANAGEMENT &amp; RESOURCES YIELD</text>
+      fontWeight="500" fontSize="10"
+      fill={`rgba(147,184,216,0.50)`} letterSpacing="4">MANAGEMENT &amp; RESOURCES YIELD</text>
   </svg>
 )
 
-// Blue accent divider (from landing)
+// ── ACCENT DIVIDER ────────────────────────────────────────────────────────
 const AccentDivider = () => (
   <div style={{
-    width: 40,
-    height: 3,
+    width: 32, height: 3,
     background: `linear-gradient(90deg, ${GREEN_500}, ${BLUE_500})`,
     borderRadius: 2,
-    margin: '0.6rem auto 0',
+    margin: '0.6rem 0 0',
   }} />
 )
 
-// Pill badge (from landing hero)
+// ── PILL BADGE ────────────────────────────────────────────────────────────
 const PillBadge = ({ children }) => (
   <div style={{
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    padding: '5px 14px',
-    borderRadius: 9999,
-    background: 'rgba(46,120,214,0.14)',
-    border: `1px solid rgba(46,120,214,0.36)`,
-    marginBottom: 20,
-    fontSize: 11,
-    fontWeight: 600,
-    color: '#8FB8E8',
-    letterSpacing: '0.04em',
+    display: 'inline-flex', alignItems: 'center', gap: 7,
+    padding: '5px 14px', borderRadius: 9999,
+    background: `rgba(26,94,180,0.18)`,
+    border: `1px solid rgba(26,94,180,0.40)`,
+    marginBottom: 16,
+    fontSize: 11, fontWeight: 600, color: '#8FB8E8', letterSpacing: '0.04em',
   }}>
-    <span style={{ width: 7, height: 7, borderRadius: '50%', background: BLUE_400, flexShrink: 0 }} />
+    <span style={{ width: 7, height: 7, borderRadius: '50%', background: BLUE_500, flexShrink: 0 }} />
     {children}
+  </div>
+)
+
+// ── CHECK BULLET ──────────────────────────────────────────────────────────
+const CheckBullet = ({ children }) => (
+  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 13 }}>
+    <div style={{
+      width: 20, height: 20, flexShrink: 0,
+      background: `rgba(26,94,180,0.20)`,
+      border: `1px solid rgba(26,94,180,0.40)`,
+      borderRadius: '50%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      marginTop: 1,
+    }}>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <polyline points="2,5 4,7 8,3" stroke={GREEN_500} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+    <p style={{ fontSize: 12.5, color: `rgba(180,210,255,0.75)`, lineHeight: 1.5, margin: 0 }}>
+      {children}
+    </p>
   </div>
 )
 
@@ -357,6 +420,140 @@ const EyeIcon = ({ visible }) => visible ? (
   </svg>
 )
 
+// ── FIELD ICON WRAPPER ────────────────────────────────────────────────────
+const FieldIcon = ({ children }) => (
+  <span style={{
+    position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+    color: `rgba(147,184,216,0.50)`,
+    pointerEvents: 'none', display: 'flex', alignItems: 'center',
+  }}>
+    {children}
+  </span>
+)
+
+// ── ERROR BOX ─────────────────────────────────────────────────────────────
+const ErrorBox = ({ msg }) => (
+  <div style={{
+    background: RED_BG,
+    border: `0.5px solid ${RED_BD}`,
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 12,
+    color: RED_FG,
+    textAlign: 'center',
+  }}>
+    {msg}
+  </div>
+)
+
+// ── LEFT PANEL COMPONENT ──────────────────────────────────────────────────
+function LeftPanel({ t, variant }) {
+  const headline = variant === 'login'
+    ? t.left_headline_login
+    : variant === 'register'
+    ? t.left_headline_reg
+    : t.left_headline_forgot
+
+  const sub = variant === 'login'
+    ? t.left_sub_login
+    : variant === 'register'
+    ? t.left_sub_reg
+    : t.left_sub_forgot
+
+  return (
+    <div style={leftPanelStyle}>
+      <div style={leftGridStyle} />
+      <div style={leftGlowStyle} />
+
+      {/* Logo mark + wordmark */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+          <MaryMarkSVG />
+          <span style={{ fontSize: 22, fontWeight: 900, color: WHITE, letterSpacing: 2 }}>MARY</span>
+        </div>
+
+        <PillBadge>{t.left_badge}</PillBadge>
+
+        <h1 style={{
+          fontSize: 22, fontWeight: 700, color: WHITE,
+          lineHeight: 1.3, letterSpacing: '-0.3px',
+          margin: '0 0 12px',
+        }}>
+          {headline}
+        </h1>
+        <p style={{
+          fontSize: 13.5, color: `rgba(147,184,216,0.65)`,
+          lineHeight: 1.6, margin: '0 0 1.75rem',
+        }}>
+          {sub}
+        </p>
+
+        {/* Bullets */}
+        {variant === 'login' && (
+          <div>
+            <CheckBullet>{t.left_bullet1}</CheckBullet>
+            <CheckBullet>{t.left_bullet2}</CheckBullet>
+            <CheckBullet>{t.left_bullet3}</CheckBullet>
+            <CheckBullet>{t.left_bullet4}</CheckBullet>
+          </div>
+        )}
+
+        {variant === 'register' && (
+          <div style={{
+            background: `rgba(26,94,180,0.12)`,
+            border: `1px solid rgba(26,94,180,0.28)`,
+            borderRadius: 10, padding: '14px 16px',
+          }}>
+            <p style={{ fontSize: 11, color: `rgba(147,184,216,0.55)`, textTransform: 'uppercase', letterSpacing: '0.10em', fontWeight: 600, margin: '0 0 10px' }}>
+              {t.left_trial_title}
+            </p>
+            {[t.left_trial1, t.left_trial2, t.left_trial3, t.left_trial4].map((item, i) => (
+              <p key={i} style={{ fontSize: 12.5, color: `rgba(180,210,255,0.80)`, margin: '0 0 7px', display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ color: GREEN_500, fontSize: 13 }}>✓</span> {item}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {variant === 'forgot' && (
+          <div>
+            <CheckBullet>{t.left_bullet1}</CheckBullet>
+            <CheckBullet>{t.left_bullet2}</CheckBullet>
+            <CheckBullet>{t.left_bullet3}</CheckBullet>
+          </div>
+        )}
+      </div>
+
+      {/* Footer del panel izquierdo */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <a
+          href="https://www.marquezprojectsolutions.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 12, color: BLUE_200, textDecoration: 'none',
+            opacity: 0.75, transition: 'opacity 160ms',
+            marginBottom: 12,
+          }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '0.75'}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          {t.who_we_are}
+        </a>
+        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.22em', color: `rgba(147,184,216,0.28)`, textTransform: 'uppercase', margin: 0 }}>
+          MARQUEZ PROJECT SOLUTIONS LLC · 2026
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── LEGAL MODAL ───────────────────────────────────────────────────────────
 function LegalModal({ type, lang, onClose }) {
   const t = T[lang]
@@ -389,7 +586,7 @@ MARY está diseñada exclusivamente para gestión empresarial legítima. Usted a
 
 4. PLANES, PRECIOS Y PERÍODO DE PRUEBA
 
-MARY ofrece un período de prueba gratuito de 60 días con el plan Pro sin necesidad de tarjeta de crédito. Al vencimiento del período de prueba, el servicio requiere una suscripción mensual activa para continuar operando. Los precios y límites de cada plan están publicados en www.marquezprojectsolutions.com y pueden actualizarse con previo aviso.
+MARY ofrece un período de prueba gratuito de 7 días sin necesidad de tarjeta de crédito. Al vencimiento del período de prueba, el servicio requiere una suscripción mensual activa para continuar operando. Los precios y límites de cada plan están publicados en www.marquezprojectsolutions.com y pueden actualizarse con previo aviso.
 
 5. SUSPENSIÓN Y CANCELACIÓN DE CUENTAS
 
@@ -401,7 +598,7 @@ MARY, su código fuente, diseño, arquitectura, módulos y toda la tecnología a
 
 7. LIMITACIÓN DE RESPONSABILIDAD
 
-MARY se proporciona "tal como está" y "según disponibilidad". Marquez Project Solutions LLC no garantiza que el servicio sea ininterrumpido, libre de errores o completamente seguro. En la máxima medida permitida por la ley aplicable, Marquez Project Solutions LLC no será responsable por: pérdida de datos, lucro cesante, daños indirectos, incidentales o consecuentes derivados del uso o la imposibilidad de uso del servicio, incluyendo interrupciones del servicio, accesos no autorizados por terceros o pérdida de información por causas fuera de nuestro control razonable.
+MARY se proporciona "tal como está" y "según disponibilidad". Marquez Project Solutions LLC no garantiza que el servicio sea ininterrumpido, libre de errores o completamente seguro. En la máxima medida permitida por la ley aplicable, Marquez Project Solutions LLC no será responsable por: pérdida de datos, lucro cesante, daños indirectos, incidentales o consecuentes derivados del uso o la imposibilidad de uso del servicio.
 
 8. MODIFICACIONES
 
@@ -442,7 +639,7 @@ MARY is designed exclusively for legitimate business management. You agree NOT t
 
 4. PLANS, PRICING AND TRIAL PERIOD
 
-MARY offers a free 60-day trial with the Pro plan without requiring a credit card. Upon expiration of the trial period, the service requires an active monthly subscription to continue operating. Prices and limits for each plan are published at www.marquezprojectsolutions.com and may be updated with prior notice.
+MARY offers a free 7-day trial without requiring a credit card. Upon expiration of the trial period, the service requires an active monthly subscription to continue operating. Prices and limits for each plan are published at www.marquezprojectsolutions.com and may be updated with prior notice.
 
 5. ACCOUNT SUSPENSION AND CANCELLATION
 
@@ -454,7 +651,7 @@ MARY, its source code, design, architecture, modules and all associated technolo
 
 7. LIMITATION OF LIABILITY
 
-MARY is provided "as is" and "as available." Marquez Project Solutions LLC does not guarantee that the service will be uninterrupted, error-free or completely secure. To the maximum extent permitted by applicable law, Marquez Project Solutions LLC will not be liable for: data loss, lost profits, indirect, incidental or consequential damages arising from the use or inability to use the service, including service interruptions, unauthorized access by third parties or loss of information due to causes beyond our reasonable control.
+MARY is provided "as is" and "as available." Marquez Project Solutions LLC does not guarantee that the service will be uninterrupted, error-free or completely secure. To the maximum extent permitted by applicable law, Marquez Project Solutions LLC will not be liable for: data loss, lost profits, indirect, incidental or consequential damages arising from the use or inability to use the service.
 
 8. MODIFICATIONS
 
@@ -492,21 +689,21 @@ Utilizamos su información para:
 - Operar y mantener el servicio de MARY
 - Gestionar su cuenta y suscripción
 - Enviarle comunicaciones relacionadas con su cuenta, actualizaciones del servicio y notificaciones importantes
-- Generar estadísticas anónimas y agregadas sobre el uso de la plataforma (sin identificar personas ni empresas específicas)
+- Generar estadísticas anónimas y agregadas sobre el uso de la plataforma
 - Mejorar las funcionalidades del sistema
 - Cumplir con obligaciones legales aplicables
 
 3. ESTADÍSTICAS Y MENCIONES PÚBLICAS
 
-Marquez Project Solutions LLC puede mencionar públicamente métricas generales de uso de la plataforma, tales como número total de empresas registradas o países donde opera MARY. En ningún caso se revelarán nombres de empresas, usuarios, datos financieros ni información operativa de ningún cliente sin su autorización expresa y por escrito.
+Marquez Project Solutions LLC puede mencionar públicamente métricas generales de uso de la plataforma. En ningún caso se revelarán nombres de empresas, usuarios, datos financieros ni información operativa de ningún cliente sin su autorización expresa y por escrito.
 
 4. COMPARTIR INFORMACIÓN CON TERCEROS
 
-No vendemos, alquilamos ni compartimos su información personal con terceros con fines comerciales. Únicamente compartimos información con proveedores de infraestructura tecnológica necesarios para operar el servicio (almacenamiento en la nube, autenticación y entrega del servicio), quienes están contractualmente obligados a proteger su información y a no usarla para ningún otro fin.
+No vendemos, alquilamos ni compartimos su información personal con terceros con fines comerciales. Únicamente compartimos información con proveedores de infraestructura tecnológica necesarios para operar el servicio.
 
 5. SEGURIDAD DE LOS DATOS
 
-Implementamos medidas técnicas y organizativas razonables para proteger su información contra acceso no autorizado, pérdida, alteración o divulgación. Esto incluye cifrado de contraseñas, comunicaciones cifradas mediante TLS/HTTPS y control de acceso basado en roles. Sin embargo, ningún sistema de seguridad es completamente infalible.
+Implementamos medidas técnicas y organizativas razonables para proteger su información contra acceso no autorizado, pérdida, alteración o divulgación.
 
 6. SUS DERECHOS
 
@@ -616,7 +813,6 @@ California, United States
         display: 'flex', flexDirection: 'column',
         maxHeight: '90vh',
       }}>
-        {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '1rem 1.5rem',
@@ -628,16 +824,8 @@ California, United States
               {t.last_updated} · Marquez Project Solutions LLC
             </p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none', border: 'none',
-              color: `rgba(147,184,216,0.6)`,
-              cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 8px',
-            }}
-          >✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: `rgba(147,184,216,0.6)`, cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 8px' }}>✕</button>
         </div>
-        {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem' }}>
           {content.trim().split('\n').map((line, i) => {
             const trimmed = line.trim()
@@ -655,11 +843,8 @@ California, United States
             return <p key={i} style={{ color: `rgba(200,220,255,0.72)`, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>{trimmed}</p>
           })}
         </div>
-        {/* Footer */}
         <div style={{ padding: '1rem 1.5rem', borderTop: `1px solid rgba(127,168,212,0.12)` }}>
-          <button onClick={onClose} style={{ ...btnPrimary, fontSize: 14, padding: '12px' }}>
-            {t.close}
-          </button>
+          <button onClick={onClose} style={{ ...btnPrimary, fontSize: 14, padding: '12px' }}>{t.close}</button>
         </div>
       </div>
     </div>
@@ -673,32 +858,6 @@ function detectLang() {
   const browser = (navigator.language || navigator.languages?.[0] || 'es').toLowerCase()
   return browser.startsWith('es') ? 'ES' : 'EN'
 }
-
-// ── FIELD ICON WRAPPER ────────────────────────────────────────────────────
-const FieldIcon = ({ children }) => (
-  <span style={{
-    position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-    color: `rgba(147,184,216,0.50)`,
-    pointerEvents: 'none', display: 'flex', alignItems: 'center',
-  }}>
-    {children}
-  </span>
-)
-
-// ── ERROR BOX ─────────────────────────────────────────────────────────────
-const ErrorBox = ({ msg }) => (
-  <div style={{
-    background: RED_BG,
-    border: `0.5px solid ${RED_BD}`,
-    borderRadius: 8,
-    padding: '8px 12px',
-    fontSize: 12,
-    color: RED_FG,
-    textAlign: 'center',
-  }}>
-    {msg}
-  </div>
-)
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────
 export default function Login({ onNavigate }) {
@@ -813,7 +972,6 @@ export default function Login({ onNavigate }) {
     setForgotLoading(false)
   }
 
-  // Shared eye button style
   const eyeBtn = {
     position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
     background: 'none', border: 'none', cursor: 'pointer',
@@ -836,24 +994,8 @@ export default function Login({ onNavigate }) {
     backgroundColor: NAVY_900,
   }
 
-  const footerStyle = {
-    marginTop: '2rem', textAlign: 'center',
-    borderTop: `1px solid rgba(127,168,212,0.08)`,
-    paddingTop: '1rem',
-  }
-
-  const footerTextStyle = {
-    fontSize: 10, fontWeight: 600, letterSpacing: '0.25em',
-    color: `rgba(147,184,216,0.30)`,
-    textTransform: 'uppercase', margin: 0,
-  }
-
   return (
     <>
-      {/* Global background layers */}
-      <div style={blueprintGridStyle} />
-      <div style={radialGlowStyle} />
-
       {/* Legal modal */}
       {legalModal && (
         <LegalModal type={legalModal} lang={lang} onClose={() => setLegalModal(null)} />
@@ -861,362 +1003,397 @@ export default function Login({ onNavigate }) {
 
       {/* ── LOGIN ─────────────────────────────────────────────────────────── */}
       {view === 'login' && (
-        <div style={bgStyle}>
-          <LangToggle lang={lang} setLang={setLang} />
-          <div style={{ ...cardStyle, maxWidth: 400 }}>
-            {/* Logo */}
-            <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-              <MaryLogoSVG />
-              <AccentDivider />
-            </div>
+        <div style={splitWrapStyle}>
+          {/* Blueprint grid (full page background) */}
+          <div style={{
+            position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+            backgroundImage: `linear-gradient(rgba(127,168,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(127,168,212,0.04) 1px, transparent 1px)`,
+            backgroundSize: '48px 48px',
+          }} />
 
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: '1.5rem' }}>
-              {/* Email */}
-              <div style={{ position: 'relative' }}>
-                <FieldIcon>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                  </svg>
-                </FieldIcon>
-                <input
-                  type="email"
-                  placeholder={t.email}
-                  style={inputBase}
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                />
+          <LeftPanel t={t} variant="login" />
+
+          <div style={rightPanelStyle}>
+            <LangToggle lang={lang} setLang={setLang} />
+            <div style={cardInnerStyle}>
+
+              {/* Logo */}
+              <div style={{ marginBottom: '1.75rem' }}>
+                <MaryLogoSVG />
+                <AccentDivider />
               </div>
 
-              {/* Password */}
-              <div style={{ position: 'relative' }}>
-                <FieldIcon>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                </FieldIcon>
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  placeholder={t.password}
-                  style={inputBaseWithEye}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                />
-                <button type="button" style={eyeBtn} onClick={() => setShowPass(v => !v)} aria-label={showPass ? t.hide_pass : t.show_pass}>
-                  <EyeIcon visible={showPass} />
-                </button>
-              </div>
-
-              {error && <ErrorBox msg={error} />}
-
-              <button
-                type="submit"
-                disabled={loading}
-                style={{ ...btnPrimary, marginTop: 4, opacity: loading ? 0.6 : 1 }}
-              >
-                {loading ? t.loading : t.enter}
-              </button>
-            </form>
-
-            <div style={{ textAlign: 'center', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button
-                onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail('') }}
-                style={{
-                  background: 'none', border: 'none',
-                  fontSize: 13, fontWeight: 500,
-                  color: `rgba(200,220,255,0.72)`,
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: '3px',
-                  textDecorationColor: `rgba(200,220,255,0.22)`,
-                }}
-              >
-                {t.forgot}
-              </button>
-              <div style={{ borderTop: `1px solid rgba(127,168,212,0.10)`, paddingTop: 12 }}>
-                <button
-                  onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false); setSelectedPlan('') }}
-                  style={{ ...btnSecondary }}
-                >
-                  ✨ {t.try}
-                </button>
-              </div>
-            </div>
-
-            <footer style={footerStyle}>
-              <p style={footerTextStyle}>{t.footer}</p>
-            </footer>
-          </div>
-        </div>
-      )}
-
-      {/* ── REGISTER ──────────────────────────────────────────────────────── */}
-      {view === 'register' && (
-        <div style={bgStyle}>
-          <LangToggle lang={lang} setLang={setLang} />
-          <div style={{ ...cardStyle, maxWidth: 500 }}>
-            {/* Logo */}
-            <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-              <MaryLogoSVG />
-              <AccentDivider />
-            </div>
-
-            {/* Heading */}
-            <div style={{ textAlign: 'center', margin: '1.25rem 0 1rem' }}>
-              <PillBadge>
-                {lang === 'ES' ? 'ERP de construcción · 22 países' : 'Construction ERP · 22 countries'}
-              </PillBadge>
               <h2 style={{ color: WHITE, fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>
-                {t.reg_title}
+                {lang === 'ES' ? 'Iniciar sesión' : 'Sign in'}
               </h2>
-              <p style={{ color: `rgba(180,210,255,0.60)`, fontSize: 13, margin: '0 0 16px' }}>{t.reg_sub}</p>
+              <p style={{ color: `rgba(147,184,216,0.55)`, fontSize: 13, margin: '0 0 1.5rem' }}>
+                {lang === 'ES' ? 'Bienvenido de nuevo a MARY' : 'Welcome back to MARY'}
+              </p>
 
-              {/* Plan selector */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[
-                  { id: 'starter',    name: 'Starter',    users: 1, projects: 2,  price: '$29.99/m', fg: '#5F5E5A', bg: 'rgba(95,94,90,0.15)' },
-                  { id: 'pro',        name: 'Pro',         users: 3, projects: 5,  price: '$49.99/m', fg: BLUE_200, bg: `rgba(46,120,214,0.18)` },
-                  { id: 'enterprise', name: 'Enterprise',  users: 5, projects: 10, price: '$69.99/m', fg: '#B4B0FF', bg: 'rgba(60,52,137,0.22)' },
-                ].map(plan => {
-                  const active = selectedPlan === plan.id
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setSelectedPlan(plan.id)}
-                      style={{
-                        flex: 1, minWidth: 0,
-                        padding: '10px 6px',
-                        borderRadius: 10,
-                        border: active
-                          ? `1.5px solid ${BLUE_400}`
-                          : `1px solid rgba(127,168,212,0.20)`,
-                        background: active ? 'rgba(46,120,214,0.20)' : 'rgba(11,28,54,0.45)',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 150ms',
-                      }}
-                    >
-                      <p style={{ color: active ? WHITE : `rgba(200,220,255,0.72)`, fontWeight: 700, fontSize: 13, margin: '0 0 3px' }}>
-                        {plan.name}
-                      </p>
-                      <p style={{ color: active ? BLUE_200 : `rgba(147,184,216,0.50)`, fontSize: 11, margin: '0 0 2px' }}>
-                        {lang === 'ES'
-                          ? `${plan.users} usuario${plan.users > 1 ? 's' : ''} · ${plan.projects} proyectos`
-                          : `${plan.users} user${plan.users > 1 ? 's' : ''} · ${plan.projects} projects`}
-                      </p>
-                      <p style={{ color: active ? BLUE_200 : `rgba(100,150,200,0.45)`, fontSize: 11, margin: 0 }}>
-                        {plan.price}
-                      </p>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {regSuccess ? (
-              <div style={{
-                background: 'rgba(26,158,92,0.10)',
-                border: `1px solid rgba(26,158,92,0.30)`,
-                borderRadius: 12, padding: '1.5rem', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎉</div>
-                <p style={{ color: GREEN_500, fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>{t.reg_success}</p>
-                <button
-                  onClick={() => { setView('login'); setRegSuccess(false) }}
-                  style={{
-                    background: 'none', border: 'none',
-                    color: BLUE_200, fontSize: 13, cursor: 'pointer', textDecoration: 'underline',
-                  }}
-                >
-                  {t.reg_back}
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label style={labelStyle}>{t.reg_name} *</label>
-                    <input style={inputBaseNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>{t.reg_company} *</label>
-                    <input style={inputBaseNoIcon} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label style={labelStyle}>{t.reg_phone} *</label>
-                    <input style={inputBaseNoIcon} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>{t.reg_country} *</label>
-                    <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
-                      <option value="" style={{ backgroundColor: NAVY_900, color: WHITE }}>{t.reg_select}</option>
-                      {PAISES[lang].map(p => (
-                        <option key={p} value={p} style={{ backgroundColor: NAVY_900, color: WHITE }}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>{t.reg_email} *</label>
-                  <input type="email" style={inputBaseNoIcon} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>{t.reg_password} *</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showRegPass ? 'text' : 'password'}
-                      style={{ ...inputBaseNoIcon, paddingRight: '42px' }}
-                      value={reg.password}
-                      onChange={setR('password')}
-                      placeholder="••••••••"
-                    />
-                    <button type="button" style={eyeBtn} onClick={() => setShowRegPass(v => !v)} aria-label={showRegPass ? t.hide_pass : t.show_pass}>
-                      <EyeIcon visible={showRegPass} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Referral code */}
-                <div>
-                  <label style={{ ...labelStyle, color: `rgba(180,200,240,0.50)` }}>{t.reg_ref_code}</label>
-                  <input
-                    type="text"
-                    style={{ ...inputBaseNoIcon, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
-                    value={reg.ref_code}
-                    onChange={e => setReg(f => ({ ...f, ref_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
-                    maxLength={20}
-                    placeholder={t.reg_ref_code_ph}
-                  />
-                  {reg.ref_code && (
-                    <p style={{ fontSize: 11, color: GREEN_500, marginTop: 4 }}>
-                      ✓ {t.reg_ref_applied}: {reg.ref_code}
-                    </p>
-                  )}
-                </div>
-
-                {/* Terms */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingTop: 4 }}>
-                  <input
-                    type="checkbox"
-                    id="terms"
-                    checked={termsAccepted}
-                    onChange={e => setTermsAccepted(e.target.checked)}
-                    style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, accentColor: BLUE_500 }}
-                  />
-                  <label htmlFor="terms" style={{ fontSize: 12, color: `rgba(180,200,240,0.62)`, lineHeight: 1.5, cursor: 'pointer' }}>
-                    {t.reg_terms}{' '}
-                    <button type="button" onClick={() => setLegalModal('tos')}
-                      style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
-                      {t.reg_terms_link}
-                    </button>
-                    {' '}{t.reg_and}{' '}
-                    <button type="button" onClick={() => setLegalModal('pp')}
-                      style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
-                      {t.reg_privacy_link}
-                    </button>
-                    {' '}de MARY.
-                  </label>
-                </div>
-
-                {regError && <ErrorBox msg={regError} />}
-
-                <button type="submit" disabled={regLoading} style={{ ...btnPrimary, marginTop: 4, opacity: regLoading ? 0.6 : 1 }}>
-                  {regLoading ? t.reg_loading : t.reg_btn}
-                </button>
-
-                <button type="button" onClick={() => setView('login')}
-                  style={{
-                    background: 'none', border: 'none',
-                    color: `rgba(200,220,255,0.72)`,
-                    fontSize: 13, cursor: 'pointer', padding: '8px',
-                    textDecoration: 'underline', textUnderlineOffset: '3px',
-                    textDecorationColor: `rgba(200,220,255,0.22)`,
-                  }}>
-                  {t.reg_back}
-                </button>
-              </form>
-            )}
-
-            <footer style={footerStyle}>
-              <p style={footerTextStyle}>{t.footer}</p>
-            </footer>
-          </div>
-        </div>
-      )}
-
-      {/* ── FORGOT PASSWORD ───────────────────────────────────────────────── */}
-      {view === 'forgot' && (
-        <div style={bgStyle}>
-          <LangToggle lang={lang} setLang={setLang} />
-          <div style={{ ...cardStyle, maxWidth: 400 }}>
-            {/* Logo */}
-            <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-              <MaryLogoSVG />
-              <AccentDivider />
-            </div>
-
-            <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
-              <h2 style={{ color: WHITE, fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>{t.forgot_title}</h2>
-              <p style={{ color: `rgba(180,210,255,0.60)`, fontSize: 13, margin: 0 }}>{t.forgot_sub}</p>
-            </div>
-
-            {forgotSent ? (
-              <div style={{
-                background: 'rgba(26,158,92,0.10)',
-                border: `1px solid rgba(26,158,92,0.30)`,
-                borderRadius: 12, padding: '1.5rem', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📧</div>
-                <p style={{ color: GREEN_500, fontWeight: 600, fontSize: 13, margin: 0 }}>{t.forgot_sent}</p>
-              </div>
-            ) : (
-              <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ position: 'relative' }}>
                   <FieldIcon>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                      <polyline points="22,6 12,13 2,6"/>
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                     </svg>
                   </FieldIcon>
                   <input
                     type="email"
                     placeholder={t.email}
                     style={inputBase}
-                    value={forgotEmail}
-                    onChange={e => setForgotEmail(e.target.value)}
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
                     required
                   />
                 </div>
-                <button type="submit" disabled={forgotLoading} style={{ ...btnPrimary, opacity: forgotLoading ? 0.6 : 1 }}>
-                  {forgotLoading ? t.forgot_loading : t.forgot_btn}
+
+                <div style={{ position: 'relative' }}>
+                  <FieldIcon>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                  </FieldIcon>
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    placeholder={t.password}
+                    style={inputBaseWithEye}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                  />
+                  <button type="button" style={eyeBtn} onClick={() => setShowPass(v => !v)} aria-label={showPass ? t.hide_pass : t.show_pass}>
+                    <EyeIcon visible={showPass} />
+                  </button>
+                </div>
+
+                {error && <ErrorBox msg={error} />}
+
+                <button type="submit" disabled={loading} style={{ ...btnPrimary, marginTop: 4, opacity: loading ? 0.6 : 1 }}>
+                  {loading ? t.loading : t.enter}
                 </button>
               </form>
-            )}
 
-            <button
-              onClick={() => setView('login')}
-              style={{
-                display: 'block', width: '100%', textAlign: 'center',
-                background: 'none', border: 'none',
-                color: `rgba(200,220,255,0.72)`,
-                fontSize: 13, cursor: 'pointer', padding: '12px', marginTop: 8,
-                textDecoration: 'underline', textUnderlineOffset: '3px',
-                textDecorationColor: `rgba(200,220,255,0.22)`,
-              }}
-            >
-              {t.forgot_back}
-            </button>
+              <div style={{ textAlign: 'center', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button
+                  onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail('') }}
+                  style={{
+                    background: 'none', border: 'none',
+                    fontSize: 13, fontWeight: 500,
+                    color: BLUE_200,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px',
+                    textDecorationColor: `rgba(147,184,216,0.30)`,
+                  }}
+                >
+                  {t.forgot}
+                </button>
+                <div style={{ borderTop: `1px solid rgba(127,168,212,0.10)`, paddingTop: 12 }}>
+                  <button
+                    onClick={() => { setView('register'); setRegError(''); setRegSuccess(false); setTermsAccepted(false); setSelectedPlan('') }}
+                    style={{ ...btnSecondary }}
+                  >
+                    ✨ {t.try}
+                  </button>
+                </div>
+              </div>
 
-            <footer style={footerStyle}>
-              <p style={footerTextStyle}>{t.footer}</p>
-            </footer>
+              <footer style={{ marginTop: '2rem', textAlign: 'center', borderTop: `1px solid rgba(127,168,212,0.08)`, paddingTop: '1rem' }}>
+                <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.25em', color: `rgba(147,184,216,0.25)`, textTransform: 'uppercase', margin: 0 }}>
+                  {t.footer}
+                </p>
+              </footer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REGISTER ──────────────────────────────────────────────────────── */}
+      {view === 'register' && (
+        <div style={splitWrapStyle}>
+          <div style={{
+            position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+            backgroundImage: `linear-gradient(rgba(127,168,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(127,168,212,0.04) 1px, transparent 1px)`,
+            backgroundSize: '48px 48px',
+          }} />
+
+          <LeftPanel t={t} variant="register" />
+
+          <div style={{ ...rightPanelStyle, paddingTop: '3rem', paddingBottom: '3rem' }}>
+            <LangToggle lang={lang} setLang={setLang} />
+            <div style={{ ...cardInnerStyle, maxWidth: 460 }}>
+
+              <div style={{ marginBottom: '1.25rem' }}>
+                <MaryLogoSVG />
+                <AccentDivider />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <PillBadge>
+                  {lang === 'ES' ? 'ERP de construcción · 22 países' : 'Construction ERP · 22 countries'}
+                </PillBadge>
+                <h2 style={{ color: WHITE, fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>
+                  {t.reg_title}
+                </h2>
+                <p style={{ color: `rgba(180,210,255,0.60)`, fontSize: 13, margin: '0 0 16px' }}>{t.reg_sub}</p>
+
+                {/* Plan selector */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[
+                    { id: 'starter',    name: 'Starter',   users: 1, projects: 2,  price: '$29.99/m' },
+                    { id: 'pro',        name: 'Pro',        users: 3, projects: 5,  price: '$49.99/m' },
+                    { id: 'enterprise', name: 'Enterprise', users: 5, projects: 10, price: '$69.99/m' },
+                  ].map(plan => {
+                    const active = selectedPlan === plan.id
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => setSelectedPlan(plan.id)}
+                        style={{
+                          flex: 1, minWidth: 0,
+                          padding: '10px 6px',
+                          borderRadius: 10,
+                          border: active ? `1.5px solid ${BLUE_500}` : `1px solid rgba(127,168,212,0.20)`,
+                          background: active ? `rgba(26,94,180,0.22)` : 'rgba(11,28,54,0.45)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 150ms',
+                        }}
+                      >
+                        <p style={{ color: active ? WHITE : `rgba(200,220,255,0.72)`, fontWeight: 700, fontSize: 13, margin: '0 0 3px' }}>
+                          {plan.name}
+                        </p>
+                        <p style={{ color: active ? BLUE_200 : `rgba(147,184,216,0.50)`, fontSize: 11, margin: '0 0 2px' }}>
+                          {lang === 'ES'
+                            ? `${plan.users} usuario${plan.users > 1 ? 's' : ''} · ${plan.projects} proyectos`
+                            : `${plan.users} user${plan.users > 1 ? 's' : ''} · ${plan.projects} projects`}
+                        </p>
+                        <p style={{ color: active ? BLUE_200 : `rgba(100,150,200,0.45)`, fontSize: 11, margin: 0 }}>
+                          {plan.price}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {regSuccess ? (
+                <div style={{
+                  background: 'rgba(26,158,92,0.10)',
+                  border: `1px solid rgba(26,158,92,0.30)`,
+                  borderRadius: 12, padding: '1.5rem', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎉</div>
+                  <p style={{ color: GREEN_500, fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>{t.reg_success}</p>
+                  <button
+                    onClick={() => { setView('login'); setRegSuccess(false) }}
+                    style={{ background: 'none', border: 'none', color: BLUE_200, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    {t.reg_back}
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={labelStyle}>{t.reg_name} *</label>
+                      <input style={inputBaseNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>{t.reg_company} *</label>
+                      <input style={inputBaseNoIcon} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={labelStyle}>{t.reg_phone} *</label>
+                      <input style={inputBaseNoIcon} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>{t.reg_country} *</label>
+                      <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
+                        <option value="" style={{ backgroundColor: NAVY_900, color: WHITE }}>{t.reg_select}</option>
+                        {PAISES[lang].map(p => (
+                          <option key={p} value={p} style={{ backgroundColor: NAVY_900, color: WHITE }}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>{t.reg_email} *</label>
+                    <input type="email" style={inputBaseNoIcon} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>{t.reg_password} *</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showRegPass ? 'text' : 'password'}
+                        style={{ ...inputBaseNoIcon, paddingRight: '42px' }}
+                        value={reg.password}
+                        onChange={setR('password')}
+                        placeholder="••••••••"
+                      />
+                      <button type="button" style={eyeBtn} onClick={() => setShowRegPass(v => !v)} aria-label={showRegPass ? t.hide_pass : t.show_pass}>
+                        <EyeIcon visible={showRegPass} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Referral code */}
+                  <div>
+                    <label style={{ ...labelStyle, color: `rgba(180,200,240,0.50)` }}>{t.reg_ref_code}</label>
+                    <input
+                      type="text"
+                      style={{ ...inputBaseNoIcon, fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                      value={reg.ref_code}
+                      onChange={e => setReg(f => ({ ...f, ref_code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                      maxLength={20}
+                      placeholder={t.reg_ref_code_ph}
+                    />
+                    {reg.ref_code && (
+                      <p style={{ fontSize: 11, color: GREEN_500, marginTop: 4 }}>
+                        ✓ {t.reg_ref_applied}: {reg.ref_code}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Terms */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingTop: 4 }}>
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      checked={termsAccepted}
+                      onChange={e => setTermsAccepted(e.target.checked)}
+                      style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, accentColor: BLUE_500 }}
+                    />
+                    <label htmlFor="terms" style={{ fontSize: 12, color: `rgba(180,200,240,0.62)`, lineHeight: 1.5, cursor: 'pointer' }}>
+                      {t.reg_terms}{' '}
+                      <button type="button" onClick={() => setLegalModal('tos')}
+                        style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
+                        {t.reg_terms_link}
+                      </button>
+                      {' '}{t.reg_and}{' '}
+                      <button type="button" onClick={() => setLegalModal('pp')}
+                        style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
+                        {t.reg_privacy_link}
+                      </button>
+                      {' '}de MARY.
+                    </label>
+                  </div>
+
+                  {regError && <ErrorBox msg={regError} />}
+
+                  <button type="submit" disabled={regLoading} style={{ ...btnPrimary, marginTop: 4, opacity: regLoading ? 0.6 : 1 }}>
+                    {regLoading ? t.reg_loading : t.reg_btn}
+                  </button>
+
+                  <button type="button" onClick={() => setView('login')}
+                    style={{
+                      background: 'none', border: 'none',
+                      color: BLUE_200,
+                      fontSize: 13, cursor: 'pointer', padding: '8px',
+                      textDecoration: 'underline', textUnderlineOffset: '3px',
+                      textDecorationColor: `rgba(147,184,216,0.30)`,
+                    }}>
+                    {t.reg_back}
+                  </button>
+                </form>
+              )}
+
+              <footer style={{ marginTop: '1.5rem', textAlign: 'center', borderTop: `1px solid rgba(127,168,212,0.08)`, paddingTop: '1rem' }}>
+                <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.25em', color: `rgba(147,184,216,0.25)`, textTransform: 'uppercase', margin: 0 }}>
+                  {t.footer}
+                </p>
+              </footer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FORGOT PASSWORD ───────────────────────────────────────────────── */}
+      {view === 'forgot' && (
+        <div style={splitWrapStyle}>
+          <div style={{
+            position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+            backgroundImage: `linear-gradient(rgba(127,168,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(127,168,212,0.04) 1px, transparent 1px)`,
+            backgroundSize: '48px 48px',
+          }} />
+
+          <LeftPanel t={t} variant="forgot" />
+
+          <div style={rightPanelStyle}>
+            <LangToggle lang={lang} setLang={setLang} />
+            <div style={cardInnerStyle}>
+
+              <div style={{ marginBottom: '1.75rem' }}>
+                <MaryLogoSVG />
+                <AccentDivider />
+              </div>
+
+              <h2 style={{ color: WHITE, fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>
+                {t.forgot_title}
+              </h2>
+              <p style={{ color: `rgba(147,184,216,0.55)`, fontSize: 13, margin: '0 0 1.5rem' }}>
+                {t.forgot_sub}
+              </p>
+
+              {forgotSent ? (
+                <div style={{
+                  background: 'rgba(26,158,92,0.10)',
+                  border: `1px solid rgba(26,158,92,0.30)`,
+                  borderRadius: 12, padding: '1.5rem', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📧</div>
+                  <p style={{ color: GREEN_500, fontWeight: 600, fontSize: 13, margin: 0 }}>{t.forgot_sent}</p>
+                </div>
+              ) : (
+                <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ position: 'relative' }}>
+                    <FieldIcon>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                      </svg>
+                    </FieldIcon>
+                    <input
+                      type="email"
+                      placeholder={t.email}
+                      style={inputBase}
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <button type="submit" disabled={forgotLoading} style={{ ...btnPrimary, opacity: forgotLoading ? 0.6 : 1 }}>
+                    {forgotLoading ? t.forgot_loading : t.forgot_btn}
+                  </button>
+                </form>
+              )}
+
+              <button
+                onClick={() => setView('login')}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'center',
+                  background: 'none', border: 'none',
+                  color: BLUE_200,
+                  fontSize: 13, cursor: 'pointer', padding: '12px', marginTop: 8,
+                  textDecoration: 'underline', textUnderlineOffset: '3px',
+                  textDecorationColor: `rgba(147,184,216,0.30)`,
+                }}
+              >
+                {t.forgot_back}
+              </button>
+
+              <footer style={{ marginTop: '2rem', textAlign: 'center', borderTop: `1px solid rgba(127,168,212,0.08)`, paddingTop: '1rem' }}>
+                <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.25em', color: `rgba(147,184,216,0.25)`, textTransform: 'uppercase', margin: 0 }}>
+                  {t.footer}
+                </p>
+              </footer>
+            </div>
           </div>
         </div>
       )}
