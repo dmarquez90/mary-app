@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useContext, Fragment } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { useAuth } from '../AuthContext'
+import { useAuth } from '../auth'
 import { supabase } from '../supabase'
 import { EmptyState, Icons } from '../components'
 
