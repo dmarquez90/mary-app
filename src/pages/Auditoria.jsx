@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useContext, Fragment } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
+import { useAuth } from '../AuthContext'
 import { supabase } from '../supabase'
 import { EmptyState, Icons } from '../components'
 
@@ -113,6 +114,7 @@ export default function Auditoria() {
   const { state } = useStore()
   const { lang } = useContext(LangContext)
   const { canView } = usePermissions()
+  const { tenantId } = useAuth()
   const isEs = lang === 'ES'
   const { proyectos = [], usuarios = [] } = state
 
@@ -137,6 +139,8 @@ export default function Auditoria() {
     async function load() {
       setLoading(true)
       let query = supabase.from('auditoria_log').select('*').order('created_at', { ascending: false }).limit(limit)
+      // Siempre filtrar por tenant — cada empresa solo ve sus propios registros
+      if (tenantId) query = query.eq('tenant_id', tenantId)
       if (fDesde) query = query.gte('created_at', `${fDesde}T00:00:00`)
       if (fHasta) query = query.lte('created_at', `${fHasta}T23:59:59`)
       if (fProyecto) query = query.eq('proyecto_id', fProyecto)
@@ -157,7 +161,13 @@ export default function Auditoria() {
       const { label, modulo } = parseAccion(l.accion, isEs)
       const detalle = describePayload(l.payload, isEs)
       const proy = proyectos.find(p => p.id === l.proyecto_id)
-      return { ...l, label, modulo, detalle, proyLabel: proy ? `${proy.project_code} — ${proy.nombre}` : '' }
+      // Si proyecto_id existe pero ya no está en el store = fue eliminado
+      const proyLabel = l.proyecto_id
+        ? proy
+          ? `${proy.project_code} — ${proy.nombre}`
+          : (isEs ? '[Proyecto eliminado]' : '[Deleted project]')
+        : ''
+      return { ...l, label, modulo, detalle, proyLabel }
     })
   }, [logs, isEs, proyectos])
 
@@ -275,7 +285,13 @@ export default function Auditoria() {
                       </td>
                       <td className="px-4 py-2.5 text-sm text-gray-700">{r.label}</td>
                       <td className="px-4 py-2.5 text-sm text-gray-500 max-w-[260px] truncate">{r.detalle || '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.proyLabel || '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                        {r.proyLabel
+                          ? r.proyLabel.includes('[') || r.proyLabel.includes('[Deleted')
+                            ? <span className="italic text-gray-400">{r.proyLabel}</span>
+                            : r.proyLabel
+                          : '—'}
+                      </td>
                       <td className="px-4 py-2.5">
                         <button onClick={()=>setExpandedId(expandedId===r.id?null:r.id)} className="text-xs text-gray-400 hover:text-gray-600">
                           {expandedId===r.id ? (isEs?'Ocultar':'Hide') : (isEs?'Ver datos':'View data')}
