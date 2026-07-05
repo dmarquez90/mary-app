@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, useState } from 'react'
+import { createContext, useContext, useReducer, useEffect, useState, useRef } from 'react'
 import { supabase } from './supabase'
 import { uuid, genProjectCode, genOCCode, genBudgetCode, today, r2 } from './utils'
 
@@ -353,10 +353,16 @@ export function StoreProvider({ children, tenantId, rol }) {
 
   // ── Avisos de error visibles al usuario (antes solo iban a console.error) ──
   const [avisos, setAvisos] = useState([])
+  const avisoTimers = useRef(new Set())
+  useEffect(() => () => { avisoTimers.current.forEach(clearTimeout); avisoTimers.current.clear() }, [])
   function avisar(mensaje) {
     const id = uuid()
     setAvisos(prev => [...prev, { id, mensaje }])
-    setTimeout(() => setAvisos(prev => prev.filter(a => a.id !== id)), 8000)
+    const timer = setTimeout(() => {
+      avisoTimers.current.delete(timer)
+      setAvisos(prev => prev.filter(a => a.id !== id))
+    }, 8000)
+    avisoTimers.current.add(timer)
   }
 
   useEffect(() => {
@@ -627,6 +633,44 @@ useEffect(() => {
       return true
     }
 
+    // ── Lógica compartida de DEL_ENTRADA / DEL_SALIDA ──
+    // Extraída para que APROBAR_SOL_ELIM pueda llamarla directamente en vez de
+    // invocar dbDispatch recursivamente: dbDispatch atrapa todos sus propios
+    // errores (ver catch más abajo), así que un `await dbDispatch(...)` anidado
+    // nunca rechaza y el try/catch de APROBAR_SOL_ELIM nunca podía enterarse de
+    // un fallo aquí. Llamando estas funciones directamente, si fallan, sí lanzan
+    // hacia quien las invoque.
+    async function delEntradaDb(payload) {
+      const salidasAfectadas   = state.salidas.filter(s => s.material_id === payload.materialId)
+      const otrasentradas      = state.entradas.filter(e => e.id !== payload.id && e.material_id === payload.materialId)
+      const totalOtrasEntradas = otrasentradas.reduce((s,e) => s + parseFloat(e.cantidad||0), 0)
+      const totalSalidas       = salidasAfectadas.reduce((s,e) => s + parseFloat(e.cantidad||0), 0)
+      if (totalSalidas > totalOtrasEntradas) {
+        for (const sal of salidasAfectadas) {
+          await sbThrow(supabase.from('salidas').delete().eq('id', sal.id))
+          dispatch({ type: 'DEL_SALIDA_LOCAL', payload: sal.id })
+        }
+      }
+      await sbThrow(supabase.from('entradas').delete().eq('id', payload.id))
+      const mat = state.materiales.find(m => m.id === payload.materialId)
+      const nuevoStock = Math.max(0, parseFloat(mat?.stock_actual||0) - parseFloat(payload.cantidad||0))
+      if (mat) {
+        await sbThrow(supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id))
+        dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+      }
+      dispatch({ type: 'DEL_ENTRADA_LOCAL', payload: payload.id })
+    }
+    async function delSalidaDb(payload) {
+      await sbThrow(supabase.from('salidas').delete().eq('id', payload.id))
+      const mat = state.materiales.find(m => m.id === payload.materialId)
+      const nuevoStock = parseFloat(mat?.stock_actual||0) + parseFloat(payload.cantidad||0)
+      if (mat) {
+        await sbThrow(supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id))
+        dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
+      }
+      dispatch({ type: 'DEL_SALIDA_LOCAL', payload: payload.id })
+    }
+
     try {
     switch (action.type) {
 
@@ -669,8 +713,7 @@ useEffect(() => {
           estado: directo ? 'activa' : 'pendiente_aprobacion',
           saldo_actual: directo ? monto : 0,
         }
-        const { error } = await supabase.from('cajas_chicas').insert(item)
-        if (error) { console.error('ADD_CAJA_CHICA:', JSON.stringify(error)); break }
+        await sbThrow(supabase.from('cajas_chicas').insert(item))
         dispatch({ type: 'ADD_CAJA_CHICA', payload: item })
         break
       }
@@ -696,11 +739,9 @@ useEffect(() => {
         // Si fue pagado del bolsillo del responsable, no afecta el saldo de la caja.
         const nuevoSaldo = pagoPropio ? parseFloat(caja.saldo_actual||0) : r2(parseFloat(caja.saldo_actual||0) - monto)
         const gasto = { ...action.payload, pago_propio: pagoPropio, id: uuid(), created_at: today(), tenant_id: tenantId, liquidacion_id: null }
-        const { error: eG } = await supabase.from('gastos_caja_chica').insert(gasto)
-        if (eG) { console.error('ADD_GASTO_CC — gasto:', JSON.stringify(eG)); break }
+        await sbThrow(supabase.from('gastos_caja_chica').insert(gasto))
         if (!pagoPropio) {
-          const { error: eC } = await supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id)
-          if (eC) console.error('ADD_GASTO_CC — caja:', JSON.stringify(eC))
+          await sbThrow(supabase.from('cajas_chicas').update({ saldo_actual: nuevoSaldo }).eq('id', caja.id))
         }
         dispatch({ type: 'ADD_GASTO_CC', payload: { gasto, nuevoSaldo } })
         break
@@ -731,17 +772,13 @@ useEffect(() => {
           fecha: today(), total_gastos: totalGastos, reposicion, reembolso_personal: reembolsoMonto,
           estado: 'pendiente', created_at: today(),
         }
-        const { error: eL } = await supabase.from('liquidaciones_caja_chica').insert(liquidacion)
-        if (eL) { console.error('ADD_LIQUIDACION_CC — liquidacion:', JSON.stringify(eL)); break }
-
-        const { error: eG } = await supabase.from('gastos_caja_chica').update({ liquidacion_id: liquidacion.id }).in('id', gastoIds)
-        if (eG) console.error('ADD_LIQUIDACION_CC — gastos:', JSON.stringify(eG))
+        await sbThrow(supabase.from('liquidaciones_caja_chica').insert(liquidacion))
+        await sbThrow(supabase.from('gastos_caja_chica').update({ liquidacion_id: liquidacion.id }).in('id', gastoIds))
 
         let reembolso = null
         if (reembolsoMonto > 0) {
           reembolso = { id: uuid(), tenant_id: tenantId, liquidacion_id: liquidacion.id, proyecto_id, usuario_id: usuarioId, monto: reembolsoMonto, estado: 'pendiente', created_at: today() }
-          const { error: eR } = await supabase.from('reembolsos_personal').insert(reembolso)
-          if (eR) console.error('ADD_LIQUIDACION_CC — reembolso:', JSON.stringify(eR))
+          await sbThrow(supabase.from('reembolsos_personal').insert(reembolso))
         }
         dispatch({ type: 'ADD_LIQUIDACION_CC', payload: { liquidacion, gastoIds, reembolso } })
         break
@@ -762,9 +799,9 @@ useEffect(() => {
         const gastos = state.gastos_caja_chica.filter(g => g.liquidacion_id === liquidacionId)
 
         const { nuevosCostosDirectos, nuevosCostosIndirectos, nuevosEquipos } = buildCostosFromGastosCC(gastos, liquidacion.proyecto_id, tenantId)
-        if (nuevosCostosDirectos.length)   { const { error } = await supabase.from('costos_directos').insert(nuevosCostosDirectos);   if (error) console.error('APROBAR_LIQUIDACION_CC — costos_directos:', JSON.stringify(error)) }
-        if (nuevosCostosIndirectos.length) { const { error } = await supabase.from('costos_indirectos').insert(nuevosCostosIndirectos); if (error) console.error('APROBAR_LIQUIDACION_CC — costos_indirectos:', JSON.stringify(error)) }
-        if (nuevosEquipos.length)          { const { error } = await supabase.from('equipos').insert(nuevosEquipos);          if (error) console.error('APROBAR_LIQUIDACION_CC — equipos:', JSON.stringify(error)) }
+        if (nuevosCostosDirectos.length)   await sbThrow(supabase.from('costos_directos').insert(nuevosCostosDirectos))
+        if (nuevosCostosIndirectos.length) await sbThrow(supabase.from('costos_indirectos').insert(nuevosCostosIndirectos))
+        if (nuevosEquipos.length)          await sbThrow(supabase.from('equipos').insert(nuevosEquipos))
 
         // La reposición devuelve a la caja exactamente lo gastado con sus fondos (corrige el sobregiro si lo hubo).
         // El reembolso personal NO toca el saldo de la caja: es deuda de la empresa hacia el responsable, pagada aparte.
@@ -805,31 +842,26 @@ useEffect(() => {
             fecha: today(), total_gastos: totalGastos, reposicion, reembolso_personal: reembolsoMonto,
             estado: 'aprobada', aprobado_por: action.payload.usuarioId || null, fecha_aprobacion: today(), created_at: today(),
           }
-          const { error: eL } = await supabase.from('liquidaciones_caja_chica').insert(liquidacionAuto)
-          if (eL) { console.error('CERRAR_CAJA_CHICA — liquidacion:', JSON.stringify(eL)); break }
-
-          const { error: eG } = await supabase.from('gastos_caja_chica').update({ liquidacion_id: liquidacionAuto.id }).in('id', gastoIds)
-          if (eG) console.error('CERRAR_CAJA_CHICA — gastos:', JSON.stringify(eG))
+          await sbThrow(supabase.from('liquidaciones_caja_chica').insert(liquidacionAuto))
+          await sbThrow(supabase.from('gastos_caja_chica').update({ liquidacion_id: liquidacionAuto.id }).in('id', gastoIds))
 
           if (reembolsoMonto > 0) {
             reembolsoAuto = { id: uuid(), tenant_id: tenantId, liquidacion_id: liquidacionAuto.id, proyecto_id: caja.proyecto_id, usuario_id: action.payload.usuarioId || caja.responsable_id, monto: reembolsoMonto, estado: 'pendiente', created_at: today() }
-            const { error: eR } = await supabase.from('reembolsos_personal').insert(reembolsoAuto)
-            if (eR) console.error('CERRAR_CAJA_CHICA — reembolso:', JSON.stringify(eR))
+            await sbThrow(supabase.from('reembolsos_personal').insert(reembolsoAuto))
           }
 
           const built = buildCostosFromGastosCC(pendientes, caja.proyecto_id, tenantId)
           nuevosCostosDirectos   = built.nuevosCostosDirectos
           nuevosCostosIndirectos = built.nuevosCostosIndirectos
           nuevosEquipos          = built.nuevosEquipos
-          if (nuevosCostosDirectos.length)   { const { error } = await supabase.from('costos_directos').insert(nuevosCostosDirectos);     if (error) console.error('CERRAR_CAJA_CHICA — costos_directos:', JSON.stringify(error)) }
-          if (nuevosCostosIndirectos.length) { const { error } = await supabase.from('costos_indirectos').insert(nuevosCostosIndirectos); if (error) console.error('CERRAR_CAJA_CHICA — costos_indirectos:', JSON.stringify(error)) }
-          if (nuevosEquipos.length)          { const { error } = await supabase.from('equipos').insert(nuevosEquipos);                    if (error) console.error('CERRAR_CAJA_CHICA — equipos:', JSON.stringify(error)) }
+          if (nuevosCostosDirectos.length)   await sbThrow(supabase.from('costos_directos').insert(nuevosCostosDirectos))
+          if (nuevosCostosIndirectos.length) await sbThrow(supabase.from('costos_indirectos').insert(nuevosCostosIndirectos))
+          if (nuevosEquipos.length)          await sbThrow(supabase.from('equipos').insert(nuevosEquipos))
 
           saldoFinal = r2(saldoFinal + reposicion)
         }
 
-        const { error: eC } = await supabase.from('cajas_chicas').update({ estado: 'cerrada', saldo_actual: saldoFinal }).eq('id', caja.id)
-        if (eC) { console.error('CERRAR_CAJA_CHICA — caja:', JSON.stringify(eC)); break }
+        await sbThrow(supabase.from('cajas_chicas').update({ estado: 'cerrada', saldo_actual: saldoFinal }).eq('id', caja.id))
 
         dispatch({ type: 'CERRAR_CAJA_CHICA', payload: {
           cajaId: caja.id, saldoFinal, liquidacionAuto, reembolsoAuto, gastoIds,
@@ -846,8 +878,7 @@ useEffect(() => {
           impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
           fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
         }
-        const { error } = await supabase.from('proyectos').insert(item)
-        if (error) { console.error('ADD_PROYECTO:', JSON.stringify(error)); break }
+        await sbThrow(supabase.from('proyectos').insert(item))
         dispatch({ type: 'ADD_PROYECTO', payload: item })
         break
       }
@@ -858,76 +889,16 @@ useEffect(() => {
           impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
           fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
         }
-        const { error } = await supabase.from('proyectos').update(fields).eq('id', fields.id)
-        if (error) { console.error('UPD_PROYECTO:', JSON.stringify(error)); break }
+        await sbThrow(supabase.from('proyectos').update(fields).eq('id', fields.id))
         dispatch({ type: 'UPD_PROYECTO', payload: fields })
         break
       }
       case 'DEL_PROYECTO': {
-        const pid = action.payload
-        await sbThrow(supabase.from('presupuesto').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('presupuesto_indirectos').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('fases').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('materiales_presupuestados').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('salidas').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('entradas').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('costos_directos').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('nominas').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('subcontratos').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('equipos').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('costos_indirectos').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('usuario_proyecto').delete().eq('proyecto_id', pid))
-        const { data: sols } = await supabase.from('solicitudes').select('id').eq('proyecto_id', pid)
-        if (sols?.length) {
-          await sbThrow(supabase.from('solicitud_items').delete().in('solicitud_id', sols.map(s => s.id)))
-          await sbThrow(supabase.from('solicitudes').delete().eq('proyecto_id', pid))
-        }
-        const { data: ocs } = await supabase.from('ordenes_compra').select('id').eq('proyecto_id', pid)
-        if (ocs?.length) {
-          await sbThrow(supabase.from('ordenes_compra_items').delete().in('oc_id', ocs.map(o => o.id)))
-          await sbThrow(supabase.from('ordenes_compra').delete().eq('proyecto_id', pid))
-        }
-        const { data: ocsC } = await supabase.from('ordenes_cambio').select('id').eq('proyecto_id', pid)
-        if (ocsC?.length) {
-          await sbThrow(supabase.from('ordenes_cambio_items').delete().in('oc_id', ocsC.map(o => o.id)))
-          await sbThrow(supabase.from('ordenes_cambio').delete().eq('proyecto_id', pid))
-        }
-        // ── Retenciones y órdenes de pago de retención (FK NO ACTION — deben
-        // borrarse ANTES de subcontratos_avaluos / subcontratos_contratos / proyectos) ──
-        await sbThrow(supabase.from('subcontratos_retenciones').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('ordenes_pago_retencion').delete().eq('proyecto_id', pid))
-        const { data: scs } = await supabase.from('subcontratos_contratos').select('id').eq('proyecto_id', pid)
-        if (scs?.length) {
-          const scIds = scs.map(s => s.id)
-          const { data: avs } = await supabase.from('subcontratos_avaluos').select('id').in('subcontrato_id', scIds)
-          if (avs?.length) {
-            const avIds = avs.map(a => a.id)
-            await sbThrow(supabase.from('subcontratos_retenciones').delete().in('avaluo_id', avIds))
-            await sbThrow(supabase.from('subcontratos_avaluo_items').delete().in('avaluo_id', avIds))
-          }
-          await sbThrow(supabase.from('subcontratos_retenciones').delete().in('subcontrato_id', scIds))
-          await sbThrow(supabase.from('subcontratos_avaluos').delete().in('subcontrato_id', scIds))
-          await sbThrow(supabase.from('subcontratos_items').delete().in('subcontrato_id', scIds))
-          await sbThrow(supabase.from('subcontratos_contratos').delete().eq('proyecto_id', pid))
-        }
-        const { data: avsCli } = await supabase.from('avaluos_cliente').select('id').eq('proyecto_id', pid)
-        if (avsCli?.length) {
-          await sbThrow(supabase.from('avaluos_cliente_items').delete().in('avaluo_id', avsCli.map(a => a.id)))
-          await sbThrow(supabase.from('avaluos_cliente').delete().eq('proyecto_id', pid))
-        }
-        // ── Caja Chica (v1.1) — reembolsos_personal.proyecto_id es NO ACTION,
-        // se borra explícito; gastos_caja_chica / liquidaciones_caja_chica /
-        // reembolsos_personal (via liquidacion_id) caen en cascada al borrar cajas_chicas ──
-        await sbThrow(supabase.from('reembolsos_personal').delete().eq('proyecto_id', pid))
-        await sbThrow(supabase.from('cajas_chicas').delete().eq('proyecto_id', pid))
-        // ── Log de auditoría (v1.2) — proyecto_id es NO ACTION ──
-        await sbThrow(supabase.from('auditoria_log').delete().eq('proyecto_id', pid))
-        const { error: eP } = await supabase.from('proyectos').delete().eq('id', pid)
-        if (eP) {
-          console.error('DEL_PROYECTO — proyectos:', JSON.stringify(eP))
-          alert(`No se pudo eliminar el proyecto / Could not delete project: ${eP.message}`)
-          break
-        }
+        // Cascada completa en una función de Postgres (transacción atómica —
+        // todo o nada). Antes eran ~30 deletes secuenciales desde el cliente:
+        // un fallo a mitad de camino dejaba el proyecto parcialmente borrado
+        // sin ningún rollback ni reintento.
+        await sbThrow(supabase.rpc('delete_proyecto_cascade', { p_proyecto_id: action.payload }))
         dispatch(action)
         break
       }
@@ -1039,10 +1010,8 @@ useEffect(() => {
           proyecto_id:     entrada.proyecto_id || null,
           oc_id:           entrada.oc_id       || null,
         }
-        const { error: eM } = await supabase.from('materiales').insert(cleanMat)
-        if (eM) { console.error('ADD_MATERIAL_CON_ENTRADA — materiales:', JSON.stringify(eM)); break }
-        const { error: eE } = await supabase.from('entradas').insert(cleanEnt)
-        if (eE) console.error('ADD_MATERIAL_CON_ENTRADA — entradas:', JSON.stringify(eE))
+        await sbThrow(supabase.from('materiales').insert(cleanMat))
+        await sbThrow(supabase.from('entradas').insert(cleanEnt))
         await sbThrow(supabase.from('materiales').update({ stock_actual: cleanMat.stock_actual }).eq('id', cleanMat.id))
         dispatch({ type: 'ADD_MATERIAL_CON_ENTRADA', payload: { material: cleanMat, entrada: cleanEnt } })
         break
@@ -1058,8 +1027,7 @@ useEffect(() => {
           precio_unitario: parseFloat(cleanP.precio_unitario) || 0,
           created_at: today(), tenant_id: tenantId,
         }
-        const { error: eM } = await supabase.from('materiales').insert(item)
-        if (eM) { console.error('ADD_MATERIAL — materiales:', JSON.stringify(eM)); break }
+        await sbThrow(supabase.from('materiales').insert(item))
         dispatch({ type: 'ADD_MATERIAL', payload: item })
         if (stockInicial > 0) {
           const entrada = {
@@ -1068,8 +1036,7 @@ useEffect(() => {
             numero_factura: 'STOCK-INICIAL', proveedor: 'Stock inicial',
             fecha_recepcion: today(), created_at: today(), tenant_id: tenantId,
           }
-          const { error: eE } = await supabase.from('entradas').insert(entrada)
-          if (eE) console.error('ADD_MATERIAL — entradas stock inicial:', JSON.stringify(eE))
+          await sbThrow(supabase.from('entradas').insert(entrada))
           dispatch({ type: 'ADD_ENTRADA', payload: entrada })
         }
         break
@@ -1102,8 +1069,7 @@ useEffect(() => {
         }
         if (!item.oc_id)       delete item.oc_id
         if (!item.proyecto_id) delete item.proyecto_id
-        const { error: eE } = await supabase.from('entradas').insert(item)
-        if (eE) { console.error('ADD_ENTRADA — entradas:', JSON.stringify(eE)); break }
+        await sbThrow(supabase.from('entradas').insert(item))
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) {
           const nuevoStock = (parseFloat(mat.stock_actual)||0) + (parseFloat(item.cantidad)||0)
@@ -1130,24 +1096,7 @@ useEffect(() => {
         break
       }
       case 'DEL_ENTRADA': {
-        const salidasAfectadas   = state.salidas.filter(s => s.material_id === action.payload.materialId)
-        const otrasentradas      = state.entradas.filter(e => e.id !== action.payload.id && e.material_id === action.payload.materialId)
-        const totalOtrasEntradas = otrasentradas.reduce((s,e) => s + parseFloat(e.cantidad||0), 0)
-        const totalSalidas       = salidasAfectadas.reduce((s,e) => s + parseFloat(e.cantidad||0), 0)
-        if (totalSalidas > totalOtrasEntradas) {
-          for (const sal of salidasAfectadas) {
-            await sbThrow(supabase.from('salidas').delete().eq('id', sal.id))
-            dispatch({ type: 'DEL_SALIDA_LOCAL', payload: sal.id })
-          }
-        }
-        await sbThrow(supabase.from('entradas').delete().eq('id', action.payload.id))
-        const mat = state.materiales.find(m => m.id === action.payload.materialId)
-        const nuevoStock = Math.max(0, parseFloat(mat?.stock_actual||0) - parseFloat(action.payload.cantidad||0))
-        if (mat) {
-          await sbThrow(supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id))
-          dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
-        }
-        dispatch({ type: 'DEL_ENTRADA_LOCAL', payload: action.payload.id })
+        await delEntradaDb(action.payload)
         break
       }
 
@@ -1157,8 +1106,7 @@ useEffect(() => {
         if (!payload.actividad_id)       delete payload.actividad_id
         if (!payload.origen_proyecto_id) delete payload.origen_proyecto_id
         const item = { ...payload, id: uuid(), created_at: today(), tenant_id: tenantId }
-        const { error: eS } = await supabase.from('salidas').insert(item)
-        if (eS) { console.error('ADD_SALIDA — salidas:', eS, item); break }
+        await sbThrow(supabase.from('salidas').insert(item))
         const mat = state.materiales.find(m => m.id === item.material_id)
         if (mat) {
           const nuevoStock = Math.max(0, (parseFloat(mat.stock_actual)||0) - (parseFloat(item.cantidad)||0))
@@ -1200,14 +1148,7 @@ useEffect(() => {
         break
       }
       case 'DEL_SALIDA': {
-        await sbThrow(supabase.from('salidas').delete().eq('id', action.payload.id))
-        const mat = state.materiales.find(m => m.id === action.payload.materialId)
-        const nuevoStock = parseFloat(mat?.stock_actual||0) + parseFloat(action.payload.cantidad||0)
-        if (mat) {
-          await sbThrow(supabase.from('materiales').update({ stock_actual: nuevoStock }).eq('id', mat.id))
-          dispatch({ type: 'UPD_MATERIAL', payload: { ...mat, stock_actual: nuevoStock } })
-        }
-        dispatch({ type: 'DEL_SALIDA_LOCAL', payload: action.payload.id })
+        await delSalidaDb(action.payload)
         break
       }
 
@@ -1239,7 +1180,7 @@ useEffect(() => {
             // Eliminar la entrada si existe en el store
             const existeLocal = state.entradas.find(e => e.id === sol.registro_id)
             if (existeLocal) {
-              await dbDispatch({ type: 'DEL_ENTRADA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+              await delEntradaDb({ id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad })
             } else {
               // El registro ya no está en el store — actualizar stock directamente en Supabase
               const { data: entradaDB } = await supabase.from('entradas').select('id').eq('id', sol.registro_id).single()
@@ -1260,7 +1201,7 @@ useEffect(() => {
           } else if (sol.tipo === 'salida') {
             const existeLocal = state.salidas.find(s => s.id === sol.registro_id)
             if (existeLocal) {
-              await dbDispatch({ type: 'DEL_SALIDA', payload: { id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad } })
+              await delSalidaDb({ id: sol.registro_id, materialId: sol.material_id, cantidad: sol.cantidad })
             } else {
               // La salida ya no está en el store — ajustar stock directamente
               const { data: salidaDB } = await supabase.from('salidas').select('id').eq('id', sol.registro_id).single()
@@ -1276,10 +1217,10 @@ useEffect(() => {
           }
         } catch (e) { console.warn('Error al procesar eliminación:', e.message) }
 
-        // Siempre actualizar el estado de la solicitud — primero local, luego DB
+        // Siempre actualizar el estado de la solicitud — DB primero, local después
         const upd = { estado: 'aprobada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
-        dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
         await sbThrow(supabase.from('solicitudes_eliminacion').update(upd).eq('id', sol.id))
+        dispatch({ type: 'UPD_SOL_ELIM', payload: { id: sol.id, ...upd } })
         const tipoAprobEN = sol.tipo === 'entrada' ? 'an entry' : 'an exit'
         const tipoAprobES = sol.tipo === 'entrada' ? 'una entrada' : 'una salida'
         const comentAprobEN = action.payload.comentario ? ' Comment: ' + action.payload.comentario : ''
@@ -1298,8 +1239,8 @@ useEffect(() => {
       case 'RECHAZAR_SOL_ELIM': {
         const sol2 = state.solicitudes_eliminacion.find(s => s.id === action.payload.id)
         const upd = { estado: 'rechazada', comentario_admin: action.payload.comentario || '', reviewed_at: today(), reviewed_by: action.payload.reviewedBy }
-        dispatch({ type: 'UPD_SOL_ELIM', payload: { id: action.payload.id, ...upd } })
         await sbThrow(supabase.from('solicitudes_eliminacion').update(upd).eq('id', action.payload.id))
+        dispatch({ type: 'UPD_SOL_ELIM', payload: { id: action.payload.id, ...upd } })
         const motivoEN = action.payload.comentario ? ' Reason: ' + action.payload.comentario : ''
         const motivoES = action.payload.comentario ? ' Motivo: ' + action.payload.comentario : ''
         // Notificar al usuario específico que elaboró la solicitud
@@ -1326,11 +1267,9 @@ useEffect(() => {
       case 'ADD_SOLICITUD': {
         const sol   = { ...action.payload.solicitud, id: uuid(), estado: 'pendiente', created_at: today(), tenant_id: tenantId }
         const items = (action.payload.items||[]).map(it => ({ ...it, id: uuid(), solicitud_id: sol.id, tenant_id: tenantId }))
-        const { error: solError } = await supabase.from('solicitudes').insert(sol)
-        if (solError) { console.error('Error al insertar solicitud:', solError); break }
+        await sbThrow(supabase.from('solicitudes').insert(sol))
         if (items.length) {
-          const { error: itemsError } = await supabase.from('solicitud_items').insert(items)
-          if (itemsError) console.error('Error al insertar solicitud_items:', itemsError, items)
+          await sbThrow(supabase.from('solicitud_items').insert(items))
         }
         dispatch({ type: 'ADD_SOLICITUD', payload: { solicitud: sol, items } })
         // Notificar a gerentes y coordinadores
@@ -1433,14 +1372,9 @@ useEffect(() => {
             tenant_id:         tenantId,
           }
         })
-        const { error: ocErr } = await supabase.from('ordenes_compra').insert(oc)
-        if (ocErr) {
-          console.error('[MARY] ADD_OC — insert ordenes_compra:', JSON.stringify(ocErr))
-          break
-        }
+        await sbThrow(supabase.from('ordenes_compra').insert(oc))
         if (ocItems.length) {
-          const { error: ocItemsErr } = await supabase.from('ordenes_compra_items').insert(ocItems)
-          if (ocItemsErr) console.error('[MARY] ADD_OC — insert ordenes_compra_items:', JSON.stringify(ocItemsErr))
+          await sbThrow(supabase.from('ordenes_compra_items').insert(ocItems))
         }
         if (oc.solicitud_id) {
           await sbThrow(supabase.from('solicitudes').update({ estado: 'oc_generada' }).eq('id', oc.solicitud_id))
@@ -1521,7 +1455,10 @@ useEffect(() => {
               }
 
               const { error: eqErr } = await supabase.from('equipos').insert(nuevoEquipo)
-              if (!eqErr) {
+              if (eqErr) {
+                console.error('UPD_OC_ESTADO — equipos:', JSON.stringify(eqErr))
+                avisar(`No se pudo registrar el equipo alquilado "${nuevoEquipo.descripcion}" en Financiero / Could not register rented equipment "${nuevoEquipo.descripcion}".`)
+              } else {
                 dispatch({ type: 'ADD_EQUIPO', payload: nuevoEquipo })
               }
             }
@@ -1789,8 +1726,8 @@ useEffect(() => {
           fecha_solicitud:  new Date().toISOString(),
           created_at:       new Date().toISOString(),
         }
-        const { error } = await supabase.from('equipos_ajustes').insert(ajuste)
-        if (!error) dispatch({ type: 'ADD_AJUSTE_EQUIPO', payload: ajuste })
+        await sbThrow(supabase.from('equipos_ajustes').insert(ajuste))
+        dispatch({ type: 'ADD_AJUSTE_EQUIPO', payload: ajuste })
         break
       }
 
@@ -1881,8 +1818,7 @@ useEffect(() => {
           es_adicional:           action.payload.es_adicional           || false,
           costo_unitario:         parseFloat(action.payload.costo_unitario) || 0,
         }
-        const { error: eMP } = await supabase.from('materiales_presupuestados').insert(item)
-        if (eMP) { console.error('ADD_MAT_PRES:', JSON.stringify(eMP)); break }
+        await sbThrow(supabase.from('materiales_presupuestados').insert(item))
         dispatch({ type: 'ADD_MAT_PRES', payload: item })
         break
       }
@@ -1916,11 +1852,10 @@ useEffect(() => {
           .filter(i => parseFloat(i.ajuste||0) !== 0)
           .map(i => ({ ...i, id: uuid(), oc_id: orden.id, created_at: today(), tenant_id: tenantId }))
 
-        // Dispatch primero para UI inmediata
-        dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items, indirectos } })
-
-        const { error: errOrden } = await supabase.from('ordenes_cambio').insert(orden)
-        if (errOrden) { console.error('ordenes_cambio insert error:', errOrden); break }
+        // DB primero, dispatch local solo si todo se guardó (antes se hacía al
+        // revés "para UI inmediata": si la escritura fallaba, la UI ya mostraba
+        // la orden de cambio como creada aunque nada se hubiera persistido).
+        await sbThrow(supabase.from('ordenes_cambio').insert(orden))
 
         if (items.length) {
           const dbItems = items.map(({ ...it }) => ({
@@ -1930,14 +1865,14 @@ useEffect(() => {
             diferencia:    parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
             monto_cambio:  r2((parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0)),
           }))
-          const { error: errItems } = await supabase.from('ordenes_cambio_items').insert(dbItems)
-          if (errItems) console.error('ordenes_cambio_items insert error:', errItems)
+          await sbThrow(supabase.from('ordenes_cambio_items').insert(dbItems))
         }
 
         if (indirectos.length) {
-          const { error: errInds } = await supabase.from('ordenes_cambio_indirectos').insert(indirectos)
-          if (errInds) console.error('ordenes_cambio_indirectos insert error:', errInds)
+          await sbThrow(supabase.from('ordenes_cambio_indirectos').insert(indirectos))
         }
+
+        dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items, indirectos } })
         break
       }
       case 'FETCH_OC_ITEMS': {
