@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, r2 as round2 } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, r2 as round2, flatBudgetItems } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -2256,7 +2256,7 @@ export default function Reportes() {
     const totalInd = inds.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalReal = totalMat+totalDir+totalNom+totalSub+totalEq+totalInd
 
-    const actividades = items.filter(i=>i.tipo==='actividad').map(act => {
+    const actividades = flatBudgetItems(items).filter(i=>i.tipo==='actividad').map(act => {
       const pres=round2((act.cantidad||0)*((act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)))
       // Real por actividad: materiales + imprevistos + subcontratos (nuevo y anterior)
       const scActIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId&&sc.actividad_id===act.id).map(sc=>sc.id)

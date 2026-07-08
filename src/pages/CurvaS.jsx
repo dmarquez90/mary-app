@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, calcGrandTotal, r2 } from '../utils'
+import { fmt, calcGrandTotal, r2, flatBudgetItems } from '../utils'
 import { EmptyState, StatCard, Icons } from '../components'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
@@ -242,7 +242,7 @@ export default function CurvaS() {
 
   const actDeviations = useMemo(() => {
     if (!proyId) return []
-    return items.filter(i => i.tipo === 'actividad').map(act => {
+    return flatBudgetItems(items).filter(i => i.tipo === 'actividad').map(act => {
       const presupuestado = r2((act.cantidad||0) * ((act.costo_mo||0) + (act.costo_materiales||0) + (act.costo_equipos||0)))
       const matCost = salidas.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sa) => {
         const e = entradas.find(en => en.material_id === sa.material_id)
@@ -315,7 +315,7 @@ export default function CurvaS() {
   const noData = budget === 0 && allCosts.length === 0
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">{t('curva_title')}</h1>
