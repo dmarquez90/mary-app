@@ -10,8 +10,8 @@ export const CATEGORIAS_IND = {
     es: 'Administración de obra',
     en: 'Project Administration',
     subs: {
-      es: ['Personal administrativo de obra','Papelería, impresiones, comunicaciones','Seguridad e higiene industrial'],
-      en: ['Administrative staff','Stationery, printing, communications','Safety and industrial hygiene'],
+      es: ['Personal administrativo de obra','Papelería, impresiones, comunicaciones','Seguridad e higiene industrial','Viáticos de alimentación','Viáticos de transporte'],
+      en: ['Administrative staff','Stationery, printing, communications','Safety and industrial hygiene','Meal allowance','Transportation allowance'],
     }
   },
   'Instalaciones y servicios generales': {
