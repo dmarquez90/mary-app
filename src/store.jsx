@@ -554,10 +554,10 @@ useEffect(() => {
           usuariosTenant = data || []
         }
 
-        // Si roles incluye super_admin, buscarlo en toda la tabla (sin filtro tenant)
+        // Si roles incluye super_admin, buscarlo vía RPC (RLS no permite leer usuarios de otros tenants directamente)
         let superAdmins = []
         if (roles?.includes('super_admin')) {
-          const { data: sas } = await supabase.from('usuarios').select('id').eq('rol', 'super_admin').eq('activo', true)
+          const { data: sas } = await supabase.rpc('get_super_admin_ids')
           superAdmins = sas || []
         }
 

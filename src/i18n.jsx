@@ -249,10 +249,6 @@ const ES = {
   inv_del_mat_title: 'Eliminar material',
   inv_del_mat_msg: '¿Eliminar "{mat}" del catálogo?',
 
-  // BOM
-  bom_form_save: 'Guardar material',
-  bom_form_save_edit: 'Actualizar material',
-
   // MATERIALES PRESUPUESTADOS
   mp_title: 'Materiales Presupuestados',
   mp_add: '+ Agregar material',
@@ -1129,10 +1125,6 @@ const EN = {
   inv_del_mat_blocked: 'The material has {n} {u} in stock.',
   inv_del_mat_title: 'Delete material',
   inv_del_mat_msg: 'Delete "{mat}" from the catalog?',
-
-  // BOM
-  bom_form_save: 'Save material',
-  bom_form_save_edit: 'Update material',
 
   // BUDGETED MATERIALS
   mp_title: 'Budgeted Materials',

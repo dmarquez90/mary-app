@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { SubscriptionContext } from './subscriptionContext'
 import { StoreProvider } from './store'
 import { LangProvider, useLanguage } from './i18n'
@@ -8,25 +8,33 @@ import { MODULOS_PRO_PLUS, MODULOS_ENTERPRISE, PLAN_INFO } from './plans'
 import { Icons } from './components'
 import { supabase } from './supabase'
 import AuthRouter from './pages/AuthRouter'
-import Admin from './pages/Admin'
-import Configuracion from './pages/Configuracion'
-import Dashboard from './pages/Dashboard'
-import Proyectos from './pages/Proyectos'
-import Presupuesto from './pages/Presupuesto'
-import Inventario from './pages/Inventario'
-import MatPresupuestados from './pages/MatPresupuestados'
-import Compras from './pages/Compras'
-import OrdenesCambio from './pages/OrdenesCambio'
-import AvaluosCliente from './pages/AvaluosCliente'
-import Financiero from './pages/Financiero'
-import CurvaS from './pages/CurvaS'
-import Reportes from './pages/Reportes'
-import Auditoria from './pages/Auditoria'
-import Chat from './pages/Chat'
 import NotificacionesPanel from './pages/NotificacionesPanel'
-import PagoExitoso from './pages/PagoExitoso'
-import Planes from './pages/Planes'
 import WelcomeTour from './pages/WelcomeTour'
+
+// Páginas cargadas bajo demanda para dividir el bundle
+const Admin             = lazy(() => import('./pages/Admin'))
+const Configuracion     = lazy(() => import('./pages/Configuracion'))
+const Dashboard         = lazy(() => import('./pages/Dashboard'))
+const Proyectos         = lazy(() => import('./pages/Proyectos'))
+const Presupuesto       = lazy(() => import('./pages/Presupuesto'))
+const Inventario        = lazy(() => import('./pages/Inventario'))
+const MatPresupuestados = lazy(() => import('./pages/MatPresupuestados'))
+const Compras           = lazy(() => import('./pages/Compras'))
+const OrdenesCambio     = lazy(() => import('./pages/OrdenesCambio'))
+const AvaluosCliente    = lazy(() => import('./pages/AvaluosCliente'))
+const Financiero        = lazy(() => import('./pages/Financiero'))
+const CurvaS            = lazy(() => import('./pages/CurvaS'))
+const Reportes          = lazy(() => import('./pages/Reportes'))
+const Auditoria         = lazy(() => import('./pages/Auditoria'))
+const Chat              = lazy(() => import('./pages/Chat'))
+const PagoExitoso       = lazy(() => import('./pages/PagoExitoso'))
+const Planes            = lazy(() => import('./pages/Planes'))
+
+const PageSpinner = () => (
+  <div className="flex items-center justify-center min-h-full p-16">
+    <div className="w-8 h-8 border-4 border-blue-200 border-t-[#1B3A6B] rounded-full animate-spin" />
+  </div>
+)
 
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
@@ -159,6 +167,9 @@ function Layout() {
   const [page, setPage]         = useState(defaultPage)
   const [sideOpen, setSideOpen] = useState(true)
   const [chatUnread, setChatUnread] = useState(0)
+  // Ref con la página actual para que los callbacks realtime no lean un valor congelado
+  const pageRef = useRef(page)
+  useEffect(() => { pageRef.current = page }, [page])
   const isEs = lang === 'ES'
 
   // ── Estado de suscripción ────────────────────────────
@@ -250,7 +261,7 @@ function Layout() {
         filter: `tenant_id=eq.${perfil.tenant_id}`,
       }, (payload) => {
         if (payload.new.usuario_id !== perfil.id) {
-          if (page !== 'chat') setChatUnread(prev => prev + 1)
+          if (pageRef.current !== 'chat') setChatUnread(prev => prev + 1)
         }
       })
       .subscribe()
@@ -512,7 +523,7 @@ function Layout() {
           <SubscriptionContext.Provider value={{ isReadOnly }}>
             {pageBlockedByPlan
               ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
-              : <Page onNavigate={setPage} />
+              : <Suspense fallback={<PageSpinner />}><Page onNavigate={setPage} /></Suspense>
             }
           </SubscriptionContext.Provider>
         </main>
@@ -540,8 +551,8 @@ function AppContent() {
   if (!user) return <AuthRouter />
 
   const pathname = window.location.pathname
-  if (pathname === '/pago-exitoso') return <PagoExitoso />
-  if (pathname === '/planes') return <Planes />
+  if (pathname === '/pago-exitoso') return <Suspense fallback={<PageSpinner />}><PagoExitoso /></Suspense>
+  if (pathname === '/planes') return <Suspense fallback={<PageSpinner />}><Planes /></Suspense>
   if (pathname === '/admin') {
     if (!perfil) return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4F8' }}>
@@ -551,7 +562,7 @@ function AppContent() {
         </div>
       </div>
     )
-    if (perfil.rol === 'super_admin') return <Admin />
+    if (perfil.rol === 'super_admin') return <Suspense fallback={<PageSpinner />}><Admin /></Suspense>
     return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500 text-sm">Acceso no autorizado.</p></div>
   }
 
