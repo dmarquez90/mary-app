@@ -18,6 +18,7 @@ const INIT = {
   presupuesto_indirectos: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
   cajas_chicas: [], gastos_caja_chica: [], liquidaciones_caja_chica: [], reembolsos_personal: [],
+  bitacora_log: [], bitacora_adjuntos: [],
   usuarios: [],
   notificaciones: [],
   loaded: false
@@ -50,6 +51,10 @@ function reducer(state, action) {
   switch (action.type) {
     case 'LOAD_ALL': return { ...action.payload, loaded: true }
     case 'RESET':    return { ...INIT, loaded: true }
+
+    case 'ADD_BITACORA':  return { ...state, bitacora_log: [...state.bitacora_log, action.payload] }
+    case 'DEL_BITACORA':  return { ...state, bitacora_log: state.bitacora_log.filter(b => b.id !== action.payload), bitacora_adjuntos: state.bitacora_adjuntos.filter(a => a.bitacora_id !== action.payload) }
+    case 'ADD_BITACORA_ADJUNTO': return { ...state, bitacora_adjuntos: [...state.bitacora_adjuntos, action.payload] }
 
     case 'ADD_PROYECTO':  return { ...state, proyectos: [...state.proyectos, action.payload] }
     case 'UPD_PROYECTO':  return { ...state, proyectos: state.proyectos.map(p => p.id === action.payload.id ? { ...p, ...action.payload } : p) }
@@ -381,6 +386,7 @@ export function StoreProvider({ children, tenantId, rol }) {
         'avaluos_cliente','avaluos_cliente_items',
         'presupuesto_indirectos',
         'cajas_chicas','gastos_caja_chica','liquidaciones_caja_chica','reembolsos_personal',
+        'bitacora_log','bitacora_adjuntos',
         'usuarios',
       ]
       const tenantResults = await Promise.all(
@@ -463,7 +469,7 @@ useEffect(() => {
   // (la fila ya no existe cuando el evento llega). Se escuchan DOS canales:
   // uno filtrado para INSERT/UPDATE, y uno sin filtro para DELETE
   // que recarga la tabla completa del tenant.
-  const TABLES_WITH_DELETE = ['entradas', 'salidas', 'materiales_presupuestados', 'solicitudes', 'solicitud_items', 'equipos', 'gastos_caja_chica']
+  const TABLES_WITH_DELETE = ['entradas', 'salidas', 'materiales_presupuestados', 'solicitudes', 'solicitud_items', 'equipos', 'gastos_caja_chica', 'bitacora_log', 'bitacora_adjuntos']
   const deleteChannels = TABLES_WITH_DELETE.flatMap(table => [
     // Canal filtrado para INSERT y UPDATE
     supabase
@@ -867,6 +873,32 @@ useEffect(() => {
           cajaId: caja.id, saldoFinal, liquidacionAuto, reembolsoAuto, gastoIds,
           nuevosCostosDirectos, nuevosCostosIndirectos, nuevosEquipos,
         }})
+        break
+      }
+
+      case 'ADD_BITACORA': {
+        const { data: { user: bitUser } } = await supabase.auth.getUser()
+        const usuarioBit = (state.usuarios||[]).find(u => u.id === bitUser?.id)
+        const item = {
+          ...action.payload, id: action.payload.id || uuid(), tenant_id: tenantId, created_at: today(),
+          creado_por: bitUser?.id || null,
+          creado_por_nombre: usuarioBit?.nombre || usuarioBit?.email || null,
+          creado_por_rol: usuarioBit?.rol || rol || null,
+        }
+        await sbThrow(supabase.from('bitacora_log').insert(item))
+        dispatch({ type: 'ADD_BITACORA', payload: item })
+        break
+      }
+      case 'DEL_BITACORA': {
+        await sbThrow(supabase.from('bitacora_adjuntos').delete().eq('bitacora_id', action.payload))
+        await sbThrow(supabase.from('bitacora_log').delete().eq('id', action.payload))
+        dispatch({ type: 'DEL_BITACORA', payload: action.payload })
+        break
+      }
+      case 'ADD_BITACORA_ADJUNTO': {
+        const item = { ...action.payload, id: uuid(), tenant_id: tenantId, created_at: today() }
+        await sbThrow(supabase.from('bitacora_adjuntos').insert(item))
+        dispatch({ type: 'ADD_BITACORA_ADJUNTO', payload: item })
         break
       }
 

@@ -3,12 +3,12 @@ import { planTieneModulo } from './plans'
 import { useSubscription } from './subscriptionContext'
 
 const MATRIX = {
-  dashboard:          { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true  },
-  proyectos_ver:      { client_admin: true,  coordinador: true,  gerente: true,  residente: 'own', bodeguero: 'own', contador: true,  lectura: true  },
+  dashboard:          { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true  },
+  proyectos_ver:      { client_admin: true,  coordinador: true,  gerente: true,  residente: 'own', bodeguero: 'own', contador: true,  lectura: true,  supervisor: 'own' },
   proyectos_crear:    { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   proyectos_editar:   { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   proyectos_eliminar: { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  presupuesto_ver:    { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
+  presupuesto_ver:    { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true,  supervisor: true  },
   presupuesto_editar: { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
   inventario_ver:     { client_admin: true,  coordinador: false, gerente: true,  residente: false, bodeguero: true,  contador: true,  lectura: true  },
   inventario_editar:  { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: true,  contador: false, lectura: false },
@@ -17,7 +17,7 @@ const MATRIX = {
   compras_ver:        { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true  },
   solicitud_crear:    { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
   oc_crear:           { client_admin: true,  coordinador: false, gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
-  oc_aprobar:         { client_admin: true,  coordinador: false, gerente: 'cond',residente: false, bodeguero: false, contador: false, lectura: false },
+  oc_aprobar:         { client_admin: true,  coordinador: false, gerente: 'cond',residente: false, bodeguero: false, contador: false, lectura: false, supervisor: true },
   financiero_ver:     { client_admin: true,  coordinador: false, gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
   financiero_editar:  { client_admin: true,  coordinador: false, gerente: true, residente: true,  bodeguero: false, contador: true,  lectura: false },
   curvas_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
@@ -25,10 +25,13 @@ const MATRIX = {
   reportes_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: false },
   auditoria_ver:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   // Módulos Pro+
-  ordenes_cambio_ver:  { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
-  ordenes_cambio_editar:{ client_admin: true, coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false },
-  avaluos_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
-  avaluos_editar:      { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
+  ordenes_cambio_ver:  { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true,  supervisor: true },
+  ordenes_cambio_editar:{ client_admin: true, coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: false },
+  avaluos_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true,  supervisor: true },
+  avaluos_editar:      { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: false },
+  // Bitácora de Supervisión
+  supervision_ver:     { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: true },
+  supervision_editar:  { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: true },
 }
 
 export const NAV_PERMISOS = {
@@ -40,6 +43,7 @@ export const NAV_PERMISOS = {
   bodeguero:    ['dashboard','inventario','compras','chat'],
   contador:     ['dashboard','proyectos','presupuesto','financiero','curvas','reportes','chat'],
   lectura:      ['dashboard','proyectos','presupuesto','inventario','compras','financiero','curvas','chat'],
+  supervisor:   ['dashboard','proyectos','presupuesto','ordenes_cambio','avaluos','supervision','chat'],
 }
 
 export const MODULOS_PERMISOS = [
@@ -53,6 +57,7 @@ export const MODULOS_PERMISOS = [
   { id: 'financiero',     label_es: 'Financiero',          label_en: 'Financial',          tieneEditar: true  },
   { id: 'curvas',         label_es: 'Curva S',             label_en: 'S Curve',            tieneEditar: false },
   { id: 'reportes',       label_es: 'Reportes',            label_en: 'Reports',            tieneEditar: false },
+  { id: 'supervision',    label_es: 'Supervisión',         label_en: 'Supervision',        tieneEditar: true  },
 ]
 
 const PERMISO_A_MODULO = {
@@ -69,6 +74,7 @@ const PERMISO_A_MODULO = {
   configuracion:        ['configuracion','ver'],
   ordenes_cambio_ver:   ['ordenes_cambio','ver'], ordenes_cambio_editar: ['ordenes_cambio','editar'],
   avaluos_ver:          ['avaluos','ver'],        avaluos_editar:        ['avaluos','editar'],
+  supervision_ver:      ['supervision','ver'],    supervision_editar:    ['supervision','editar'],
 }
 
 export function usePermissions() {
@@ -82,7 +88,8 @@ export function usePermissions() {
   // Permisos de edición bloqueados en modo lectura (suscripción vencida)
   const EDIT_PERMISOS = ['proyectos_crear','proyectos_editar','proyectos_eliminar',
     'presupuesto_editar','inventario_editar','mat_pres_editar','solicitud_crear',
-    'oc_crear','oc_aprobar','financiero_editar','ordenes_cambio_editar','avaluos_editar']
+    'oc_crear','oc_aprobar','financiero_editar','ordenes_cambio_editar','avaluos_editar',
+    'supervision_editar']
 
   const can = (permiso) => {
     if (isReadOnly && EDIT_PERMISOS.includes(permiso)) return false

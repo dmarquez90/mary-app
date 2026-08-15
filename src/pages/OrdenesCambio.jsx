@@ -1,4 +1,4 @@
-import { useState, useContext, useMemo, useEffect } from 'react'
+import { useState, useContext, useMemo, useEffect, Fragment } from 'react'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { supabase } from '../supabase'
@@ -31,6 +31,46 @@ const emptyItem = () => ({
   unidad: 'und', cantidad_original: '', cantidad_nueva: '',
   precio_unitario: '', costo_mo: '', costo_materiales: '', costo_equipos: '',
 })
+
+// ── Selector de actividad con buscador (evita un <select> nativo de cientos de opciones) ──
+function ActividadPicker({ actividades, valueId, onSelect, isEs }) {
+  const [open, setOpen]   = useState(false)
+  const [query, setQuery] = useState('')
+  const selected = actividades.find(a => a.id === valueId)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return actividades
+    return actividades.filter(a => `${a.code} ${a.descripcion}`.toLowerCase().includes(q))
+  }, [actividades, query])
+
+  return (
+    <div className="relative">
+      <input
+        className={inputCls}
+        value={open ? query : (selected ? `${selected.code} — ${selected.descripcion}` : '')}
+        placeholder={isEs ? 'Buscar actividad...' : 'Search activity...'}
+        onFocus={() => { setOpen(true); setQuery('') }}
+        onChange={e => setQuery(e.target.value)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 w-[min(560px,90vw)] max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-gray-400">{isEs ? 'Sin resultados' : 'No results'}</div>
+          ) : filtered.map(a => (
+            <div key={a.id}
+              onMouseDown={() => { onSelect(a); setOpen(false) }}
+              className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+              <p className="text-xs font-mono font-semibold" style={{color:BRAND}}>{a.code}</p>
+              <p className="text-sm text-gray-700 leading-snug mt-0.5">{a.descripcion}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 
 // ── EXCEL EXPORT — ORDEN DE CAMBIO ───────────────────────────────────────────
@@ -219,6 +259,7 @@ export default function OrdenesCambio() {
   }
 
   const [proyId, setProyId]     = useState(proyectos[0]?.id || '')
+  const [vista, setVista]       = useState('lista')
   const [drawer, setDrawer]     = useState(null)
   const [detailId, setDetailId] = useState(null)
   const [form, setForm]         = useState({})
@@ -294,7 +335,7 @@ export default function OrdenesCambio() {
     })
     setItems([emptyItem()])
     setAjustesInd({})
-    setDrawer('nueva')
+    setVista('nueva')
   }
 
   const saveOC = () => {
@@ -340,7 +381,7 @@ export default function OrdenesCambio() {
         indirectos: indirectosPayload,
       }
     })
-    setDrawer(null)
+    setVista('lista')
   }
 
   const cambiarEstado = (id, estado) => dispatch({ type: 'UPD_ORDEN_CAMBIO_ESTADO', payload: { id, estado } })
@@ -367,6 +408,319 @@ export default function OrdenesCambio() {
 
   const thCls = 'px-3 py-2.5 text-left text-xs text-gray-500 font-medium whitespace-nowrap'
   const tdCls = 'px-3 py-2.5 text-sm text-gray-700'
+
+  // ── VISTA NUEVA OC ──────────────────────────────────────────────────────
+  if (vista === 'nueva') {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-800">
+              {isEs ? `Nueva Orden de Cambio` : `New Change Order`} — {proy?.project_code}
+            </h1>
+            <p className="text-sm text-gray-400">{proy?.nombre}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-5">
+          <div className="bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label={isEs ? 'Número *' : 'Number *'}>
+                <input className={inputCls} value={form.numero||''} onChange={set('numero')} />
+              </Field>
+              <Field label={isEs ? 'Fecha' : 'Date'}>
+                <input type="date" className={inputCls} value={form.fecha||''} onChange={set('fecha')} />
+              </Field>
+              <Field label={isEs ? 'Presentado a' : 'Submitted to'}>
+                <input className={inputCls} value={form.presentado_a||''} onChange={set('presentado_a')}
+                  placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
+              </Field>
+            </div>
+
+            <Field label={isEs ? 'Motivo / Justificación' : 'Reason / Justification'}>
+              <textarea className={inputCls} rows={2} value={form.motivo||''} onChange={set('motivo')}
+                placeholder={isEs ? 'Ej: Planos incompletos — cantidades incorrectas en excavación' : 'E.g.: Incomplete drawings — incorrect quantities in excavation'} />
+            </Field>
+          </div>
+
+          {/* Ajuste de costos indirectos */}
+          {indsDelProy.length > 0 && (
+            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {isEs ? 'Ajuste de costos indirectos (opcional)' : 'Indirect cost adjustment (optional)'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {isEs ? 'Solo ingresa los que cambian' : 'Only enter the ones that change'}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 divide-gray-50">
+                {indsDelProy.map(ind => {
+                  const ajuste     = parseFloat(ajustesInd[ind.id] || 0)
+                  const montoNuevo = parseFloat(ind.monto_presupuestado || 0) + ajuste
+                  return (
+                    <div key={ind.id} className="px-4 py-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-700 truncate">{ind.categoria}</p>
+                        <p className="text-xs text-gray-400 font-mono">
+                          {isEs ? 'Actual:' : 'Current:'} {fmt(ind.monto_presupuestado, moneda)}
+                          {ajuste !== 0 && (
+                            <span className={`ml-2 font-medium ${ajuste > 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                              → {fmt(montoNuevo, moneda)}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="w-36">
+                        <input
+                          type="number"
+                          className={inputCls}
+                          value={ajustesInd[ind.id] ?? ''}
+                          onChange={e => setAjustesInd(prev => ({ ...prev, [ind.id]: e.target.value }))}
+                          placeholder={isEs ? 'Ajuste (+/-)' : 'Adjustment (+/-)'}
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {Object.values(ajustesInd).some(v => parseFloat(v||0) !== 0) && (
+                <div className="px-4 py-2.5 bg-amber-50 border-t border-amber-100 flex justify-between items-center">
+                  <span className="text-xs font-medium text-amber-700">
+                    {isEs ? 'Total ajuste indirectos' : 'Total indirect adjustment'}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-amber-700">
+                    {(() => {
+                      const total = indsDelProy.reduce((s, ind) => s + parseFloat(ajustesInd[ind.id]||0), 0)
+                      return `${total >= 0 ? '+' : ''}${fmt(total, moneda)}`
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Items */}
+          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                {isEs ? 'Cambios en actividades *' : 'Activity changes *'}
+              </p>
+              <button onClick={addItem}
+                className="text-xs font-medium px-3 py-1 rounded-lg"
+                style={{ color: BRAND, background: '#EEF2F7' }}>
+                + {isEs ? 'Agregar actividad' : 'Add activity'}
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-2 py-2 text-left text-gray-500 font-medium whitespace-nowrap">#</th>
+                    <th className="px-2 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{isEs?'Tipo':'Type'}</th>
+                    <th className="px-2 py-2 text-left text-gray-500 font-medium min-w-[260px]">{isEs?'Actividad / Descripción':'Activity / Description'}</th>
+                    <th className="px-2 py-2 text-center text-gray-500 font-medium whitespace-nowrap">{isEs?'Unidad':'Unit'}</th>
+                    <th className="px-2 py-2 text-center text-gray-500 font-medium whitespace-nowrap">{isEs?'Cant. Original':'Original Qty'}</th>
+                    <th className="px-2 py-2 text-center text-gray-500 font-medium whitespace-nowrap">{isEs?'Cant. Nueva *':'New Qty *'}</th>
+                    <th className="px-2 py-2 text-center text-gray-500 font-medium whitespace-nowrap">{isEs?'P.U.':'Unit Price'}</th>
+                    <th className="px-2 py-2 text-center text-gray-500 font-medium whitespace-nowrap">{isEs?'Diferencia':'Difference'}</th>
+                    <th className="px-2 py-2 text-right text-gray-500 font-medium whitespace-nowrap">{isEs?'Monto':'Amount'}</th>
+                    <th className="px-2 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it, idx) => {
+                    const { diff, monto, pu } = calcItem(it)
+                    return (
+                      <Fragment key={idx}>
+                        <tr className={`border-b ${it.tipo === 'nueva' ? 'border-amber-100 bg-amber-50/30' : 'border-gray-50'}`}>
+                          <td className="px-2 py-2 text-gray-400 font-mono align-top">{idx+1}</td>
+                          <td className="px-2 py-2 align-top">
+                            <div className="flex flex-col gap-1">
+                              {['existente','nueva'].map(tipo => (
+                                <button key={tipo}
+                                  onClick={() => setItem(idx, 'tipo', tipo)}
+                                  className={`text-xs px-2 py-0.5 rounded-md border whitespace-nowrap transition-colors ${
+                                    it.tipo === tipo
+                                      ? 'border-[#1B3A6B] text-[#1B3A6B] bg-blue-50 font-medium'
+                                      : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                                  }`}>
+                                  {tipo === 'existente' ? (isEs?'Existente':'Existing') : (isEs?'+ Nueva':'+ New')}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            <div className="flex flex-col gap-1.5 min-w-[240px]">
+                              {it.tipo === 'existente' && (
+                                <ActividadPicker
+                                  actividades={actividades}
+                                  valueId={it.actividad_id}
+                                  isEs={isEs}
+                                  onSelect={act => {
+                                    setItem(idx, 'actividad_id', act.id)
+                                    setItem(idx, 'descripcion', act.descripcion)
+                                    setItem(idx, 'unidad', act.unidad || 'und')
+                                    setItem(idx, 'cantidad_original', act.cantidad || '')
+                                    const puAct = (act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)
+                                    setItem(idx, 'precio_unitario', puAct || '')
+                                  }}
+                                />
+                              )}
+                              <input className={inputCls} value={it.descripcion||''}
+                                onChange={e => setItem(idx, 'descripcion', e.target.value)}
+                                placeholder={it.tipo === 'nueva'
+                                  ? (isEs ? 'Descripción de la actividad nueva *' : 'New activity description *')
+                                  : (isEs ? 'Descripción (editable)' : 'Description (editable)')} />
+                              {it.tipo === 'nueva' && (
+                                <div>
+                                  <select className={selectCls} value={it.parent_id||''}
+                                    onChange={e => setItem(idx, 'parent_id', e.target.value)}>
+                                    <option value="">{isEs ? '— Pertenece a (etapa/sub-etapa) *' : '— Belongs to (stage/sub-stage) *'}</option>
+                                    {subEtapas.length > 0 && (
+                                      <optgroup label={isEs ? 'Sub-etapas' : 'Sub-stages'}>
+                                        {subEtapas.map(s => (
+                                          <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                    <optgroup label={isEs ? 'Etapas (directo)' : 'Stages (direct)'}>
+                                      {etapas.map(s => (
+                                        <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
+                                      ))}
+                                    </optgroup>
+                                  </select>
+                                  {!it.parent_id && (
+                                    <p className="text-xs text-red-400 mt-1">
+                                      {isEs ? 'Requerido — define dónde aparecerá en el presupuesto' : 'Required — defines where it appears in the budget'}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            <input className={`${inputCls} w-20 text-center`} value={it.unidad||'und'}
+                              onChange={e => setItem(idx, 'unidad', e.target.value)} />
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {it.tipo === 'nueva' ? (
+                              <span className="block text-center text-gray-300">—</span>
+                            ) : (
+                              <input type="number" className={`${inputCls} w-24 text-center`}
+                                value={it.cantidad_original||''}
+                                onChange={e => setItem(idx, 'cantidad_original', e.target.value)}
+                                placeholder="0.00" min="0" step="0.01" />
+                            )}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            <input type="number" className={`${inputCls} w-24 text-center`}
+                              value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
+                              placeholder="0.00" min="0" step="0.01" />
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {it.tipo === 'nueva' ? (
+                              <span className="block text-center font-mono" style={{color:BRAND}}>{pu > 0 ? fmt(pu, moneda) : '—'}</span>
+                            ) : (
+                              <input type="number" className={`${inputCls} w-24 text-center`}
+                                value={it.precio_unitario||''} onChange={e => setItem(idx, 'precio_unitario', e.target.value)}
+                                placeholder="0.00" min="0" step="0.01" />
+                            )}
+                          </td>
+                          <td className="px-2 py-2 align-top text-center font-mono text-gray-500 whitespace-nowrap">
+                            {it.tipo === 'existente' && it.cantidad_nueva !== '' ? `${diff >= 0 ? '+' : ''}${fmtNum(diff)}` : '—'}
+                          </td>
+                          <td className="px-2 py-2 align-top text-right font-mono font-bold whitespace-nowrap"
+                            style={{color: monto >= 0 ? '#1D9E75' : '#ef4444'}}>
+                            {(it.cantidad_nueva !== '' && pu > 0) ? `${monto >= 0 ? '+' : ''}${fmt(monto, moneda)}` : '—'}
+                          </td>
+                          <td className="px-2 py-2 align-top">
+                            {items.length > 1 && (
+                              <button onClick={() => removeItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                            )}
+                          </td>
+                        </tr>
+                        {it.tipo === 'nueva' && (
+                          <tr className="border-b border-amber-100 bg-amber-50/30">
+                            <td></td>
+                            <td colSpan={9} className="px-2 pb-3">
+                              <div className="grid grid-cols-3 gap-2 p-2 bg-white rounded-lg border border-amber-100 max-w-xl">
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">
+                                    {isEs ? 'Costo MO / unidad' : 'Labor cost / unit'}
+                                  </label>
+                                  <input type="number" className={inputCls}
+                                    value={it.costo_mo||''} onChange={e => setItem(idx, 'costo_mo', e.target.value)}
+                                    placeholder="0.00" min="0" step="0.01" />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">
+                                    {isEs ? 'Costo Materiales / unidad' : 'Materials cost / unit'}
+                                  </label>
+                                  <input type="number" className={inputCls}
+                                    value={it.costo_materiales||''} onChange={e => setItem(idx, 'costo_materiales', e.target.value)}
+                                    placeholder="0.00" min="0" step="0.01" />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500 block mb-1">
+                                    {isEs ? 'Costo Equipo / unidad' : 'Equipment cost / unit'}
+                                  </label>
+                                  <input type="number" className={inputCls}
+                                    value={it.costo_equipos||''} onChange={e => setItem(idx, 'costo_equipos', e.target.value)}
+                                    placeholder="0.00" min="0" step="0.01" />
+                                </div>
+                                {pu > 0 && (
+                                  <div className="col-span-3 flex items-center gap-2 text-xs pt-1 border-t border-amber-100">
+                                    <span className="text-gray-500">{isEs ? 'P.U. calculado:' : 'Calculated unit price:'}</span>
+                                    <span className="font-mono font-bold" style={{ color: BRAND }}>{fmt(pu, moneda)}</span>
+                                    <span className="text-gray-400">{isEs ? '(MO + Materiales + Equipo)' : '(Labor + Materials + Equipment)'}</span>
+                                    <span className="ml-auto px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                                      {isEs ? 'Se agregará al presupuesto al aprobar' : 'Will be added to budget upon approval'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Total OC */}
+          <div className="bg-white border border-gray-100 rounded-xl p-5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">{isEs ? 'Total Orden de Cambio' : 'Total Change Order'}</span>
+              <span className={`text-xl font-bold font-mono ${totalOC >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {totalOC >= 0 ? '+' : ''}{fmt(totalOC, moneda)}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 rounded-xl p-5">
+            <Field label={isEs ? 'Notas adicionales' : 'Additional notes'}>
+              <textarea className={inputCls} rows={2} value={form.notas||''} onChange={set('notas')} />
+            </Field>
+          </div>
+
+          <div className="flex gap-2 justify-end pb-6">
+            <SecondaryBtn onClick={() => setVista('lista')}>{t('btn_cancel')}</SecondaryBtn>
+            <PrimaryBtn onClick={saveOC}
+              disabled={!proyId || !form.numero || items.every(it => !it.descripcion || it.cantidad_nueva === '')}>
+              {isEs ? 'Guardar OC' : 'Save CO'}
+            </PrimaryBtn>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -494,322 +848,6 @@ export default function OrdenesCambio() {
           )}
         </>
       )}
-
-      {/* ── DRAWER: NUEVA OC ── */}
-      <Drawer open={drawer === 'nueva'} onClose={() => setDrawer(null)}
-        title={isEs ? 'Nueva Orden de Cambio' : 'New Change Order'} width={720}>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={isEs ? 'Número *' : 'Number *'}>
-            <input className={inputCls} value={form.numero||''} onChange={set('numero')} />
-          </Field>
-          <Field label={isEs ? 'Fecha' : 'Date'}>
-            <input type="date" className={inputCls} value={form.fecha||''} onChange={set('fecha')} />
-          </Field>
-        </div>
-
-        <Field label={isEs ? 'Presentado a' : 'Submitted to'}>
-          <input className={inputCls} value={form.presentado_a||''} onChange={set('presentado_a')}
-            placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
-        </Field>
-
-        <Field label={isEs ? 'Motivo / Justificación' : 'Reason / Justification'}>
-          <textarea className={inputCls} rows={2} value={form.motivo||''} onChange={set('motivo')}
-            placeholder={isEs ? 'Ej: Planos incompletos — cantidades incorrectas en excavación' : 'E.g.: Incomplete drawings — incorrect quantities in excavation'} />
-        </Field>
-
-        {/* Ajuste de costos indirectos */}
-        {indsDelProy.length > 0 && (
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                {isEs ? 'Ajuste de costos indirectos (opcional)' : 'Indirect cost adjustment (optional)'}
-              </p>
-              <p className="text-xs text-gray-400">
-                {isEs ? 'Solo ingresa los que cambian' : 'Only enter the ones that change'}
-              </p>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {indsDelProy.map(ind => {
-                const ajuste     = parseFloat(ajustesInd[ind.id] || 0)
-                const montoNuevo = parseFloat(ind.monto_presupuestado || 0) + ajuste
-                return (
-                  <div key={ind.id} className="px-4 py-3 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700 truncate">{ind.categoria}</p>
-                      <p className="text-xs text-gray-400 font-mono">
-                        {isEs ? 'Actual:' : 'Current:'} {fmt(ind.monto_presupuestado, moneda)}
-                        {ajuste !== 0 && (
-                          <span className={`ml-2 font-medium ${ajuste > 0 ? 'text-amber-600' : 'text-red-500'}`}>
-                            → {fmt(montoNuevo, moneda)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="w-36">
-                      <input
-                        type="number"
-                        className={inputCls}
-                        value={ajustesInd[ind.id] ?? ''}
-                        onChange={e => setAjustesInd(prev => ({ ...prev, [ind.id]: e.target.value }))}
-                        placeholder={isEs ? 'Ajuste (+/-)' : 'Adjustment (+/-)'}
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            {Object.values(ajustesInd).some(v => parseFloat(v||0) !== 0) && (
-              <div className="px-4 py-2.5 bg-amber-50 border-t border-amber-100 flex justify-between items-center">
-                <span className="text-xs font-medium text-amber-700">
-                  {isEs ? 'Total ajuste indirectos' : 'Total indirect adjustment'}
-                </span>
-                <span className="text-xs font-mono font-bold text-amber-700">
-                  {(() => {
-                    const total = indsDelProy.reduce((s, ind) => s + parseFloat(ajustesInd[ind.id]||0), 0)
-                    return `${total >= 0 ? '+' : ''}${fmt(total, moneda)}`
-                  })()}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Items */}
-        <div className="border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {isEs ? 'Cambios en actividades *' : 'Activity changes *'}
-            </p>
-            <button onClick={addItem}
-              className="text-xs font-medium px-3 py-1 rounded-lg"
-              style={{ color: BRAND, background: '#EEF2F7' }}>
-              + {isEs ? 'Agregar' : 'Add'}
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {items.map((it, idx) => {
-              const { diff, monto, pu } = calcItem(it)
-              const act = actividades.find(a => a.id === it.actividad_id)
-              return (
-                <div key={idx} className={`border rounded-xl p-3 ${it.tipo === 'nueva' ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-500">#{idx+1}</span>
-                    {items.length > 1 && (
-                      <button onClick={() => removeItem(idx)} className="text-xs text-red-400 hover:text-red-600">✕</button>
-                    )}
-                  </div>
-
-                  {/* Tipo */}
-                  <div className="flex gap-2 mb-3">
-                    {['existente','nueva'].map(tipo => (
-                      <button key={tipo}
-                        onClick={() => setItem(idx, 'tipo', tipo)}
-                        className={`text-xs px-3 py-1 rounded-lg border transition-colors ${
-                          it.tipo === tipo
-                            ? 'border-[#1B3A6B] text-[#1B3A6B] bg-blue-50 font-medium'
-                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                        }`}>
-                        {tipo === 'existente'
-                          ? (isEs ? 'Actividad existente' : 'Existing activity')
-                          : (isEs ? '+ Actividad nueva' : '+ New activity')}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Actividad existente: selector */}
-                  {it.tipo === 'existente' && (
-                    <div className="mb-2">
-                      <select className={selectCls} value={it.actividad_id||''} onChange={e => {
-                        const act = actividades.find(a => a.id === e.target.value)
-                        setItem(idx, 'actividad_id', e.target.value)
-                        if (act) {
-                          setItem(idx, 'descripcion', act.descripcion)
-                          setItem(idx, 'unidad', act.unidad || 'und')
-                          setItem(idx, 'cantidad_original', act.cantidad || '')
-                          const pu = (act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)
-                          setItem(idx, 'precio_unitario', pu || '')
-                        }
-                      }}>
-                        <option value="">{isEs ? '— Seleccionar actividad —' : '— Select activity —'}</option>
-                        {actividades.map(a => (
-                          <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Descripción */}
-                  <div className="mb-2">
-                    <input className={inputCls} value={it.descripcion||''}
-                      onChange={e => setItem(idx, 'descripcion', e.target.value)}
-                      placeholder={it.tipo === 'nueva'
-                        ? (isEs ? 'Descripción de la actividad nueva *' : 'New activity description *')
-                        : (isEs ? 'Descripción (editable)' : 'Description (editable)')} />
-                  </div>
-
-                  {/* Parent — solo para actividad nueva */}
-                  {it.tipo === 'nueva' && (
-                    <div className="mb-2">
-                      <label className="text-xs text-gray-500 block mb-1">
-                        {isEs ? 'Pertenece a (etapa / sub-etapa) *' : 'Belongs to (stage / sub-stage) *'}
-                      </label>
-                      <select className={selectCls} value={it.parent_id||''}
-                        onChange={e => setItem(idx, 'parent_id', e.target.value)}>
-                        <option value="">{isEs ? '— Seleccionar —' : '— Select —'}</option>
-                        {subEtapas.length > 0 && (
-                          <optgroup label={isEs ? 'Sub-etapas' : 'Sub-stages'}>
-                            {subEtapas.map(s => (
-                              <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                        <optgroup label={isEs ? 'Etapas (directo)' : 'Stages (direct)'}>
-                          {etapas.map(s => (
-                            <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
-                          ))}
-                        </optgroup>
-                      </select>
-                      {!it.parent_id && (
-                        <p className="text-xs text-red-400 mt-1">
-                          {isEs ? 'Requerido — define dónde aparecerá en el presupuesto' : 'Required — defines where it appears in the budget'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Costos desglosados — solo para actividad NUEVA */}
-                  {it.tipo === 'nueva' && (
-                    <div className="grid grid-cols-3 gap-2 mb-2 p-2 bg-white rounded-lg border border-amber-100">
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">
-                          {isEs ? 'Costo MO / unidad' : 'Labor cost / unit'}
-                        </label>
-                        <input type="number" className={inputCls}
-                          value={it.costo_mo||''} onChange={e => setItem(idx, 'costo_mo', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">
-                          {isEs ? 'Costo Materiales / unidad' : 'Materials cost / unit'}
-                        </label>
-                        <input type="number" className={inputCls}
-                          value={it.costo_materiales||''} onChange={e => setItem(idx, 'costo_materiales', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">
-                          {isEs ? 'Costo Equipo / unidad' : 'Equipment cost / unit'}
-                        </label>
-                        <input type="number" className={inputCls}
-                          value={it.costo_equipos||''} onChange={e => setItem(idx, 'costo_equipos', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                      {pu > 0 && (
-                        <div className="col-span-3 flex items-center gap-2 text-xs pt-1 border-t border-amber-100">
-                          <span className="text-gray-500">{isEs ? 'P.U. calculado:' : 'Calculated unit price:'}</span>
-                          <span className="font-mono font-bold" style={{ color: BRAND }}>{fmt(pu, moneda)}</span>
-                          <span className="text-gray-400">{isEs ? '(MO + Materiales + Equipo)' : '(Labor + Materials + Equipment)'}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Cantidades */}
-                  {it.tipo === 'nueva' ? (
-                    /* Actividad nueva: solo unidad y cantidad */
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
-                        <input className={inputCls} value={it.unidad||'und'}
-                          onChange={e => setItem(idx, 'unidad', e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Cantidad *' : 'Quantity *'}</label>
-                        <input type="number" className={inputCls}
-                          value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                    </div>
-                  ) : (
-                    /* Actividad existente: unidad, cant original, cant nueva, PU */
-                    <div className="grid grid-cols-4 gap-2">
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Unidad' : 'Unit'}</label>
-                        <input className={inputCls} value={it.unidad||'und'}
-                          onChange={e => setItem(idx, 'unidad', e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Cant. Original' : 'Original Qty'}</label>
-                        <input type="number" className={inputCls}
-                          value={it.cantidad_original||''}
-                          onChange={e => setItem(idx, 'cantidad_original', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'Cant. Nueva *' : 'New Qty *'}</label>
-                        <input type="number" className={inputCls}
-                          value={it.cantidad_nueva||''} onChange={e => setItem(idx, 'cantidad_nueva', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">{isEs ? 'P.U.' : 'Unit Price'}</label>
-                        <input type="number" className={inputCls}
-                          value={it.precio_unitario||''} onChange={e => setItem(idx, 'precio_unitario', e.target.value)}
-                          placeholder="0.00" min="0" step="0.01" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Resultado del item */}
-                  {(it.cantidad_nueva !== '' && pu > 0) && (
-                    <div className="mt-2 flex items-center gap-3 text-xs flex-wrap">
-                      {it.tipo === 'existente' && (
-                        <span className="text-gray-500">
-                          {isEs ? 'Diferencia:' : 'Difference:'} <strong>{diff >= 0 ? '+' : ''}{fmtNum(diff)} {it.unidad}</strong>
-                        </span>
-                      )}
-                      <span className={`font-bold ${monto >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {monto >= 0 ? '+' : ''}{fmt(monto, moneda)}
-                      </span>
-                      {it.tipo === 'nueva' && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                          {isEs ? 'Se agregará al presupuesto al aprobar' : 'Will be added to budget upon approval'}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Total OC */}
-        <div className="border-t border-gray-100 pt-3">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">{isEs ? 'Total Orden de Cambio' : 'Total Change Order'}</span>
-            <span className={`text-xl font-bold font-mono ${totalOC >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-              {totalOC >= 0 ? '+' : ''}{fmt(totalOC, moneda)}
-            </span>
-          </div>
-        </div>
-
-        <Field label={isEs ? 'Notas adicionales' : 'Additional notes'}>
-          <textarea className={inputCls} rows={2} value={form.notas||''} onChange={set('notas')} />
-        </Field>
-
-        <div className="flex gap-2 mt-auto pt-2">
-          <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-          <PrimaryBtn onClick={saveOC}
-            disabled={!proyId || !form.numero || items.every(it => !it.descripcion || it.cantidad_nueva === '')}
-            className="flex-1">
-            {isEs ? 'Guardar OC' : 'Save CO'}
-          </PrimaryBtn>
-        </div>
-      </Drawer>
 
       {/* ── DRAWER: DETALLE OC ── */}
       <Drawer open={drawer === 'detalle'} onClose={() => setDrawer(null)}

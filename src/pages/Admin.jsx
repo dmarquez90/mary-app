@@ -7,7 +7,7 @@ const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
 const BRAND_DARK  = '#122848'
 
-const ROLES  = ['client_admin','coordinador','gerente','residente','bodeguero','contador','lectura']
+const ROLES  = ['client_admin','coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
 const PLANES = ['starter','pro','enterprise']
 
 const PLAN_LIMITS = {
@@ -30,6 +30,7 @@ const ROL_COLORS = {
   residente:    'bg-green-100 text-green-700',
   bodeguero:    'bg-orange-100 text-orange-700',
   contador:     'bg-violet-100 text-violet-700',
+  supervisor:   'bg-rose-100 text-rose-700',
   lectura:      'bg-gray-100 text-gray-500',
 }
 
@@ -119,6 +120,7 @@ export default function Admin() {
     role_residente:    isEs ? 'Residente' : 'Site Supervisor',
     role_bodeguero:    isEs ? 'Bodeguero' : 'Warehouse',
     role_contador:     isEs ? 'Contador' : 'Accountant',
+    role_supervisor:   isEs ? 'Supervisor' : 'Supervisor',
     role_lectura:      isEs ? 'Solo Lectura' : 'Read Only',
     role_super_admin:  'Super Admin',
     plan_starter:     'Starter',

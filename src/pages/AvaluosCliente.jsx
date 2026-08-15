@@ -195,7 +195,7 @@ export default function AvaluosCliente() {
   } = state
 
   const puedeEditar = can('financiero_editar')
-  const puedeAprobar = ['super_admin','client_admin','gerente'].includes(rol)
+  const puedeAprobar = ['super_admin','client_admin','gerente','supervisor'].includes(rol)
 
   const [exportando, setExportando] = useState(false)
 
@@ -390,7 +390,7 @@ export default function AvaluosCliente() {
   const pctEjecucion   = presupuestoTotalReal > 0 ? (totalCobrado/presupuestoTotalReal)*100 : 0
 
   const thCls = 'px-3 py-2.5 text-left text-xs text-gray-500 font-medium whitespace-nowrap'
-  const tdCls = 'px-3 py-2.5 text-sm text-gray-700'
+  const tdCls = 'px-3 py-2.5 text-sm text-gray-700 whitespace-nowrap'
 
   const avDetalle    = avaluos_cliente.find(a => a.id === detailId)
   const itemsDetalle = avaluos_cliente_items.filter(i => i.avaluo_id === detailId)
@@ -398,7 +398,7 @@ export default function AvaluosCliente() {
   // ── VISTA NUEVO ──────────────────────────────────────────────────────────
   if (vista === 'nuevo') {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <div>
@@ -451,7 +451,7 @@ export default function AvaluosCliente() {
                     isEs?'P.U.':'Unit Price',isEs?'Monto Contrato':'Contract Amount',isEs?'Ant.':'Prev.',
                     isEs?'Este Periodo *':'This Period *',isEs?'Acumulado':'Accumulated',isEs?'Saldo':'Balance',
                     isEs?'% Fis.':'% Phys.',isEs?'Monto Periodo':'Period Amount',
-                  ].map((h,i) => <th key={i} className="px-2 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}
+                  ].map((h,i) => <th key={i} className={`px-2 py-2 text-gray-500 font-medium whitespace-nowrap ${i===0 ? 'text-left' : 'text-center'}`}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -466,29 +466,29 @@ export default function AvaluosCliente() {
                   return (
                     <tr key={idx} className={`border-b border-gray-50 ${sobrepa ? 'bg-red-50/30' : ''}`}>
                       <td className="px-2 py-2 text-gray-700">{it.descripcion}{it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}</td>
-                      <td className="px-2 py-2 text-gray-400">{it.unidad}</td>
-                      <td className="px-2 py-2 font-mono">{fmtNum(it.cantidad_total)}</td>
-                      <td className="px-2 py-2 font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
-                      <td className="px-2 py-2 font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
-                      <td className="px-2 py-2 font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
-                      <td className="px-2 py-2">
+                      <td className="px-2 py-2 text-center text-gray-400">{it.unidad}</td>
+                      <td className="px-2 py-2 text-center font-mono">{fmtNum(it.cantidad_total)}</td>
+                      <td className="px-2 py-2 text-center font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
+                      <td className="px-2 py-2 text-center font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
+                      <td className="px-2 py-2 text-center font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
+                      <td className="px-2 py-2 text-center">
                         <input type="number"
-                          className={`w-24 border rounded-lg px-2 py-1 text-xs focus:outline-none ${sobrepa ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-[#1B3A6B]'}`}
+                          className={`w-24 mx-auto border rounded-lg px-2 py-1 text-xs text-center focus:outline-none ${sobrepa ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-[#1B3A6B]'}`}
                           value={it.cantidad_periodo} placeholder="0" min="0" step="0.01"
                           onChange={e => setItemPeriodo(idx, e.target.value)} />
                         {sobrepa && <p className="text-xs text-red-500 mt-0.5">! {isEs?'Excede':'Exceeds'}</p>}
                       </td>
-                      <td className="px-2 py-2 font-mono" style={{color: sobrepa?'#ef4444':'#1D9E75'}}>{fmtNum(acum)}</td>
-                      <td className="px-2 py-2 font-mono text-gray-500">{fmtNum(saldo)}</td>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-2 py-2 text-center font-mono" style={{color: sobrepa?'#ef4444':'#1D9E75'}}>{fmtNum(acum)}</td>
+                      <td className="px-2 py-2 text-center font-mono text-gray-500">{fmtNum(saldo)}</td>
+                      <td className="px-2 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div className="h-full rounded-full" style={{width:`${Math.min(100,pct)}%`,background:sobrepa?'#ef4444':pct>=100?'#1D9E75':BRAND}} />
                           </div>
                           <span className="font-mono" style={{color:sobrepa?'#ef4444':BRAND}}>{pct.toFixed(1)}%</span>
                         </div>
                       </td>
-                      <td className="px-2 py-2 font-mono font-medium" style={{color:'#1D9E75'}}>{mp > 0 ? fmt(mp, moneda) : '—'}</td>
+                      <td className="px-2 py-2 text-center font-mono font-medium" style={{color:'#1D9E75'}}>{mp > 0 ? fmt(mp, moneda) : '—'}</td>
                     </tr>
                   )
                 })}
@@ -749,7 +749,7 @@ export default function AvaluosCliente() {
 
   // ── LISTA ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">{isEs ? 'Avaluos al Cliente' : 'Client Valuations'}</h1>

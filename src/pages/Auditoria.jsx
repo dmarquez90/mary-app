@@ -45,6 +45,7 @@ const ENTITY_LABELS = {
   SOLICITUD:              { es: 'solicitud',                     en: 'request',                   modulo: 'Compras' },
   SOL_ELIM:               { es: 'solicitud de eliminación',      en: 'deletion request',          modulo: 'Inventario' },
   SUBCONTRATO:            { es: 'subcontrato',                   en: 'subcontract',                modulo: 'Financiero' },
+  BITACORA:               { es: 'entrada de bitácora',           en: 'log entry',                  modulo: 'Supervisión' },
 }
 
 // Acciones que no siguen el patrón VERBO_ENTIDAD — etiqueta completa

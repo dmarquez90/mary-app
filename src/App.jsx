@@ -26,6 +26,7 @@ const Financiero        = lazy(() => import('./pages/Financiero'))
 const CurvaS            = lazy(() => import('./pages/CurvaS'))
 const Reportes          = lazy(() => import('./pages/Reportes'))
 const Auditoria         = lazy(() => import('./pages/Auditoria'))
+const Supervision       = lazy(() => import('./pages/Supervision'))
 const Chat              = lazy(() => import('./pages/Chat'))
 const PagoExitoso       = lazy(() => import('./pages/PagoExitoso'))
 const Planes            = lazy(() => import('./pages/Planes'))
@@ -53,6 +54,7 @@ const NAV = [
   { id: 'curvas',         labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
   { id: 'reportes',       labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
   { id: 'auditoria',      labelEs: 'Auditoría',           labelEn: 'Audit Log',          icon: 'financial' },
+  { id: 'supervision',    labelEs: 'Supervisión',         labelEn: 'Supervision',        icon: 'supervision' },
   { id: 'chat',           labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]
 
@@ -70,6 +72,7 @@ const PAGES = {
   configuracion:  Configuracion,
   reportes:       Reportes,
   auditoria:      Auditoria,
+  supervision:    Supervision,
   chat:           Chat,
 }
 
