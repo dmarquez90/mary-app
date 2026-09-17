@@ -103,12 +103,19 @@ export default function Supervision() {
       const path = `${tenantId}/${bitacoraId}/${Date.now()}_${file.name}`
       const { error: upErr } = await supabase.storage.from('bitacora-adjuntos').upload(path, file)
       if (upErr) { console.error('upload adjunto:', upErr); continue }
-      const { data: pub } = supabase.storage.from('bitacora-adjuntos').getPublicUrl(path)
+      // El bucket es privado (solo la empresa/tenant dueña puede verlo), así que
+      // guardamos la ruta y generamos una URL firmada temporal al momento de abrirlo.
       dispatch({
         type: 'ADD_BITACORA_ADJUNTO',
-        payload: { bitacora_id: bitacoraId, url: pub.publicUrl, nombre: file.name, tipo_mime: file.type },
+        payload: { bitacora_id: bitacoraId, url: path, nombre: file.name, tipo_mime: file.type },
       })
     }
+  }
+
+  const abrirAdjunto = async (path) => {
+    const { data, error } = await supabase.storage.from('bitacora-adjuntos').createSignedUrl(path, 300)
+    if (error || !data?.signedUrl) { console.error('signed url adjunto:', error); return }
+    window.open(data.signedUrl, '_blank', 'noreferrer')
   }
 
   const eliminarEntrada = async (id) => {
@@ -195,10 +202,10 @@ export default function Supervision() {
                   {e.adjuntos.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {e.adjuntos.map(a => (
-                        <a key={a.id} href={a.url} target="_blank" rel="noreferrer"
+                        <button key={a.id} type="button" onClick={() => abrirAdjunto(a.url)}
                           className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50">
                           {a.nombre}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}
