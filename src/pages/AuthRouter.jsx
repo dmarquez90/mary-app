@@ -313,7 +313,7 @@ function BlockedScreen({ reason, trialMeta, onBack }) {
 }
 
 // ── ROUTER PRINCIPAL ──────────────────────────────────────────────────────
-export default function AuthRouter() {
+export default function AuthRouter({ initialView = 'login', onExitToLanding }) {
   const { blockedReason, setBlockedReason } = useAuth()
   // blockedReason puede ser string (user_inactive, tenant_inactive) u objeto { reason, trialDias, ... }
   const [screen, setScreen] = useState('login')
@@ -347,6 +347,6 @@ export default function AuthRouter() {
       return <ResetPassword onNavigate={navigate} />
     case 'login':
     default:
-      return <Login onNavigate={navigate} />
+      return <Login onNavigate={navigate} initialView={initialView} onExitToLanding={onExitToLanding} />
   }
 }

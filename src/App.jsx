@@ -30,6 +30,7 @@ const Supervision       = lazy(() => import('./pages/Supervision'))
 const Chat              = lazy(() => import('./pages/Chat'))
 const PagoExitoso       = lazy(() => import('./pages/PagoExitoso'))
 const Planes            = lazy(() => import('./pages/Planes'))
+const Landing           = lazy(() => import('./pages/Landing'))
 
 const PageSpinner = () => (
   <div className="flex items-center justify-center min-h-full p-16">
@@ -538,6 +539,48 @@ function Layout() {
   )
 }
 
+// ── Rutas públicas: landing (/) y pantallas de autenticación ─────────
+// La app no usa router; se navega con history.pushState y estado local.
+const AUTH_PATHS = ['/login', '/registro', '/signin', '/signup']
+
+function PublicRoutes() {
+  const { blockedReason } = useAuth()
+  const [path, setPath] = useState(window.location.pathname)
+
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname)
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const navigate = (to) => {
+    if (window.location.pathname !== to) window.history.pushState({}, '', to)
+    setPath(to)
+    window.scrollTo(0, 0)
+  }
+
+  // Cuenta bloqueada (trial vencido, usuario o empresa inactivos): AuthRouter
+  // muestra su propia pantalla, sin importar la ruta.
+  if (blockedReason) return <AuthRouter />
+
+  const esRutaAuth = AUTH_PATHS.includes(path) || path.startsWith('/reset-password')
+  if (!esRutaAuth) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: '100vh', background: '#060E1D' }} />}>
+        <Landing onNavigate={navigate} />
+      </Suspense>
+    )
+  }
+
+  return (
+    <AuthRouter
+      key={path}
+      initialView={path === '/registro' || path === '/signup' ? 'register' : 'login'}
+      onExitToLanding={() => navigate('/')}
+    />
+  )
+}
+
 function AppContent() {
   const { user, perfil, loading } = useAuth()
 
@@ -550,7 +593,7 @@ function AppContent() {
     </div>
   )
 
-  if (!user) return <AuthRouter />
+  if (!user) return <PublicRoutes />
 
   const pathname = window.location.pathname
   if (pathname === '/pago-exitoso') return <Suspense fallback={<PageSpinner />}><PagoExitoso /></Suspense>

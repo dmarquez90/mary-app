@@ -83,6 +83,7 @@ const T = {
     left_trial3:       'Soporte por email incluido',
     left_trial4:       'Exportación de reportes Excel',
     who_we_are:        'Quiénes somos',
+    back_site:         '← Volver al sitio',
   },
   EN: {
     tagline:           'MANAGEMENT & RESOURCES YIELD',
@@ -151,6 +152,7 @@ const T = {
     left_trial3:       'Email support included',
     left_trial4:       'Excel report exports',
     who_we_are:        'About us',
+    back_site:         '← Back to site',
   }
 }
 
@@ -447,7 +449,7 @@ const ErrorBox = ({ msg }) => (
 )
 
 // ── LEFT PANEL COMPONENT ──────────────────────────────────────────────────
-function LeftPanel({ t, variant }) {
+function LeftPanel({ t, variant, onExitToLanding }) {
   const headline = variant === 'login'
     ? t.left_headline_login
     : variant === 'register'
@@ -467,10 +469,34 @@ function LeftPanel({ t, variant }) {
 
       {/* Logo mark + wordmark */}
       <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2rem' }}>
+        <button
+          onClick={() => onExitToLanding?.()}
+          disabled={!onExitToLanding}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            marginBottom: onExitToLanding ? 12 : '2rem',
+            background: 'none', border: 'none', padding: 0,
+            cursor: onExitToLanding ? 'pointer' : 'default',
+          }}
+        >
           <MaryMarkSVG />
           <span style={{ fontSize: 22, fontWeight: 900, color: WHITE, letterSpacing: 2 }}>MARY</span>
-        </div>
+        </button>
+
+        {onExitToLanding && (
+          <button
+            onClick={onExitToLanding}
+            style={{
+              display: 'block', background: 'none', border: 'none', padding: 0,
+              marginBottom: '1.5rem', fontSize: 12.5, color: BLUE_200, cursor: 'pointer',
+              opacity: 0.8, fontFamily: 'inherit',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '0.8'}
+          >
+            {t.back_site}
+          </button>
+        )}
 
         <PillBadge>{t.left_badge}</PillBadge>
 
@@ -555,7 +581,7 @@ function LeftPanel({ t, variant }) {
 }
 
 // ── LEGAL MODAL ───────────────────────────────────────────────────────────
-function LegalModal({ type, lang, onClose }) {
+export function LegalModal({ type, lang, onClose }) {
   const t = T[lang]
   const isEs = lang === 'ES'
 
@@ -860,10 +886,10 @@ function detectLang() {
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────
-export default function Login({ onNavigate }) {
+export default function Login({ onNavigate, initialView = 'login', onExitToLanding }) {
   const { login }                   = useAuth()
   const [lang, setLangState]        = useState(detectLang)
-  const [view, setView]             = useState('login')
+  const [view, setView]             = useState(initialView)
   const [legalModal, setLegalModal] = useState(null)
   const t = T[lang]
 
@@ -1011,7 +1037,7 @@ export default function Login({ onNavigate }) {
             backgroundSize: '48px 48px',
           }} />
 
-          <LeftPanel t={t} variant="login" />
+          <LeftPanel t={t} variant="login" onExitToLanding={onExitToLanding} />
 
           <div style={rightPanelStyle}>
             <LangToggle lang={lang} setLang={setLang} />
@@ -1117,7 +1143,7 @@ export default function Login({ onNavigate }) {
             backgroundSize: '48px 48px',
           }} />
 
-          <LeftPanel t={t} variant="register" />
+          <LeftPanel t={t} variant="register" onExitToLanding={onExitToLanding} />
 
           <div style={{ ...rightPanelStyle, paddingTop: '3rem', paddingBottom: '3rem' }}>
             <LangToggle lang={lang} setLang={setLang} />
@@ -1323,7 +1349,7 @@ export default function Login({ onNavigate }) {
             backgroundSize: '48px 48px',
           }} />
 
-          <LeftPanel t={t} variant="forgot" />
+          <LeftPanel t={t} variant="forgot" onExitToLanding={onExitToLanding} />
 
           <div style={rightPanelStyle}>
             <LangToggle lang={lang} setLang={setLang} />

@@ -132,6 +132,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await supabase.auth.signOut()
+    // Al salir se muestra el login, no la landing pública
+    if (window.location.pathname !== '/login') window.history.pushState({}, '', '/login')
     setUser(null)
     setPerfil(null)
     setBlockedReason(null)
