@@ -53,7 +53,6 @@ const NAV = [
   { id: 'financiero',     labelEs: 'Financiero',          labelEn: 'Financial',          icon: 'financial' },
   { id: 'curvas',         labelEs: 'Curva S',             labelEn: 'S Curve',            icon: 'curvas'    },
   { id: 'reportes',       labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
-  { id: 'auditoria',      labelEs: 'Auditoría',           labelEn: 'Audit Log',          icon: 'financial' },
   { id: 'supervision',    labelEs: 'Supervisión',         labelEn: 'Supervision',        icon: 'supervision' },
   { id: 'chat',           labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]

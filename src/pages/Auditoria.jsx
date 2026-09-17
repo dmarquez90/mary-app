@@ -111,7 +111,7 @@ function describePayload(payload, isEs) {
   return parts.join(' — ')
 }
 
-export default function Auditoria() {
+export default function Auditoria({ onNavigate }) {
   const { state } = useStore()
   const { lang } = useContext(LangContext)
   const { canView } = usePermissions()
@@ -205,6 +205,10 @@ export default function Auditoria() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-5">
+        <button onClick={() => onNavigate?.('configuracion')}
+          className="text-xs text-gray-400 hover:text-[#1B3A6B] mb-2 flex items-center gap-1">
+          ← {isEs ? 'Configuración' : 'Settings'}
+        </button>
         <h1 className="text-xl font-semibold text-gray-800">{isEs ? 'Auditoría' : 'Audit Log'}</h1>
         <p className="text-sm text-gray-400 mt-0.5">
           {isEs

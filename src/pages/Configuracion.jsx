@@ -20,7 +20,7 @@ const ROL_COLORS = {
 const inputCls  = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B]'
 const selectCls = inputCls
 
-export default function Configuracion() {
+export default function Configuracion({ onNavigate }) {
   const { perfil, isClientAdmin, isSuperAdmin } = useAuth()
   const { state, dispatch } = useStore()
   const { t, lang }       = useContext(LangContext)
@@ -550,6 +550,12 @@ export default function Configuracion() {
             {tab.label}
           </button>
         ))}
+        {esAdmin && (
+          <button onClick={() => onNavigate?.('auditoria')}
+            className="px-5 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors -mb-px">
+            {isEs ? 'Auditoría' : 'Audit Log'}
+          </button>
+        )}
       </div>
 
       {/* ── TAB USUARIOS ─────────────────────────────────────────────────── */}
