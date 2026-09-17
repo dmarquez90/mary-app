@@ -560,7 +560,7 @@ export default function AvaluosCliente() {
     const avSubtotal2 = parseFloat(avDetalle.subtotal || 0)
     const avImp2      = parseFloat(avDetalle.impuesto_monto || 0)
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
@@ -687,32 +687,32 @@ export default function AvaluosCliente() {
                     isEs?'Saldo Qty':'Balance Qty',isEs?'% Fis.':'% Phys.',
                     isEs?'Monto Ant.':'Prev. Amt',isEs?'Monto Periodo':'Period Amt',
                     isEs?'Monto Acum.':'Accum. Amt',isEs?'Saldo $':'Balance $',
-                  ].map((h,i) => <th key={i} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>)}
+                  ].map((h,i) => <th key={i} className={`px-3 py-2 text-gray-500 font-medium whitespace-nowrap ${i===0 ? 'text-left' : 'text-center'}`}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {itemsDetalle.filter(it => parseFloat(it.cantidad_periodo||0) > 0).map(it => (
                     <tr key={it.id} className="border-b border-gray-50">
-                      <td className="px-3 py-2 text-gray-700">{it.descripcion}{it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}</td>
-                      <td className="px-3 py-2 text-gray-400">{it.unidad}</td>
-                      <td className="px-3 py-2 font-mono">{fmtNum(it.cantidad_total)}</td>
-                      <td className="px-3 py-2 font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
-                      <td className="px-3 py-2 font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
-                      <td className="px-3 py-2 font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
-                      <td className="px-3 py-2 font-mono font-bold" style={{color:BRAND}}>{fmtNum(it.cantidad_periodo)}</td>
-                      <td className="px-3 py-2 font-mono text-green-600">{fmtNum(it.cantidad_acumulada)}</td>
-                      <td className="px-3 py-2 font-mono text-gray-500">{fmtNum(it.cantidad_saldo)}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-3 py-2 text-gray-700 min-w-[280px] max-w-[440px] whitespace-normal align-top">{it.descripcion}{it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}</td>
+                      <td className="px-3 py-2 text-center text-gray-400">{it.unidad}</td>
+                      <td className="px-3 py-2 text-center font-mono">{fmtNum(it.cantidad_total)}</td>
+                      <td className="px-3 py-2 text-center font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
+                      <td className="px-3 py-2 text-center font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
+                      <td className="px-3 py-2 text-center font-mono text-gray-400">{it.cantidad_anterior > 0 ? fmtNum(it.cantidad_anterior) : '—'}</td>
+                      <td className="px-3 py-2 text-center font-mono font-bold" style={{color:BRAND}}>{fmtNum(it.cantidad_periodo)}</td>
+                      <td className="px-3 py-2 text-center font-mono text-green-600">{fmtNum(it.cantidad_acumulada)}</td>
+                      <td className="px-3 py-2 text-center font-mono text-gray-500">{fmtNum(it.cantidad_saldo)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div className="h-full rounded-full" style={{width:`${Math.min(100,parseFloat(it.pct_fisico||0))}%`,background:BRAND}} />
                           </div>
                           <span className="font-mono" style={{color:BRAND}}>{parseFloat(it.pct_fisico||0).toFixed(1)}%</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 font-mono text-gray-400">{parseFloat(it.monto_anterior||0) > 0 ? fmt(it.monto_anterior, moneda) : '—'}</td>
-                      <td className="px-3 py-2 font-mono font-bold text-green-600">{fmt(it.monto_periodo, moneda)}</td>
-                      <td className="px-3 py-2 font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(it.monto_acumulado, moneda)}</td>
-                      <td className="px-3 py-2 font-mono text-gray-500">{fmt(it.monto_saldo, moneda)}</td>
+                      <td className="px-3 py-2 text-center font-mono text-gray-400">{parseFloat(it.monto_anterior||0) > 0 ? fmt(it.monto_anterior, moneda) : '—'}</td>
+                      <td className="px-3 py-2 text-center font-mono font-bold text-green-600">{fmt(it.monto_periodo, moneda)}</td>
+                      <td className="px-3 py-2 text-center font-mono font-medium" style={{color:'#1D9E75'}}>{fmt(it.monto_acumulado, moneda)}</td>
+                      <td className="px-3 py-2 text-center font-mono text-gray-500">{fmt(it.monto_saldo, moneda)}</td>
                     </tr>
                   ))}
                 </tbody>
