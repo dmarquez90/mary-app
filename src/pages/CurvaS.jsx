@@ -137,16 +137,15 @@ export default function CurvaS() {
     const presPorPeriodo = {}
 
     if (avsDelProy.length > 0) {
-      // Distribuir según pct_fisico acumulado por período de avalúo
-      let pctAcumAnterior = 0
+      // Distribuir según el avance físico de cada avalúo (pct_avance = avance del
+      // período, fracción 0-1, guardado en AvaluosCliente.jsx). Se asigna a cada
+      // período el presupuesto correspondiente a ESE avance individual, no acumulado.
       avsDelProy.forEach(av => {
         const fecha    = av.fecha_elaboracion || av.created_at?.slice(0,10)
         if (!fecha) return
-        const key      = closestPeriod(fecha)
-        const pctAcum  = parseFloat(av.pct_avance_global || 0)
-        const pctPeriodo = Math.max(0, pctAcum - pctAcumAnterior)
-        presPorPeriodo[key] = (presPorPeriodo[key] || 0) + (budget * pctPeriodo / 100)
-        pctAcumAnterior = pctAcum
+        const key         = closestPeriod(fecha)
+        const pctPeriodo  = Math.max(0, parseFloat(av.pct_avance || 0))
+        presPorPeriodo[key] = (presPorPeriodo[key] || 0) + (budget * pctPeriodo)
       })
       // Asignar el saldo restante al último período
       const totalDistribuido = Object.values(presPorPeriodo).reduce((s,v) => s+v, 0)
