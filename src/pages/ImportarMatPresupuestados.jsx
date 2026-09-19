@@ -199,10 +199,10 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
               {errors.length > 0 && <span className="text-amber-600 ml-2">({errors.length} {isEs?'omitidos':'skipped'})</span>}
             </span>
             <div className="flex gap-2">
-              <button onClick={reset} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">
+              <button onClick={reset} className="m-btn m-btn-sm m-btn-ghost">
                 {isEs ? 'Cancelar' : 'Cancel'}
               </button>
-              <button onClick={importar} className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg" style={{ background: '#1B3A6B' }}>
+              <button onClick={importar} className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg" style={{ background: 'var(--brand)' }}>
                 {isEs ? 'Importar ahora' : 'Import now'}
               </button>
             </div>
@@ -217,7 +217,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
 
           <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="m-thead-row sticky top-0">
                 <tr>
                   {[isEs?'Código':'Code', isEs?'Nombre':'Name', isEs?'Unidad':'Unit',
                     isEs?'Cantidad':'Qty', isEs?'Vinculado':'Linked'].map((h,i) => (
@@ -227,7 +227,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className="border-b border-gray-50">
+                  <tr key={i} className="m-tr">
                     <td className="px-2 py-1.5 font-mono text-gray-700">{r._codigo}</td>
                     <td className="px-2 py-1.5 text-gray-700">{r.nombre_libre}</td>
                     <td className="px-2 py-1.5 text-gray-500">{r.unidad_libre}</td>
@@ -252,7 +252,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
             <span className="font-mono">{progress}%</span>
           </div>
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: '#1B3A6B' }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'var(--brand)' }} />
           </div>
         </div>
       )}

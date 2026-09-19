@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../auth'
 
 
-const BRAND       = '#1B3A6B'
+const BRAND       = 'var(--brand)'
 const BRAND_LIGHT = '#2E5FA3'
 const BRAND_DARK  = '#122848'
 
@@ -379,7 +379,7 @@ export default function Admin() {
   const rolLabel = (rol) => T[`role_${rol}`] || rol?.replace('_',' ')
 
   return (
-    <div className="min-h-screen" style={{ background: '#F0F4F8' }}>
+    <div className="min-h-screen" style={{ background: 'var(--surface-2)' }}>
 
       {/* SUCCESS TOAST */}
       {success && (
@@ -512,7 +512,7 @@ export default function Admin() {
 
               <div className="flex gap-2 mt-auto pt-2">
                 <button onClick={() => setDrawer(null)}
-                  className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{T.cancel}</button>
+                  className="m-btn m-btn-ghost flex-1">{T.cancel}</button>
                 <button onClick={drawer.includes('tenant') ? saveTenant : saveUsuario}
                   disabled={saving}
                   className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-60"
@@ -562,7 +562,7 @@ export default function Admin() {
             { label: T.entPlans,     value: tenants.filter(t=>t.plan==='enterprise'&&t.activo).length, sub: T.active },
             { label: isEs ? 'Trials activos' : 'Active trials', value: tenants.filter(t=>t.es_trial&&t.activo&&t.trial_fin&&new Date(t.trial_fin)>new Date()).length, sub: isEs ? '60 días gratis' : '60 days free' },
           ].map((k,i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 p-5">
+            <div key={i} className="m-card p-5">
               <p className="text-xs text-gray-400 mb-1">{k.label}</p>
               <p className="text-2xl font-bold" style={{ color: BRAND }}>{k.value}</p>
               <p className="text-xs text-gray-400 mt-1">{k.sub}</p>
@@ -571,11 +571,11 @@ export default function Admin() {
         </div>
 
         {/* TABS */}
-        <div className="flex border-b border-gray-200 mb-6">
+        <div className="m-tabbar">
           {[['tenants', T.companies], ['usuarios', T.users]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
-                ${tab===id ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              className={`m-tab
+                ${tab===id ? 'm-tab-active' : ''}`}>
               {label}
             </button>
           ))}
@@ -591,18 +591,18 @@ export default function Admin() {
                 className="px-4 py-2 text-sm font-semibold text-white rounded-lg"
                 style={{ background: BRAND }}>{T.newCompany}</button>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="bg-gray-50 border-b border-gray-100">
+                <thead><tr className="m-thead-row">
                   {[T.company, T.planCol, T.usersCol, T.maxProjects, T.statusCol, T.createdCol, T.renewalCol, T.actionsCol].map((h,i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                    <th key={i} className="px-4 py-3 text-left">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {tenants.map(t => {
                     const nUsuarios = usuarios.filter(u => u.tenant_id === t.id).length
                     return (
-                      <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <tr key={t.id} className="m-tr">
                         <td className="px-4 py-3">
                           <p className="text-sm font-medium text-gray-800">{t.nombre_empresa}</p>
                           {(t.telefono || t.pais) && (
@@ -641,7 +641,7 @@ export default function Admin() {
                         <td className="px-4 py-3">
                           <div className="flex gap-1">
                             <button onClick={() => openDrawer('edit_tenant', {...t})}
-                              className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">{T.edit}</button>
+                              className="m-btn m-btn-sm m-btn-ghost">{T.edit}</button>
                             <button onClick={() => setConfirmDel({
                               msg: `¿${t.activo ? T.deactivate : T.activate} "${t.nombre_empresa}"?`,
                               action: () => toggleTenant(t),
@@ -678,16 +678,16 @@ export default function Admin() {
                 className="px-4 py-2 text-sm font-semibold text-white rounded-lg"
                 style={{ background: BRAND }}>{T.newUser}</button>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="bg-gray-50 border-b border-gray-100">
+                <thead><tr className="m-thead-row">
                   {[T.nameCol, T.emailCol, T.companyCol, T.roleCol, T.statusCol, T.lastAccess, T.actionsCol].map((h,i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                    <th key={i} className="px-4 py-3 text-left">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {usuarios.map(u => (
-                    <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={u.id} className="m-tr">
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{u.nombre}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{u.email}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{u.tenants?.nombre_empresa || '—'}</td>
@@ -707,7 +707,7 @@ export default function Admin() {
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <button onClick={() => openDrawer('edit_user', {...u})}
-                            className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">{T.edit}</button>
+                            className="m-btn m-btn-sm m-btn-ghost">{T.edit}</button>
                           <button onClick={() => setConfirmDel({
                             msg: `¿${u.activo ? T.deactivate : T.activate} "${u.nombre}"?`,
                             action: () => toggleUsuario(u),

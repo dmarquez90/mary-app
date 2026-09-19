@@ -4,10 +4,10 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
-import { EmptyState, Icons, Field, PrimaryBtn, Confirm, inputCls } from '../components'
+import { EmptyState, Icons, Field, PrimaryBtn, Confirm, inputCls, PageHeader } from '../components'
 import { uuid } from '../utils'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 
 export default function Supervision() {
   const { state, dispatch } = useStore()
@@ -136,18 +136,16 @@ export default function Supervision() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold text-gray-800">{isEs ? 'Supervisión — Bitácora' : 'Supervision — Log'}</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
-          {isEs
-            ? 'Registro de bitácora de obra por proyecto. Cada proyecto tiene su propia bitácora privada.'
-            : 'Site log entries by project. Each project has its own private log.'}
-        </p>
-      </div>
+    <div className="p-5 md:p-6 max-w-4xl mx-auto">
+      <PageHeader
+        title={isEs ? 'Supervisión — Bitácora' : 'Supervision — Log'}
+        subtitle={isEs
+          ? 'Registro de bitácora de obra por proyecto. Cada proyecto tiene su propia bitácora privada.'
+          : 'Site log entries by project. Each project has its own private log.'}
+      />
 
       {/* Selector de proyecto — único, controla filtro y nueva entrada */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5">
+      <div className="m-card p-4 mb-5">
         <Field label={isEs ? 'Proyecto' : 'Project'}>
           <select className={inputCls} value={fProyecto} onChange={e => setFProyecto(e.target.value)}>
             <option value="">{isEs ? 'Selecciona un proyecto...' : 'Select a project...'}</option>
@@ -165,7 +163,7 @@ export default function Supervision() {
 
       {/* Formulario nueva entrada */}
       {puedeEscribir && fProyecto && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5 flex flex-col gap-3">
+        <div className="m-card p-4 mb-5 flex flex-col gap-3">
           <p className="text-sm font-semibold text-gray-700">{isEs ? 'Nueva entrada' : 'New entry'}</p>
           <Field label={isEs ? 'Fecha' : 'Date'} required>
             <input type="date" className={inputCls} value={nuevaFecha} onChange={e => setNuevaFecha(e.target.value)} />
@@ -190,11 +188,11 @@ export default function Supervision() {
       {fProyecto && (
         <div className="flex flex-col gap-3">
           {entradas.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100">
+            <div className="m-card">
               <EmptyState icon={Icons.supervision} title={isEs ? 'Sin entradas registradas' : 'No entries recorded'} />
             </div>
           ) : entradas.map(e => (
-            <div key={e.id} className="bg-white rounded-xl border border-gray-100 p-4">
+            <div key={e.id} className="m-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <p className="text-xs text-gray-400">{fmtFecha(e.fecha || e.created_at)} · {proyLabel(e.proyecto_id)}</p>
@@ -203,7 +201,7 @@ export default function Supervision() {
                     <div className="flex flex-wrap gap-2 mt-2">
                       {e.adjuntos.map(a => (
                         <button key={a.id} type="button" onClick={() => abrirAdjunto(a.url)}
-                          className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50">
+                          className="m-btn m-btn-sm m-btn-ghost">
                           {a.nombre}
                         </button>
                       ))}

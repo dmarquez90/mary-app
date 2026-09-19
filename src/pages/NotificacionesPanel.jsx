@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 
 const TIPO_CONFIG = {
   aprobacion: { bg: 'bg-green-100', text: 'text-green-700', icon: '✅' },

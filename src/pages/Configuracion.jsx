@@ -4,8 +4,9 @@ import { useAuth } from '../auth'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { MODULOS_PERMISOS } from '../usePermissions'
+import { PageHeader } from '../components'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 const ROLES  = ['coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
 const ROL_COLORS = {
   gerente:      'bg-blue-100 text-blue-700',
@@ -336,7 +337,7 @@ export default function Configuracion({ onNavigate }) {
 
   return (
     <>
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-5 md:p-6 max-w-5xl mx-auto">
 
       {/* SUCCESS TOAST */}
       {success && (
@@ -368,7 +369,7 @@ export default function Configuracion({ onNavigate }) {
               <div><p className="text-xs text-gray-400">{isEs ? 'Cantidad' : 'Quantity'}</p><p className="font-mono font-medium">{modalSol.sol.cantidad}</p></div>
               <div className="col-span-2">
                 <p className="text-xs text-gray-400 mb-1">{isEs ? 'Justificación del bodeguero' : 'Warehouse keeper justification'}</p>
-                <p className="text-sm text-gray-700 bg-white border border-gray-100 rounded-lg p-2">{modalSol.sol.justificacion}</p>
+                <p className="text-sm text-gray-700 m-card p-2">{modalSol.sol.justificacion}</p>
               </div>
               <div><p className="text-xs text-gray-400">{isEs ? 'Fecha solicitud' : 'Request date'}</p><p className="text-sm">{modalSol.sol.created_at}</p></div>
             </div>
@@ -386,7 +387,7 @@ export default function Configuracion({ onNavigate }) {
 
             <div className="flex gap-2">
               <button onClick={() => { setModalSol(null); setComentarioAdmin('') }}
-                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+                className="m-btn m-btn-ghost flex-1">
                 {isEs ? 'Cancelar' : 'Cancel'}
               </button>
               <button onClick={rechazarSolicitud}
@@ -464,7 +465,7 @@ export default function Configuracion({ onNavigate }) {
               )}
               {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{error}</div>}
               <div className="flex gap-2 mt-auto pt-2">
-                <button onClick={() => setDrawer(null)} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">{t('btn_cancel')}</button>
+                <button onClick={() => setDrawer(null)} className="m-btn m-btn-ghost flex-1">{t('btn_cancel')}</button>
                 <button onClick={saveUsuario} disabled={saving}
                   className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-60"
                   style={{ background: BRAND }}>
@@ -477,27 +478,25 @@ export default function Configuracion({ onNavigate }) {
       )}
 
       {/* HEADER */}
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">
-          {esAdmin ? t('cfg_users_title') : (isEs ? 'Configuración' : 'Settings')}
-        </h1>
-        <p className="text-sm text-gray-400 mt-0.5">{tenant?.nombre_empresa}</p>
-      </div>
+      <PageHeader
+        title={esAdmin ? t('cfg_users_title') : (isEs ? 'Configuración' : 'Settings')}
+        subtitle={tenant?.nombre_empresa}
+      />
 
       {/* KPIs — solo para admins */}
       {esAdmin && (
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="m-card p-4">
           <p className="text-xs text-gray-400 mb-1">{t('cfg_users_plan')}</p>
           <p className="text-lg font-bold capitalize" style={{ color: BRAND }}>{tenant?.plan || '—'}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="m-card p-4">
           <p className="text-xs text-gray-400 mb-1">{t('cfg_users_limit')}</p>
           <p className="text-lg font-bold" style={{ color: limiteAlcanzado ? '#ef4444' : BRAND }}>
             {usuariosActivos} / {tenant?.max_usuarios}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4 relative">
+        <div className="m-card p-4 relative">
           <p className="text-xs text-gray-400 mb-1">{t('cfg_users_max_projects')}</p>
           <p className="text-lg font-bold" style={{ color: BRAND }}>{tenant?.max_proyectos}</p>
           {solicitudesPendientes.length > 0 && (
@@ -537,7 +536,7 @@ export default function Configuracion({ onNavigate }) {
       )}
 
       {/* TABS */}
-      <div className="flex border-b border-gray-200 mb-5">
+      <div className="m-tabbar">
         {[
           esAdmin && { id:'usuarios',    label: t('cfg_users_sub') },
           esAdmin && { id:'solicitudes', label: `${isEs ? 'Solicitudes de eliminación' : 'Deletion requests'}${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
@@ -545,14 +544,14 @@ export default function Configuracion({ onNavigate }) {
           esAdmin && { id:'suscripcion', label: isEs ? 'Suscripción' : 'Subscription' },
         ].filter(Boolean).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
-              ${activeTab===tab.id ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            className={`m-tab
+              ${activeTab===tab.id ? 'm-tab-active' : ''}`}>
             {tab.label}
           </button>
         ))}
         {esAdmin && (
           <button onClick={() => onNavigate?.('auditoria')}
-            className="px-5 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors -mb-px">
+            className="m-tab">
             {isEs ? 'Auditoría' : 'Audit Log'}
           </button>
         )}
@@ -574,16 +573,16 @@ export default function Configuracion({ onNavigate }) {
           {loading ? (
             <div className="text-center py-16 text-gray-400 text-sm">Cargando...</div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="bg-gray-50 border-b border-gray-100">
+                <thead><tr className="m-thead-row">
                   {[t('cfg_users_col_name'), t('cfg_users_col_email'), t('cfg_users_col_role'), t('cfg_users_col_status'), t('cfg_users_col_last_access'), t('cfg_users_col_actions')].map((h,i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                    <th key={i} className="px-4 py-3 text-left">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {usuarios.map(u => (
-                    <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={u.id} className="m-tr">
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{u.nombre}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{u.email}</td>
                       <td className="px-4 py-3">
@@ -603,10 +602,10 @@ export default function Configuracion({ onNavigate }) {
                         {u.id !== perfil?.id ? (
                           <div className="flex gap-1 flex-wrap">
                             <button onClick={() => { setForm({...u}); setError(''); setDrawer('edit') }}
-                              className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">{t('btn_edit')}</button>
+                              className="m-btn m-btn-sm m-btn-ghost">{t('btn_edit')}</button>
                             <button onClick={() => openPermisos(u)}
                               className="text-xs px-2 py-1 border rounded-lg hover:bg-blue-50"
-                              style={{ borderColor:'#1B3A6B', color:'#1B3A6B' }}>
+                              style={{ borderColor:'var(--brand)', color:'var(--brand)' }}>
                               {isEs ? 'Permisos' : 'Permissions'}
                             </button>
                             <button onClick={() => setConfirmAct({
@@ -650,25 +649,25 @@ export default function Configuracion({ onNavigate }) {
           </div>
 
           {(state.solicitudes_eliminacion || []).length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+            <div className="m-card p-12 text-center">
               <p className="text-sm text-gray-400">
                 {isEs ? 'No hay solicitudes de eliminación registradas.' : 'No deletion requests found.'}
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="bg-gray-50 border-b border-gray-100">
+                <thead><tr className="m-thead-row">
                   {(isEs
                     ? ['Fecha','Solicitante','Tipo','Material','Cantidad','Justificación','Estado','Acciones']
                     : ['Date','Requested by','Type','Material','Quantity','Justification','Status','Actions']
                   ).map((h,i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                    <th key={i} className="px-4 py-3 text-left">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {[...(state.solicitudes_eliminacion||[])].reverse().map(sol => (
-                    <tr key={sol.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={sol.id} className="m-tr">
                       <td className="px-4 py-3 text-xs text-gray-400">{sol.created_at}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{sol.solicitante_nombre || '—'}</td>
                       <td className="px-4 py-3">
@@ -741,7 +740,7 @@ export default function Configuracion({ onNavigate }) {
 
           {/* MODO CAMBIO NORMAL */}
           {pwMode === 'cambio' && (
-            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+            <div className="m-card p-5 flex flex-col gap-4">
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">
                   {isEs ? 'Contraseña actual' : 'Current password'} *
@@ -796,7 +795,7 @@ export default function Configuracion({ onNavigate }) {
 
           {/* MODO OLVIDÉ MI CONTRASEÑA */}
           {pwMode === 'olvide' && (
-            <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+            <div className="m-card p-5 flex flex-col gap-4">
               {!resetSent ? (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-3 text-xs text-blue-700">
@@ -853,14 +852,14 @@ export default function Configuracion({ onNavigate }) {
         <div className="max-w-2xl mx-auto">
 
           {/* Plan actual */}
-          <div className="bg-white border border-gray-100 rounded-xl p-5 mb-6 text-center">
+          <div className="m-card p-5 mb-6 text-center">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
               {isEs ? 'Plan actual' : 'Current plan'}
             </p>
             <div className="flex flex-col items-center gap-2">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-1"
                 style={{ background: '#EEF2FF' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" strokeWidth="2">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2">
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                 </svg>
               </div>
@@ -884,7 +883,7 @@ export default function Configuracion({ onNavigate }) {
                       : `${tenant?.billing_cycle === 'anual' ? 'Annual billing' : 'Monthly billing'}`)}
               </p>
               {suscripcion?.current_period_end && (
-                <p className="text-xs font-medium mt-1" style={{ color: '#1B3A6B' }}>
+                <p className="text-xs font-medium mt-1" style={{ color: 'var(--brand)' }}>
                   {isEs
                     ? `Próxima renovación: ${new Date(suscripcion.current_period_end).toLocaleDateString('es')}`
                     : `Next renewal: ${new Date(suscripcion.current_period_end).toLocaleDateString('en')}`}
@@ -903,7 +902,7 @@ export default function Configuracion({ onNavigate }) {
                 <button key={p} onClick={() => setSubPeriodo(p)}
                   className="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
                   style={{
-                    background: subPeriodo === p ? '#1B3A6B' : 'transparent',
+                    background: subPeriodo === p ? 'var(--brand)' : 'transparent',
                     color:      subPeriodo === p ? '#fff' : '#6B7280',
                   }}>
                   {p === 'mensual'
@@ -958,28 +957,28 @@ export default function Configuracion({ onNavigate }) {
                   onClick={() => setSubPlan(plan.id)}
                   className="relative rounded-xl border-2 p-4 cursor-pointer transition-all"
                   style={{
-                    borderColor:  activo ? '#1B3A6B' : plan.destacado ? '#D6E4F0' : '#E5E7EB',
+                    borderColor:  activo ? 'var(--brand)' : plan.destacado ? '#D6E4F0' : '#E5E7EB',
                     background:   activo ? '#F0F4F8' : '#fff',
                     boxShadow:    plan.destacado && !activo ? '0 2px 8px rgba(27,58,107,0.08)' : undefined,
                   }}>
                   {plan.destacado && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <span className="text-xs font-bold px-2.5 py-0.5 rounded-full text-white"
-                        style={{ background: '#1B3A6B' }}>
+                        style={{ background: 'var(--brand)' }}>
                         {isEs ? 'Popular' : 'Popular'}
                       </span>
                     </div>
                   )}
                   {activo && (
                     <div className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ background: '#1B3A6B' }}>
+                      style={{ background: 'var(--brand)' }}>
                       <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                         <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
                   )}
                   <p className="font-bold text-gray-800 text-sm mb-1">MARY {plan.nombre}</p>
-                  <p className="text-2xl font-bold mb-0.5" style={{ color: '#1B3A6B' }}>
+                  <p className="text-2xl font-bold mb-0.5" style={{ color: 'var(--brand)' }}>
                     ${precio.toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-400 mb-3">
@@ -1057,7 +1056,7 @@ export default function Configuracion({ onNavigate }) {
                       onClick={validatePromoCode}
                       disabled={!promoCode.trim() || promoLoading}
                       className="px-3 py-2 text-xs font-semibold text-white rounded-lg disabled:opacity-40 transition-opacity"
-                      style={{ background: '#1B3A6B' }}>
+                      style={{ background: 'var(--brand)' }}>
                       {promoLoading
                         ? (isEs ? 'Validando...' : 'Checking...')
                         : (isEs ? 'Aplicar' : 'Apply')}
@@ -1084,7 +1083,7 @@ export default function Configuracion({ onNavigate }) {
                   else cambiarPlan()
                 }}
                 className="w-full py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
-                style={{ background: planAction === 'downgrade' ? '#92400E' : '#1B3A6B' }}>
+                style={{ background: planAction === 'downgrade' ? '#92400E' : 'var(--brand)' }}>
                 {subLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1143,10 +1142,10 @@ export default function Configuracion({ onNavigate }) {
               <div className="text-xs text-gray-400 mb-2">
                 {isEs ? 'Si no configuras permisos, se usan los del rol asignado.' : 'If not configured, role defaults are used.'}
               </div>
-              <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+              <div className="m-card overflow-hidden">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
+                    <tr className="m-thead-row">
                       <th className="px-4 py-2.5 text-left text-xs text-gray-500">{isEs ? 'Módulo' : 'Module'}</th>
                       <th className="px-4 py-2.5 text-center text-xs text-gray-500">{isEs ? 'Ver' : 'View'}</th>
                       <th className="px-4 py-2.5 text-center text-xs text-gray-500">{isEs ? 'Editar' : 'Edit'}</th>
@@ -1235,12 +1234,12 @@ export default function Configuracion({ onNavigate }) {
 
           <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
             <button onClick={() => setPermDrawer(null)}
-              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+              className="m-btn m-btn-ghost flex-1">
               {isEs ? 'Cancelar' : 'Cancel'}
             </button>
             <button onClick={savePermisos} disabled={savingPerm}
               className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50"
-              style={{ background: '#1B3A6B' }}>
+              style={{ background: 'var(--brand)' }}>
               {savingPerm ? '...' : (isEs ? 'Guardar permisos' : 'Save permissions')}
             </button>
           </div>

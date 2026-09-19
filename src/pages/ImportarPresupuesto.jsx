@@ -209,7 +209,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-xl rounded-t-none border-t-0 px-4 py-3">
+    <div className="m-card rounded-t-none border-t-0 px-4 py-3">
       {step === 'idle' && (
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">
@@ -244,12 +244,12 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
               )}
             </div>
             <div className="flex gap-2">
-              <button onClick={reset} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">
+              <button onClick={reset} className="m-btn m-btn-sm m-btn-ghost">
                 {isEs ? 'Cancelar' : 'Cancel'}
               </button>
               <button onClick={importar}
                 className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg"
-                style={{ background: '#1B3A6B' }}>
+                style={{ background: 'var(--brand)' }}>
                 {isEs ? 'Importar ahora' : 'Import now'}
               </button>
             </div>
@@ -264,7 +264,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
 
           <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="m-thead-row sticky top-0">
                 <tr>
                   {[isEs?'Tipo':'Type', isEs?'Codigo':'Code', isEs?'Descripcion':'Description', isEs?'Unidad':'Unit',
                     isEs?'Cantidad':'Qty', 'M.O.', isEs?'Mat.':'Mat.', isEs?'Equip.':'Equip.'].map((h,i) => (
@@ -306,7 +306,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           </div>
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${progress}%`, background: '#1B3A6B' }} />
+              style={{ width: `${progress}%`, background: 'var(--brand)' }} />
           </div>
           <p className="text-xs text-gray-400">
             {isEs ? 'No cierres esta ventana.' : 'Do not close this window.'}

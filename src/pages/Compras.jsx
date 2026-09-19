@@ -2,12 +2,12 @@ import { useState, useContext, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { today } from '../utils'
-import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { supabase } from '../supabase'
 import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 
 // ── BADGE DE FLUJO ────────────────────────────────────────
 function FlujoBadge({ flujo }) {
@@ -93,7 +93,7 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
           onFocus={() => setOpen(true)} autoComplete="off" />
       )}
       {open && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 m-card shadow-xl max-h-56 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-400 text-center">No results</div>
           ) : filtered.map(m => (
@@ -180,7 +180,7 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
           onFocus={() => setOpen(true)} autoComplete="off" />
       )}
       {open && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-y-auto">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 m-card shadow-xl max-h-80 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-400 text-center">No approved requests</div>
           ) : filtered.map(s => {
@@ -516,7 +516,7 @@ export default function Compras() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
       <style>{printStyles}</style>
 
       {/* CONFIRM DELETE */}
@@ -556,14 +556,12 @@ export default function Compras() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('comp_title')}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{t('comp_sub_pending', { n: pendSol })} · {t('comp_sub_oc', { n: pendOC })}</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title={t('comp_title')}
+        subtitle={`${t('comp_sub_pending', { n: pendSol })} · ${t('comp_sub_oc', { n: pendOC })}`}
+        actions={<>
           <button onClick={syncSolicitudes} disabled={syncing} title="Recargar desde servidor"
-            className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-40 transition-colors text-sm">
+            className="m-btn m-btn-ghost" style={{ padding: 9 }}>
             {syncing ? '⟳' : '↺'}
           </button>
         {tab === 0 && can('solicitud_crear') && (
@@ -579,15 +577,15 @@ export default function Compras() {
             setDrawer('oc')
           }}>{t('comp_new_oc')}</PrimaryBtn>
         )}
-        </div>
-      </div>
+        </>}
+      />
 
       {/* TABS */}
-      <div className="flex border-b border-gray-200 mb-5">
+      <div className="m-tabbar">
         {TABS.map((label, i) => (
           <button key={i} onClick={() => setTab(i)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px
-              ${tab===i ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            className={`m-tab
+              ${tab===i ? 'm-tab-active' : ''}`}>
             {label}
             {i===0 && pendSol > 0 && <span className="ml-1.5 bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full">{pendSol}</span>}
             {i===1 && pendOC  > 0 && <span className="ml-1.5 bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full">{pendOC}</span>}
@@ -604,11 +602,11 @@ export default function Compras() {
             setDrawer('sol')
           } : null} />
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <div className="m-card overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
+              <thead><tr className="m-thead-row">
                 {[t('comp_sol_folio'), t('comp_col_project'), t('comp_requester_name'), t('comp_col_status'), t('comp_sol_priority'), t('comp_col_items'), t('comp_col_date'), t('comp_col_actions')].map((h,i) => (
-                  <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                  <th key={i} className="px-4 py-3 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -616,7 +614,7 @@ export default function Compras() {
                   const proy  = proyectos.find(p => p.id === sol.proyecto_id)
                   const items = solicitud_items.filter(i => i.solicitud_id === sol.id)
                   return (
-                    <tr key={sol.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={sol.id} className="m-tr">
                       <td className="px-4 py-3 text-xs font-mono font-semibold" style={{color:BRAND}}>{sol.folio || '—'}</td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-600">{proy?.project_code || '—'}</td>
                       <td className="px-4 py-3 text-xs text-gray-600">{sol.nombre_solicitante || '—'}</td>
@@ -691,11 +689,11 @@ export default function Compras() {
         ordenes_compra.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_oc')} subtitle={t('comp_empty_oc_sub')} />
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <div className="m-card overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
+              <thead><tr className="m-thead-row">
                 {[t('comp_col_oc'),t('comp_col_project'),t('comp_col_supplier'),t('comp_col_status'),t('comp_col_approval'),t('comp_col_actions')].map((h,i) => (
-                  <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                  <th key={i} className="px-4 py-3 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -704,7 +702,7 @@ export default function Compras() {
                   const ocItemsRow = ordenes_compra_items.filter(i => i.oc_id === oc.id)
                   const tieneEquipo = ocItemsRow.some(i => i.tipo_item === 'equipo_alquilado')
                   return (
-                    <tr key={oc.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={oc.id} className="m-tr">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-mono font-semibold text-gray-700">{oc.oc_number}</span>
@@ -792,7 +790,7 @@ export default function Compras() {
           <div className="flex items-center justify-between mb-3">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('comp_form_items_eq')} *</label>
             <button onClick={addSolItem} className="text-xs font-medium px-2 py-1 rounded-md"
-              style={{ color:BRAND, background:'#EEF2F7' }}>
+              style={{ color: 'var(--brand)', background: 'var(--brand-soft)' }}>
               {t('comp_form_add_item_eq')}
             </button>
           </div>
@@ -965,13 +963,12 @@ export default function Compras() {
 
                 <div className="flex gap-2">
                   <input type="number"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B]"
-                    style={{ background:'#F2F2F2' }}
+                    className="m-input flex-1"
+                    style={{ background: 'var(--surface-2)' }}
                     placeholder={t('lbl_quantity') + ' *'}
                     value={it.cantidad} onChange={e=>setSolItem(idx,'cantidad',e.target.value)} min="0" step="0.01"/>
                   <input
-                    className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
-                    style={{ background:'#F2F2F2' }}
+                    className="m-input" style={{ width: 80 }}
                     placeholder={t('lbl_unit')}
                     value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
                 </div>

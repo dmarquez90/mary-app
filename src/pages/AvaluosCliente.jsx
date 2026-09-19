@@ -6,9 +6,9 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, calcGrandTotal, r2 } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 
 const ESTADO_AV = {
   borrador:   { label: 'Borrador',   labelEn: 'Draft',      cls: 'bg-gray-100 text-gray-600'   },
@@ -398,17 +398,17 @@ export default function AvaluosCliente() {
   // ── VISTA NUEVO ──────────────────────────────────────────────────────────
   if (vista === 'nuevo') {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <div>
-            <h1 className="text-xl font-semibold text-gray-800">
+            <h1 className="text-xl font-bold tracking-tight text-gray-900">
               {isEs ? `Avaluo #${numAvaluo}` : `Valuation #${numAvaluo}`} — {proy?.project_code}
             </h1>
             <p className="text-sm text-gray-400">{proy?.nombre}</p>
           </div>
         </div>
-        <div className="bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4">
+        <div className="m-card p-5 flex flex-col gap-4">
           <div className="grid grid-cols-3 gap-4">
             <Field label={isEs ? 'Periodo inicio' : 'Period start'}>
               <input type="date" className={inputCls} value={avForm.periodo_inicio||''} onChange={setAvF('periodo_inicio')} />
@@ -446,7 +446,7 @@ export default function AvaluosCliente() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
+                <tr className="m-thead-row">
                   {[isEs?'Descripcion':'Description',isEs?'Unidad':'Unit',isEs?'Cant. Total':'Total Qty',
                     isEs?'P.U.':'Unit Price',isEs?'Monto Contrato':'Contract Amount',isEs?'Ant.':'Prev.',
                     isEs?'Este Periodo *':'This Period *',isEs?'Acumulado':'Accumulated',isEs?'Saldo':'Balance',
@@ -560,12 +560,12 @@ export default function AvaluosCliente() {
     const avSubtotal2 = parseFloat(avDetalle.subtotal || 0)
     const avImp2      = parseFloat(avDetalle.impuesto_monto || 0)
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
             <div>
-              <h1 className="text-xl font-semibold text-gray-800">
+              <h1 className="text-xl font-bold tracking-tight text-gray-900">
                 {isEs ? `Avaluo #${avDetalle.numero}` : `Valuation #${avDetalle.numero}`}
               </h1>
               <p className="text-sm text-gray-400">{proy?.project_code} — {proy?.nombre}</p>
@@ -659,7 +659,7 @@ export default function AvaluosCliente() {
         )}
 
         <div className="flex flex-col gap-5">
-          <div className="bg-white border border-gray-100 rounded-xl p-5">
+          <div className="m-card p-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {[
                 [isEs?'Periodo':'Period', avDetalle.periodo_inicio && avDetalle.periodo_fin ? `${avDetalle.periodo_inicio} → ${avDetalle.periodo_fin}` : '—'],
@@ -674,7 +674,7 @@ export default function AvaluosCliente() {
               ))}
             </div>
           </div>
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="m-card overflow-hidden">
             <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{isEs?'Detalle de avance':'Progress detail'}</p>
             </div>
@@ -691,7 +691,7 @@ export default function AvaluosCliente() {
                 </tr></thead>
                 <tbody>
                   {itemsDetalle.filter(it => parseFloat(it.cantidad_periodo||0) > 0).map(it => (
-                    <tr key={it.id} className="border-b border-gray-50">
+                    <tr key={it.id} className="m-tr">
                       <td className="px-3 py-2 text-gray-700 min-w-[280px] max-w-[440px] whitespace-normal align-top">{it.descripcion}{it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}</td>
                       <td className="px-3 py-2 text-center text-gray-400">{it.unidad}</td>
                       <td className="px-3 py-2 text-center font-mono">{fmtNum(it.cantidad_total)}</td>
@@ -749,23 +749,21 @@ export default function AvaluosCliente() {
 
   // ── LISTA ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{isEs ? 'Avaluos al Cliente' : 'Client Valuations'}</h1>
-          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+    <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+      <PageHeader
+        title={isEs ? 'Avalúos al Cliente' : 'Client Valuations'}
+        subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
+        actions={<>
+          <select className="m-input" style={{ width: 'auto', minWidth: 190 }}
             value={proyId} onChange={e => setProyId(e.target.value)}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
           {proyId && puedeEditar && (
-            <PrimaryBtn onClick={openNuevo}>+ {isEs ? 'Nuevo Avaluo' : 'New Valuation'}</PrimaryBtn>
+            <PrimaryBtn icon={Icons.plus} onClick={openNuevo}>{isEs ? 'Nuevo avalúo' : 'New valuation'}</PrimaryBtn>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       {!proyId ? (
         <EmptyState icon={Icons.budget} title={isEs ? 'Selecciona un proyecto' : 'Select a project'} />
@@ -807,7 +805,7 @@ export default function AvaluosCliente() {
               { label: isEs?'Saldo por cobrar':'Balance to bill',                     value: fmt(saldoPorCobrar, moneda),       color: '#D97706' },
               { label: isEs?'% Ejecucion financiera':'% Financial exec.',             value: `${pctEjecucion.toFixed(1)}%`,    color: BRAND },
             ].map(k => (
-              <div key={k.label} className="bg-white border border-gray-100 rounded-xl p-4">
+              <div key={k.label} className="m-card p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
                 <p className="text-xl font-bold font-mono" style={{ color: k.color }}>{k.value}</p>
               </div>
@@ -816,7 +814,7 @@ export default function AvaluosCliente() {
 
           {/* ── RESUMEN FINANCIERO ── */}
           {avs.length > 0 && presupuestoTotalReal > 0 && (
-            <div className="bg-white border border-gray-100 rounded-xl p-5 mb-5">
+            <div className="m-card p-5 mb-5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 {isEs ? 'Resumen financiero del proyecto' : 'Project financial summary'}
               </p>
@@ -849,7 +847,7 @@ export default function AvaluosCliente() {
           )}
 
           {avs.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-xl py-16">
+            <div className="m-card py-16">
               <EmptyState icon={Icons.budget}
                 title={isEs ? 'No hay avaluos registrados' : 'No valuations registered'}
                 subtitle={isEs ? 'Crea el primer avaluo para cobrar al cliente' : 'Create the first valuation to bill the client'}
@@ -857,10 +855,10 @@ export default function AvaluosCliente() {
                 onAction={puedeEditar ? openNuevo : null} />
             </div>
           ) : (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
+                  <tr className="m-thead-row">
                     {['#', isEs?'Periodo':'Period', isEs?'Fecha':'Date', isEs?'Presentado a':'Submitted to',
                       isEs?'Subtotal':'Subtotal', isEs?'Impuesto':'Tax', isEs?'Total':'Total',
                       isEs?'Estado':'Status', ''].map((h,i) => <th key={i} className={thCls}>{h}</th>)}

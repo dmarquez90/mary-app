@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { fmtNum, fmt, UNIDADES_CONFIG } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 import ImportarMatPresupuestados from './ImportarMatPresupuestados'
 
 const emptyForm = () => ({
@@ -198,22 +198,20 @@ export default function MatPresupuestados() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('mp_title')}</h1>
-          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+      <PageHeader
+        title={t('mp_title')}
+        subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
+        actions={<>
           <select
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+            className="m-input" style={{ width: 'auto', minWidth: 190 }}
             value={proyId} onChange={e => { setProyId(e.target.value); setSearch(''); setFilterEtapa('') }}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
           {proyId && puedeEditar && <PrimaryBtn onClick={openAdd}>{t('mp_add')}</PrimaryBtn>}
-        </div>
-      </div>
+        </>}
+      />
 
       {!proyId ? (
         <EmptyState icon={Icons.budget} title={t('mp_no_project')} />
@@ -222,13 +220,13 @@ export default function MatPresupuestados() {
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             {[
-              { label: t('mp_kpi_materials'), value: matsPres.length, color: '#1B3A6B' },
+              { label: t('mp_kpi_materials'), value: matsPres.length, color: 'var(--brand)' },
               { label: t('mp_kpi_additional'), value: totalAdicionales, color: totalAdicionales > 0 ? '#e0982c' : '#6b7280' },
-              { label: t('mp_kpi_activities'), value: totalActividades, color: '#1B3A6B' },
+              { label: t('mp_kpi_activities'), value: totalActividades, color: 'var(--brand)' },
               { label: t('mp_kpi_budget_value'), value: fmt(totalPresupuestado, moneda), color: '#1D9E75' },
               { label: t('mp_kpi_consumed_cost'), value: fmt(totalConsumido, moneda), color: totalConsumido > totalPresupuestado ? '#ef4444' : '#1D9E75' },
             ].map((k, i) => (
-              <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
+              <div key={i} className="m-card p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
                 <p className="text-xl font-semibold" style={{ color: k.color }}>{k.value}</p>
               </div>
@@ -246,7 +244,7 @@ export default function MatPresupuestados() {
                 placeholder={t('mp_search_placeholder')}
                 value={search} onChange={e => setSearch(e.target.value)} />
               {etapas.length > 0 && (
-                <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+                <select className="m-input" style={{ width: 'auto', minWidth: 170 }}
                   value={filterEtapa} onChange={e => setFilterEtapa(e.target.value)}>
                   <option value="">{t('mp_filter_all_stages')}</option>
                   {etapas.map(e => <option key={e.id} value={e.id}>{e.code} — {e.descripcion}</option>)}
@@ -260,14 +258,14 @@ export default function MatPresupuestados() {
               action={puedeEditar ? t('mp_add') : null}
               onAction={puedeEditar ? openAdd : null} />
           ) : matsFiltrados.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+            <div className="m-card p-12 text-center">
               <p className="text-sm text-gray-400">{t('mp_no_results')}</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
+                  <tr className="m-thead-row">
                     {[
                       { label: t('mp_col_material'),       w: '220px' },
                       { label: t('mp_col_unit'),           w: '70px'  },
@@ -282,7 +280,7 @@ export default function MatPresupuestados() {
                       { label: t('mp_col_status'),         w: '100px' },
                       puedeEditar ? { label: '', w: '80px' } : null,
                     ].filter(h => h !== null).map((h, i) => (
-                      <th key={i} style={{ minWidth: h.w, width: h.w }} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h.label}</th>
+                      <th key={i} style={{ minWidth: h.w, width: h.w }} className="px-4 py-3 text-left">{h.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -296,7 +294,7 @@ export default function MatPresupuestados() {
                     const status    = pct >= 100 ? 'agotado' : pct >= 80 ? 'alerta' : 'ok'
 
                     return (
-                      <tr key={mp.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <tr key={mp.id} className="m-tr">
                         <td className="px-4 py-3" style={{ minWidth: '220px', width: '220px' }}>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm text-gray-800">{getNombre(mp)}</span>
@@ -320,7 +318,7 @@ export default function MatPresupuestados() {
                         <td className="px-4 py-3 text-xs text-gray-500">{getUnidad(mp)}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-700">{fmtNum(presup)}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-600 whitespace-nowrap">{fmt(costoPres(mp), moneda)}</td>
-                        <td className="px-4 py-3 text-sm font-mono" style={{ color: solicit > presup ? '#ef4444' : '#1B3A6B' }}>
+                        <td className="px-4 py-3 text-sm font-mono" style={{ color: solicit > presup ? '#ef4444' : 'var(--brand)' }}>
                           {fmtNum(solicit)}{solicit > presup && ' ⚠'}
                         </td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(consumido)}</td>
@@ -414,7 +412,7 @@ export default function MatPresupuestados() {
               <button
                 type="button"
                 onClick={() => { setMatOpen(o => !o); setMatSearch('') }}
-                className="w-full flex items-center justify-between px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white hover:border-[#1B3A6B] focus:outline-none focus:border-[#1B3A6B] transition-colors"
+                className="m-input flex items-center justify-between"
               >
                 <span className={form.material_id ? 'text-gray-800' : 'text-gray-400'}>
                   {form.material_id
@@ -437,7 +435,7 @@ export default function MatPresupuestados() {
                       value={matSearch}
                       onChange={e => setMatSearch(e.target.value)}
                       placeholder={isEs ? 'Buscar por código o nombre...' : 'Search by code or name...'}
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-[#1B3A6B]"
+                      className="m-input" style={{ padding: '6px 10px' }}
                     />
                   </div>
                   {/* Options list */}

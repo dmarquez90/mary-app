@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, r2 } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { useAuth } from '../auth'
 import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
 import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc, buildPettyCashReceipt } from '../pages/Reportes'
@@ -231,43 +231,43 @@ export default function Financiero() {
   const tdCls = 'px-4 py-3 text-sm text-gray-700'
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('fin_title')}</h1>
-          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
-        </div>
-        <div className="flex items-center gap-3">
-          <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+      <PageHeader
+        title={t('fin_title')}
+        subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
+        actions={<>
+          <select className="m-input" style={{ width: 'auto', minWidth: 190 }}
             value={proyId} onChange={e => setProyId(e.target.value)}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
-          {proyId && !closed && puedeEditar && tab !== 2 && tab !== 5 && <PrimaryBtn onClick={openDrawer}>+ {TABS[tab]}</PrimaryBtn>}
-        </div>
-      </div>
+          {proyId && !closed && puedeEditar && tab !== 2 && tab !== 5 && (
+            <PrimaryBtn icon={Icons.plus} onClick={openDrawer}>{TABS[tab]}</PrimaryBtn>
+          )}
+        </>}
+      />
 
       {!proyId ? (
         <EmptyState icon={Icons.financial} title={t('fin_select_project')} />
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <StatCard label={t('fin_total_real')}   value={fmt(totalReal, moneda)} color="#1B3A6B" />
+            <StatCard label={t('fin_total_real')}   value={fmt(totalReal, moneda)} color="var(--brand)" />
             <StatCard label={t('fin_materials')}    value={fmt(totalMat, moneda)}  sub={t('fin_materials_sub')} />
             <StatCard label={t('fin_payroll')}      value={fmt(totalNom, moneda)}  sub={t('fin_payroll_sub')} />
             <StatCard label={t('fin_subcontracts')} value={fmt(totalSub, moneda)}  sub={t('fin_subcontracts_sub')} />
           </div>
 
           {/* TABS */}
-          <div className="flex border-b border-gray-200 mb-5 overflow-x-auto">
+          <div className="m-tabbar">
             {TABS.map((tab_label, i) => {
               const cajaProy = cajas_chicas.find(c => c.proyecto_id === proyId && c.estado === 'activa')
               const gastosPend = cajaProy ? gastos_caja_chica.filter(g => g.caja_id === cajaProy.id && !g.liquidacion_id).length : 0
               const counts = [directs.length, noms.length, subs.length, eqs.length, inds.length, gastosPend]
               return (
                 <button key={i} onClick={() => setTab(i)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap
-                    ${tab===i ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  className={`m-tab
+                    ${tab===i ? 'm-tab-active' : ''}`}>
                   {tab_label}
                   {counts[i] > 0 && <span className="ml-1.5 text-xs text-gray-400">({counts[i]})</span>}
                 </button>
@@ -283,9 +283,9 @@ export default function Financiero() {
                 action={puedeEditar&&!closed ? `+ ${TABS[0]}` : null}
                 onAction={puedeEditar&&!closed ? openDrawer : null} />
             ) : (
-              <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+              <div className="m-card overflow-x-auto">
                 <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">
+                  <thead><tr className="m-thead-row">
                     {[t('fin_form_date'), t('fin_form_type'), t('fin_form_desc'), t('fin_form_activity'), t('fin_form_amount'), t('fin_form_doc'), puedeEditar?'':null]
                       .filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
                   </tr></thead>
@@ -293,7 +293,7 @@ export default function Financiero() {
                     {directs.map(c => {
                       const act = acts.find(a => a.id === c.actividad_id)
                       return (
-                        <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <tr key={c.id} className="m-tr">
                           <td className={tdCls+' text-xs text-gray-400'}>{c.fecha||c.created_at?.slice(0,10)}</td>
                           <td className={tdCls}><span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{c.tipo==='factura_obra'?(isEs?'Factura':'Invoice'):(isEs?'Caja chica':'Petty cash')}</span></td>
                           <td className={tdCls}>{c.descripcion||'—'}</td>
@@ -325,9 +325,9 @@ export default function Financiero() {
                 action={puedeEditar&&!closed ? `+ ${TABS[1]}` : null}
                 onAction={puedeEditar&&!closed ? openDrawer : null} />
             ) : (
-              <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+              <div className="m-card overflow-x-auto">
                 <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">
+                  <thead><tr className="m-thead-row">
                     {[t('fin_col_worker'), t('fin_col_position'),
                       isEs?'Período':'Period',
                       isEs?'Días trab.':'Days worked',
@@ -342,7 +342,7 @@ export default function Financiero() {
                         ? Math.round((new Date(n.periodo_fin)-new Date(n.periodo_inicio))/(1000*60*60*24))+1 : '—'
                       const neto = (parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0)
                       return (
-                        <tr key={n.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <tr key={n.id} className="m-tr">
                           <td className={tdCls+' font-medium'}>{n.trabajador}</td>
                           <td className={tdCls+' text-xs text-gray-500'}>{n.cargo||'—'}</td>
                           <td className={tdCls+' text-xs text-gray-400'}>{n.periodo_inicio} → {n.periodo_fin}</td>
@@ -423,9 +423,9 @@ export default function Financiero() {
                     </p>
                   </div>
                 )}
-                <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+                <div className="m-card overflow-x-auto">
                   <table className="w-full">
-                    <thead><tr className="bg-gray-50 border-b border-gray-100">
+                    <thead><tr className="m-thead-row">
                       {[t('fin_col_eq_desc'),t('fin_col_eq_type'),t('fin_eq_col_origin'),t('fin_col_eq_rate'),t('fin_col_eq_days'),t('fin_col_eq_total'),t('fin_eq_col_state'),puedeEditar?'':null]
                         .filter(h=>h!==null).map((h,i)=><th key={i} className={thCls}>{h}</th>)}
                     </tr></thead>
@@ -438,7 +438,7 @@ export default function Financiero() {
                         const act        = presupuesto.find(b => b.id === eq.actividad_id)
                         const ocNum      = ordenes_compra.find(o => o.id === eq.origen_oc_id)?.oc_number
                         return (
-                          <tr key={eq.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <tr key={eq.id} className="m-tr">
                             <td className={tdCls}>
                               <div className="flex flex-col gap-1">
                                 <span className="font-medium text-gray-800">{eq.descripcion}</span>
@@ -522,7 +522,7 @@ export default function Financiero() {
                 </div>
 
                 {ajustesProy.length > 0 && (
-                  <div className="mt-4 bg-white rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="mt-4 m-card overflow-hidden">
                     <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
                       <p className="text-sm font-semibold text-gray-700">🔧 {t('fin_eq_adj_tab')}</p>
                     </div>
@@ -560,7 +560,7 @@ export default function Financiero() {
           {tab === 4 && (
             <>
               {comparacionIndirectos.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 mb-4 overflow-hidden">
+                <div className="m-card mb-4 overflow-hidden">
                   <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-700">{t('fin_budgeted_vs_executed')}</p>
                   </div>
@@ -576,7 +576,7 @@ export default function Financiero() {
                           const pct    = r.presupuestado > 0 ? (r.ejecutado / r.presupuestado) * 100 : 0
                           const status = r.diferencia < 0 ? 'sobrecosto' : r.diferencia === 0 ? 'justo' : 'ahorro'
                           return (
-                            <tr key={r.catKey} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <tr key={r.catKey} className="m-tr">
                               <td className={tdCls}>
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{r.label}</span>
                               </td>
@@ -607,8 +607,8 @@ export default function Financiero() {
                         })}
                         <tr className="bg-gray-50">
                           <td className={tdCls + ' font-semibold text-gray-600'}>{t('fin_row_total')}</td>
-                          <td className={tdCls + ' font-mono font-bold'} style={{color:'#1B3A6B'}}>{fmt(totalIndPres, moneda)}</td>
-                          <td className={tdCls + ' font-mono font-bold'} style={{color:'#1B3A6B'}}>{fmt(totalInd, moneda)}</td>
+                          <td className={tdCls + ' font-mono font-bold'} style={{ color: 'var(--brand)' }}>{fmt(totalIndPres, moneda)}</td>
+                          <td className={tdCls + ' font-mono font-bold'} style={{ color: 'var(--brand)' }}>{fmt(totalInd, moneda)}</td>
                           <td className={tdCls + ' font-mono font-bold'} style={{color: totalIndPres - totalInd < 0 ? '#ef4444' : '#1D9E75'}}>
                             {totalIndPres - totalInd >= 0 ? '+' : ''}{fmt(totalIndPres - totalInd, moneda)}
                           </td>
@@ -625,9 +625,9 @@ export default function Financiero() {
                   action={puedeEditar&&!closed ? `+ ${TABS[4]}` : null}
                   onAction={puedeEditar&&!closed ? openDrawer : null} />
               ) : (
-                <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+                <div className="m-card overflow-x-auto">
                   <table className="w-full">
-                    <thead><tr className="bg-gray-50 border-b border-gray-100">
+                    <thead><tr className="m-thead-row">
                       {[t('fin_form_date'),
                         isEs?'Categoría':'Category',
                         isEs?'Subcategoría':'Subcategory',
@@ -642,7 +642,7 @@ export default function Financiero() {
                         )
                         const catLabel = catKey ? (isEs ? CATEGORIAS_IND[catKey].es : CATEGORIAS_IND[catKey].en) : c.categoria
                         return (
-                          <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <tr key={c.id} className="m-tr">
                             <td className={tdCls+' text-xs text-gray-400'}>{c.fecha||c.created_at?.slice(0,10)}</td>
                             <td className={tdCls}><span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{catLabel}</span></td>
                             <td className={tdCls+' text-xs text-gray-500'}>{c.subcategoria||'—'}</td>
@@ -954,7 +954,7 @@ export default function Financiero() {
             <div className="mb-4">
               <p className="text-xs text-gray-500 mb-1">{t('fin_eq_adj_reason')} *</p>
               <textarea
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] resize-none"
+                className="m-input" style={{ resize: 'none' }}
                 rows={3}
                 placeholder={t('fin_eq_adj_reason_ph')}
                 value={ajusteForm.motivo || ''}
@@ -969,14 +969,14 @@ export default function Financiero() {
 
             <div className="flex gap-2">
               <button onClick={() => { setAjusteModal(null); setAjusteForm({}) }}
-                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+                className="m-btn m-btn-ghost flex-1">
                 {t('btn_cancel')}
               </button>
               <button
                 disabled={!ajusteForm.motivo?.trim() || !ajusteForm.dias_ajustados}
                 onClick={submitAjuste}
                 className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
-                style={{ background: '#1B3A6B' }}>
+                style={{ background: 'var(--brand)' }}>
                 {t('fin_eq_adj_send')}
               </button>
             </div>
@@ -1001,7 +1001,7 @@ function SubcontratosModule({ can, rol,
   dispatch, fmt2, fmt, t,
   currentUserId, nombreEmpresa,
 }) {
-  const BRAND = '#1B3A6B'
+  const BRAND = 'var(--brand)'
   const puedeRechazar = ['super_admin','client_admin','gerente'].includes(rol)
   const acts  = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
   const contratosProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
@@ -1191,13 +1191,13 @@ function SubcontratosModule({ can, rol,
       </div>
 
       {contratosProy.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+        <div className="m-card p-12 text-center">
           <p className="text-gray-400 text-sm">{t('fin_empty_subcontracts')}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+        <div className="m-card overflow-x-auto">
           <table className="w-full">
-            <thead><tr className="bg-gray-50 border-b border-gray-100">
+            <thead><tr className="m-thead-row">
               {[
                 t('fin_sc_col_subcontractor'),
                 t('fin_sc_col_desc'),
@@ -1217,7 +1217,7 @@ function SubcontratosModule({ can, rol,
                   ? Math.min(100, (pagado / parseFloat(sc.monto_total)) * 100).toFixed(1)
                   : '0.0'
                 return (
-                  <tr key={sc.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <tr key={sc.id} className="m-tr">
                     <td className={tdCls + ' font-medium'}>{sc.subcontratista}</td>
                     <td className={tdCls + ' text-xs text-gray-500 max-w-[180px] truncate'}>{sc.descripcion || '—'}</td>
                     <td className={tdCls + ' font-mono'}>{fmt(sc.monto_total, moneda)}</td>
@@ -1243,7 +1243,7 @@ function SubcontratosModule({ can, rol,
                     <td className={tdCls}>
                       <div className="flex gap-1">
                         <button onClick={() => { setScSelected(sc); setScView('detail') }}
-                          className="text-xs px-2 py-1 border border-gray-200 rounded-lg hover:bg-gray-50">
+                          className="m-btn m-btn-sm m-btn-ghost">
                           {t('btn_view')}
                         </button>
                         {puedeEditar && (
@@ -1272,23 +1272,23 @@ function SubcontratosModule({ can, rol,
         <h2 className="text-base font-semibold text-gray-800">{t('fin_sc_form_title')}</h2>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+      <div className="m-card p-5 flex flex-col gap-4">
         {/* Datos generales */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_contractor')}</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+            <input className="m-input"
               value={scForm.subcontratista||''} onChange={setScF('subcontratista')} placeholder={t('fin_sc_form_contractor_ph')} />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_tax')}</label>
-            <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+            <input type="number" className="m-input"
               value={scForm.impuesto_pct||''} onChange={setScF('impuesto_pct')} placeholder="0" min="0" max="100" step="0.01" />
           </div>
         </div>
         <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_col_desc')}</label>
-          <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+          <textarea className="m-input"
             rows={2} value={scForm.descripcion||''} onChange={setScF('descripcion')} />
         </div>
 
@@ -1316,17 +1316,17 @@ function SubcontratosModule({ can, rol,
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_contract_date')}</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+            <input type="date" className="m-input"
               value={scForm.fecha_contrato||''} onChange={setScF('fecha_contrato')} />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_start_date')}</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+            <input type="date" className="m-input"
               value={scForm.fecha_inicio||''} onChange={setScF('fecha_inicio')} />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_end_date')}</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] bg-[#F2F2F2]"
+            <input type="date" className="m-input"
               value={scForm.fecha_fin||''} onChange={setScF('fecha_fin')} />
           </div>
         </div>
@@ -1339,7 +1339,7 @@ function SubcontratosModule({ can, rol,
             </p>
             <button onClick={() => setScItems(i => [...i, { actividad_id:'', descripcion:'', unidad:'und', cantidad_contrato:'', costo_unitario:'' }])}
               className="text-xs font-medium px-3 py-1 rounded-lg"
-              style={{ color: BRAND, background: '#EEF2F7' }}>
+              style={{ color: 'var(--brand)', background: 'var(--brand-soft)' }}>
               {t('fin_sc_form_add')}
             </button>
           </div>
@@ -1362,7 +1362,7 @@ function SubcontratosModule({ can, rol,
                   </div>
                   <div className="mb-2">
                     <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_budget_activity')}</label>
-                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#1B3A6B]"
+                    <select className="m-input"
                       value={it.actividad_id||''} onChange={e => {
                         const act = acts.find(a => a.id === e.target.value)
                         setScItem(idx, 'actividad_id', e.target.value)
@@ -1374,24 +1374,24 @@ function SubcontratosModule({ can, rol,
                   </div>
                   <div className="mb-2">
                     <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_desc')}</label>
-                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                    <input className="m-input"
                       value={it.descripcion||''} onChange={e => setScItem(idx,'descripcion',e.target.value)}
                       placeholder={t('fin_sc_form_act_desc_ph')} />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_unit')}</label>
-                      <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                      <input className="m-input"
                         value={it.unidad||'und'} onChange={e => setScItem(idx,'unidad',e.target.value)} />
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_qty')}</label>
-                      <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                      <input type="number" className="m-input"
                         value={it.cantidad_contrato||''} onChange={e => setScItem(idx,'cantidad_contrato',e.target.value)} placeholder="0" min="0" step="0.01" />
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_unit_cost')}</label>
-                      <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+                      <input type="number" className="m-input"
                         value={it.costo_unitario||''} onChange={e => setScItem(idx,'costo_unitario',e.target.value)} placeholder="0.00" min="0" step="0.01" />
                     </div>
                   </div>
@@ -1427,7 +1427,7 @@ function SubcontratosModule({ can, rol,
 
         <div className="flex gap-2 pt-2">
           <button onClick={() => setScView('list')}
-            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+            className="m-btn m-btn-ghost flex-1">
             {t('btn_cancel')}
           </button>
           <button onClick={saveContrato}
@@ -1468,7 +1468,7 @@ function SubcontratosModule({ can, rol,
               lang:           isEs ? 'ES' : 'EN',
               nombreEmpresa,
             })}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+            className="m-btn m-btn-sm m-btn-ghost"
             title={isEs ? 'Exportar contrato (Excel)' : 'Export contract (Excel)'}>
             📥 {isEs ? 'Exportar contrato' : 'Export contract'}
           </button>
@@ -1510,11 +1510,11 @@ function SubcontratosModule({ can, rol,
         {/* Resumen financiero */}
         <div className="grid grid-cols-3 gap-4 mb-5">
           {[
-            [t('fin_sc_col_contract'), fmt(scSelected.monto_total, moneda), '#1B3A6B'],
+            [t('fin_sc_col_contract'), fmt(scSelected.monto_total, moneda), 'var(--brand)'],
             [t('fin_sc_valued'), fmt(totalPagado, moneda), '#1D9E75'],
             [t('fin_sc_balance'), fmt(parseFloat(scSelected.monto_total||0) - totalPagado, moneda), '#D97706'],
           ].map(([label, val, color]) => (
-            <div key={label} className="bg-white border border-gray-100 rounded-xl p-4">
+            <div key={label} className="m-card p-4">
               <p className="text-xs text-gray-400 mb-1">{label}</p>
               <p className="text-xl font-bold font-mono" style={{ color }}>{val}</p>
             </div>
@@ -1567,7 +1567,7 @@ Total: `)
                       })
                     }}
                     className="text-xs px-3 py-1.5 rounded-lg text-white font-semibold flex items-center gap-1.5"
-                    style={{ background: '#1B3A6B' }}>
+                    style={{ background: 'var(--brand)' }}>
                     📄 {t('fin_sc_emit_order_btn')} ({fmt(totalSinOrden, moneda)})
                   </button>
                 )}
@@ -1673,7 +1673,7 @@ Total: `)
                           <td className="px-2 py-1.5 font-mono font-semibold text-blue-700">{o.numero_orden}</td>
                           <td className="px-2 py-1.5 text-gray-500">{o.fecha_orden}</td>
                           <td className="px-2 py-1.5 text-center">{o.cantidad_avaluos}</td>
-                          <td className="px-2 py-1.5 font-mono font-bold" style={{color:'#1B3A6B'}}>{fmt(o.monto_total, moneda)}</td>
+                          <td className="px-2 py-1.5 font-mono font-bold" style={{ color: 'var(--brand)' }}>{fmt(o.monto_total, moneda)}</td>
                           <td className="px-2 py-1.5">
                             <span className={`px-2 py-0.5 rounded-full font-medium ${
                               o.estado === 'pagada' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
@@ -1714,7 +1714,7 @@ Total: `)
         })()}
 
         {/* Items del contrato */}
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden mb-5">
+        <div className="m-card overflow-hidden mb-5">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               {t('fin_sc_contract_activities')}
@@ -1739,7 +1739,7 @@ Total: `)
                     }, 0)
                 const saldo = parseFloat(it.cantidad_contrato||0) - acum
                 return (
-                  <tr key={it.id} className="border-b border-gray-50">
+                  <tr key={it.id} className="m-tr">
                     <td className={tdCls}>{it.descripcion}</td>
                     <td className={tdCls + ' text-xs text-gray-400'}>{it.unidad}</td>
                     <td className={tdCls + ' font-mono'}>{it.cantidad_contrato}</td>
@@ -1755,7 +1755,7 @@ Total: `)
         </div>
 
         {/* Lista de avalúos */}
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               {t('fin_sc_valuations_title')}
@@ -1777,7 +1777,7 @@ Total: `)
               </tr></thead>
               <tbody>
                 {avaluosSc.map(av => (
-                  <tr key={av.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <tr key={av.id} className="m-tr">
                     <td className={tdCls + ' font-mono font-bold'} style={{ color: BRAND }}>#{av.numero}</td>
                     <td className={tdCls + ' text-xs text-gray-400'}>
                       {av.periodo_inicio && av.periodo_fin
@@ -1872,22 +1872,22 @@ Total: `)
           </h2>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-4">
+        <div className="m-card p-5 flex flex-col gap-4">
           {/* Cabecera */}
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_period_start')}</label>
-              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+              <input type="date" className="m-input"
                 value={avForm.periodo_inicio||''} onChange={setAvF('periodo_inicio')} />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_period_end')}</label>
-              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+              <input type="date" className="m-input"
                 value={avForm.periodo_fin||''} onChange={setAvF('periodo_fin')} />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_prepared_date')}</label>
-              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+              <input type="date" className="m-input"
                 value={avForm.fecha_elaboracion||''} onChange={setAvF('fecha_elaboracion')} />
             </div>
           </div>
@@ -1895,7 +1895,7 @@ Total: `)
           {/* Tabla de ítems */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
+              <thead><tr className="m-thead-row">
                 {[isEs?'Descripción':'Description', isEs?'UM':'UM',
                   isEs?'Cant. Contrato':'Contract Qty',
                   isEs?'C. Unitario':'Unit Cost',
@@ -1988,13 +1988,13 @@ Total: `)
 
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('lbl_notes')}</label>
-            <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#F2F2F2] focus:outline-none focus:border-[#1B3A6B]"
+            <textarea className="m-input"
               rows={2} value={avForm.notas||''} onChange={setAvF('notas')} />
           </div>
 
           <div className="flex gap-2 pt-2">
             <button onClick={() => setScView('detail')}
-              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+              className="m-btn m-btn-ghost flex-1">
               {t('btn_cancel')}
             </button>
             <button onClick={saveAvaluo}
@@ -2166,14 +2166,14 @@ function CajaChicaModule({
   if (!caja) {
     if (!puedeGestionarFondo) {
       return (
-        <div className="bg-white rounded-xl border border-gray-100 p-6 max-w-lg">
+        <div className="m-card p-6 max-w-lg">
           <h3 className="text-sm font-semibold text-gray-700 mb-1">{t('cc_no_fund_title')}</h3>
           <p className="text-xs text-gray-400">{t('cc_no_permission')}</p>
         </div>
       )
     }
     return (
-      <div className="bg-white rounded-xl border border-gray-100 p-6 max-w-lg">
+      <div className="m-card p-6 max-w-lg">
         <h3 className="text-sm font-semibold text-gray-700 mb-1">
           {puedeAbrirDirecto ? t('cc_open_title') : t('cc_request_title')}
         </h3>
@@ -2224,7 +2224,7 @@ function CajaChicaModule({
     <div className="flex flex-col gap-5">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label={t('cc_assigned_fund')} value={fmt(caja.monto_asignado, moneda)} color="#1B3A6B" />
+        <StatCard label={t('cc_assigned_fund')} value={fmt(caja.monto_asignado, moneda)} color="var(--brand)" />
         <StatCard label={t('cc_current_balance')} value={fmt(caja.saldo_actual, moneda)}
           color={parseFloat(caja.saldo_actual) < 0 ? '#ef4444' : undefined}
           sub={parseFloat(caja.saldo_actual) < 0 ? t('cc_overspent') : parseFloat(caja.saldo_actual)===0 ? t('cc_no_cash') : undefined} />
@@ -2254,7 +2254,7 @@ function CajaChicaModule({
 
       {/* Nuevo gasto */}
       {puedeEditar && !closed && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5">
+        <div className="m-card p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">{t('cc_register_expense')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Field label={t('cc_description')}>
@@ -2322,7 +2322,7 @@ function CajaChicaModule({
       )}
 
       {/* Gastos pendientes de liquidar */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="m-card overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm font-semibold text-gray-700">{t('cc_pending_expenses')}</h3>
           {puedeEditar && !closed && pendientes.length>0 && (
@@ -2340,7 +2340,7 @@ function CajaChicaModule({
               </tr></thead>
               <tbody>
                 {pendientes.map(g=>(
-                  <tr key={g.id} className="border-b border-gray-50">
+                  <tr key={g.id} className="m-tr">
                     <td className={tdCls+' text-xs text-gray-500'}>{g.fecha}</td>
                     <td className={tdCls}>{g.descripcion}</td>
                     <td className={tdCls+' text-xs text-gray-500'}>{g.proveedor||'—'}</td>
@@ -2370,7 +2370,7 @@ function CajaChicaModule({
 
       {/* Liquidaciones */}
       {liquidsProy.length>0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700">{t('cc_settlements')}</h3>
           </div>
@@ -2390,7 +2390,7 @@ function CajaChicaModule({
                   }
                   const e = ESTADOS[l.estado]||ESTADOS.pendiente
                   return (
-                    <tr key={l.id} className="border-b border-gray-50">
+                    <tr key={l.id} className="m-tr">
                       <td className={tdCls+' text-xs text-gray-500'}>{l.fecha}</td>
                       <td className={tdCls+' text-right font-mono'}>{fmt(l.total_gastos, moneda)}</td>
                       <td className={tdCls+' text-right font-mono'}>{fmt(l.reposicion, moneda)}</td>
@@ -2426,7 +2426,7 @@ function CajaChicaModule({
 
       {/* Reembolsos a personal */}
       {reembolsosProy.length>0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700">{t('cc_reimbursements')}</h3>
             <p className="text-xs text-gray-400 mt-0.5">{t('cc_reimbursements_desc')}</p>
@@ -2439,7 +2439,7 @@ function CajaChicaModule({
               </tr></thead>
               <tbody>
                 {reembolsosProy.map(r=>(
-                  <tr key={r.id} className="border-b border-gray-50">
+                  <tr key={r.id} className="m-tr">
                     <td className={tdCls}>{nombreUsuario(r.usuario_id)}</td>
                     <td className={tdCls+' text-right font-mono font-medium'}>{fmt(r.monto, moneda)}</td>
                     <td className={tdCls}>
@@ -2451,7 +2451,7 @@ function CajaChicaModule({
                     <td className={tdCls+' text-xs text-gray-500'}>{r.fecha_pago||'—'}</td>
                     <td className={tdCls}>
                       {r.estado==='pendiente' && puedeEditar && !closed && (
-                        <button onClick={()=>pagarReembolso(r.id)} className="text-xs px-2 py-1 rounded-lg text-white font-medium" style={{background:'#1B3A6B'}}>
+                        <button onClick={()=>pagarReembolso(r.id)} className="text-xs px-2 py-1 rounded-lg text-white font-medium" style={{ background: 'var(--brand)' }}>
                           {t('cc_mark_paid')}
                         </button>
                       )}

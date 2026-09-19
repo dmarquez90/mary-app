@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls, PageHeader } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
 import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from './categoriasIndirectos'
 
@@ -181,34 +181,32 @@ export default function Presupuesto() {
   }
 
   return (
-    <div className="p-6 max-w-full">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('pres_title')}</h1>
-          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="p-5 md:p-6 max-w-full">
+      <PageHeader
+        title={t('pres_title')}
+        subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
+        actions={<>
           <button
             onClick={() => syncPresupuesto(proyId)}
             disabled={!proyId || syncing}
             title={t('pres_reload_server')}
-            className="p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 disabled:opacity-40 transition-colors text-sm">
+            className="m-btn m-btn-ghost" style={{ padding: 9 }}>
             {syncing ? '⟳' : '↺'}
           </button>
           <select
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+            className="m-input" style={{ width: 'auto', minWidth: 190 }}
             value={proyId} onChange={e => handleProyChange(e.target.value)}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
-        </div>
-      </div>
+        </>}
+      />
 
       {!proyId ? (
         <EmptyState icon={Icons.budget} title={t('pres_no_project')} subtitle={t('pres_empty_sub')} />
       ) : (
         <>
-          <div className="bg-white border border-gray-100 rounded-xl mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0 sticky top-0 z-20">
+          <div className="m-card mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0 sticky top-0 z-20">
             {puedeEditar && !closed && <>
               <TBtn onClick={() => openAdd('etapa')}>
                 <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>
@@ -239,13 +237,13 @@ export default function Presupuesto() {
           )}
 
           {flat.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-xl rounded-t-none py-16">
+            <div className="m-card rounded-t-none py-16">
               <EmptyState icon={Icons.table} title={t('pres_empty')} subtitle={t('pres_empty_sub')}
                 action={puedeEditar ? t('pres_add_stage') : null}
                 onAction={puedeEditar ? () => openAdd('etapa') : null} />
             </div>
           ) : (
-            <div className="bg-white border border-gray-100 rounded-xl rounded-t-none overflow-x-auto">
+            <div className="m-card rounded-t-none overflow-x-auto">
               <table className="w-full min-w-[860px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 ">
@@ -322,7 +320,7 @@ export default function Presupuesto() {
 
       {/* ── SECCIÓN COSTOS INDIRECTOS PRESUPUESTADOS ── */}
       {proyId && (
-        <div className="mt-6 bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <div className="mt-6 m-card overflow-hidden">
           <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">{t('pres_indirect_title')}</p>
           </div>
@@ -372,7 +370,7 @@ export default function Presupuesto() {
                       <Fragment key={g.categoria}>
                         <tr className={isSimple ? 'border-b border-gray-50 hover:bg-gray-50/50' : 'bg-gray-50/70 border-b border-gray-100'}>
                           <td className={`px-2 py-2 text-sm ${isSimple ? 'text-gray-700' : 'font-semibold text-gray-700'}`}>{g.label}</td>
-                          <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{color:'#1B3A6B'}}>{fmt(g.total, moneda)}</td>
+                          <td className="px-2 py-2 text-sm font-mono text-right font-medium" style={{ color: 'var(--brand)' }}>{fmt(g.total, moneda)}</td>
                           {puedeEditar && (
                             <td className="px-2 py-2">
                               {isSimple && (
@@ -385,7 +383,7 @@ export default function Presupuesto() {
                           )}
                         </tr>
                         {!isSimple && g.items.map(ind => (
-                          <tr key={ind.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <tr key={ind.id} className="m-tr">
                             <td className="px-2 py-2 pl-7 text-xs text-gray-500">
                               {(() => {
                                 const sub = ind.subcategoria
@@ -413,7 +411,7 @@ export default function Presupuesto() {
                   })}
                   <tr className="bg-gray-50">
                     <td className="px-2 py-2 text-xs font-semibold text-gray-500 text-right">{t('pres_indirect_total')}</td>
-                    <td className="px-2 py-2 text-sm font-mono font-bold text-right" style={{color:'#1B3A6B'}}>{fmt(totalIndirecto, moneda)}</td>
+                    <td className="px-2 py-2 text-sm font-mono font-bold text-right" style={{ color: 'var(--brand)' }}>{fmt(totalIndirecto, moneda)}</td>
                     {puedeEditar && <td/>}
                   </tr>
                 </tbody>
@@ -425,7 +423,7 @@ export default function Presupuesto() {
 
       {/* ── RESUMEN FINANCIERO COMPLETO ── */}
       {proyId && (
-        <div className="mt-4 bg-white border border-gray-100 rounded-xl overflow-hidden">
+        <div className="mt-4 m-card overflow-hidden">
           <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-700">{t('pres_summary_title')}</p>
           </div>
@@ -456,8 +454,8 @@ export default function Presupuesto() {
               <span className="font-mono text-gray-600">{fmt(impuestoMonto, moneda)}</span>
             </div>
             <div className="flex justify-between text-base font-bold py-2 bg-blue-50 rounded-lg px-3 mt-1">
-              <span style={{color:'#1B3A6B'}}>{t('pres_summary_with_tax')}</span>
-              <span className="font-mono" style={{color:'#1B3A6B'}}>{fmt(totalConImp, moneda)}</span>
+              <span style={{ color: 'var(--brand)' }}>{t('pres_summary_with_tax')}</span>
+              <span className="font-mono" style={{ color: 'var(--brand)' }}>{fmt(totalConImp, moneda)}</span>
             </div>
             {(!proy?.utilidad_pct && !proy?.impuesto_pct) && (
               <p className="text-xs text-amber-600 mt-2">

@@ -68,7 +68,7 @@ const CONTENT = {
     counter:  (c, t) => `Paso ${c} de ${t}`,
     finalMsg: 'Ya conoces los módulos principales de MARY. ¡Comienza a gestionar tus proyectos!',
     modules: [
-      { icon: '🏗️', titulo: 'Dashboard',           color: '#1B3A6B', desc: 'Tu centro de mando. Resumen de proyectos activos, avance presupuestal vs. costo real, alertas de stock crítico y órdenes de compra pendientes en tiempo real.' },
+      { icon: '🏗️', titulo: 'Dashboard',           color: 'var(--brand)', desc: 'Tu centro de mando. Resumen de proyectos activos, avance presupuestal vs. costo real, alertas de stock crítico y órdenes de compra pendientes en tiempo real.' },
       { icon: '📁', titulo: 'Proyectos',             color: '#1D9E75', desc: 'Cada proyecto funciona como una sub-empresa con su propio personal, inventario y finanzas. Crea proyectos, define la ruta crítica y gestiona todo el ciclo de vida.' },
       { icon: '📊', titulo: 'Presupuesto',           color: '#2563EB', desc: 'Define el presupuesto base con etapas, sub-etapas y actividades. MARY genera la Curva S automáticamente comparando presupuesto vs. costo real.' },
       { icon: '📦', titulo: 'Inventario',            color: '#7C3AED', desc: 'Control completo de bodega: catálogo de materiales, entradas por orden de compra, salidas asignadas a actividades. Alertas automáticas por stock bajo mínimo.' },
@@ -89,7 +89,7 @@ const CONTENT = {
     counter:  (c, t) => `Step ${c} of ${t}`,
     finalMsg: "You've seen MARY's main modules. Start managing your projects!",
     modules: [
-      { icon: '🏗️', titulo: 'Dashboard',          color: '#1B3A6B', desc: 'Your command center. Summary of active projects, budget vs. actual cost, critical stock alerts, and pending purchase orders in real time.' },
+      { icon: '🏗️', titulo: 'Dashboard',          color: 'var(--brand)', desc: 'Your command center. Summary of active projects, budget vs. actual cost, critical stock alerts, and pending purchase orders in real time.' },
       { icon: '📁', titulo: 'Projects',            color: '#1D9E75', desc: 'Each project works as its own sub-company with its own staff, inventory, and finances. Create projects, define the critical path, and manage the full lifecycle.' },
       { icon: '📊', titulo: 'Budget',              color: '#2563EB', desc: 'Define the base budget with stages, sub-stages, and activities. MARY automatically generates the S-Curve comparing budget vs. actual cost.' },
       { icon: '📦', titulo: 'Inventory',           color: '#7C3AED', desc: 'Full warehouse control: material catalog, entries by purchase order, exits assigned to activities. Automatic alerts when stock falls below minimum.' },
@@ -211,7 +211,7 @@ export default function WelcomeTour() {
 
         {/* ══ CABECERA ════════════════════════════════════════════════════ */}
         <div style={{
-          background: '#1B3A6B', padding: '24px 28px 20px',
+          background: 'var(--brand)', padding: '24px 28px 20px',
           position: 'relative', overflow: 'hidden',
         }}>
           {/* Decoración */}
@@ -363,12 +363,12 @@ export default function WelcomeTour() {
           )}
           <button onClick={siguiente} style={{
             ...btnBase,
-            background: esFinal ? '#1D9E75' : '#1B3A6B',
+            background: esFinal ? '#1D9E75' : 'var(--brand)',
             color: '#fff', borderRadius: 10, padding: '9px 24px',
             fontSize: 13, fontWeight: 700,
           }}
           onMouseEnter={e => { e.currentTarget.style.background = esFinal ? '#178A68' : '#16305A' }}
-          onMouseLeave={e => { e.currentTarget.style.background = esFinal ? '#1D9E75' : '#1B3A6B' }}
+          onMouseLeave={e => { e.currentTarget.style.background = esFinal ? '#1D9E75' : 'var(--brand)' }}
           >
             {esFinal ? `✓ ${c.finish}` : `${c.next} →`}
           </button>

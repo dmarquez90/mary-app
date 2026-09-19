@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 
 export default function PagoExitoso() {
   const lang = localStorage.getItem('mary_lang') || 'ES'
@@ -22,7 +22,7 @@ export default function PagoExitoso() {
   }, [])
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#F0F4F8' }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--surface-2)' }}>
       <div className="w-full max-w-md text-center">
 
         {/* Logo */}

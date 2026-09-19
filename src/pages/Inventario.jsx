@@ -2,7 +2,7 @@ import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { today, fmtNum, fmt } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader, Toolbar, SearchInput, Chip, IconBtn } from '../components'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
@@ -47,7 +47,7 @@ function ModalJustificacion({ open, onClose, onConfirm, tipo, isEs }) {
             : 'This action requires administrator approval. Please explain the reason for this deletion.'}
         </p>
         <textarea
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] resize-none"
+          className="m-input" style={{ resize: 'none' }}
           rows={4}
           placeholder={isEs ? 'Escribe aqui la justificacion...' : 'Write the justification here...'}
           value={justificacion}
@@ -55,14 +55,14 @@ function ModalJustificacion({ open, onClose, onConfirm, tipo, isEs }) {
         />
         <div className="flex gap-2 mt-4">
           <button onClick={() => { setJustificacion(''); onClose() }}
-            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+            className="m-btn m-btn-ghost flex-1">
             {isEs ? 'Cancelar' : 'Cancel'}
           </button>
           <button
             disabled={!justificacion.trim()}
             onClick={() => { onConfirm(justificacion); setJustificacion('') }}
             className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
-            style={{ background: '#1B3A6B' }}>
+            style={{ background: 'var(--brand)' }}>
             {isEs ? 'Enviar solicitud' : 'Send request'}
           </button>
         </div>
@@ -282,7 +282,7 @@ export default function Inventario() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
 
       <ModalJustificacion
         open={!!modalElim}
@@ -292,28 +292,32 @@ export default function Inventario() {
         isEs={isEs}
       />
 
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('inv_title')}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+      <PageHeader
+        title={t('inv_title')}
+        subtitle={
+          <span>
             {t('inv_sub', { n: activos.length })}
-            {criticos.length > 0 && <span className="text-red-500 ml-1">· {t('inv_critical', { n: criticos.length })}</span>}
-          </p>
-        </div>
-        {puedeEditar && (
-          <div className="flex gap-2">
-            {tab === 0 && <PrimaryBtn onClick={() => { setForm(emptyMat()); setEditMat(null); setDrawer('mat') }}>{t('inv_add_material')}</PrimaryBtn>}
-            {tab === 1 && <PrimaryBtn onClick={() => { setForm(emptyIn()); setDrawer('in') }}>{t('inv_add_entry')}</PrimaryBtn>}
-            {tab === 2 && <PrimaryBtn onClick={() => { setForm(emptyOut()); setSearchOut(''); setDrawer('out') }}>{t('inv_add_exit')}</PrimaryBtn>}
-          </div>
+            {criticos.length > 0 && (
+              <span className="ml-1 font-semibold" style={{ color: 'var(--danger)' }}>
+                · {t('inv_critical', { n: criticos.length })}
+              </span>
+            )}
+          </span>
+        }
+        actions={puedeEditar && (
+          <>
+            {tab === 0 && <PrimaryBtn icon={Icons.plus} onClick={() => { setForm(emptyMat()); setEditMat(null); setDrawer('mat') }}>{t('inv_add_material')}</PrimaryBtn>}
+            {tab === 1 && <PrimaryBtn icon={Icons.plus} onClick={() => { setForm(emptyIn()); setDrawer('in') }}>{t('inv_add_entry')}</PrimaryBtn>}
+            {tab === 2 && <PrimaryBtn icon={Icons.plus} onClick={() => { setForm(emptyOut()); setSearchOut(''); setDrawer('out') }}>{t('inv_add_exit')}</PrimaryBtn>}
+          </>
         )}
-      </div>
+      />
 
-      <div className="flex border-b border-gray-200 mb-5">
+      <div className="m-tabbar">
         {TABS.map((label, i) => (
           <button key={i} onClick={() => setTab(i)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px
-              ${tab===i ? 'border-[#1B3A6B] text-[#1B3A6B]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            className={`m-tab
+              ${tab===i ? 'm-tab-active' : ''}`}>
             {label}
           </button>
         ))}
@@ -332,46 +336,47 @@ export default function Inventario() {
             </div>
           ) : (
             <div className="mt-4">
-              <div className="mb-4">
-                <div className="relative">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                  <input
-                    className="w-full border border-gray-200 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
-                    placeholder={isEs ? 'Buscar por nombre o codigo...' : 'Search by name or code...'}
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
-                  {search && (
-                    <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">x</button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button onClick={() => setCatFilter('')}
-                  className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
-                  style={!catFilter ? { background:'#1B3A6B', color:'#fff', borderColor:'#1B3A6B' } : { background:'#fff', color:'#6B7280', borderColor:'#D1D5DB' }}>
-                  {isEs ? 'Todos' : 'All'}
-                </button>
-                {CATEGORIAS.filter(c => activos.some(m => m.categoria === c.key)).map(c => (
-                  <button key={c.key} onClick={() => setCatFilter(catFilter === c.key ? '' : c.key)}
-                    className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
-                    style={catFilter === c.key ? { background:c.color, color:'#fff', borderColor:c.color } : { background:'#fff', color:c.color, borderColor:c.color }}>
-                    {isEs ? c.es : c.en}
+              <Toolbar>
+                <SearchInput value={search} onChange={setSearch} width={300}
+                  placeholder={isEs ? 'Buscar por nombre o código...' : 'Search by name or code...'} />
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <button onClick={() => setCatFilter('')} className="m-chip"
+                    style={!catFilter
+                      ? { cursor:'pointer', background:'var(--brand)', color:'#fff' }
+                      : { cursor:'pointer', background:'var(--surface)', color:'var(--txt-2)', borderColor:'var(--bd)' }}>
+                    {isEs ? 'Todos' : 'All'}
+                    <span style={{ opacity: .7 }}>{activos.length}</span>
                   </button>
-                ))}
-              </div>
+                  {CATEGORIAS.filter(c => activos.some(m => m.categoria === c.key)).map(c => {
+                    const n = activos.filter(m => m.categoria === c.key).length
+                    const on = catFilter === c.key
+                    return (
+                      <button key={c.key} onClick={() => setCatFilter(on ? '' : c.key)} className="m-chip"
+                        style={on
+                          ? { cursor:'pointer', background:c.color, color:'#fff' }
+                          : { cursor:'pointer', background:'var(--surface)', color:c.color, borderColor:'var(--bd)' }}>
+                        <span className="m-chip-dot" style={{ background: c.color }} />
+                        {isEs ? c.es : c.en}
+                        <span style={{ opacity: .7 }}>{n}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <span className="text-xs ml-auto" style={{ color: 'var(--txt-3)' }}>
+                  {activosFiltrados.length} / {activos.length}
+                </span>
+              </Toolbar>
 
               {activosFiltrados.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-                  <p className="text-sm text-gray-400">{isEs ? 'No se encontraron materiales' : 'No materials found'}</p>
+                <div className="m-card">
+                  <EmptyState icon={Icons.search}
+                    title={isEs ? 'No se encontraron materiales' : 'No materials found'}
+                    subtitle={isEs ? 'Prueba con otro término o quita el filtro de categoría.' : 'Try another term or clear the category filter.'} />
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+                <div className="m-card overflow-x-auto">
                   <table className="w-full">
-                    <thead><tr className="bg-gray-50 border-b border-gray-100">
+                    <thead><tr className="m-thead-row">
                       {[
                         t('inv_col_code'), t('inv_col_desc'),
                         isEs ? 'Categoria' : 'Category',
@@ -381,7 +386,7 @@ export default function Inventario() {
                         t('inv_col_location'), t('inv_col_status'),
                         puedeEditar ? '' : null
                       ].filter(h => h !== null).map((h,i) => (
-                        <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                        <th key={i} className="px-4 py-3 text-left">{h}</th>
                       ))}
                     </tr></thead>
                     <tbody>
@@ -389,16 +394,16 @@ export default function Inventario() {
                         const crit = parseFloat(m.stock_actual||0) < parseFloat(m.stock_minimo||0)
                         const cat  = CATEGORIAS.find(c => c.key === m.categoria)
                         return (
-                          <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                            <td className="px-4 py-3 text-xs font-mono text-gray-500">{m.codigo}</td>
-                            <td className="px-4 py-3 text-sm text-gray-800" style={{minWidth:200}}>{m.descripcion}</td>
+                          <tr key={m.id} className="m-tr">
+                            <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--txt-3)' }}>{m.codigo}</td>
+                            <td className="px-4 py-3 text-sm font-medium" style={{ minWidth: 200, color: 'var(--txt)' }}>{m.descripcion}</td>
                             <td className="px-4 py-3">
                               {cat
                                 ? <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: cat.color }}>{isEs ? cat.es : cat.en}</span>
                                 : <span className="text-xs text-gray-300">---</span>}
                             </td>
                             <td className="px-4 py-3 text-xs text-gray-500">{m.unidad}</td>
-                            <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: crit ? '#ef4444' : '#1D9E75' }}>
+                            <td className="px-4 py-3 text-sm font-mono font-semibold" style={{ color: crit ? 'var(--danger)' : 'var(--ok)' }}>
                               {fmtNum(m.stock_actual)} {crit && <span className="text-xs">!</span>}
                             </td>
                             <td className="px-4 py-3 text-sm font-mono text-gray-500">{fmtNum(m.stock_minimo)}</td>
@@ -414,7 +419,7 @@ export default function Inventario() {
                                 return m.precio_unitario > 0 ? fmt(m.precio_unitario, 'USD') : '---'
                               })()}
                             </td>
-                            <td className="px-4 py-3 text-sm font-mono font-semibold" style={{color:"#1B3A6B", minWidth:120}}>
+                            <td className="px-4 py-3 text-sm font-mono font-semibold" style={{ color: 'var(--brand)', minWidth: 120 }}>
                               {(() => {
                                 const entsM = entradas.filter(e => e.material_id === m.id)
                                 const precio = entsM.length > 0
@@ -426,16 +431,19 @@ export default function Inventario() {
                             </td>
                             <td className="px-4 py-3 text-xs text-gray-500">{m.ubicacion_bodega || '---'}</td>
                             <td className="px-4 py-3">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                              <Chip tone={crit ? 'danger' : 'ok'} dot>
                                 {crit ? t('inv_critical_badge') : t('inv_ok')}
-                              </span>
+                              </Chip>
                             </td>
                             {puedeEditar && (
                               <td className="px-4 py-3">
-                                <div className="flex gap-1">
-                                  <TBtn onClick={() => { setForm({...m}); setEditMat(m.id); setDrawer('mat') }}>{t('btn_edit')}</TBtn>
-                                  <TBtn danger onClick={() => dispatch({ type:'TOGGLE_MATERIAL', payload:m.id })}>{t('inv_deactivate')}</TBtn>
-                                  <TBtn danger onClick={() => delMat(m)}>{isEs ? 'Eliminar' : 'Delete'}</TBtn>
+                                <div className="flex gap-0.5 justify-end">
+                                  <IconBtn icon={Icons.edit} tip={t('btn_edit')}
+                                    onClick={() => { setForm({...m}); setEditMat(m.id); setDrawer('mat') }} />
+                                  <IconBtn icon={Icons.x} tip={t('inv_deactivate')}
+                                    onClick={() => dispatch({ type:'TOGGLE_MATERIAL', payload:m.id })} />
+                                  <IconBtn icon={Icons.trash} danger tip={isEs ? 'Eliminar' : 'Delete'}
+                                    onClick={() => delMat(m)} />
                                 </div>
                               </td>
                             )}
@@ -453,13 +461,13 @@ export default function Inventario() {
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
                     {isEs ? `${inactivos.length} material(es) inactivo(s)` : `${inactivos.length} inactive material(s)`}
                   </p>
-                  <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto opacity-70">
+                  <div className="m-card overflow-x-auto opacity-70">
                     <table className="w-full">
                       <tbody>
                         {inactivos.map(m => {
                           const cat = CATEGORIAS.find(c => c.key === m.categoria)
                           return (
-                            <tr key={m.id} className="border-b border-gray-50">
+                            <tr key={m.id} className="m-tr">
                               <td className="px-4 py-2 text-xs font-mono text-gray-400">{m.codigo}</td>
                               <td className="px-4 py-2 text-sm text-gray-400">{m.descripcion}</td>
                               <td className="px-4 py-2 text-xs text-gray-400">
@@ -507,16 +515,16 @@ export default function Inventario() {
             action={puedeEditar ? t('inv_add_entry') : null}
             onAction={puedeEditar ? () => { setForm(emptyIn()); setDrawer('in') } : null} />
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <div className="m-card overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
+              <thead><tr className="m-thead-row">
                 {[
                   t('inv_col_date'), t('inv_col_material'), t('inv_col_qty'),
                   t('inv_col_price'), isEs ? 'Impuesto' : 'Tax', t('inv_col_invoice'), t('inv_col_supplier'),
                   t('inv_col_project'), isEs ? 'Tipo' : 'Type',
                   puedeEditar ? '' : null
                 ].filter(h => h !== null).map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -525,7 +533,7 @@ export default function Inventario() {
                   const proy = proyectos.find(p => p.id === e.proyecto_id)
                   const esStockInicial = e.numero_factura === 'STOCK-INICIAL'
                   return (
-                    <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={e.id} className="m-tr">
                       <td className="px-4 py-3 text-xs text-gray-500">{e.fecha_recepcion}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '---'}</td>
                       <td className="px-4 py-3 text-sm font-mono text-[#1D9E75]">+{fmtNum(e.cantidad)} {mat?.unidad}</td>
@@ -593,16 +601,16 @@ export default function Inventario() {
             action={puedeEditar ? t('inv_add_exit') : null}
             onAction={puedeEditar ? () => { setForm(emptyOut()); setSearchOut(''); setDrawer('out') } : null} />
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <div className="m-card overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
+              <thead><tr className="m-thead-row">
                 {[
                   t('inv_col_date'), t('inv_col_material'), t('inv_col_qty'),
                   t('inv_col_project'), t('inv_col_activity'),
                   isEs ? 'Tipo' : 'Type',
                   puedeEditar ? '' : null
                 ].filter(h => h !== null).map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -611,7 +619,7 @@ export default function Inventario() {
                   const proy = proyectos.find(p => p.id === s.proyecto_id)
                   const act  = presupuesto.find(b => b.id === s.actividad_id)
                   return (
-                    <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={s.id} className="m-tr">
                       <td className="px-4 py-3 text-xs text-gray-500">{s.fecha_salida}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '---'}</td>
                       <td className="px-4 py-3 text-sm font-mono text-red-500">-{fmtNum(s.cantidad)} {mat?.unidad}</td>
@@ -664,18 +672,18 @@ export default function Inventario() {
         allMovs.length === 0 ? (
           <EmptyState icon={Icons.inventory} title={t('inv_empty_movements')} />
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+          <div className="m-card overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="bg-gray-50 border-b border-gray-100">
+              <thead><tr className="m-thead-row">
                 {[t('inv_col_type'),t('inv_col_date'),t('inv_col_material'),t('inv_col_qty'),t('inv_col_detail')].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs text-gray-500">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left">{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {allMovs.map(m => {
                   const mat = materiales.find(x => x.id === m.material_id)
                   return (
-                    <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={m.id} className="m-tr">
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.mov==='entrada' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                           {m.mov==='entrada' ? `+ ${t('inv_entry')}` : `- ${t('inv_exit')}`}

@@ -4,7 +4,7 @@ import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
-import { EmptyState, Icons } from '../components'
+import { EmptyState, Icons, PageHeader } from '../components'
 
 // ── Diccionarios para traducir action.type a una etiqueta legible ─────────
 const VERB_LABELS = {
@@ -203,25 +203,24 @@ export default function Auditoria({ onNavigate }) {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-5">
-        <button onClick={() => onNavigate?.('configuracion')}
-          className="text-xs text-gray-400 hover:text-[#1B3A6B] mb-2 flex items-center gap-1">
-          ← {isEs ? 'Configuración' : 'Settings'}
-        </button>
-        <h1 className="text-xl font-semibold text-gray-800">{isEs ? 'Auditoría' : 'Audit Log'}</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
-          {isEs
-            ? 'Registro de todas las acciones realizadas por los usuarios — quién hizo qué y cuándo.'
-            : 'Log of every action performed by users — who did what and when.'}
-        </p>
-      </div>
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+      <button onClick={() => onNavigate?.('configuracion')}
+        className="text-xs mb-3 flex items-center gap-1 font-medium"
+        style={{ color: 'var(--txt-3)' }}>
+        ← {isEs ? 'Configuración' : 'Settings'}
+      </button>
+      <PageHeader
+        title={isEs ? 'Auditoría' : 'Audit Log'}
+        subtitle={isEs
+          ? 'Registro de todas las acciones realizadas por los usuarios — quién hizo qué y cuándo.'
+          : 'Log of every action performed by users — who did what and when.'}
+      />
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5 grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="m-card p-4 mb-5 grid grid-cols-2 md:grid-cols-6 gap-3">
         <div>
           <label className="text-xs text-gray-500 block mb-1">{isEs?'Usuario':'User'}</label>
-          <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+          <select className="m-input"
             value={fUsuario} onChange={e=>setFUsuario(e.target.value)}>
             <option value="">{isEs?'Todos':'All'}</option>
             {usuarios.map(u=><option key={u.id} value={u.id}>{u.nombre||u.email}</option>)}
@@ -229,7 +228,7 @@ export default function Auditoria({ onNavigate }) {
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">{isEs?'Módulo':'Module'}</label>
-          <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+          <select className="m-input"
             value={fModulo} onChange={e=>setFModulo(e.target.value)}>
             <option value="">{isEs?'Todos':'All'}</option>
             {modulos.map(m=><option key={m} value={m}>{m}</option>)}
@@ -237,7 +236,7 @@ export default function Auditoria({ onNavigate }) {
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">{isEs?'Proyecto':'Project'}</label>
-          <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+          <select className="m-input"
             value={fProyecto} onChange={e=>setFProyecto(e.target.value)}>
             <option value="">{isEs?'Todos':'All'}</option>
             {proyectos.map(p=><option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
@@ -245,23 +244,23 @@ export default function Auditoria({ onNavigate }) {
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">{isEs?'Desde':'From'}</label>
-          <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+          <input type="date" className="m-input"
             value={fDesde} onChange={e=>setFDesde(e.target.value)} />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">{isEs?'Hasta':'To'}</label>
-          <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+          <input type="date" className="m-input"
             value={fHasta} onChange={e=>setFHasta(e.target.value)} />
         </div>
         <div>
           <label className="text-xs text-gray-500 block mb-1">{isEs?'Buscar':'Search'}</label>
-          <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+          <input className="m-input"
             value={fTexto} onChange={e=>setFTexto(e.target.value)} placeholder={isEs?'Texto libre...':'Free text...'} />
         </div>
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="m-card overflow-hidden">
         {loading ? (
           <p className="text-sm text-gray-400 px-5 py-6 text-center">{isEs?'Cargando...':'Loading...'}</p>
         ) : filtered.length === 0 ? (
@@ -269,7 +268,7 @@ export default function Auditoria({ onNavigate }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead style={{background:'#1B3A6B'}}>
+              <thead style={{ background: 'var(--brand)' }}>
                 <tr>
                   {[isEs?'Fecha y hora':'Date & time', isEs?'Usuario':'User', isEs?'Módulo':'Module',
                     isEs?'Acción':'Action', isEs?'Detalle':'Detail', isEs?'Proyecto':'Project', '']
@@ -286,7 +285,7 @@ export default function Auditoria({ onNavigate }) {
                         {r.usuario_rol && <span className="text-xs text-gray-400 ml-1">({r.usuario_rol})</span>}
                       </td>
                       <td className="px-4 py-2.5 text-xs">
-                        <span className="px-2 py-0.5 rounded-full font-medium" style={{background:'#1B3A6B1A', color:'#1B3A6B'}}>{r.modulo}</span>
+                        <span className="px-2 py-0.5 rounded-full font-medium" style={{background:'#1B3A6B1A', color:'var(--brand)'}}>{r.modulo}</span>
                       </td>
                       <td className="px-4 py-2.5 text-sm text-gray-700">{r.label}</td>
                       <td className="px-4 py-2.5 text-sm text-gray-500 max-w-[260px] truncate">{r.detalle || '—'}</td>
@@ -306,7 +305,7 @@ export default function Auditoria({ onNavigate }) {
                     {expandedId===r.id && (
                       <tr className="bg-gray-50">
                         <td colSpan={7} className="px-4 py-3">
-                          <pre className="text-xs text-gray-600 whitespace-pre-wrap break-all bg-white border border-gray-100 rounded-lg p-3 max-h-64 overflow-auto">
+                          <pre className="text-xs text-gray-600 whitespace-pre-wrap break-all m-card p-3 max-h-64 overflow-auto">
                             {JSON.stringify(r.payload, null, 2)}
                           </pre>
                         </td>

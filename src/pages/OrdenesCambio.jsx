@@ -6,9 +6,9 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, r2 } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls } from '../components'
+import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
-const BRAND = '#1B3A6B'
+const BRAND = 'var(--brand)'
 
 const ESTADO_OC = {
   borrador:   { label: 'Borrador',   labelEn: 'Draft',      cls: 'bg-gray-100 text-gray-600'   },
@@ -55,7 +55,7 @@ function ActividadPicker({ actividades, valueId, onSelect, isEs }) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && (
-        <div className="absolute z-20 mt-1 w-[min(560px,90vw)] max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+        <div className="absolute z-20 mt-1 w-[min(560px,90vw)] max-h-80 overflow-y-auto m-card shadow-lg">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-400">{isEs ? 'Sin resultados' : 'No results'}</div>
           ) : filtered.map(a => (
@@ -412,11 +412,11 @@ export default function OrdenesCambio() {
   // ── VISTA NUEVA OC ──────────────────────────────────────────────────────
   if (vista === 'nueva') {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <div>
-            <h1 className="text-xl font-semibold text-gray-800">
+            <h1 className="text-xl font-bold tracking-tight text-gray-900">
               {isEs ? `Nueva Orden de Cambio` : `New Change Order`} — {proy?.project_code}
             </h1>
             <p className="text-sm text-gray-400">{proy?.nombre}</p>
@@ -424,7 +424,7 @@ export default function OrdenesCambio() {
         </div>
 
         <div className="flex flex-col gap-5">
-          <div className="bg-white border border-gray-100 rounded-xl p-5 flex flex-col gap-4">
+          <div className="m-card p-5 flex flex-col gap-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <Field label={isEs ? 'Número *' : 'Number *'}>
                 <input className={inputCls} value={form.numero||''} onChange={set('numero')} />
@@ -446,7 +446,7 @@ export default function OrdenesCambio() {
 
           {/* Ajuste de costos indirectos */}
           {indsDelProy.length > 0 && (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="m-card overflow-hidden">
               <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   {isEs ? 'Ajuste de costos indirectos (opcional)' : 'Indirect cost adjustment (optional)'}
@@ -503,14 +503,14 @@ export default function OrdenesCambio() {
           )}
 
           {/* Items */}
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="m-card overflow-hidden">
             <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 {isEs ? 'Cambios en actividades *' : 'Activity changes *'}
               </p>
               <button onClick={addItem}
                 className="text-xs font-medium px-3 py-1 rounded-lg"
-                style={{ color: BRAND, background: '#EEF2F7' }}>
+                style={{ color: 'var(--brand)', background: 'var(--brand-soft)' }}>
                 + {isEs ? 'Agregar actividad' : 'Add activity'}
               </button>
             </div>
@@ -695,7 +695,7 @@ export default function OrdenesCambio() {
           </div>
 
           {/* Total OC */}
-          <div className="bg-white border border-gray-100 rounded-xl p-5">
+          <div className="m-card p-5">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">{isEs ? 'Total Orden de Cambio' : 'Total Change Order'}</span>
               <span className={`text-xl font-bold font-mono ${totalOC >= 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -704,7 +704,7 @@ export default function OrdenesCambio() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-100 rounded-xl p-5">
+          <div className="m-card p-5">
             <Field label={isEs ? 'Notas adicionales' : 'Additional notes'}>
               <textarea className={inputCls} rows={2} value={form.notas||''} onChange={set('notas')} />
             </Field>
@@ -723,30 +723,24 @@ export default function OrdenesCambio() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">
-            {isEs ? 'Órdenes de Cambio' : 'Change Orders'}
-          </h1>
-          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
+      <PageHeader
+        title={isEs ? 'Órdenes de Cambio' : 'Change Orders'}
+        subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
+        actions={<>
           <select
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#1B3A6B]"
+            className="m-input" style={{ width: 'auto', minWidth: 190 }}
             value={proyId} onChange={e => setProyId(e.target.value)}>
             <option value="">{t('lbl_select')}</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
           {proyId && puedeEditar && (
-            <PrimaryBtn onClick={openNueva}>
-              + {isEs ? 'Nueva OC' : 'New CO'}
-            </PrimaryBtn>
+            <PrimaryBtn icon={Icons.plus} onClick={openNueva}>{isEs ? 'Nueva OC' : 'New CO'}</PrimaryBtn>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       {!proyId ? (
         <EmptyState icon={Icons.budget} title={isEs ? 'Selecciona un proyecto' : 'Select a project'} />
@@ -760,7 +754,7 @@ export default function OrdenesCambio() {
               { label: isEs ? 'En borrador'            : 'Draft',                value: totalBorradores,             color: '#6b7280' },
               { label: isEs ? 'Total OC'               : 'Total COs',            value: ocs.length,                  color: BRAND     },
             ].map(k => (
-              <div key={k.label} className="bg-white border border-gray-100 rounded-xl p-4">
+              <div key={k.label} className="m-card p-4">
                 <p className="text-xs text-gray-400 mb-1">{k.label}</p>
                 <p className="text-2xl font-bold font-mono" style={{ color: k.color }}>{k.value}</p>
               </div>
@@ -768,7 +762,7 @@ export default function OrdenesCambio() {
           </div>
 
           {ocs.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-xl py-16">
+            <div className="m-card py-16">
               <EmptyState icon={Icons.budget}
                 title={isEs ? 'No hay órdenes de cambio' : 'No change orders'}
                 subtitle={isEs ? 'Crea una OC para registrar cambios al contrato' : 'Create a CO to record contract changes'}
@@ -776,10 +770,10 @@ export default function OrdenesCambio() {
                 onAction={puedeEditar ? openNueva : null} />
             </div>
           ) : (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
+                  <tr className="m-thead-row">
                     {[
                       isEs?'Número':'Number',
                       isEs?'Fecha':'Date',
@@ -798,7 +792,7 @@ export default function OrdenesCambio() {
                     const total   = parseFloat(oc.total_oc || 0)
                     const tieneNuevas = ocItems.some(i => i.tipo === 'nueva')
                     return (
-                      <tr key={oc.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <tr key={oc.id} className="m-tr">
                         <td className={tdCls + ' font-mono font-bold'} style={{ color: BRAND }}>{oc.numero}</td>
                         <td className={tdCls + ' text-xs text-gray-400'}>{oc.fecha || '—'}</td>
                         <td className={tdCls + ' text-xs'}>{oc.presentado_a || '—'}</td>
@@ -1032,7 +1026,7 @@ export default function OrdenesCambio() {
                     const diff  = it.diferencia || (parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0))
                     const monto = it.monto_cambio || r2(diff * parseFloat(it.precio_unitario||0))
                     return (
-                      <tr key={it.id} className="border-b border-gray-50">
+                      <tr key={it.id} className="m-tr">
                         <td className={tdCls}>
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${it.tipo === 'nueva' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
                             {it.tipo === 'nueva' ? (isEs?'Nueva':'New') : (isEs?'Modificada':'Modified')}

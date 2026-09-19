@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../auth'
 import { LangContext } from '../i18n'
 
-const BRAND      = '#1B3A6B'
+const BRAND      = 'var(--brand)'
 const BRAND_DARK = '#122848'
 
 // ── HELPERS ───────────────────────────────────────────────
@@ -24,7 +24,7 @@ function initials(nombre) {
 }
 
 function Avatar({ nombre, size = 8, online }) {
-  const colors = ['#1B3A6B','#1D9E75','#D97706','#7C3AED','#DC2626','#0891B2']
+  const colors = ['var(--brand)','#1D9E75','#D97706','#7C3AED','#DC2626','#0891B2']
   const idx    = nombre ? nombre.charCodeAt(0) % colors.length : 0
   return (
     <div className="relative flex-shrink-0">
@@ -162,14 +162,14 @@ function ModalNuevoCanal({ open, onClose, onCrear, usuarios, proyectos, tenantId
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Nombre del canal *' : 'Channel name *'}</label>
             <input
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+              className="m-input"
               value={nombre} onChange={e => setNombre(e.target.value)}
               placeholder={isEs ? 'Ej: Obra Norte — Equipo' : 'E.g.: North Site — Team'}
             />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Proyecto (opcional)' : 'Project (optional)'}</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+            <select className="m-input"
               value={proyId} onChange={e => setProyId(e.target.value)}>
               <option value="">— {isEs ? 'Sin proyecto' : 'No project'} —</option>
               {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
@@ -193,7 +193,7 @@ function ModalNuevoCanal({ open, onClose, onCrear, usuarios, proyectos, tenantId
           </div>
         </div>
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+          <button onClick={onClose} className="m-btn m-btn-ghost">
             {isEs ? 'Cancelar' : 'Cancel'}
           </button>
           <button onClick={crear} disabled={!nombre.trim() || loading}
@@ -501,7 +501,7 @@ export default function Chat({ onNavigate }) {
   })
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: '#F0F4F8' }}>
+    <div className="flex h-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
 
       {/* Modal confirmar borrar canal */}
       {confirmDelCanal && (
@@ -519,7 +519,7 @@ export default function Chat({ onNavigate }) {
             </p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmDelCanal(null)}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                className="m-btn m-btn-ghost">
                 {isEs ? 'Cancelar' : 'Cancel'}
               </button>
               <button onClick={() => borrarCanal(confirmDelCanal)}
@@ -730,7 +730,7 @@ export default function Chat({ onNavigate }) {
 
             {/* Sugerencias de menciones */}
             {showMenciones && usuariosFiltrados.length > 0 && (
-              <div className="flex-shrink-0 mx-4 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              <div className="flex-shrink-0 mx-4 m-card shadow-lg overflow-hidden">
                 {usuariosFiltrados.slice(0, 5).map(u => (
                   <button key={u.id} onClick={() => insertMencion(u.nombre)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 text-left">

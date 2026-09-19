@@ -5,7 +5,8 @@ import { LangProvider, useLanguage } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
 import { MODULOS_PRO_PLUS, MODULOS_ENTERPRISE, PLAN_INFO } from './plans'
-import { Icons } from './components'
+import { Icons, Avatar, Spinner } from './components'
+import { useTheme } from './theme'
 import { supabase } from './supabase'
 import AuthRouter from './pages/AuthRouter'
 import NotificacionesPanel from './pages/NotificacionesPanel'
@@ -34,7 +35,7 @@ const Landing           = lazy(() => import('./pages/Landing'))
 
 const PageSpinner = () => (
   <div className="flex items-center justify-center min-h-full p-16">
-    <div className="w-8 h-8 border-4 border-blue-200 border-t-[#1B3A6B] rounded-full animate-spin" />
+    <Spinner size={30} />
   </div>
 )
 
@@ -56,6 +57,15 @@ const NAV = [
   { id: 'reportes',       labelEs: 'Reportes',            labelEn: 'Reports',            icon: 'curvas'    },
   { id: 'supervision',    labelEs: 'Supervisión',         labelEn: 'Supervision',        icon: 'supervision' },
   { id: 'chat',           labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
+]
+
+// Agrupación del menú lateral por área de trabajo
+const NAV_GROUPS = [
+  { id: 'general',  labelEs: 'General',      labelEn: 'General',      items: ['dashboard', 'proyectos'] },
+  { id: 'plan',     labelEs: 'Planificación',labelEn: 'Planning',     items: ['presupuesto', 'mat_pres', 'ordenes_cambio'] },
+  { id: 'obra',     labelEs: 'Operación',    labelEn: 'Operations',   items: ['compras', 'inventario', 'supervision'] },
+  { id: 'finanzas', labelEs: 'Finanzas',     labelEn: 'Finance',      items: ['avaluos', 'financiero', 'curvas', 'reportes'] },
+  { id: 'equipo',   labelEs: 'Equipo',       labelEn: 'Team',         items: ['chat'] },
 ]
 
 const PAGES = {
@@ -167,9 +177,18 @@ function Layout() {
   const navFiltrado = NAV.filter(item => navVisible(item.id))
   const defaultPage = navFiltrado[0]?.id || 'dashboard'
 
+  const { isDark, toggle }      = useTheme()
   const [page, setPage]         = useState(defaultPage)
-  const [sideOpen, setSideOpen] = useState(true)
+  const [sideOpen, setSideOpen] = useState(() => {
+    try { return localStorage.getItem('mary_sidebar') !== 'closed' } catch { return true }
+  })
   const [chatUnread, setChatUnread] = useState(0)
+  const [userMenu, setUserMenu] = useState(false)
+  const userMenuRef             = useRef(null)
+
+  useEffect(() => {
+    try { localStorage.setItem('mary_sidebar', sideOpen ? 'open' : 'closed') } catch { /* ignorar */ }
+  }, [sideOpen])
   // Ref con la página actual para que los callbacks realtime no lean un valor congelado
   const pageRef = useRef(page)
   useEffect(() => { pageRef.current = page }, [page])
@@ -282,226 +301,334 @@ function Layout() {
   const Page = PAGES[page] || Dashboard
   const currentNav = NAV.find(n => n.id === page)
 
-  const iniciales = perfil?.nombre
-    ? perfil.nombre.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
-    : 'U'
+  const tituloPagina = page === 'configuracion'
+    ? (isEs ? 'Configuración' : 'Settings')
+    : (isEs ? currentNav?.labelEs : currentNav?.labelEn) || ''
 
   // Badge de plan en sidebar
   const planInfo = PLAN_INFO[plan] || PLAN_INFO.starter
 
+  // Navegación agrupada por área, filtrada por permisos del rol
+  const gruposVisibles = NAV_GROUPS
+    .map(g => ({ ...g, items: g.items.map(id => NAV.find(n => n.id === id)).filter(n => n && navVisible(n.id)) }))
+    .filter(g => g.items.length > 0)
+
+  // Cierra el menú de usuario al hacer clic fuera
+  useEffect(() => {
+    if (!userMenu) return
+    const onClick = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenu(false)
+    }
+    const onKey = (e) => { if (e.key === 'Escape') setUserMenu(false) }
+    document.addEventListener('mousedown', onClick)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [userMenu])
+
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#F0F4F8' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
 
-      {/* SIDEBAR */}
-      <aside className={`flex flex-col flex-shrink-0 transition-all duration-200 ${sideOpen ? 'w-60' : 'w-16'}`}
-        style={{ background: BRAND_DARK, borderRight: `1px solid ${BRAND}` }}>
+      {/* ══ SIDEBAR ══════════════════════════════════════════════ */}
+      <aside className={`flex flex-col flex-shrink-0 transition-all duration-200 ${sideOpen ? 'w-60' : 'w-[68px]'}`}
+        style={{
+          background: `linear-gradient(180deg, var(--nav-bg) 0%, var(--nav-bg-2) 100%)`,
+          borderRight: '1px solid var(--nav-bd)',
+        }}>
 
-        <div className={`flex items-center px-4 py-4 border-b flex-shrink-0 ${sideOpen ? 'justify-start' : 'justify-center'}`}
-          style={{ borderColor: BRAND, minHeight: 64 }}>
+        {/* Logo */}
+        <div className={`flex items-center px-4 flex-shrink-0 ${sideOpen ? 'justify-start' : 'justify-center'}`}
+          style={{ borderBottom: '1px solid var(--nav-bd)', height: 64 }}>
           {sideOpen ? (
-            <svg viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg" style={{ height: "36px", width: "auto" }} aria-label="MARY"><g transform="translate(4,3)"><rect x="14" y="29" width="8" height="16" rx="1.5" fill="#7a8fa6" opacity="0.75"/><rect x="24" y="23" width="8" height="22" rx="1.5" fill="#a0b4c8" opacity="0.75"/><rect x="34" y="17" width="8" height="28" rx="1.5" fill="#c0d0e0" opacity="0.75"/><ellipse cx="29" cy="33" rx="18" ry="5.5" fill="none" stroke="#3a8adc" strokeWidth="1.5" opacity="0.85"/><rect x="26" y="17" width="10" height="10" rx="2" fill="#3bb876" opacity="0.95"/><rect x="36" y="11" width="8" height="8" rx="2" fill="#26d4ff" opacity="0.9"/><line x1="36" y1="20" x2="48" y2="6" stroke="#3bb876" strokeWidth="1.8" opacity="0.9"/><polygon points="48,3 51,9 45,9" fill="#3bb876" opacity="0.9"/></g><text x="62" y="37" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="32" fill="#ffffff" letterSpacing="1">MARY</text></svg>
+            <svg viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg" style={{ height: 34, width: 'auto' }} aria-label="MARY"><g transform="translate(4,3)"><rect x="14" y="29" width="8" height="16" rx="1.5" fill="#7a8fa6" opacity="0.75"/><rect x="24" y="23" width="8" height="22" rx="1.5" fill="#a0b4c8" opacity="0.75"/><rect x="34" y="17" width="8" height="28" rx="1.5" fill="#c0d0e0" opacity="0.75"/><ellipse cx="29" cy="33" rx="18" ry="5.5" fill="none" stroke="#3a8adc" strokeWidth="1.5" opacity="0.85"/><rect x="26" y="17" width="10" height="10" rx="2" fill="#3bb876" opacity="0.95"/><rect x="36" y="11" width="8" height="8" rx="2" fill="#26d4ff" opacity="0.9"/><line x1="36" y1="20" x2="48" y2="6" stroke="#3bb876" strokeWidth="1.8" opacity="0.9"/><polygon points="48,3 51,9 45,9" fill="#3bb876" opacity="0.9"/></g><text x="62" y="37" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="32" fill="#ffffff" letterSpacing="1">MARY</text></svg>
           ) : (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm"
-              style={{ background: BRAND_LIGHT }}>M</div>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm"
+              style={{ background: 'linear-gradient(135deg, #1A5EB4, #2E78D6)', boxShadow: '0 4px 14px -4px rgba(26,94,180,0.9)' }}>M</div>
           )}
         </div>
 
+        {/* Empresa + plan */}
         {sideOpen && (
-          <div className="px-4 py-2 border-b" style={{ borderColor: `${BRAND}80` }}>
-            <p className="text-xs font-medium truncate" style={{ color: '#7FA8D4' }}>
-              {perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'}
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--nav-bd)' }}>
+            <p className="text-xs font-semibold truncate" style={{ color: '#fff' }}>
+              {perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions'}
             </p>
-            {/* Badge de plan */}
-            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
-              style={{ background: planInfo.bg, color: planInfo.color }}>
-              {planInfo.nombre}
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                style={{ background: 'rgba(127,168,212,0.16)', color: '#A9C6E6', border: '1px solid rgba(127,168,212,0.22)' }}>
+                {planInfo.nombre}
+              </span>
+              {isSuperAdmin && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                  style={{ background: 'rgba(245,158,11,0.16)', color: '#F5B345' }}>ADMIN</span>
+              )}
             </div>
           </div>
         )}
 
-        <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2 overflow-y-auto">
-          {navFiltrado.map(item => {
-            const active   = page === item.id
-            const bloqueado = [...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(item.id) && !canUsePlan(item.id)
-
-            return (
-              <button key={item.id} onClick={() => setPage(item.id)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150 w-full relative"
-                style={{
-                  background: active ? BRAND_LIGHT : 'transparent',
-                  color: active ? '#fff' : bloqueado ? '#5a7a9a' : '#93B8D8',
-                  opacity: bloqueado ? 0.8 : 1,
-                }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = `${BRAND}80` }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
-                title={!sideOpen ? (isEs ? item.labelEs : item.labelEn) : ''}>
-                {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: '#7FB3E8' }} />}
-                <span className="w-4 h-4 flex-shrink-0 relative">
-                  {bloqueado ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0110 0v4"/>
-                    </svg>
-                  ) : Icons[item.icon]}
-                  {item.id === 'chat' && chatUnread > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5 leading-none">
-                      {chatUnread > 99 ? '99+' : chatUnread}
-                    </span>
-                  )}
-                </span>
-                {sideOpen && (
-                  <span className="text-sm font-medium truncate flex-1 flex items-center justify-between">
-                    <span>{isEs ? item.labelEs : item.labelEn}</span>
-                    <span className="flex items-center gap-1">
-                      {/* Badge Pro+ / Enterprise para módulos bloqueados */}
-                      {bloqueado && (
-                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
-                          style={MODULOS_ENTERPRISE.includes(item.id)
-                            ? { background: PLAN_INFO.enterprise.bg, color: PLAN_INFO.enterprise.color, fontSize: '9px' }
-                            : { background: '#EEEDFE', color: '#534AB7', fontSize: '9px' }}>
-                          {MODULOS_ENTERPRISE.includes(item.id) ? 'Enterprise' : 'Pro+'}
+        {/* Navegación agrupada */}
+        <nav className="flex-1 py-3 px-2 overflow-y-auto scrollbar-thin">
+          {gruposVisibles.map(grupo => (
+            <div key={grupo.id} className="mb-3">
+              {sideOpen && (
+                <p className="px-3 mb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
+                  style={{ color: 'rgba(169,198,230,0.45)' }}>
+                  {isEs ? grupo.labelEs : grupo.labelEn}
+                </p>
+              )}
+              <div className="flex flex-col gap-0.5">
+                {grupo.items.map(item => {
+                  const active    = page === item.id
+                  const bloqueado = [...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(item.id) && !canUsePlan(item.id)
+                  const label     = isEs ? item.labelEs : item.labelEn
+                  return (
+                    <button key={item.id} onClick={() => setPage(item.id)}
+                      data-tip={!sideOpen ? label : undefined}
+                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left transition-all duration-150 ${!sideOpen ? 'm-tip justify-center' : ''}`}
+                      style={{
+                        background: active ? 'linear-gradient(120deg, rgba(46,120,214,0.30), rgba(26,158,92,0.12))' : 'transparent',
+                        color: active ? 'var(--nav-txt-active)' : bloqueado ? 'rgba(169,198,230,0.45)' : 'var(--nav-txt)',
+                        border: `1px solid ${active ? 'rgba(46,120,214,0.45)' : 'transparent'}`,
+                        boxShadow: active ? '0 6px 18px -10px rgba(26,94,180,0.9)' : 'none',
+                      }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(127,168,212,0.09)' }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+                      {active && sideOpen && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                          style={{ background: 'linear-gradient(180deg, #3BB876, #26D4FF)' }} />
+                      )}
+                      <span className="w-[18px] h-[18px] flex-shrink-0 relative">
+                        {bloqueado ? (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          </svg>
+                        ) : Icons[item.icon]}
+                        {item.id === 'chat' && chatUnread > 0 && !sideOpen && (
+                          <span className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] rounded-full text-white text-[9px] font-bold flex items-center justify-center px-0.5"
+                            style={{ background: '#E5484D' }}>
+                            {chatUnread > 9 ? '9+' : chatUnread}
+                          </span>
+                        )}
+                      </span>
+                      {sideOpen && (
+                        <span className="text-[13px] font-medium truncate flex-1 flex items-center justify-between gap-2">
+                          <span className="truncate">{label}</span>
+                          {bloqueado && (
+                            <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide flex-shrink-0"
+                              style={MODULOS_ENTERPRISE.includes(item.id)
+                                ? { background: 'rgba(124,58,237,0.22)', color: '#C4B5FD' }
+                                : { background: 'rgba(46,120,214,0.22)', color: '#93C5FD' }}>
+                              {MODULOS_ENTERPRISE.includes(item.id) ? 'ENT' : 'PRO'}
+                            </span>
+                          )}
+                          {item.id === 'chat' && chatUnread > 0 && (
+                            <span className="min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1 flex-shrink-0"
+                              style={{ background: '#E5484D' }}>
+                              {chatUnread > 99 ? '99+' : chatUnread}
+                            </span>
+                          )}
                         </span>
                       )}
-                      {item.id === 'chat' && chatUnread > 0 && sideOpen && (
-                        <span className="min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 ml-1">
-                          {chatUnread > 99 ? '99+' : chatUnread}
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                )}
-              </button>
-            )
-          })}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Configuración — visible para todos los roles */}
-        {(isClientAdmin || perfil?.rol) && (
-          <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
+        {/* Configuración / Admin */}
+        <div className="px-2 py-2 flex flex-col gap-0.5" style={{ borderTop: '1px solid var(--nav-bd)' }}>
+          {(isClientAdmin || perfil?.rol) && (
             <button onClick={() => setPage('configuracion')}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors relative"
-              style={{ background: page === 'configuracion' ? BRAND_LIGHT : 'transparent', color: page === 'configuracion' ? '#fff' : '#93B8D8' }}
-              onMouseEnter={e => { if (page !== 'configuracion') e.currentTarget.style.background = `${BRAND}80` }}
+              data-tip={!sideOpen ? (isEs ? 'Configuración' : 'Settings') : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-colors ${!sideOpen ? 'm-tip justify-center' : ''}`}
+              style={{
+                background: page === 'configuracion' ? 'rgba(46,120,214,0.28)' : 'transparent',
+                color: page === 'configuracion' ? '#fff' : 'var(--nav-txt)',
+              }}
+              onMouseEnter={e => { if (page !== 'configuracion') e.currentTarget.style.background = 'rgba(127,168,212,0.09)' }}
               onMouseLeave={e => { if (page !== 'configuracion') e.currentTarget.style.background = 'transparent' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-              </svg>
-              {sideOpen && <span className="text-sm font-medium">{isEs ? 'Configuración' : 'Settings'}</span>}
+              <span className="w-[18px] h-[18px] flex-shrink-0">{Icons.settings}</span>
+              {sideOpen && <span className="text-[13px] font-medium">{isEs ? 'Configuración' : 'Settings'}</span>}
             </button>
-          </div>
-        )}
+          )}
 
-        {/* Admin Panel — solo Super Admin */}
-        {isSuperAdmin && (
-          <div className="px-2 pb-1 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
+          {isSuperAdmin && (
             <a href="/admin"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors"
-              style={{ color: '#F59E0B' }}
-              onMouseEnter={e => e.currentTarget.style.background = `${BRAND}80`}
+              data-tip={!sideOpen ? (isEs ? 'Panel Admin' : 'Admin Panel') : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-colors ${!sideOpen ? 'm-tip justify-center' : ''}`}
+              style={{ color: '#F5B345' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(245,179,69,0.12)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
-                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-              </svg>
-              {sideOpen && <span className="text-sm font-medium">{isEs ? 'Panel Admin' : 'Admin Panel'}</span>}
+              <span className="w-[18px] h-[18px] flex-shrink-0">{Icons.settings}</span>
+              {sideOpen && <span className="text-[13px] font-medium">{isEs ? 'Panel Admin' : 'Admin Panel'}</span>}
             </a>
-          </div>
-        )}
-
-        {/* Language toggle */}
-        <div className="px-2 pb-2 border-t pt-2" style={{ borderColor: `${BRAND}80` }}>
-          <button onClick={toggleLang}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors"
-            style={{ background: `${BRAND}60`, color: '#93B8D8' }}
-            onMouseEnter={e => e.currentTarget.style.background = BRAND_LIGHT}
-            onMouseLeave={e => e.currentTarget.style.background = `${BRAND}60`}>
-            <span className="text-xs font-bold">{isEs ? 'ES' : 'EN'}</span>
-            {sideOpen && <span className="text-xs">{isEs ? '→ EN' : '→ ES'}</span>}
-          </button>
+          )}
         </div>
 
-        <button onClick={() => setSideOpen(!sideOpen)}
-          className="flex items-center justify-center py-3 border-t transition-colors"
-          style={{ borderColor: `${BRAND}80`, color: '#7FA8D4' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-          onMouseLeave={e => e.currentTarget.style.color = '#7FA8D4'}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            {sideOpen ? <polyline points="15 18 9 12 15 6"/> : <polyline points="9 18 15 12 9 6"/>}
-          </svg>
-        </button>
+        {/* Idioma + tema + colapsar */}
+        <div className="px-2 pb-2 pt-2 flex flex-col gap-1.5" style={{ borderTop: '1px solid var(--nav-bd)' }}>
+          <div className={`flex gap-1.5 ${sideOpen ? '' : 'flex-col'}`}>
+            <button onClick={toggleLang}
+              data-tip={!sideOpen ? 'ES / EN' : undefined}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors ${!sideOpen ? 'm-tip' : ''}`}
+              style={{ background: 'rgba(127,168,212,0.08)', color: 'var(--nav-txt)', border: '1px solid var(--nav-bd)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(127,168,212,0.16)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(127,168,212,0.08)'}>
+              <span className="text-[11px] font-bold">{isEs ? 'ES' : 'EN'}</span>
+            </button>
+
+            <button onClick={toggle}
+              data-tip={!sideOpen ? (isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')) : undefined}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors ${!sideOpen ? 'm-tip' : ''}`}
+              style={{ background: 'rgba(127,168,212,0.08)', color: 'var(--nav-txt)', border: '1px solid var(--nav-bd)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(127,168,212,0.16)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(127,168,212,0.08)'}>
+              <span className="w-[15px] h-[15px]">{isDark ? Icons.sun : Icons.moon}</span>
+              {sideOpen && <span className="text-[11px] font-semibold">{isDark ? (isEs ? 'Claro' : 'Light') : (isEs ? 'Oscuro' : 'Dark')}</span>}
+            </button>
+          </div>
+
+          <button onClick={() => setSideOpen(!sideOpen)}
+            className="flex items-center justify-center py-2 rounded-lg transition-colors"
+            style={{ color: 'rgba(169,198,230,0.7)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(127,168,212,0.09)'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(169,198,230,0.7)' }}>
+            <span className="w-4 h-4 inline-block transition-transform duration-200"
+              style={{ transform: sideOpen ? 'rotate(180deg)' : 'none' }}>{Icons.chevron}</span>
+          </button>
+        </div>
       </aside>
 
-      {/* MAIN */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between px-6 flex-shrink-0"
-          style={{ background: '#fff', borderBottom: '1px solid #D6E4F0', height: 64 }}>
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-8 rounded-full" style={{ background: BRAND }} />
-            <div>
+      {/* ══ MAIN ═════════════════════════════════════════════════ */}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
+
+        {/* HEADER */}
+        <header className="flex items-center justify-between px-5 flex-shrink-0 relative z-20"
+          style={{
+            background: 'var(--surface)',
+            borderBottom: '1px solid var(--bd)',
+            height: 64,
+            boxShadow: 'var(--sh-xs)',
+          }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
+              <span className="w-[18px] h-[18px]">{Icons[currentNav?.icon] || Icons.dashboard}</span>
+            </span>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="font-bold text-gray-900 text-base leading-tight">
-                  {isEs ? currentNav?.labelEs : currentNav?.labelEn}
+                <p className="font-bold text-[15px] leading-tight truncate" style={{ color: 'var(--txt)' }}>
+                  {tituloPagina}
                 </p>
-                {/* Badge Pro+ en el header si el módulo está bloqueado */}
                 {[...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(page) && !canUsePlan(page) && (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: '#EEEDFE', color: '#3C3489' }}>
-                    Pro+
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+                    {MODULOS_ENTERPRISE.includes(page) ? 'Enterprise' : 'Pro+'}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-400">{perfil?.tenants?.nombre_empresa || perfil?.tenant_id || ''}</p>
+              <p className="text-[11px] truncate" style={{ color: 'var(--txt-3)' }}>
+                {perfil?.tenants?.nombre_empresa || perfil?.tenant_id || ''}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg"
-              style={{ background: '#F0F4F8', border: '1px solid #D6E4F0' }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              <span className="text-xs font-medium" style={{ color: BRAND }}>
-                {new Date().toLocaleDateString(isEs ? 'es' : 'en', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--bd)' }}>
+              <span className="w-3.5 h-3.5" style={{ color: 'var(--brand)' }}>{Icons.calendar}</span>
+              <span className="text-[11.5px] font-medium capitalize" style={{ color: 'var(--txt-2)' }}>
+                {new Date().toLocaleDateString(isEs ? 'es' : 'en', { weekday: 'long', day: 'numeric', month: 'long' })}
               </span>
             </div>
-            <div className="w-px h-8 bg-gray-200" />
+
+            <button onClick={toggle} className="m-icon-btn m-tip"
+              data-tip={isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')}>
+              <span className="w-[17px] h-[17px]">{isDark ? Icons.sun : Icons.moon}</span>
+            </button>
+
             <NotificacionesPanel onNavigate={setPage} />
-            <div className="w-px h-8 bg-gray-200" />
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow"
-                style={{ background: `linear-gradient(135deg, ${BRAND_LIGHT}, ${BRAND_DARK})` }}>
-                {iniciales}
-              </div>
-              <div className="hidden md:block">
-                <p className="text-xs font-semibold text-gray-800 leading-none">{perfil?.nombre || 'Usuario'}</p>
-                <p className="text-xs text-gray-400 mt-0.5 capitalize">{perfil?.rol?.replace('_', ' ') || ''}</p>
-              </div>
-              <button onClick={logout}
-                className="ml-2 text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
-                title={isEs ? 'Cerrar sesión' : 'Sign out'}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
+
+            <div className="w-px h-7 mx-0.5" style={{ background: 'var(--bd)' }} />
+
+            {/* Menú de usuario */}
+            <div className="relative" ref={userMenuRef}>
+              <button onClick={() => setUserMenu(o => !o)}
+                className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl transition-colors"
+                style={{ background: userMenu ? 'var(--surface-3)' : 'transparent' }}
+                onMouseEnter={e => { if (!userMenu) e.currentTarget.style.background = 'var(--surface-2)' }}
+                onMouseLeave={e => { if (!userMenu) e.currentTarget.style.background = 'transparent' }}>
+                <Avatar name={perfil?.nombre || 'Usuario'} size={32} />
+                <span className="hidden md:block text-left">
+                  <span className="block text-[12.5px] font-semibold leading-none" style={{ color: 'var(--txt)' }}>
+                    {perfil?.nombre || 'Usuario'}
+                  </span>
+                  <span className="block text-[11px] mt-0.5 capitalize" style={{ color: 'var(--txt-3)' }}>
+                    {perfil?.rol?.replace('_', ' ') || ''}
+                  </span>
+                </span>
+                <span className="w-3.5 h-3.5 transition-transform duration-200 hidden md:block"
+                  style={{ color: 'var(--txt-3)', transform: userMenu ? 'rotate(90deg)' : 'none' }}>
+                  {Icons.chevron}
+                </span>
               </button>
+
+              {userMenu && (
+                <div className="absolute right-0 top-[calc(100%+8px)] w-56 rounded-2xl overflow-hidden m-pop"
+                  style={{ background: 'var(--surface)', border: '1px solid var(--bd)', boxShadow: 'var(--sh-lg)' }}>
+                  <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--bd)', background: 'var(--surface-2)' }}>
+                    <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--txt)' }}>{perfil?.nombre}</p>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--txt-3)' }}>{perfil?.email}</p>
+                  </div>
+                  <div className="p-1.5">
+                    <button onClick={() => { setUserMenu(false); setPage('configuracion') }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors"
+                      style={{ color: 'var(--txt-2)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <span className="w-4 h-4">{Icons.settings}</span>
+                      {isEs ? 'Configuración' : 'Settings'}
+                    </button>
+                    <button onClick={() => { setUserMenu(false); toggle() }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors"
+                      style={{ color: 'var(--txt-2)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <span className="w-4 h-4">{isDark ? Icons.sun : Icons.moon}</span>
+                      {isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')}
+                    </button>
+                    <button onClick={logout}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors"
+                      style={{ color: 'var(--danger)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-soft)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      {isEs ? 'Cerrar sesión' : 'Sign out'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        {/* Banner de suscripción — 3 estados posibles */}
+        {/* Banner de suscripción */}
         {(isReadOnly || subWarning) && (
-          <div className="flex items-center justify-between px-6 py-2.5 text-xs font-medium flex-shrink-0"
+          <div className="flex items-center justify-between gap-3 px-5 py-2.5 text-xs font-medium flex-shrink-0 m-fade"
             style={{
-              background: isReadOnly ? '#FEE2E2' : '#FEF3C7',
-              borderBottom: `1px solid ${isReadOnly ? '#FCA5A5' : '#F59E0B'}`,
-              color: isReadOnly ? '#991B1B' : '#92400E',
+              background: isReadOnly ? 'var(--danger-soft)' : 'var(--warn-soft)',
+              borderBottom: `1px solid ${isReadOnly ? 'var(--danger)' : 'var(--warn)'}`,
+              color: isReadOnly ? 'var(--danger)' : 'var(--warn)',
             }}>
-            <div className="flex items-center gap-2">
-              <span>{isReadOnly ? '🔒' : '⚠'}</span>
-              <span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-4 h-4 flex-shrink-0">{Icons.alert}</span>
+              <span className="truncate">
                 {isReadOnly && (isEs
                   ? 'Suscripción vencida. Modo lectura activo — no puedes crear ni editar datos.'
                   : 'Subscription expired. Read-only mode — no creating or editing.')}
@@ -513,16 +640,15 @@ function Layout() {
                   : 'Payment issue. Stripe will automatically retry the charge.')}
               </span>
             </div>
-            <button
-              onClick={() => setPage('configuracion')}
-              className="ml-4 px-3 py-1 rounded-lg text-xs font-bold text-white flex-shrink-0"
-              style={{ background: isReadOnly ? '#DC2626' : '#D97706' }}>
+            <button onClick={() => setPage('configuracion')}
+              className="m-btn m-btn-sm flex-shrink-0"
+              style={{ background: isReadOnly ? 'var(--danger)' : 'var(--warn)', color: '#fff' }}>
               {isEs ? 'Ver suscripción' : 'View subscription'}
             </button>
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto" style={{ backgroundImage: 'var(--bg-grad)' }}>
           <SubscriptionContext.Provider value={{ isReadOnly }}>
             {pageBlockedByPlan
               ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
@@ -532,9 +658,7 @@ function Layout() {
         </main>
       </div>
 
-      {/* Tour de bienvenida — primera vez de cada usuario */}
       <WelcomeTour />
-
     </div>
   )
 }
@@ -585,10 +709,10 @@ function AppContent() {
   const { user, perfil, loading } = useAuth()
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4F8' }}>
-      <div className="text-center">
-        <div className="w-10 h-10 border-4 border-blue-200 border-t-[#1B3A6B] rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-500">Cargando MARY...</p>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+      <div className="text-center m-fade">
+        <div className="flex justify-center mb-3"><Spinner size={32} /></div>
+        <p className="text-sm" style={{ color: 'var(--txt-3)' }}>Cargando MARY...</p>
       </div>
     </div>
   )
@@ -600,15 +724,15 @@ function AppContent() {
   if (pathname === '/planes') return <Suspense fallback={<PageSpinner />}><Planes /></Suspense>
   if (pathname === '/admin') {
     if (!perfil) return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0F4F8' }}>
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-200 border-t-[#1B3A6B] rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Verificando acceso...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="text-center m-fade">
+          <div className="flex justify-center mb-3"><Spinner size={32} /></div>
+          <p className="text-sm" style={{ color: 'var(--txt-3)' }}>Verificando acceso...</p>
         </div>
       </div>
     )
     if (perfil.rol === 'super_admin') return <Suspense fallback={<PageSpinner />}><Admin /></Suspense>
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500 text-sm">Acceso no autorizado.</p></div>
+    return <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}><p className="text-sm" style={{ color: 'var(--txt-3)' }}>Acceso no autorizado.</p></div>
   }
 
   return (

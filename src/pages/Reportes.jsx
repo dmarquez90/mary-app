@@ -5,8 +5,9 @@ import { fmt, fmtNum, calcGrandTotal, r2 as round2, flatBudgetItems } from '../u
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
+import { PageHeader, Card, Icons } from '../components'
 
-const BRAND    = '#1B3A6B'
+const BRAND    = 'var(--brand)'
 const BRAND_HX = '1B3A6B'
 const LIGHT_HX = 'EEF2F7'
 const WHITE_HX = 'FFFFFF'
@@ -2356,18 +2357,18 @@ export default function Reportes() {
     setLoading(false)
   }
 
-  const inputCls = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]'
+  const inputCls = 'm-input'
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{isEs?'Reportes':'Reports'}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{isEs?'Genera y exporta reportes a Excel con formato profesional':'Generate and export professionally formatted Excel reports'}</p>
-        </div>
-      </div>
+    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+      <PageHeader
+        title={isEs ? 'Reportes' : 'Reports'}
+        subtitle={isEs
+          ? 'Genera y exporta reportes a Excel con formato profesional'
+          : 'Generate and export professionally formatted Excel reports'}
+      />
 
-      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+      <div className="m-card p-5 mb-6">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
           {isEs?'Configurar reporte':'Configure report'}
         </p>
@@ -2472,13 +2473,13 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
           {label:isEs?'Desviación':'Deviation',          val:`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`, color:desviacion>0?'#ef4444':'#1D9E75'},
           {label:isEs?'% Ejecución':'% Execution',         val:budget>0?`${((totalReal/budget)*100).toFixed(1)}%`:'0%', color:BRAND},
         ].map((k,i)=>(
-          <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
+          <div key={i} className="m-card p-4">
             <p className="text-xs text-gray-400 mb-1">{k.label}</p>
             <p className="text-lg font-bold" style={{color:k.color}}>{k.val}</p>
           </div>
         ))}
       </div>
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="m-card overflow-hidden">
         <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Resumen por categoría':'Summary by category'}</p></div>
         <table className="w-full">
           <thead><tr style={thS}><th className={thC}>{isEs?'Categoría':'Category'}</th><th className={thC+' text-right'}>{isEs?'Costo real':'Real cost'}</th><th className={thC+' text-right'}>{isEs?'% del total':'% of total'}</th></tr></thead>
@@ -2490,12 +2491,12 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                 <td className={tdC+' text-right'}>{totalReal>0?`${((r.real/totalReal)*100).toFixed(1)}%`:'—'}</td>
               </tr>
             ))}
-            <tr style={{background:'#EEF2F7'}}><td className={tdC+' font-bold'}>TOTAL</td><td className={tdC+' text-right font-mono font-bold'}>{fmt(totalReal,moneda)}</td><td className={tdC+' text-right font-bold'}>100%</td></tr>
+            <tr style={{ background: 'var(--surface-3)' }}><td className={tdC+' font-bold'}>TOTAL</td><td className={tdC+' text-right font-mono font-bold'}>{fmt(totalReal,moneda)}</td><td className={tdC+' text-right font-bold'}>100%</td></tr>
           </tbody>
         </table>
       </div>
       {actividades.length>0&&(
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Presupuesto vs Real por actividad':'Budget vs Actual by activity'}</p></div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -2525,7 +2526,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
         </div>
       )}
       {data.avsProy?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
             <p className="text-sm font-semibold text-gray-700">{isEs?'Avalúo financiero acumulado':'Accumulated financial progress billing'}</p>
           </div>
@@ -2557,7 +2558,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
         </div>
       )}
       {data.comparacionInd?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}>
             <p className="text-sm font-semibold text-gray-700">{isEs?'Costos indirectos: presupuestado vs ejecutado':'Indirect costs: budgeted vs executed'}</p>
           </div>
@@ -2588,7 +2589,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
 
       {/* ── SECCIÓN: Órdenes de Cambio ── */}
       {data.ocsDelProy?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="m-card overflow-hidden">
           <div className="px-5 py-3 border-b flex items-center justify-between" style={{borderColor:'#D6E4F0'}}>
             <p className="text-sm font-semibold text-gray-700">
               {isEs ? 'Órdenes de Cambio' : 'Change Orders'}
@@ -2641,7 +2642,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                   </tr>
                 )
               })}
-              <tr style={{background:'#EEF2F7'}}>
+              <tr style={{ background: 'var(--surface-3)' }}>
                 <td colSpan={5} className={tdC+' font-bold text-xs'} style={{color:BRAND}}>{isEs ? 'TOTAL APROBADO' : 'TOTAL APPROVED'}</td>
                 <td className={tdC+' text-right font-mono font-bold'} style={{color:'#1D9E75'}}>
                   {data.deltaOCs > 0 ? `+${fmt(data.deltaOCs, moneda)}` : fmt(data.deltaOCs, moneda)}
@@ -2667,22 +2668,22 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
   const tdC='px-4 py-2.5 text-sm text-gray-700'
   return(
     <div className="flex flex-col gap-4">
-      <div className="flex border-b border-gray-200">
+      <div className="m-tabbar">
         {['Stock actual','Entradas','Salidas'].map((label,i)=>(
-          <button key={i} onClick={()=>setSubTab(i)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${subTab===i?'border-[#1B3A6B] text-[#1B3A6B]':'border-transparent text-gray-500'}`}>
+          <button key={i} onClick={()=>setSubTab(i)} className={`m-tab ${subTab===i?'m-tab-active':''}`}>
             {label} <span className="ml-1 text-xs text-gray-400">({[data.mats.length,data.entradas.length,data.salidas.length][i]})</span>
           </button>
         ))}
       </div>
-      {subTab===0&&<div className="bg-white rounded-xl border border-gray-100 overflow-x-auto"><table className="w-full">
+      {subTab===0&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{['Código','Descripción','Unidad','Ubicación','Stock actual','Stock mín.','Estado'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
         <tbody>{data.mats.map((m,i)=>{const crit=parseFloat(m.stock_actual||0)<=parseFloat(m.stock_minimo||0);return(<tr key={m.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC+' font-mono text-xs'}>{m.codigo}</td><td className={tdC}>{m.descripcion}</td><td className={tdC}>{m.unidad}</td><td className={tdC}>{m.ubicacion_bodega||'—'}</td><td className={tdC+' font-mono font-medium'} style={{color:crit?'#ef4444':'#1D9E75'}}>{fmtNum(m.stock_actual)}</td><td className={tdC+' font-mono'}>{fmtNum(m.stock_minimo)}</td><td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit?'bg-red-100 text-red-600':'bg-green-100 text-green-700'}`}>{crit?'Crítico':'OK'}</span></td></tr>)})}</tbody>
       </table></div>}
-      {subTab===1&&<div className="bg-white rounded-xl border border-gray-100 overflow-x-auto"><table className="w-full">
+      {subTab===1&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{['Fecha','Código','Material','Cantidad','Precio unit.','Total','Factura','Proveedor','Proyecto'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
         <tbody>{data.entradas.map((e,i)=>{const m=materiales.find(x=>x.id===e.material_id);const p=proyectos.find(x=>x.id===e.proyecto_id);const total=round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0));return(<tr key={e.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(e.fecha_recepcion)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-green-600'}>+{fmtNum(e.cantidad)}</td><td className={tdC+' font-mono'}>${fmtNum(e.precio_unitario)}</td><td className={tdC+' font-mono font-medium'}>${fmtNum(total)}</td><td className={tdC}>{e.numero_factura||'—'}</td><td className={tdC}>{e.proveedor||'—'}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td></tr>)})}</tbody>
       </table></div>}
-      {subTab===2&&<div className="bg-white rounded-xl border border-gray-100 overflow-x-auto"><table className="w-full">
+      {subTab===2&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{['Fecha','Código','Material','Cantidad','Proyecto','Actividad'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
         <tbody>{data.salidas.map((s,i)=>{const m=materiales.find(x=>x.id===s.material_id);const p=proyectos.find(x=>x.id===s.proyecto_id);const act=presupuesto.find(x=>x.id===s.actividad_id);return(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(s.fecha_salida)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-red-500'}>-{fmtNum(s.cantidad)}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td><td className={tdC+' text-xs'}>{act?`${act.code} — ${act.descripcion}`:'—'}</td></tr>)})}</tbody>
       </table></div>}
@@ -2719,7 +2720,7 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
   const desviacion=totalReal-budget
   return(
     <div className="flex flex-col gap-5">
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
+      <div className="m-card p-5">
         <p className="text-sm font-semibold text-gray-700 mb-3">{isEs?'Información del proyecto':'Project information'}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           {[[isEs?'Código':'Code',proy?.project_code],[isEs?'Cliente':'Client',proy?.cliente_externo||'—'],[isEs?'Estado':'Status',t(`estado_${proy?.estado}`)],[isEs?'Moneda':'Currency',moneda],[isEs?'Inicio':'Start',proy?.fecha_inicio||'—'],[isEs?'Fin est.':'Est. end',proy?.fecha_fin_estimada||'—'],[isEs?'Ciudad':'City',proy?.ciudad||'—'],[isEs?'País':'Country',proy?.pais||'—']].map(([k,v],i)=>(
@@ -2729,10 +2730,10 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[{label:isEs?'Presupuesto total':'Total budget',val:fmt(budget,moneda),color:BRAND},{label:isEs?'Costo real total':'Total real cost',val:fmt(totalReal,moneda),color:'#1D9E75'},{label:isEs?'Desviación':'Deviation',val:`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`,color:desviacion>0?'#ef4444':'#1D9E75'},{label:isEs?'% Ejecución':'% Execution',val:budget>0?`${((totalReal/budget)*100).toFixed(1)}%`:'0%',color:BRAND}].map((k,i)=>(
-          <div key={i} className="bg-white rounded-xl border border-gray-100 p-4"><p className="text-xs text-gray-400 mb-1">{k.label}</p><p className="text-lg font-bold" style={{color:k.color}}>{k.val}</p></div>
+          <div key={i} className="m-card p-4"><p className="text-xs text-gray-400 mb-1">{k.label}</p><p className="text-lg font-bold" style={{color:k.color}}>{k.val}</p></div>
         ))}
       </div>
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="m-card overflow-hidden">
         <div className="px-5 py-3 border-b" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Resumen de costos':'Cost summary'}</p></div>
         <table className="w-full">
           <thead><tr style={thS}><th className={thC}>{isEs?'Categoría':'Category'}</th><th className={thC+' text-right'}>{isEs?'Monto':'Amount'}</th><th className={thC+' text-right'}>{isEs?'% del total':'% of total'}</th></tr></thead>
@@ -2740,15 +2741,15 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
             {[[isEs?'Materiales':'Materials',totalMat],[isEs?'Imprevistos':'Contingencies',totalDir],[isEs?'Nómina / Planilla':'Payroll',totalNom],[isEs?'Subcontratos':'Subcontracts',totalSub],[isEs?'Equipos':'Equipment',totalEq],[isEs?'Administración':'Administration',totalInd]].map(([cat,val],i)=>(
               <tr key={i} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{cat}</td><td className={tdC+' text-right font-mono'}>{fmt(val,moneda)}</td><td className={tdC+' text-right'}>{totalReal>0?`${((val/totalReal)*100).toFixed(1)}%`:'—'}</td></tr>
             ))}
-            <tr style={{background:'#EEF2F7'}}><td className={tdC+' font-bold'}>{isEs?'TOTAL REAL':'TOTAL REAL'}</td><td className={tdC+' text-right font-mono font-bold'}>{fmt(totalReal,moneda)}</td><td className={tdC+' text-right font-bold'}>100%</td></tr>
+            <tr style={{ background: 'var(--surface-3)' }}><td className={tdC+' font-bold'}>{isEs?'TOTAL REAL':'TOTAL REAL'}</td><td className={tdC+' text-right font-mono font-bold'}>{fmt(totalReal,moneda)}</td><td className={tdC+' text-right font-bold'}>100%</td></tr>
           </tbody>
         </table>
       </div>
-      {noms.length>0&&<div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      {noms.length>0&&<div className="m-card overflow-hidden">
         <div className="px-5 py-3 border-b flex justify-between" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Nómina / Planilla':'Payroll'}</p><span className="text-sm font-mono font-semibold" style={{color:BRAND}}>{fmt(totalNom,moneda)}</span></div>
         <div className="overflow-x-auto"><table className="w-full"><thead><tr style={thS}>{[isEs?'Trabajador':'Worker',isEs?'Cargo':'Position',isEs?'Período':'Period',isEs?'Base':'Base',isEs?'Deducciones':'Deductions',isEs?'Neto':'Net'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead><tbody>{noms.map((n,i)=>{const neto=(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0);return(<tr key={n.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{n.trabajador}</td><td className={tdC}>{n.cargo||'—'}</td><td className={tdC+' text-xs'}>{n.periodo_inicio} → {n.periodo_fin}</td><td className={tdC+' font-mono'}>{fmt(n.salario_base,moneda)}</td><td className={tdC+' font-mono text-red-500'}>-{fmt(n.deducciones,moneda)}</td><td className={tdC+' font-mono font-semibold'} style={{color:'#1D9E75'}}>{fmt(neto,moneda)}</td></tr>)})}</tbody></table></div>
       </div>}
-      {subs.length>0&&<div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      {subs.length>0&&<div className="m-card overflow-hidden">
         <div className="px-5 py-3 border-b flex justify-between" style={{borderColor:'#D6E4F0'}}><p className="text-sm font-semibold text-gray-700">{isEs?'Subcontratos':'Subcontracts'}</p><span className="text-sm font-mono font-semibold" style={{color:BRAND}}>{fmt(totalSub,moneda)}</span></div>
         <div className="overflow-x-auto"><table className="w-full"><thead><tr style={thS}>{[isEs?'Subcontratista':'Subcontractor',isEs?'Descripción':'Description',isEs?'Contrato':'Contract',isEs?'% Avance':'% Progress',isEs?'Pagado':'Paid'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead><tbody>{subs.map((s,i)=>(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{s.subcontratista}</td><td className={tdC+' text-xs max-w-[160px] truncate'}>{s.descripcion_trabajo||'—'}</td><td className={tdC+' font-mono'}>{fmt(s.monto_contrato,moneda)}</td><td className={tdC}>{fmtNum(s.avance_porcentaje)}%</td><td className={tdC+' font-mono font-semibold'} style={{color:'#1D9E75'}}>{fmt(s.monto_pagado,moneda)}</td></tr>))}</tbody></table></div>
       </div>}

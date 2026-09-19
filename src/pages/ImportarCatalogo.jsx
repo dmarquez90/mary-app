@@ -215,12 +215,12 @@ export default function ImportarCatalogo({ onDone }) {
               {errors.length > 0 && <span className="text-amber-600 ml-2">({errors.length} {isEs ? 'omitidos' : 'skipped'})</span>}
             </span>
             <div className="flex gap-2">
-              <button onClick={reset} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">
+              <button onClick={reset} className="m-btn m-btn-sm m-btn-ghost">
                 {isEs ? 'Cancelar' : 'Cancel'}
               </button>
               <button onClick={importar}
                 className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg"
-                style={{ background: '#1B3A6B' }}>
+                style={{ background: 'var(--brand)' }}>
                 {isEs ? 'Importar ahora' : 'Import now'}
               </button>
             </div>
@@ -235,7 +235,7 @@ export default function ImportarCatalogo({ onDone }) {
 
           <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="m-thead-row sticky top-0">
                 <tr>
                   {['Codigo', isEs ? 'Descripcion' : 'Description', isEs ? 'Categoria' : 'Category',
                     isEs ? 'Unidad' : 'Unit', 'Stock', 'Min.', isEs ? 'P.U.' : 'U.P.'].map((h,i) => (
@@ -245,7 +245,7 @@ export default function ImportarCatalogo({ onDone }) {
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className="border-b border-gray-50">
+                  <tr key={i} className="m-tr">
                     <td className="px-2 py-1.5 font-mono font-medium text-gray-700">{r.codigo}</td>
                     <td className="px-2 py-1.5 text-gray-700">{r.descripcion}</td>
                     <td className="px-2 py-1.5 text-gray-500">{catLabel(r.categoria)}</td>
@@ -269,7 +269,7 @@ export default function ImportarCatalogo({ onDone }) {
           </div>
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all"
-              style={{ width: `${progress}%`, background: '#1B3A6B' }} />
+              style={{ width: `${progress}%`, background: 'var(--brand)' }} />
           </div>
         </div>
       )}

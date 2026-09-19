@@ -2,7 +2,7 @@ import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { fmt, calcGrandTotal, r2, flatBudgetItems } from '../utils'
-import { EmptyState, StatCard, Icons } from '../components'
+import { EmptyState, StatCard, Icons, PageHeader } from '../components'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
 function generarPeriodosMensuales(fechaInicio, fechaFin) {
@@ -281,7 +281,7 @@ export default function CurvaS() {
     const base    = presRev?.value || pres?.value
     const ejecucion = base > 0 ? ((real?.value || 0) / base * 100).toFixed(1) : null
     return (
-      <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-lg text-xs min-w-[180px]">
+      <div className="m-card p-3 shadow-lg text-xs min-w-[180px]">
         <p className="font-semibold text-gray-700 mb-2 pb-1.5 border-b border-gray-100">{label}</p>
         {pres && <div className="flex justify-between gap-4 mb-1">
           <span style={{ color: '#185FA5' }}>● {isEs ? 'Presupuestado' : 'Budgeted'}</span>
@@ -314,27 +314,25 @@ export default function CurvaS() {
   const noData = budget === 0 && allCosts.length === 0
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">{t('curva_title')}</h1>
-          {proy && <p className="text-sm text-gray-400 mt-0.5">{proy.project_code} — {proy.nombre}</p>}
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+      <PageHeader
+        title={t('curva_title')}
+        subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
+        actions={<>
           <select
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+            className="m-input" style={{ width: 'auto', minWidth: 170 }}
             value={proyId} onChange={e => setProyId(e.target.value)}>
             <option value="">— {t('curva_select_project')} —</option>
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>)}
           </select>
           <select
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1B3A6B]"
+            className="m-input" style={{ width: 'auto', minWidth: 170 }}
             value={granularity} onChange={e => setGranularity(e.target.value)}>
             <option value="mes">{t('curva_by_month')}</option>
             <option value="semana">{t('curva_by_week')}</option>
           </select>
-        </div>
-      </div>
+        </>}
+      />
 
       {!proyId ? (
         <EmptyState icon={Icons.curvas} title={t('curva_empty_title')} subtitle={t('curva_empty_sub')} />
@@ -386,7 +384,7 @@ export default function CurvaS() {
           )}
 
           {chartData.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+            <div className="m-card p-5 mb-6">
               <h2 className="text-sm font-semibold text-gray-700 mb-4">
                 {t('curva_chart_title')} ({moneda})
               </h2>
@@ -413,7 +411,7 @@ export default function CurvaS() {
                       <stop offset="95%" stopColor="#185FA5" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--bd)" vertical={false} />
                   <XAxis
                     dataKey="periodo"
                     tick={{ fontSize:11, fill:'#9ca3af' }}
@@ -491,21 +489,21 @@ export default function CurvaS() {
           )}
 
           {actDeviations.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <div className="m-card overflow-x-auto">
               <div className="px-5 py-4 border-b border-gray-50">
                 <h2 className="text-sm font-semibold text-gray-700">{t('curva_dev_title')}</h2>
               </div>
               <table className="w-full">
-                <thead><tr className="bg-gray-50 border-b border-gray-100">
+                <thead><tr className="m-thead-row">
                   {[t('curva_col_code'),t('curva_col_activity'),t('curva_col_budget'),t('curva_col_real'),t('curva_col_dev'),t('curva_col_dev_pct'),t('curva_col_status')].map((h,i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">{h}</th>
+                    <th key={i} className="px-4 py-3 text-left">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {actDeviations.map((a,i) => {
                     const status = a.dev <= 0 ? 'ok' : a.presupuestado > 0 && a.dev/a.presupuestado < 0.15 ? 'alerta' : 'critico'
                     return (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <tr key={i} className="m-tr">
                         <td className="px-4 py-3 text-xs font-mono text-gray-500">{a.code}</td>
                         <td className="px-4 py-3 text-sm text-gray-800 max-w-[180px] truncate">{a.descripcion}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(a.presupuestado, moneda)}</td>
