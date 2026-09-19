@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, r2 as round2, flatBudgetItems } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -2218,7 +2218,7 @@ export default function Reportes() {
   const items          = presupuesto.filter(b => b.proyecto_id === proyId)
   const totalDirectos  = calcGrandTotal(items)
   const indsDelProy    = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
-  const totalIndPres   = indsDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+  const totalIndPres   = calcIndirectos(proy, totalDirectos, indsDelProy).total
   const subtotalPres   = totalDirectos + totalIndPres
   const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
   const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)

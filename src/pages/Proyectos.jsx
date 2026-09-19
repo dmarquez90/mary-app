@@ -2,7 +2,7 @@ import { useState, useContext, useMemo, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, MONEDAS, calcGrandTotal, PAIS_MONEDA, MONEDA_SIMBOLO } from '../utils'
+import { today, MONEDAS, calcGrandTotal, calcIndirectos, PAIS_MONEDA, MONEDA_SIMBOLO } from '../utils'
 import {
   Drawer, Modal, EmptyState, Chip, Field, PrimaryBtn, SecondaryBtn,
   TBtn, Confirm, Icons, inputCls, selectCls, PageHeader, Toolbar, SearchInput,
@@ -147,9 +147,7 @@ export default function Proyectos({ onNavigate }) {
   const calcBudgetTotal = (proyId) => {
     const p       = proyectos.find(x => x.id === proyId)
     const directo = calcGrandTotal(presupuesto.filter(b => b.proyecto_id === proyId))
-    const ind     = presupuesto_indirectos
-      .filter(i => i.proyecto_id === proyId)
-      .reduce((s, i) => s + parseFloat(i.monto_presupuestado || 0), 0)
+    const ind     = calcIndirectos(p, directo, presupuesto_indirectos.filter(i => i.proyecto_id === proyId)).total
     const subtotal = directo + ind
     const utilidad = subtotal * (parseFloat(p?.utilidad_pct || 0) / 100)
     const impuesto = (subtotal + utilidad) * (parseFloat(p?.impuesto_pct || 0) / 100)
@@ -573,8 +571,8 @@ export default function Proyectos({ onNavigate }) {
                 [isEs ? 'Pres. directo' : 'Direct budget',
                   money(calcGrandTotal(presupuesto.filter(b => b.proyecto_id === detail)), proyecto.moneda)],
                 [isEs ? 'Pres. indirecto' : 'Indirect budget',
-                  money(presupuesto_indirectos.filter(i => i.proyecto_id === detail)
-                    .reduce((s, i) => s + parseFloat(i.monto_presupuestado || 0), 0), proyecto.moneda)],
+                  money(calcIndirectos(proyecto, calcGrandTotal(presupuesto.filter(b => b.proyecto_id === detail)),
+                    presupuesto_indirectos.filter(i => i.proyecto_id === detail)).total, proyecto.moneda)],
                 ...(proyecto.utilidad_pct ? [[t('proy_profit'), `${proyecto.utilidad_pct}%`]] : []),
                 ...(proyecto.impuesto_pct ? [[t('proy_tax'), `${proyecto.impuesto_pct}% ${proyecto.impuesto_descripcion || ''}`]] : []),
               ].map(([k, v]) => (

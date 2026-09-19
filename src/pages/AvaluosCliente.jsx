@@ -5,7 +5,7 @@ import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, calcGrandTotal, r2 } from '../utils'
+import { today, fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
 const BRAND = 'var(--brand)'
@@ -223,12 +223,6 @@ export default function AvaluosCliente() {
   // Componentes del precio de venta del proyecto
   const utilidadPct  = parseFloat(proy?.utilidad_pct  || 0) / 100
   const impuestoPct  = parseFloat(proy?.impuesto_pct  || 0) / 100
-  const totalIndirectos = useMemo(() =>
-    presupuesto_indirectos
-      .filter(i => i.proyecto_id === proyId)
-      .reduce((s, i) => s + parseFloat(i.monto_presupuestado || 0), 0),
-    [presupuesto_indirectos, proyId]
-  )
 
   const todosItems   = useMemo(() =>
     presupuesto.filter(b => b.proyecto_id === proyId),
@@ -249,6 +243,10 @@ export default function AvaluosCliente() {
   const presupuestoOriginal = useMemo(() => calcGrandTotal(todosItems), [todosItems])
   const totalOCAprobadas    = useMemo(() => ocAprobadas.reduce((s,o) => s + parseFloat(o.total_oc||0), 0), [ocAprobadas])
   const presupuestoEfectivo = presupuestoOriginal + totalOCAprobadas
+  const totalIndirectos = useMemo(() =>
+    calcIndirectos(proy, presupuestoOriginal, presupuesto_indirectos.filter(i => i.proyecto_id === proyId)).total,
+    [proy, presupuestoOriginal, presupuesto_indirectos, proyId]
+  )
 
   const avs = useMemo(() =>
     avaluos_cliente.filter(a => a.proyecto_id === proyId)

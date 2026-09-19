@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, r2 } from '../utils'
+import { today, fmt, fmtNum, r2, calcGrandTotal, calcIndirectos } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { useAuth } from '../auth'
 import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
@@ -93,11 +93,13 @@ export default function Financiero() {
 
   const indsPresDelProy = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
   const comparacionIndirectos = CAT_KEYS.map(catKey => {
-    const cat           = CATEGORIAS_IND[catKey]
+    const cat  = CATEGORIAS_IND[catKey]
     // SUMA todas las filas de esa categoría (incluyendo distintas subcategorías)
-    const presupuestado = indsPresDelProy
-      .filter(p => p.categoria === catKey)
-      .reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+    const filas = indsPresDelProy.filter(p => p.categoria === catKey)
+    // Distribuir es opcional: una categoría con gasto pero sin asignación no es
+    // sobregiro, su gasto se mide contra la bolsa completa del C.I.
+    const tienePresupuesto = filas.length > 0
+    const presupuestado = filas.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
     const ejecutado     = inds
       .filter(c => {
         const ck = CAT_KEYS.find(k =>
@@ -106,10 +108,20 @@ export default function Financiero() {
         return ck === catKey
       })
       .reduce((s, c) => s + parseFloat(c.monto || 0), 0)
-    const diferencia = presupuestado - ejecutado
-    return { catKey, label: isEs ? cat.es : cat.en, presupuestado, ejecutado, diferencia }
+    return {
+      catKey, label: isEs ? cat.es : cat.en, tienePresupuesto,
+      presupuestado, ejecutado,
+      diferencia: tienePresupuesto ? presupuestado - ejecutado : null,
+    }
   }).filter(r => r.presupuestado > 0 || r.ejecutado > 0)
-  const totalIndPres = indsPresDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+
+  const proyActual   = proyectos.find(x => x.id === proyId)
+  const directoProy  = calcGrandTotal(presupuesto.filter(b => b.proyecto_id === proyId))
+  const indCalc      = calcIndirectos(proyActual, directoProy, indsPresDelProy)
+  const totalIndPres = indCalc.total
+  // Nivel bolsa: siempre comparable, aunque no exista ni una categoría.
+  const bolsaDiferencia = r2(totalIndPres - totalInd)
+  const bolsaPctUsado   = totalIndPres > 0 ? (totalInd / totalIndPres) * 100 : 0
   const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => {
     const idx = entradas.find(e=>e.material_id===sa.material_id)
     return s+r2((parseFloat(sa.cantidad)||0)*(parseFloat(idx?.precio_unitario)||0))
@@ -559,6 +571,42 @@ export default function Financiero() {
           {/* ── TAB 4: ADMINISTRACIÓN ─────────────────────────────────── */}
           {tab === 4 && (
             <>
+              {/* ── Nivel bolsa: siempre comparable, aunque no haya categorías ── */}
+              {totalIndPres > 0 && (
+                <div className="m-card mb-4 overflow-hidden">
+                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-700">{t('fin_ci_envelope')}</p>
+                  </div>
+                  <div className="p-4">
+                    <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                      <div className="h-full rounded-full" style={{
+                        width: `${Math.min(100, bolsaPctUsado)}%`,
+                        background: bolsaPctUsado > 100 ? '#ef4444' : bolsaPctUsado > 90 ? '#e0982c' : '#1D9E75',
+                      }} />
+                    </div>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2 mt-3 text-sm">
+                      <span className="text-gray-500">{isEs?'Presupuestado':'Budgeted'}{' '}
+                        <b className="font-mono text-gray-700">{fmt(totalIndPres, moneda)}</b>
+                        {indCalc.modo === 'pct' && <span className="text-xs text-gray-400"> ({fmtNum(indCalc.pct)}% {t('pres_ci_of_direct')})</span>}
+                      </span>
+                      <span className="text-gray-500">{isEs?'Ejecutado':'Executed'}{' '}
+                        <b className="font-mono text-gray-700">{fmt(totalInd, moneda)}</b>
+                        <span className="text-xs text-gray-400"> ({fmtNum(bolsaPctUsado)}%)</span>
+                      </span>
+                      <span style={{ color: bolsaDiferencia < 0 ? '#ef4444' : '#1D9E75' }}>
+                        {bolsaDiferencia < 0 ? t('fin_overrun') : t('fin_saving')}{' '}
+                        <b className="font-mono">{fmt(Math.abs(bolsaDiferencia), moneda)}</b>
+                      </span>
+                    </div>
+                    {indCalc.disponible > 0 && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        {t('fin_ci_undistributed_note', { amount: fmt(indCalc.disponible, moneda) })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {comparacionIndirectos.length > 0 && (
                 <div className="m-card mb-4 overflow-hidden">
                   <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
@@ -573,33 +621,45 @@ export default function Financiero() {
                       </tr></thead>
                       <tbody>
                         {comparacionIndirectos.map(r => {
+                          // Sin asignación propia: el gasto se mide contra la bolsa,
+                          // no contra cero. Mostrarlo como sobregiro sería falso.
+                          const sinAsignar = !r.tienePresupuesto
                           const pct    = r.presupuestado > 0 ? (r.ejecutado / r.presupuestado) * 100 : 0
-                          const status = r.diferencia < 0 ? 'sobrecosto' : r.diferencia === 0 ? 'justo' : 'ahorro'
+                          const status = sinAsignar ? 'sin_asignar'
+                            : r.diferencia < 0 ? 'sobrecosto' : r.diferencia === 0 ? 'justo' : 'ahorro'
                           return (
                             <tr key={r.catKey} className="m-tr">
                               <td className={tdCls}>
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{r.label}</span>
                               </td>
-                              <td className={tdCls + ' font-mono'}>{fmt(r.presupuestado, moneda)}</td>
+                              <td className={tdCls + ' font-mono'}>
+                                {sinAsignar ? <span className="text-gray-300">—</span> : fmt(r.presupuestado, moneda)}
+                              </td>
                               <td className={tdCls + ' font-mono'}>{fmt(r.ejecutado, moneda)}</td>
-                              <td className={tdCls + ' font-mono font-bold'} style={{color: status==='sobrecosto' ? '#ef4444' : '#1D9E75'}}>
-                                {r.diferencia >= 0 ? '+' : ''}{fmt(r.diferencia, moneda)}
+                              <td className={tdCls + ' font-mono font-bold'} style={{color: status==='sobrecosto' ? '#ef4444' : status==='sin_asignar' ? '#9ca3af' : '#1D9E75'}}>
+                                {sinAsignar ? <span className="text-gray-300">—</span> : <>{r.diferencia >= 0 ? '+' : ''}{fmt(r.diferencia, moneda)}</>}
                               </td>
                               <td className={tdCls}>
                                 <div className="flex flex-col gap-1">
                                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium w-fit ${
-                                    status === 'ahorro'     ? 'bg-green-100 text-green-700' :
-                                    status === 'sobrecosto' ? 'bg-red-100 text-red-600' :
+                                    status === 'ahorro'      ? 'bg-green-100 text-green-700' :
+                                    status === 'sobrecosto'  ? 'bg-red-100 text-red-600' :
+                                    status === 'sin_asignar' ? 'bg-gray-100 text-gray-500' :
                                     'bg-gray-100 text-gray-600'
                                   }`}>
-                                    {status === 'ahorro' ? (t('fin_saving')) : status === 'sobrecosto' ? (t('fin_overrun')) : (t('fin_on_budget'))}
+                                    {status === 'ahorro' ? (t('fin_saving'))
+                                      : status === 'sobrecosto' ? (t('fin_overrun'))
+                                      : status === 'sin_asignar' ? (t('fin_ci_unallocated'))
+                                      : (t('fin_on_budget'))}
                                   </span>
+                                  {!sinAsignar && (
                                   <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div className="h-full rounded-full" style={{
                                       width: `${Math.min(100, pct)}%`,
                                       background: pct > 100 ? '#ef4444' : pct > 80 ? '#e0982c' : '#1D9E75'
                                     }} />
                                   </div>
+                                  )}
                                 </div>
                               </td>
                             </tr>

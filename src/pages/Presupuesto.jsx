@@ -1,9 +1,9 @@
-import { useState, useMemo, useContext, useRef, Fragment } from 'react'
+import { useState, useEffect, useMemo, useContext, useRef, Fragment } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
-import { EmptyState, PrimaryBtn, TBtn, Confirm, Icons, inputCls, selectCls, PageHeader } from '../components'
+import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, calcIndirectos, montoDesdePct, pctDesdeMonto, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
+import { EmptyState, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls, PageHeader } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
 import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from './categoriasIndirectos'
 
@@ -23,7 +23,7 @@ export default function Presupuesto() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
   const { can } = usePermissions()
-  const { proyectos, presupuesto, presupuesto_indirectos = [], cajas_chicas = [] } = state
+  const { proyectos, presupuesto, presupuesto_indirectos = [], cajas_chicas = [], indirectos_historial = [] } = state
 
   const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
   const [edit, setEdit]             = useState(null)  // { id, campo } de la celda abierta
@@ -35,6 +35,7 @@ export default function Presupuesto() {
   const puedeEditar = can('presupuesto_editar')
 
   const [indForm, setIndForm]   = useState({ categoria: '', subcategoria: '', monto_presupuestado: '' })
+  const [indCatPct, setIndCatPct] = useState('')
   const [indEdit, setIndEdit]   = useState(null)
   const setIndF = k => e => setIndForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -255,8 +256,69 @@ export default function Presupuesto() {
 
   const moneda   = proy?.moneda || 'USD'
 
-  const indsDelProy   = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
-  const totalIndirecto = indsDelProy.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0)
+  const indsDelProy    = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
+  const indCalc        = calcIndirectos(proy, grandTotal, indsDelProy)
+  const totalIndirecto = indCalc.total
+
+  // ── La bolsa del C.I.: % y monto son la misma cifra vista de dos formas ──
+  // Se guarda el %, por eso la bolsa se recalcula sola si cambia el directo.
+  const [indPct,   setIndPct]   = useState('')
+  const [indMonto, setIndMonto] = useState('')
+  useEffect(() => {
+    const p = parseFloat(proy?.indirecto_pct || 0)
+    setIndPct(p ? String(p) : '')
+    setIndMonto(p ? String(montoDesdePct(p, grandTotal)) : '')
+  }, [proy?.id, proy?.indirecto_pct, grandTotal])
+
+  const onIndPctChange = v => {
+    setIndPct(v)
+    setIndMonto(v === '' ? '' : String(montoDesdePct(v, grandTotal)))
+  }
+  const onIndMontoChange = v => {
+    setIndMonto(v)
+    setIndPct(v === '' ? '' : String(pctDesdeMonto(v, grandTotal)))
+  }
+  const saveIndPct = () => {
+    const v = parseFloat(indPct) || 0
+    if (!proy || v === (parseFloat(proy.indirecto_pct) || 0)) return
+    dispatch({ type: 'UPD_PROYECTO', payload: { ...proy, indirecto_pct: v } })
+  }
+
+  // Disponible en vivo: descuenta lo que se está tecleando en el formulario,
+  // y al editar no cuenta dos veces el monto de la fila en edición.
+  const asignadoSinEdit = indEdit
+    ? r2(indCalc.asignado - parseFloat(indsDelProy.find(i => i.id === indEdit)?.monto_presupuestado || 0))
+    : indCalc.asignado
+  const montoEnForm         = parseFloat(indForm.monto_presupuestado || 0)
+  const disponibleProyectado = r2(indCalc.total - asignadoSinEdit - montoEnForm)
+
+  // En la categoría, el % es sobre la bolsa (no sobre el costo directo).
+  const onCatMontoChange = v => {
+    setIndForm(f => ({ ...f, monto_presupuestado: v }))
+    setIndCatPct(v === '' ? '' : String(pctDesdeMonto(v, indCalc.total)))
+  }
+  const onCatPctChange = v => {
+    setIndCatPct(v)
+    setIndForm(f => ({ ...f, monto_presupuestado: v === '' ? '' : String(montoDesdePct(v, indCalc.total)) }))
+  }
+  const [verHist, setVerHist] = useState(false)
+  const histDelProy = useMemo(() =>
+    indirectos_historial
+      .filter(h => h.proyecto_id === proyId)
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))),
+    [indirectos_historial, proyId]
+  )
+  const eventoLabel = (ev) => t(`pres_ci_ev_${ev}`)
+
+  const resetIndForm = () => {
+    setIndForm({ categoria: '', subcategoria: '', monto_presupuestado: '' })
+    setIndCatPct(''); setIndEdit(null)
+  }
+  const editIndRow = (ind) => {
+    setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria || '', monto_presupuestado: ind.monto_presupuestado })
+    setIndCatPct(String(pctDesdeMonto(ind.monto_presupuestado, indCalc.total)))
+    setIndEdit(ind.id)
+  }
 
   // Agrupar por categoría: una fila por categoría (con su total), y debajo
   // una fila por cada subcategoría/registro individual (editable).
@@ -281,8 +343,19 @@ export default function Presupuesto() {
   const impuestoMonto  = r2(granTotal * (impuestoPct / 100))
   const totalConImp    = r2(granTotal + impuestoMonto)
 
+  // Piso de Caja Chica: nunca puede quedar por debajo de los fondos ya
+  // entregados, porque esa plata ya salió de caja y no se puede "desentregar".
+  const entregadoCC = cajas_chicas
+    .filter(c => c.proyecto_id === proyId && c.estado === 'activa')
+    .reduce((s, c) => s + parseFloat(c.monto_asignado || 0), 0)
+
   const saveInd = () => {
     if (!indForm.categoria || !indForm.monto_presupuestado) return
+    const esCajaChica = indForm.categoria === 'Caja Chica' || indForm.categoria === 'Petty Cash'
+    if (esCajaChica && entregadoCC > 0 && parseFloat(indForm.monto_presupuestado) < entregadoCC) {
+      alert(t('pres_ci_cc_floor', { amount: fmt(entregadoCC, moneda) }))
+      return
+    }
     // Normalizar subcategoría a ES si fue seleccionada en EN
     let subcategoria = indForm.subcategoria || ''
     if (subcategoria && lang !== 'ES') {
@@ -296,8 +369,7 @@ export default function Presupuesto() {
     } else {
       dispatch({ type: 'ADD_PRES_IND', payload: { ...payload, proyecto_id: proyId } })
     }
-    setIndForm({ categoria: '', subcategoria: '', monto_presupuestado: '' })
-    setIndEdit(null)
+    resetIndForm()
   }
   const tipoLabel = (tipo) => {
     if (tipo==='etapa')     return t('pres_form_stage')
@@ -504,6 +576,56 @@ export default function Presupuesto() {
             <p className="text-sm font-semibold text-gray-700">{t('pres_indirect_title')}</p>
           </div>
           <div className="p-4">
+            {/* ── La bolsa: % y monto enlazados ── */}
+            <div className="p-3 rounded-lg bg-gray-50 mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-xs font-semibold text-gray-600 mr-1">{t('pres_ci_label')}</label>
+                <input type="number" className={inputCls + ' w-20'} placeholder="0" min="0" step="0.01"
+                  disabled={!puedeEditar || closed}
+                  value={indPct} onChange={e => onIndPctChange(e.target.value)}
+                  onBlur={saveIndPct} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} />
+                <span className="text-xs text-gray-500">%</span>
+                <span className="text-gray-300">=</span>
+                <input type="number" className={inputCls + ' w-36 font-mono'} placeholder="0.00" min="0" step="0.01"
+                  disabled={!puedeEditar || closed}
+                  value={indMonto} onChange={e => onIndMontoChange(e.target.value)}
+                  onBlur={saveIndPct} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} />
+                <span className="text-xs text-gray-400">
+                  {t('pres_ci_of_direct')} <span className="font-mono">{fmt(grandTotal, moneda)}</span>
+                </span>
+              </div>
+
+              {indCalc.modo === 'pct' ? (
+                <div className="mt-3">
+                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{
+                      width: `${Math.min(100, Math.max(0, indCalc.pctAsignado))}%`,
+                      background: indCalc.sobregiro ? '#ef4444' : indCalc.pctAsignado > 90 ? '#e0982c' : '#1D9E75',
+                    }} />
+                  </div>
+                  <div className="flex justify-between items-baseline mt-1.5 flex-wrap gap-2">
+                    <span className="text-xs text-gray-500">
+                      {t('pres_ci_allocated')} <b className="font-mono text-gray-700">{fmt(indCalc.asignado, moneda)}</b>
+                      <span className="text-gray-400"> · {fmtNum(indCalc.pctAsignado)}%</span>
+                    </span>
+                    <span className="text-sm" style={{ color: indCalc.sobregiro ? '#ef4444' : '#1D9E75' }}>
+                      {indCalc.sobregiro ? t('pres_ci_over') : t('pres_ci_available')}{' '}
+                      <b className="font-mono">{fmt(Math.abs(indCalc.disponible), moneda)}</b>
+                      <span className="opacity-70"> · {fmtNum(Math.abs(indCalc.pctDisponible))}% {t('pres_ci_of_ci')}</span>
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 mt-2">{t('pres_ci_hint_empty')}</p>
+              )}
+            </div>
+
+            {/* Aviso: el directo bajó y lo asignado ya no cabe en la bolsa */}
+            {indCalc.sobregiro && (
+              <div className="mb-4 p-3 rounded-lg border text-xs" style={{ background:'#fef2f2', borderColor:'#fecaca', color:'#b91c1c' }}>
+                {t('pres_ci_warn_over', { amount: fmt(Math.abs(indCalc.disponible), moneda) })}
+              </div>
+            )}
             {puedeEditar && !closed && (
               <div className="flex gap-2 mb-4 flex-wrap">
                 <select className={selectCls + ' flex-1 min-w-[220px]'}
@@ -518,22 +640,37 @@ export default function Presupuesto() {
                     {getSubcategorias(indForm.categoria, lang).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 )}
-                <input type="number" className={inputCls + ' w-36'}
+                <input type="number" className={inputCls + ' w-32 font-mono'}
                   placeholder={t('pres_indirect_budget_ph')}
-                  value={indForm.monto_presupuestado} onChange={setIndF('monto_presupuestado')}
+                  value={indForm.monto_presupuestado} onChange={e => onCatMontoChange(e.target.value)}
                   min="0" step="0.01" />
+                {indCalc.modo === 'pct' && (
+                  <div className="flex items-center gap-1">
+                    <input type="number" className={inputCls + ' w-20'} placeholder="0"
+                      value={indCatPct} onChange={e => onCatPctChange(e.target.value)}
+                      min="0" step="0.01" />
+                    <span className="text-xs text-gray-400">% {t('pres_ci_of_ci')}</span>
+                  </div>
+                )}
                 <PrimaryBtn onClick={saveInd} disabled={!indForm.categoria || !indForm.monto_presupuestado}>
                   {indEdit ? t('btn_save') : t('btn_add')}
                 </PrimaryBtn>
                 {indEdit && (
-                  <SecondaryBtn onClick={() => { setIndForm({ categoria: '', subcategoria: '', monto_presupuestado: '' }); setIndEdit(null) }}>
+                  <SecondaryBtn onClick={resetIndForm}>
                     {t('btn_cancel')}
                   </SecondaryBtn>
+                )}
+                {indCalc.modo === 'pct' && montoEnForm > 0 && (
+                  <span className="w-full text-xs" style={{ color: disponibleProyectado < 0 ? '#ef4444' : '#6b7280' }}>
+                    {disponibleProyectado < 0
+                      ? t('pres_ci_would_exceed', { amount: fmt(Math.abs(disponibleProyectado), moneda) })
+                      : t('pres_ci_would_leave',  { amount: fmt(disponibleProyectado, moneda) })}
+                  </span>
                 )}
               </div>
             )}
             {indsDelProy.length === 0 ? (
-              <p className="text-xs text-gray-400 py-2 text-center">{t('pres_indirect_empty')}</p>
+              indCalc.modo === 'pct' ? null : <p className="text-xs text-gray-400 py-2 text-center">{t('pres_indirect_empty')}</p>
             ) : (
               <table className="w-full">
                 <thead><tr className="border-b border-gray-100">
@@ -554,7 +691,7 @@ export default function Presupuesto() {
                             <td className="px-2 py-2">
                               {isSimple && (
                                 <div className="flex gap-1">
-                                  <TBtn onClick={() => { setIndForm({ categoria: item0.categoria, subcategoria: item0.subcategoria||'', monto_presupuestado: item0.monto_presupuestado }); setIndEdit(item0.id) }}>{t('btn_edit')}</TBtn>
+                                  <TBtn onClick={() => editIndRow(item0)}>{t('btn_edit')}</TBtn>
                                   <TBtn danger onClick={() => eliminarPresInd(item0)}>{t('btn_delete')}</TBtn>
                                 </div>
                               )}
@@ -578,7 +715,7 @@ export default function Presupuesto() {
                             {puedeEditar && (
                               <td className="px-2 py-2">
                                 <div className="flex gap-1">
-                                  <TBtn onClick={() => { setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria||'', monto_presupuestado: ind.monto_presupuestado }); setIndEdit(ind.id) }}>{t('btn_edit')}</TBtn>
+                                  <TBtn onClick={() => editIndRow(ind)}>{t('btn_edit')}</TBtn>
                                   <TBtn danger onClick={() => eliminarPresInd(ind)}>{t('btn_delete')}</TBtn>
                                 </div>
                               </td>
@@ -595,6 +732,55 @@ export default function Presupuesto() {
                   </tr>
                 </tbody>
               </table>
+            )}
+
+            {/* ── Histórico de indirectos: original vs revisado ── */}
+            {histDelProy.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <button className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                  onClick={() => setVerHist(v => !v)}>
+                  {verHist ? '▾' : '▸'} {t('pres_ci_history')} ({histDelProy.length})
+                </button>
+                {verHist && (
+                  <div className="mt-2 overflow-x-auto">
+                    {indCalc.totalOriginal !== null && (
+                      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs mb-3 p-2 rounded bg-gray-50">
+                        <span className="text-gray-500">{t('pres_ci_original')}{' '}
+                          <b className="font-mono text-gray-700">{fmt(indCalc.totalOriginal, moneda)}</b>
+                          <span className="text-gray-400"> ({fmtNum(indCalc.pctOriginal)}%)</span>
+                        </span>
+                        <span className="text-gray-500">{t('pres_ci_revised')}{' '}
+                          <b className="font-mono text-gray-700">{fmt(indCalc.total, moneda)}</b>
+                          <span className="text-gray-400"> ({fmtNum(indCalc.pct)}%)</span>
+                        </span>
+                      </div>
+                    )}
+                    <table className="w-full">
+                      <tbody>
+                        {histDelProy.map(h => (
+                          <tr key={h.id} className="border-b border-gray-50">
+                            <td className="py-1.5 pr-3 text-xs text-gray-400 whitespace-nowrap">
+                              {String(h.created_at || '').slice(0, 10)}
+                            </td>
+                            <td className="py-1.5 pr-3 text-xs">
+                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{eventoLabel(h.evento)}</span>
+                            </td>
+                            <td className="py-1.5 pr-3 text-xs text-gray-600">
+                              {h.categoria ? getCategoriaLabel(h.categoria, lang) : '—'}
+                              {h.subcategoria && <span className="text-gray-400"> / {h.subcategoria}</span>}
+                            </td>
+                            <td className="py-1.5 text-xs font-mono text-right text-gray-600 whitespace-nowrap">
+                              {h.evento === 'pct_cambio' || h.evento === 'baseline'
+                                ? <>{h.pct_anterior != null && <>{fmtNum(h.pct_anterior)}% → </>}{fmtNum(h.pct_nuevo)}%</>
+                                : <>{fmt(h.monto_anterior || 0, moneda)} → {fmt(h.monto_nuevo || 0, moneda)}</>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useState, useRef } from 'react'
 import { supabase } from './supabase'
-import { uuid, genProjectCode, genOCCode, genBudgetCode, today, r2 } from './utils'
+import { uuid, genProjectCode, genOCCode, genBudgetCode, today, r2, calcGrandTotal, calcIndirectos } from './utils'
 
 const INIT = {
   proyectos: [], fases: [], presupuesto: [],
@@ -15,7 +15,7 @@ const INIT = {
   subcontratos_retenciones: [],
   ordenes_pago_retencion: [],
   ordenes_cambio: [], ordenes_cambio_items: [], ordenes_cambio_indirectos: [],
-  presupuesto_indirectos: [],
+  presupuesto_indirectos: [], indirectos_historial: [],
   avaluos_cliente: [], avaluos_cliente_items: [],
   cajas_chicas: [], gastos_caja_chica: [], liquidaciones_caja_chica: [], reembolsos_personal: [],
   bitacora_log: [], bitacora_adjuntos: [],
@@ -279,6 +279,8 @@ function reducer(state, action) {
     case 'DEL_PRES_IND': return { ...state, presupuesto_indirectos: (state.presupuesto_indirectos||[]).filter(p => p.id !== action.payload) }
     case 'REFRESH_PRES_IND': return { ...state, presupuesto_indirectos: action.payload }
 
+    case 'ADD_IND_HIST': return { ...state, indirectos_historial: [...(state.indirectos_historial||[]), action.payload] }
+
     // ── CAJA CHICA (v1.1) ──────────────────────────────────────────────
     case 'ADD_CAJA_CHICA': return { ...state, cajas_chicas: [...state.cajas_chicas, action.payload] }
     case 'APROBAR_CAJA_CHICA': return { ...state, cajas_chicas: state.cajas_chicas.map(c => c.id === action.payload.id ? { ...c, estado:'activa', saldo_actual: action.payload.saldo_actual } : c) }
@@ -384,7 +386,7 @@ export function StoreProvider({ children, tenantId, rol }) {
         'ordenes_pago_retencion',
         'ordenes_cambio','ordenes_cambio_items','ordenes_cambio_indirectos',
         'avaluos_cliente','avaluos_cliente_items',
-        'presupuesto_indirectos',
+        'presupuesto_indirectos','indirectos_historial',
         'cajas_chicas','gastos_caja_chica','liquidaciones_caja_chica','reembolsos_personal',
         'bitacora_log','bitacora_adjuntos',
         'usuarios',
@@ -677,6 +679,33 @@ useEffect(() => {
       dispatch({ type: 'DEL_SALIDA_LOCAL', payload: payload.id })
     }
 
+    // Bitácora dedicada a costos indirectos: permite reconstruir original vs
+    // revisado vs real. El snapshot (directo/bolsa/asignado) es el vigente ANTES
+    // de aplicar el cambio; el cambio en sí va en los campos *_anterior/*_nuevo.
+    // Nunca usa sbThrow: si falla el registro, la operación principal sigue.
+    const logIndirecto = async (proyecto_id, evento, extra = {}) => {
+      if (!proyecto_id) return
+      try {
+        const proy    = state.proyectos.find(p => p.id === proyecto_id)
+        const directo = calcGrandTotal(state.presupuesto.filter(b => b.proyecto_id === proyecto_id))
+        const inds    = (state.presupuesto_indirectos || []).filter(p => p.proyecto_id === proyecto_id)
+        const calc    = calcIndirectos(proy, directo, inds)
+        const { data: { user } } = await supabase.auth.getUser()
+        const row = {
+          id: uuid(), tenant_id: tenantId, proyecto_id, evento,
+          created_at: new Date().toISOString(),
+          costo_directo: directo, bolsa: calc.total, asignado: calc.asignado,
+          usuario_id: user?.id || null,
+          ...extra,
+        }
+        const { error } = await supabase.from('indirectos_historial').insert(row)
+        if (error) throw error
+        dispatch({ type: 'ADD_IND_HIST', payload: row })
+      } catch (e) {
+        console.warn('[MARY] indirectos_historial:', e.message)
+      }
+    }
+
     try {
     switch (action.type) {
 
@@ -684,12 +713,41 @@ useEffect(() => {
         const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await sbThrow(supabase.from('presupuesto_indirectos').insert(item))
         dispatch({ type: 'ADD_PRES_IND', payload: item })
+        await logIndirecto(item.proyecto_id, 'asignacion', {
+          categoria: item.categoria, subcategoria: item.subcategoria || null,
+          monto_anterior: 0, monto_nuevo: parseFloat(item.monto_presupuestado || 0),
+        })
         break
       }
       case 'UPD_PRES_IND': {
         const { id, ...fields } = action.payload
+        const prevInd = state.presupuesto_indirectos.find(p => p.id === id)
+        // Piso de Caja Chica: no puede bajar de lo ya entregado en fondos activos.
+        const esCC = prevInd?.categoria === 'Caja Chica' || prevInd?.categoria === 'Petty Cash'
+        if (esCC && fields.monto_presupuestado !== undefined) {
+          const entregado = state.cajas_chicas
+            .filter(c => c.proyecto_id === prevInd.proyecto_id && c.estado === 'activa')
+            .reduce((s, c) => s + parseFloat(c.monto_asignado || 0), 0)
+          if (entregado > 0 && parseFloat(fields.monto_presupuestado || 0) < entregado) {
+            console.warn('[MARY] UPD_PRES_IND bloqueado — Caja Chica por debajo de lo entregado')
+            await logIndirecto(prevInd.proyecto_id, 'piso_caja_chica', {
+              categoria: prevInd.categoria, subcategoria: prevInd.subcategoria || null,
+              monto_anterior: parseFloat(prevInd.monto_presupuestado || 0),
+              monto_nuevo: entregado,
+              nota: `Intento de bajar a ${fields.monto_presupuestado}; se mantiene el piso de ${entregado} ya entregado`,
+            })
+            break
+          }
+        }
         await sbThrow(supabase.from('presupuesto_indirectos').update(fields).eq('id', id))
         dispatch({ type: 'UPD_PRES_IND', payload: action.payload })
+        if (fields.monto_presupuestado !== undefined) {
+          await logIndirecto(prevInd?.proyecto_id, 'asignacion', {
+            categoria: prevInd?.categoria || null, subcategoria: prevInd?.subcategoria || null,
+            monto_anterior: parseFloat(prevInd?.monto_presupuestado || 0),
+            monto_nuevo: parseFloat(fields.monto_presupuestado || 0),
+          })
+        }
         break
       }
       case 'DEL_PRES_IND': {
@@ -700,6 +758,11 @@ useEffect(() => {
         }
         await sbThrow(supabase.from('presupuesto_indirectos').delete().eq('id', action.payload))
         dispatch({ type: 'DEL_PRES_IND', payload: action.payload })
+        await logIndirecto(item?.proyecto_id, 'asignacion', {
+          categoria: item?.categoria || null, subcategoria: item?.subcategoria || null,
+          monto_anterior: parseFloat(item?.monto_presupuestado || 0), monto_nuevo: 0,
+          nota: 'Categoría eliminada',
+        })
         break
       }
       case 'REFRESH_PRES_IND': {
@@ -908,6 +971,7 @@ useEffect(() => {
           ...action.payload, id: uuid(), project_code: code, created_at: today(), tenant_id: tenantId,
           utilidad_pct: parseFloat(action.payload.utilidad_pct) || 0,
           impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
+          indirecto_pct: parseFloat(action.payload.indirecto_pct) || 0,
           fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
         }
         await sbThrow(supabase.from('proyectos').insert(item))
@@ -919,10 +983,40 @@ useEffect(() => {
           ...action.payload,
           utilidad_pct: parseFloat(action.payload.utilidad_pct) || 0,
           impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
+          indirecto_pct: parseFloat(action.payload.indirecto_pct) || 0,
           fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
         }
+        const prevProy = state.proyectos.find(p => p.id === fields.id)
+        const pctAnterior = parseFloat(prevProy?.indirecto_pct || 0)
+
+        // Baseline del C.I.: se congela al arrancar la ejecución. Mientras el
+        // proyecto está en planificación se sigue armando la oferta, así que
+        // cambiar el % ahí no cuenta como desviación.
+        const arrancaEjecucion = prevProy?.estado === 'planificacion' && fields.estado === 'en_ejecucion'
+        const congelar = arrancaEjecucion && prevProy?.indirecto_pct_original == null
+        if (congelar) fields.indirecto_pct_original = fields.indirecto_pct
+
         await sbThrow(supabase.from('proyectos').update(fields).eq('id', fields.id))
         dispatch({ type: 'UPD_PROYECTO', payload: fields })
+
+        if (congelar) {
+          const indsProy = (state.presupuesto_indirectos || []).filter(p => p.proyecto_id === fields.id)
+          for (const ind of indsProy) {
+            const monto = parseFloat(ind.monto_presupuestado || 0)
+            await sbThrow(supabase.from('presupuesto_indirectos')
+              .update({ monto_original: monto }).eq('id', ind.id))
+            dispatch({ type: 'UPD_PRES_IND', payload: { id: ind.id, monto_original: monto } })
+          }
+          await logIndirecto(fields.id, 'baseline', {
+            pct_nuevo: fields.indirecto_pct,
+            nota: 'Inicio de ejecución: se congela el presupuesto original de indirectos',
+          })
+        }
+        if (pctAnterior !== fields.indirecto_pct) {
+          await logIndirecto(fields.id, 'pct_cambio', {
+            pct_anterior: pctAnterior, pct_nuevo: fields.indirecto_pct,
+          })
+        }
         break
       }
       case 'DEL_PROYECTO': {
@@ -2001,6 +2095,12 @@ useEffect(() => {
                 await sbThrow(supabase
                   .from('presupuesto_indirectos').update({ monto_presupuestado: montoNuevo }).eq('id', ind.ind_id))
                 dispatch({ type: 'UPD_PRES_IND', payload: { id: ind.ind_id, monto_presupuestado: montoNuevo } })
+                await logIndirecto(indActual.proyecto_id, 'reajuste_oc', {
+                  categoria: indActual.categoria, subcategoria: indActual.subcategoria || null,
+                  monto_anterior: parseFloat(indActual.monto_presupuestado || 0),
+                  monto_nuevo: montoNuevo,
+                  nota: `Orden de cambio ${ocData.numero || ''}`.trim(),
+                })
               }
             }
           }

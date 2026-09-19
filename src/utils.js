@@ -175,6 +175,42 @@ export const calcGrandTotal = (items) => {
     .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
 }
 
+// Costo indirecto presupuestado de un proyecto.
+// - Si el proyecto tiene indirecto_pct > 0: total = % × costo directo. Las filas de
+//   presupuesto_indirectos son una distribución opcional de ese total.
+// - Si no: el total es la suma de las filas (comportamiento anterior).
+export const calcIndirectos = (proy, directo, inds = []) => {
+  const asignado = r2(inds.reduce((s, p) => s + parseFloat(p.monto_presupuestado || 0), 0))
+  const pct      = parseFloat(proy?.indirecto_pct || 0)
+  const modo     = pct > 0 ? 'pct' : 'monto'
+  // Con % definido, la bolsa = % × costo directo y se recalcula sola.
+  // Sin %, el total es simplemente lo asignado (comportamiento heredado).
+  const total    = modo === 'pct' ? r2((directo || 0) * pct / 100) : asignado
+
+  const disponible    = r2(total - asignado)
+  const pctAsignado   = total > 0 ? (asignado / total) * 100 : 0
+  const pctDisponible = total > 0 ? (disponible / total) * 100 : 0
+
+  // Baseline congelado al iniciar ejecución (null mientras se planifica).
+  const pctOriginal   = proy?.indirecto_pct_original
+  const totalOriginal = (pctOriginal !== null && pctOriginal !== undefined)
+    ? r2((directo || 0) * parseFloat(pctOriginal) / 100)
+    : null
+
+  return {
+    modo, pct, total, asignado, disponible,
+    pctAsignado, pctDisponible,
+    sobregiro: disponible < 0,
+    pctOriginal: pctOriginal ?? null,
+    totalOriginal,
+  }
+}
+
+// Monto de una categoría expresado como % de la bolsa, y viceversa.
+export const montoDesdePct = (pct, bolsa) => r2((parseFloat(pct) || 0) * (bolsa || 0) / 100)
+export const pctDesdeMonto = (monto, bolsa) =>
+  (bolsa || 0) > 0 ? r2((parseFloat(monto) || 0) * 100 / bolsa) : 0
+
 export const ESTADO_COLORS = {
   planificacion:          'bg-blue-100 text-blue-700',
   en_ejecucion:           'bg-green-100 text-green-700',
