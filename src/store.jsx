@@ -979,13 +979,20 @@ useEffect(() => {
         break
       }
       case 'UPD_PROYECTO': {
-        const fields = {
-          ...action.payload,
-          utilidad_pct: parseFloat(action.payload.utilidad_pct) || 0,
-          impuesto_pct: parseFloat(action.payload.impuesto_pct) || 0,
-          indirecto_pct: parseFloat(action.payload.indirecto_pct) || 0,
-          fecha_fin_estimada: action.payload.fecha_fin_estimada || null,
+        const fields = { ...action.payload }
+        // Solo se normaliza lo que venga en el payload. Si se coercionara
+        // siempre, un dispatch parcial como {id, estado} pondría los
+        // porcentajes en cero en silencio.
+        for (const k of ['utilidad_pct', 'impuesto_pct', 'indirecto_pct']) {
+          if (k in action.payload) fields[k] = parseFloat(action.payload[k]) || 0
         }
+        if ('fecha_fin_estimada' in action.payload) {
+          fields.fecha_fin_estimada = action.payload.fecha_fin_estimada || null
+        }
+        // El baseline lo escribe únicamente congelar_baseline_indirectos().
+        // Si se dejara pasar, un payload con estado local desactualizado
+        // podría devolverlo a null y "descongelar" el original.
+        delete fields.indirecto_pct_original
         const prevProy = state.proyectos.find(p => p.id === fields.id)
         const pctAnterior = parseFloat(prevProy?.indirecto_pct || 0)
 
@@ -994,21 +1001,27 @@ useEffect(() => {
         // cambiar el % ahí no cuenta como desviación.
         const arrancaEjecucion = prevProy?.estado === 'planificacion' && fields.estado === 'en_ejecucion'
         const congelar = arrancaEjecucion && prevProy?.indirecto_pct_original == null
-        if (congelar) fields.indirecto_pct_original = fields.indirecto_pct
 
         await sbThrow(supabase.from('proyectos').update(fields).eq('id', fields.id))
         dispatch({ type: 'UPD_PROYECTO', payload: fields })
 
         if (congelar) {
-          const indsProy = (state.presupuesto_indirectos || []).filter(p => p.proyecto_id === fields.id)
-          for (const ind of indsProy) {
-            const monto = parseFloat(ind.monto_presupuestado || 0)
-            await sbThrow(supabase.from('presupuesto_indirectos')
-              .update({ monto_original: monto }).eq('id', ind.id))
-            dispatch({ type: 'UPD_PRES_IND', payload: { id: ind.id, monto_original: monto } })
+          // Proyecto y categorías se congelan juntos en una transacción. Si
+          // falla, indirecto_pct_original queda null y el próximo intento
+          // vuelve a pasar por aquí; la función es idempotente.
+          await sbThrow(supabase.rpc('congelar_baseline_indirectos', { p_proyecto_id: fields.id }))
+          // La función lee el % ya actualizado, así que si este mismo dispatch
+          // cambió estado y porcentaje a la vez, congela el nuevo.
+          const pctCongelado = 'indirecto_pct' in fields
+            ? fields.indirecto_pct
+            : parseFloat(prevProy?.indirecto_pct || 0)
+          dispatch({ type: 'UPD_PROYECTO', payload: { id: fields.id, indirecto_pct_original: pctCongelado } })
+          for (const ind of (state.presupuesto_indirectos || []).filter(p => p.proyecto_id === fields.id)) {
+            if (ind.monto_original != null) continue
+            dispatch({ type: 'UPD_PRES_IND', payload: { id: ind.id, monto_original: parseFloat(ind.monto_presupuestado || 0) } })
           }
           await logIndirecto(fields.id, 'baseline', {
-            pct_nuevo: fields.indirecto_pct,
+            pct_nuevo: pctCongelado,
             nota: 'Inicio de ejecución: se congela el presupuesto original de indirectos',
           })
         }
