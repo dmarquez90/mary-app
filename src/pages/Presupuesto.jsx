@@ -1,13 +1,23 @@
-import { useState, useMemo, useContext, Fragment } from 'react'
+import { useState, useMemo, useContext, useRef, Fragment } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
-import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Confirm, SectionBox, Icons, inputCls, selectCls, PageHeader } from '../components'
+import { EmptyState, PrimaryBtn, TBtn, Confirm, Icons, inputCls, selectCls, PageHeader } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
 import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from './categoriasIndirectos'
 
-const emptyForm = () => ({ tipo:'actividad', parent_id:'', descripcion:'', unidad:'m²', cantidad:'', costo_mo:'', costo_materiales:'', costo_equipos:'' })
+// Id de la fila que todavia no existe en la base: la partida que se esta
+// escribiendo. No colisiona con los uuid reales.
+const DRAFT_ID = '__nueva__'
+
+// Que se puede editar tocando la celda, segun el tipo de fila. El costo
+// unitario y el total no estan: son calculados.
+const CAMPOS_EDITABLES = {
+  etapa:     ['descripcion'],
+  sub_etapa: ['descripcion'],
+  actividad: ['descripcion','unidad','cantidad','costo_mo','costo_materiales','costo_equipos'],
+}
 
 export default function Presupuesto() {
   const { state, dispatch } = useStore()
@@ -16,10 +26,9 @@ export default function Presupuesto() {
   const { proyectos, presupuesto, presupuesto_indirectos = [], cajas_chicas = [] } = state
 
   const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
-  const [drawer, setDrawer]         = useState(false)
-  const [form, setForm]             = useState(emptyForm())
-  const [editing, setEditing]       = useState(null)
-  const [selected, setSelected]     = useState(null)
+  const [edit, setEdit]             = useState(null)  // { id, campo } de la celda abierta
+  const [editVal, setEditVal]       = useState('')
+  const [draft, setDraft]           = useState(null)  // partida nueva sin guardar
   const [confirmDel, setConfirmDel] = useState(null)
 
   const isEs = lang === 'ES'
@@ -58,7 +67,8 @@ export default function Presupuesto() {
   // Sincroniza automáticamente al cambiar de proyecto
   const handleProyChange = (pid) => {
     setProyId(pid)
-    setSelected(null)
+    setDraft(null)
+    setEdit(null)
     syncPresupuesto(pid)
   }
 
@@ -71,61 +81,176 @@ export default function Presupuesto() {
   const substages = items.filter(i => i.tipo === 'sub_etapa')
   const grandTotal = calcGrandTotal(items)
 
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  // ── Edición directa en celdas ──────────────────────────────
+  // La tabla se edita como una hoja de cálculo: clic en la celda, Tab para
+  // avanzar, Esc para cancelar. El costo unitario y el total son calculados,
+  // así que no se editan.
+  const num = v => parseFloat(v) || 0
+  const saltarBlur = useRef(false)
 
-  const ucPreview = r2((parseFloat(form.costo_mo)||0) + (parseFloat(form.costo_materiales)||0) + (parseFloat(form.costo_equipos)||0))
-  const tcPreview = r2((parseFloat(form.cantidad)||0) * ucPreview)
+  // Cuando la salida de una celda la decide el teclado (Enter/Tab/Esc), el
+  // blur del input que se desmonta llegaría después y pisaría lo que acabamos
+  // de hacer. Esto lo desactiva por lo que dura ese ciclo.
+  const marcarSalida = () => {
+    saltarBlur.current = true
+    setTimeout(() => { saltarBlur.current = false }, 0)
+  }
 
-  const openAdd = (tipo) => {
-    const f = emptyForm()
-    f.tipo = tipo
-    if (selected) {
-      const sel = items.find(i => i.id === selected)
-      if (sel) {
-        if (tipo === 'sub_etapa') f.parent_id = sel.tipo==='etapa' ? sel.id : sel.tipo==='sub_etapa' ? sel.parent_id : items.find(i=>i.id===sel.parent_id)?.parent_id || ''
-        if (tipo === 'actividad') f.parent_id = sel.tipo==='sub_etapa' ? sel.id : sel.tipo==='actividad' ? sel.parent_id : sel.tipo==='etapa' ? sel.id : ''
+  const ultima = (tipo) => {
+    for (let i = flat.length - 1; i >= 0; i--) if (flat[i].tipo === tipo) return flat[i]
+    return null
+  }
+
+  // Las filas que se dibujan: las guardadas más, si la hay, la partida nueva.
+  // Va al final del bloque de su padre, que es donde uno espera verla.
+  const filas = useMemo(() => {
+    const base = flat.map(item => ({ item, esDraft: false }))
+    if (!draft) return base
+    const fila = { item: { ...draft, id: DRAFT_ID }, esDraft: true }
+    if (draft.tipo === 'etapa' || !draft.parent_id) { base.push(fila); return base }
+    const idxPadre = base.findIndex(f => f.item.id === draft.parent_id)
+    if (idxPadre < 0) { base.push(fila); return base }
+    const desciendeDelPadre = (item) => {
+      let p = item.parent_id
+      for (let saltos = 0; p && saltos < 10; saltos++) {
+        if (p === draft.parent_id) return true
+        p = flat.find(x => x.id === p)?.parent_id
       }
+      return false
     }
-    setForm(f); setEditing(null); setDrawer(true)
+    let j = idxPadre + 1
+    while (j < base.length && desciendeDelPadre(base[j].item)) j++
+    base.splice(j, 0, fila)
+    return base
+  }, [flat, draft])
+
+  // Orden de tabulación: todas las celdas editables, fila por fila.
+  const celdas = useMemo(
+    () => filas.flatMap(f => (CAMPOS_EDITABLES[f.item.tipo] || []).map(campo => ({ id: f.item.id, campo }))),
+    [filas],
+  )
+
+  const filaPorId = (id) => filas.find(f => f.item.id === id)?.item
+
+  const abrirCelda = (item, campo) => {
+    if (!puedeEditar || closed) return
+    const v = item[campo]
+    const texto = (campo === 'descripcion' || campo === 'unidad')
+      ? (v ?? '')
+      : (v === '' || v == null || Number(v) === 0 ? '' : String(v))
+    setEditVal(texto)
+    setEdit({ id: item.id, campo })
   }
 
-  const openEdit = () => {
-    if (!selected) return
-    const item = items.find(i => i.id === selected)
-    if (!item) return
-    setForm({
-      tipo: item.tipo, parent_id: item.parent_id || '',
-      descripcion: item.descripcion, unidad: item.unidad || 'm²',
-      cantidad: item.cantidad || '', costo_mo: item.costo_mo || '',
-      costo_materiales: item.costo_materiales || '', costo_equipos: item.costo_equipos || ''
-    })
-    setEditing(selected); setDrawer(true)
+  // En la partida nueva solo actualiza el borrador; en una fila guardada
+  // escribe el campo, y solo si de verdad cambió.
+  const commitCelda = (item, campo, valor) => {
+    if (item.id === DRAFT_ID) { setDraft(d => d && ({ ...d, [campo]: valor })); return }
+    const numerico = campo !== 'descripcion' && campo !== 'unidad'
+    const nuevo    = numerico ? num(valor) : String(valor).trim()
+    const actual   = numerico ? num(item[campo]) : (item[campo] || '')
+    if (campo === 'descripcion' && !nuevo) return
+    if (nuevo === actual) return
+    dispatch({ type: 'UPD_BUDGET', payload: { id: item.id, [campo]: nuevo } })
   }
 
-  const save = () => {
-    if (!form.descripcion) return
-    // Actividad y sub-etapa requieren parent; etapa no
-    if (form.tipo !== 'etapa' && !form.parent_id) return
-    if (editing) {
-      dispatch({ type:'UPD_BUDGET', payload: {
-        id: editing, descripcion: form.descripcion, unidad: form.unidad,
-        cantidad: parseFloat(form.cantidad)||0, costo_mo: parseFloat(form.costo_mo)||0,
-        costo_materiales: parseFloat(form.costo_materiales)||0, costo_equipos: parseFloat(form.costo_equipos)||0
-      }})
-    } else {
-      dispatch({ type:'ADD_BUDGET', payload: {
-        proyectoId: proyId, tipo: form.tipo, parent_id: form.parent_id || null,
-        descripcion: form.descripcion, unidad: form.unidad,
-        cantidad: parseFloat(form.cantidad)||0, costo_mo: parseFloat(form.costo_mo)||0,
-        costo_materiales: parseFloat(form.costo_materiales)||0, costo_equipos: parseFloat(form.costo_equipos)||0
-      }})
+  const nuevaPartida = (tipo) => {
+    const parent_id = tipo === 'sub_etapa' ? (ultima('etapa')?.id || '')
+      : tipo === 'actividad' ? (ultima('sub_etapa')?.id || ultima('etapa')?.id || '')
+      : ''
+    setDraft({ tipo, parent_id, descripcion: '', unidad: 'm²', cantidad: '', costo_mo: '', costo_materiales: '', costo_equipos: '' })
+    setEditVal('')
+    setEdit({ id: DRAFT_ID, campo: 'descripcion' })
+  }
+
+  const cancelarDraft = () => { setDraft(null); setEdit(null) }
+
+  const draftListo = (d) => !!d && !!String(d.descripcion || '').trim() && (d.tipo === 'etapa' || !!d.parent_id)
+
+  // Guarda la partida nueva y deja otra igual lista, para cargar de corrido.
+  const guardarDraft = (d) => {
+    if (!draftListo(d)) return
+    dispatch({ type: 'ADD_BUDGET', payload: {
+      proyectoId: proyId, tipo: d.tipo, parent_id: d.parent_id || null,
+      descripcion: String(d.descripcion).trim(), unidad: d.unidad || 'm²',
+      cantidad: num(d.cantidad), costo_mo: num(d.costo_mo),
+      costo_materiales: num(d.costo_materiales), costo_equipos: num(d.costo_equipos),
+    } })
+    setDraft({ tipo: d.tipo, parent_id: d.parent_id, descripcion: '', unidad: d.unidad || 'm²',
+      cantidad: '', costo_mo: '', costo_materiales: '', costo_equipos: '' })
+    setEditVal('')
+    setEdit({ id: DRAFT_ID, campo: 'descripcion' })
+  }
+
+  const teclaCelda = (e, item, campo) => {
+    if (e.key === 'Escape') {
+      e.preventDefault(); marcarSalida()
+      if (item.id === DRAFT_ID) cancelarDraft(); else setEdit(null)
+      return
     }
-    setDrawer(false); setSelected(null)
+    if (e.key === 'Enter') {
+      e.preventDefault(); marcarSalida()
+      if (item.id === DRAFT_ID) guardarDraft({ ...draft, [campo]: editVal })
+      else { commitCelda(item, campo, editVal); setEdit(null) }
+      return
+    }
+    if (e.key !== 'Tab') return
+    e.preventDefault(); marcarSalida()
+    commitCelda(item, campo, editVal)
+    const i   = celdas.findIndex(c => c.id === item.id && c.campo === campo)
+    const sig = celdas[i + (e.shiftKey ? -1 : 1)]
+    if (!sig) { setEdit(null); return }
+    const itemSig = sig.id === DRAFT_ID
+      ? { ...draft, ...(item.id === DRAFT_ID ? { [campo]: editVal } : {}), id: DRAFT_ID }
+      : filaPorId(sig.id)
+    if (itemSig) abrirCelda(itemSig, sig.campo)
+    else setEdit(null)
+  }
+
+  // Una celda de la tabla. Es una función y no un componente a propósito: como
+  // componente, React lo remontaría en cada tecla y el input perdería el foco.
+  const celda = (item, campo, { contenido, align = 'right', clase = '' }) => {
+    const puede  = puedeEditar && !closed && (CAMPOS_EDITABLES[item.tipo] || []).includes(campo)
+    const activa = puede && edit && edit.id === item.id && edit.campo === campo
+    const base   = `px-3 py-2.5 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''} ${clase}`
+
+    if (activa) {
+      const numerico = campo !== 'descripcion' && campo !== 'unidad'
+      return (
+        <td className={base}>
+          {campo === 'unidad' ? (
+            <select autoFocus className="m-cell-input" value={editVal}
+              onChange={e => { marcarSalida(); setEditVal(e.target.value); commitCelda(item, campo, e.target.value); setEdit(null) }}
+              onKeyDown={e => teclaCelda(e, item, campo)}
+              onBlur={() => { if (!saltarBlur.current) setEdit(null) }}>
+              {UNIDADES_CONFIG.map(u => <option key={u.value} value={u.value}>{lang === 'ES' ? u.es : u.en}</option>)}
+            </select>
+          ) : (
+            <input autoFocus className={`m-cell-input${numerico ? ' num' : ''}`}
+              type={numerico ? 'number' : 'text'} min={numerico ? '0' : undefined} step={numerico ? '0.01' : undefined}
+              placeholder={numerico ? '0.00' : ''}
+              value={editVal}
+              onChange={e => setEditVal(e.target.value)}
+              onKeyDown={e => teclaCelda(e, item, campo)}
+              onBlur={() => {
+                if (saltarBlur.current) return
+                commitCelda(item, campo, editVal)
+                setEdit(prev => (prev && prev.id === item.id && prev.campo === campo) ? null : prev)
+              }} />
+          )}
+        </td>
+      )
+    }
+    return (
+      <td className={`${base}${puede ? ' m-cell' : ''}`} onClick={puede ? () => abrirCelda(item, campo) : undefined}>
+        {contenido}
+      </td>
+    )
   }
 
   const del = () => {
     dispatch({ type:'DEL_BUDGET', payload: confirmDel })
-    setConfirmDel(null); setSelected(null)
+    setConfirmDel(null)
   }
 
   const moneda   = proy?.moneda || 'USD'
@@ -208,22 +333,23 @@ export default function Presupuesto() {
         <>
           <div className="m-card mb-0 px-4 py-3 flex items-center gap-2 flex-wrap rounded-b-none border-b-0 sticky top-0 z-20">
             {puedeEditar && !closed && <>
-              <TBtn onClick={() => openAdd('etapa')}>
+              <TBtn onClick={() => nuevaPartida('etapa')}>
                 <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#1D9E75'}}/>
                 {t('pres_add_stage')}
               </TBtn>
-              <TBtn onClick={() => openAdd('sub_etapa')} disabled={stages.length===0}>
+              <TBtn onClick={() => nuevaPartida('sub_etapa')} disabled={stages.length===0}>
                 <span className="w-2 h-2 rounded-sm inline-block mr-1" style={{background:'#185FA5'}}/>
                 {t('pres_add_substage')}
               </TBtn>
-              {/* ← CAMBIO: actividad habilitada apenas haya una etapa */}
-              <TBtn onClick={() => openAdd('actividad')} disabled={stages.length===0}>
+              <TBtn onClick={() => nuevaPartida('actividad')} disabled={stages.length===0}>
                 <span className="w-2 h-2 rounded-sm inline-block mr-1 bg-gray-400"/>
                 {t('pres_add_activity')}
               </TBtn>
               <div className="w-px h-5 bg-gray-200 mx-1" />
-              <TBtn onClick={openEdit} disabled={!selected}>✎ {t('btn_edit')}</TBtn>
-              <TBtn danger onClick={() => selected && setConfirmDel(selected)} disabled={!selected}>✕ {t('btn_delete')}</TBtn>
+              <span className="text-[11px] text-gray-400 hidden md:inline">
+                {isEs ? 'Clic en una celda para editarla · Tab avanza · Esc cancela'
+                      : 'Click a cell to edit · Tab moves on · Esc cancels'}
+              </span>
             </>}
             <div className="ml-auto flex items-center gap-2 text-sm">
               <span className="text-gray-400 text-xs">{t('pres_grand_total')}:</span>
@@ -233,14 +359,14 @@ export default function Presupuesto() {
 
           {/* ← IMPORTAR DESDE EXCEL */}
           {puedeEditar && !closed && (
-            <ImportarPresupuesto proyId={proyId} moneda={moneda} onDone={() => setSelected(null)} />
+            <ImportarPresupuesto proyId={proyId} moneda={moneda} onDone={() => { setDraft(null); setEdit(null) }} />
           )}
 
-          {flat.length === 0 ? (
+          {flat.length === 0 && !draft ? (
             <div className="m-card rounded-t-none py-16">
               <EmptyState icon={Icons.table} title={t('pres_empty')} subtitle={t('pres_empty_sub')}
                 action={puedeEditar ? t('pres_add_stage') : null}
-                onAction={puedeEditar ? () => openAdd('etapa') : null} />
+                onAction={puedeEditar ? () => nuevaPartida('etapa') : null} />
             </div>
           ) : (
             <div className="m-card rounded-t-none overflow-x-auto">
@@ -250,25 +376,42 @@ export default function Presupuesto() {
                     {['ID',t('pres_col_desc'),t('pres_col_unit'),t('pres_col_qty'),t('pres_col_mo'),t('pres_col_mat'),t('pres_col_eq'),t('pres_col_uc'),t('pres_col_total')].map((h,i) => (
                       <th key={i} className={`px-3 py-3 text-xs text-gray-500 whitespace-nowrap ${i>=3?'text-right':'text-left'}`}>{h}</th>
                     ))}
+                    {puedeEditar && !closed && <th className="px-3 py-3 w-16" />}
                   </tr>
                 </thead>
                 <tbody>
-                  {flat.map(item => {
+                  {filas.map(({ item, esDraft }) => {
                     const isEt = item.tipo==='etapa'
                     const isSs = item.tipo==='sub_etapa'
                     const isAc = item.tipo==='actividad'
-                    const uc   = isAc ? r2((item.costo_mo||0)+(item.costo_materiales||0)+(item.costo_equipos||0)) : 0
-                    const tc   = isAc ? r2((item.cantidad||0)*uc) : calcSubtotal(items, item.id, item.tipo)
-                    const sel  = item.id===selected
+                    const uc   = isAc ? r2(num(item.costo_mo)+num(item.costo_materiales)+num(item.costo_equipos)) : 0
+                    const tc   = isAc ? r2(num(item.cantidad)*uc)
+                               : esDraft ? 0
+                               : calcSubtotal(items, item.id, item.tipo)
                     return (
                       <tr key={item.id}
-                        onClick={() => puedeEditar ? setSelected(sel ? null : item.id) : null}
                         className={`transition-colors
                           ${isEt ? 'border-b-2 border-t border-gray-200' : 'border-b border-gray-50'}
-                          ${puedeEditar ? 'cursor-pointer' : ''}
-                          ${sel ? 'bg-blue-50' : isEt ? 'bg-green-50/60 hover:bg-green-50' : 'hover:bg-gray-50/50'}`}>
+                          ${esDraft ? 'bg-amber-50/70' : isEt ? 'bg-green-50/60 hover:bg-green-50' : 'hover:bg-gray-50/50'}`}>
+
+                        {/* ID — en la partida nueva, el selector de padre */}
                         <td className="px-3 py-2.5">
-                          {isEt ? (
+                          {esDraft ? (
+                            isEt ? (
+                              <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                                {isEs ? 'NUEVA' : 'NEW'}
+                              </span>
+                            ) : (
+                              <select className="m-cell-input" style={{ width: 104 }} value={item.parent_id || ''}
+                                title={isEs ? 'Dónde se cuelga la partida' : 'Where this item hangs'}
+                                onChange={e => setDraft(d => d && ({ ...d, parent_id: e.target.value }))}>
+                                <option value="">{isEs ? '— padre —' : '— parent —'}</option>
+                                {(isSs ? stages : [...substages, ...stages]).map(s => (
+                                  <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>
+                                ))}
+                              </select>
+                            )
+                          ) : isEt ? (
                             <div className="flex items-center gap-2">
                               <div className="w-1 h-5 rounded-full bg-green-500 flex-shrink-0"/>
                               <span className="inline-block px-2 py-0.5 rounded text-xs font-mono font-bold bg-green-100 text-green-700">
@@ -282,34 +425,70 @@ export default function Presupuesto() {
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2.5 max-w-xs">
-                          <div className="flex items-center gap-1.5" style={{ paddingLeft: isAc?24:isSs?12:0 }}>
-                            <span className={`text-sm ${isEt?'font-semibold text-gray-800':isSs?'font-medium text-gray-700':'text-gray-600'}`}>
-                              {item.descripcion}
-                            </span>
-                            {item.origen_oc_id && (
-                              <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 border border-amber-200">
-                                OC
+
+                        {celda(item, 'descripcion', {
+                          align: 'left', clase: 'max-w-xs',
+                          contenido: (
+                            <div className="flex items-center gap-1.5" style={{ paddingLeft: isAc?24:isSs?12:0 }}>
+                              <span className={`text-sm ${isEt?'font-semibold text-gray-800':isSs?'font-medium text-gray-700':'text-gray-600'}`}>
+                                {item.descripcion || <span className="text-gray-300">{tipoLabel(item.tipo)}…</span>}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5 text-center text-xs text-gray-500">{isAc ? getUnitLabel(item.unidad, lang) : '—'}</td>
-                        <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-600">{isAc?fmtNum(item.cantidad):'—'}</td>
-                        <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-500">{isAc?fmt(item.costo_mo,moneda):'—'}</td>
-                        <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-500">{isAc?fmt(item.costo_materiales,moneda):'—'}</td>
-                        <td className="px-3 py-2.5 text-right text-xs font-mono text-gray-500">{isAc?fmt(item.costo_equipos,moneda):'—'}</td>
+                              {item.origen_oc_id && (
+                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                                  OC
+                                </span>
+                              )}
+                            </div>
+                          ),
+                        })}
+
+                        {celda(item, 'unidad', {
+                          align: 'center', clase: 'text-xs text-gray-500',
+                          contenido: isAc ? getUnitLabel(item.unidad, lang) : '—',
+                        })}
+                        {celda(item, 'cantidad', {
+                          clase: 'text-xs font-mono text-gray-600',
+                          contenido: isAc ? fmtNum(item.cantidad) : '—',
+                        })}
+                        {celda(item, 'costo_mo', {
+                          clase: 'text-xs font-mono text-gray-500',
+                          contenido: isAc ? fmt(item.costo_mo, moneda) : '—',
+                        })}
+                        {celda(item, 'costo_materiales', {
+                          clase: 'text-xs font-mono text-gray-500',
+                          contenido: isAc ? fmt(item.costo_materiales, moneda) : '—',
+                        })}
+                        {celda(item, 'costo_equipos', {
+                          clase: 'text-xs font-mono text-gray-500',
+                          contenido: isAc ? fmt(item.costo_equipos, moneda) : '—',
+                        })}
+
                         <td className="px-3 py-2.5 text-right text-xs font-mono font-medium text-gray-700">{isAc?fmt(uc,moneda):'—'}</td>
                         <td className="px-3 py-2.5 text-right text-sm font-mono font-semibold"
                           style={{ color: isEt?'#1D9E75':isSs?'#185FA5':'#374151' }}>
                           {fmt(tc, moneda)}
                         </td>
+
+                        {puedeEditar && !closed && (
+                          <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                            {esDraft ? (
+                              <div className="flex items-center gap-1 justify-end">
+                                <button onClick={() => guardarDraft(draft)} disabled={!draftListo(draft)}
+                                  title={t('btn_add')} className="m-btn m-btn-sm m-btn-primary" style={{ padding: '3px 9px' }}>✓</button>
+                                <TBtn onClick={cancelarDraft} title={t('btn_cancel')}>✕</TBtn>
+                              </div>
+                            ) : (
+                              <TBtn danger onClick={() => setConfirmDel(item.id)} title={t('btn_delete')}>✕</TBtn>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     )
                   })}
                   <tr className="bg-gray-50 border-t border-gray-200">
                     <td colSpan={8} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('pres_grand_total')}</td>
                     <td className="px-3 py-3 text-right text-sm font-bold font-mono" style={{color:'#1D9E75'}}>{fmt(grandTotal, moneda)}</td>
+                    {puedeEditar && !closed && <td />}
                   </tr>
                 </tbody>
               </table>
@@ -464,79 +643,6 @@ export default function Presupuesto() {
             )}
           </div>
         </div>
-      )}
-
-      {puedeEditar && (
-        <Drawer open={drawer} onClose={() => setDrawer(false)}
-          title={`${editing?t('btn_edit'):t('btn_add')} ${tipoLabel(form.tipo)}`} width={380}>
-          {form.tipo==='sub_etapa' && !editing && (
-            <Field label={t('pres_form_parent_stage')} required>
-              <select className={selectCls} value={form.parent_id} onChange={set('parent_id')}>
-                <option value="">{t('lbl_select')}</option>
-                {stages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
-              </select>
-            </Field>
-          )}
-          {/* ← CAMBIO: actividad puede tener como parent una sub-etapa O una etapa directamente */}
-          {form.tipo==='actividad' && !editing && (
-            <Field label={t('pres_form_parent_sub')} required>
-              <select className={selectCls} value={form.parent_id} onChange={set('parent_id')}>
-                <option value="">{t('lbl_select')}</option>
-                {substages.length > 0 && (
-                  <optgroup label="Sub-etapas">
-                    {substages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
-                  </optgroup>
-                )}
-                <optgroup label="Etapas (sin sub-etapa)">
-                  {stages.map(s => <option key={s.id} value={s.id}>{s.code} — {s.descripcion}</option>)}
-                </optgroup>
-              </select>
-            </Field>
-          )}
-          <Field label={t('pres_form_desc')} required>
-            <input className={inputCls} value={form.descripcion} onChange={set('descripcion')}
-              placeholder={form.tipo==='etapa'?'Ej: Obras Preliminares':form.tipo==='sub_etapa'?'Ej: Movimiento de Tierras':'Ej: Excavación manual'} />
-          </Field>
-          {form.tipo==='actividad' && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={t('pres_form_unit')}>
-                  <select className={selectCls} value={form.unidad} onChange={set('unidad')}>
-                    {UNIDADES_CONFIG.map(u => (
-                      <option key={u.value} value={u.value}>
-                        {lang === 'ES' ? u.es : u.en}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={t('pres_form_qty')}>
-                  <input type="number" className={inputCls} value={form.cantidad} onChange={set('cantidad')} placeholder="0.00" min="0" step="0.01" />
-                </Field>
-              </div>
-              <SectionBox title={t('pres_unit_cost')}>
-                <Field label={t('pres_form_mo')}><input type="number" className={inputCls} value={form.costo_mo} onChange={set('costo_mo')} placeholder="0.00" min="0" step="0.01" /></Field>
-                <Field label={t('pres_form_mat')}><input type="number" className={inputCls} value={form.costo_materiales} onChange={set('costo_materiales')} placeholder="0.00" min="0" step="0.01" /></Field>
-                <Field label={t('pres_form_eq')}><input type="number" className={inputCls} value={form.costo_equipos} onChange={set('costo_equipos')} placeholder="0.00" min="0" step="0.01" /></Field>
-                <div className="border-t border-gray-200 pt-2 mt-1 flex flex-col gap-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">{t('pres_unit_cost')}</span>
-                    <span className="font-mono font-medium">{fmt(ucPreview, moneda)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span className="text-gray-600">{t('pres_total_cost')}</span>
-                    <span className="font-mono" style={{color:'#1D9E75'}}>{fmt(tcPreview, moneda)}</span>
-                  </div>
-                </div>
-              </SectionBox>
-            </>
-          )}
-          <div className="flex gap-2 mt-auto pt-2">
-            <SecondaryBtn onClick={() => setDrawer(false)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-            <PrimaryBtn onClick={save} disabled={!form.descripcion||(form.tipo!=='etapa'&&!editing&&!form.parent_id)} className="flex-1">
-              {editing ? t('btn_save') : t('btn_add')}
-            </PrimaryBtn>
-          </div>
-        </Drawer>
       )}
 
       <Confirm open={!!confirmDel} message={t('pres_delete_confirm')}
