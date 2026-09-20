@@ -1025,7 +1025,11 @@ useEffect(() => {
             nota: 'Inicio de ejecución: se congela el presupuesto original de indirectos',
           })
         }
-        if (pctAnterior !== fields.indirecto_pct) {
+        // Solo se registra si el payload trae el porcentaje. En un dispatch
+        // parcial ({id, estado}) fields.indirecto_pct queda undefined y la
+        // comparación sería true siempre, escribiendo en la bitácora un
+        // cambio de % que nunca ocurrió.
+        if ('indirecto_pct' in fields && pctAnterior !== fields.indirecto_pct) {
           await logIndirecto(fields.id, 'pct_cambio', {
             pct_anterior: pctAnterior, pct_nuevo: fields.indirecto_pct,
           })

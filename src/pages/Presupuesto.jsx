@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useContext, useRef, Fragment } from 'reac
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, calcIndirectos, montoDesdePct, pctDesdeMonto, UNIDADES, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
+import { fmt, fmtNum, flatBudgetItems, calcSubtotal, calcGrandTotal, calcIndirectos, montoDesdePct, pctDesdeMonto, UNIDADES_CONFIG, getUnitLabel, r2 } from '../utils'
 import { EmptyState, PrimaryBtn, SecondaryBtn, TBtn, Confirm, Icons, inputCls, selectCls, PageHeader } from '../components'
 import ImportarPresupuesto from './ImportarPresupuesto'
 import { CATEGORIAS_IND, CAT_KEYS, getSubcategorias, getCategoriaLabel } from './categoriasIndirectos'
