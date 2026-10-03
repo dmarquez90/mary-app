@@ -710,7 +710,7 @@ export default function Inventario() {
       {puedeEditar && <>
         <Drawer open={drawer==='mat'} onClose={() => setDrawer(null)} title={editMat ? t('inv_form_mat_title_edit') : t('inv_form_mat_title')} width={380}>
           <Field label={t('inv_form_code')} required><input className={inputCls} value={form.codigo||''} onChange={set('codigo')} placeholder="MAT-001" /></Field>
-          <Field label={t('inv_form_desc')} required><input className={inputCls} value={form.descripcion||''} onChange={set('descripcion')} placeholder="Ej: Cemento Portland" /></Field>
+          <Field label={t('inv_form_desc')} required><input className={inputCls} value={form.descripcion||''} onChange={set('descripcion')} placeholder={isEs ? 'Ej: Cemento Portland' : 'e.g. Portland cement'} /></Field>
           <Field label={isEs ? 'Categoria' : 'Category'}>
             <select className={selectCls} value={form.categoria||''} onChange={set('categoria')}>
               <option value="">{t('lbl_select')}</option>
@@ -719,7 +719,7 @@ export default function Inventario() {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('inv_form_unit')}><input className={inputCls} value={form.unidad||''} onChange={set('unidad')} placeholder="und" /></Field>
-            <Field label={t('inv_form_location')}><input className={inputCls} value={form.ubicacion_bodega||''} onChange={set('ubicacion_bodega')} placeholder="Estante A-1" /></Field>
+            <Field label={t('inv_form_location')}><input className={inputCls} value={form.ubicacion_bodega||''} onChange={set('ubicacion_bodega')} placeholder={isEs ? 'Estante A-1' : 'Shelf A-1'} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('inv_form_stock')}><input type="number" className={inputCls} value={form.stock_actual||''} onChange={set('stock_actual')} placeholder="0" min="0" step="0.01" /></Field>
@@ -802,7 +802,7 @@ export default function Inventario() {
               </p>
               <div className="flex flex-col gap-2">
                 <Field label={isEs ? 'Codigo para el catalogo' : 'Catalog code'} required>
-                  <input className={inputCls} value={form._mat_codigo||''} onChange={e => setForm(f => ({...f, _mat_codigo: e.target.value}))} placeholder="Ej: BLQ-6" />
+                  <input className={inputCls} value={form._mat_codigo||''} onChange={e => setForm(f => ({...f, _mat_codigo: e.target.value}))} placeholder={isEs ? 'Ej: BLQ-6' : 'e.g. BLQ-6'} />
                 </Field>
                 <Field label={isEs ? 'Nombre en catalogo' : 'Catalog name'}>
                   <input className={inputCls} value={form._mat_nombre||''} onChange={e => setForm(f => ({...f, _mat_nombre: e.target.value}))} />

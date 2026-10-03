@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { SubscriptionContext } from './subscriptionContext'
 import { StoreProvider } from './store'
-import { LangProvider, useLanguage } from './i18n'
+import { LangProvider, useLanguage, detectInitialLang } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
 import { MODULOS_PRO_PLUS, MODULOS_ENTERPRISE, PLAN_INFO } from './plans'
@@ -562,10 +562,10 @@ function Layout() {
                 style={{ background: userMenu ? 'var(--surface-3)' : 'transparent' }}
                 onMouseEnter={e => { if (!userMenu) e.currentTarget.style.background = 'var(--surface-2)' }}
                 onMouseLeave={e => { if (!userMenu) e.currentTarget.style.background = 'transparent' }}>
-                <Avatar name={perfil?.nombre || 'Usuario'} size={32} />
+                <Avatar name={perfil?.nombre || (isEs ? 'Usuario' : 'User')} size={32} />
                 <span className="hidden md:block text-left">
                   <span className="block text-[12.5px] font-semibold leading-none" style={{ color: 'var(--txt)' }}>
-                    {perfil?.nombre || 'Usuario'}
+                    {perfil?.nombre || (isEs ? 'Usuario' : 'User')}
                   </span>
                   <span className="block text-[11px] mt-0.5 capitalize" style={{ color: 'var(--txt-3)' }}>
                     {perfil?.rol?.replace('_', ' ') || ''}
@@ -707,12 +707,14 @@ function PublicRoutes() {
 
 function AppContent() {
   const { user, perfil, loading } = useAuth()
+  // Pantallas previas al LangProvider: resolvemos el idioma con el detector compartido
+  const bootIsEs = detectInitialLang() === 'ES'
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
       <div className="text-center m-fade">
         <div className="flex justify-center mb-3"><Spinner size={32} /></div>
-        <p className="text-sm" style={{ color: 'var(--txt-3)' }}>Cargando MARY...</p>
+        <p className="text-sm" style={{ color: 'var(--txt-3)' }}>{bootIsEs ? 'Cargando MARY...' : 'Loading MARY...'}</p>
       </div>
     </div>
   )
@@ -727,12 +729,12 @@ function AppContent() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
         <div className="text-center m-fade">
           <div className="flex justify-center mb-3"><Spinner size={32} /></div>
-          <p className="text-sm" style={{ color: 'var(--txt-3)' }}>Verificando acceso...</p>
+          <p className="text-sm" style={{ color: 'var(--txt-3)' }}>{bootIsEs ? 'Verificando acceso...' : 'Verifying access...'}</p>
         </div>
       </div>
     )
     if (perfil.rol === 'super_admin') return <Suspense fallback={<PageSpinner />}><Admin /></Suspense>
-    return <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}><p className="text-sm" style={{ color: 'var(--txt-3)' }}>Acceso no autorizado.</p></div>
+    return <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}><p className="text-sm" style={{ color: 'var(--txt-3)' }}>{bootIsEs ? 'Acceso no autorizado.' : 'Unauthorized access.'}</p></div>
   }
 
   return (

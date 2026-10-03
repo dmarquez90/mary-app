@@ -37,6 +37,25 @@ export const PAIS_MONEDA = {
   'Venezuela':             'VES',
 }
 
+// Etiquetas en inglés de los países. La CLAVE (y el valor guardado en BD) sigue
+// siendo el nombre en español, que es la llave de PAIS_MONEDA; esto solo cambia
+// lo que se muestra cuando el usuario trabaja en inglés.
+export const PAIS_LABEL_EN = {
+  'Belice':               'Belize',
+  'Brasil':               'Brazil',
+  'Canadá':               'Canada',
+  'Haití':                'Haiti',
+  'México':               'Mexico',
+  'Panamá':               'Panama',
+  'Perú':                 'Peru',
+  'República Dominicana': 'Dominican Republic',
+  'Trinidad y Tobago':    'Trinidad and Tobago',
+}
+
+// Etiqueta legible de un país según el idioma ('ES' | 'EN')
+export const getPaisLabel = (pais, lang = 'ES') =>
+  lang === 'ES' ? pais : (PAIS_LABEL_EN[pais] || pais)
+
 // Símbolo de moneda
 export const MONEDA_SIMBOLO = {
   USD: '$',

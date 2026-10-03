@@ -69,6 +69,24 @@ const OVERRIDE_LABELS = {
   UPD_SOLICITUD_ESTADO:       { es: 'Cambió estado de solicitud',           en: 'Changed request status',           modulo: 'Compras' },
 }
 
+// El campo `modulo` se guarda con su nombre en español porque sirve de clave
+// para agrupar y filtrar; aquí solo se traduce al mostrarlo.
+const MODULO_LABELS_EN = {
+  'Avalúos':             'Valuations',
+  'Compras':             'Purchases',
+  'Financiero':          'Financial',
+  'Inventario':          'Inventory',
+  'Mat. Presupuestados': 'Budgeted Materials',
+  'Órdenes de Cambio':   'Change Orders',
+  'Otro':                'Other',
+  'Presupuesto':         'Budget',
+  'Proyectos':           'Projects',
+  'Supervisión':         'Supervision',
+}
+
+const moduloLabel = (modulo, isEs) =>
+  isEs ? modulo : (MODULO_LABELS_EN[modulo] || modulo)
+
 const VERB_PREFIXES = ['APROBAR','RECHAZAR','DEVOLVER','EMITIR','PAGAR','TOGGLE','ADD','DEL','UPD']
 
 function parseAccion(accion, isEs) {
@@ -231,7 +249,7 @@ export default function Auditoria({ onNavigate }) {
           <select className="m-input"
             value={fModulo} onChange={e=>setFModulo(e.target.value)}>
             <option value="">{isEs?'Todos':'All'}</option>
-            {modulos.map(m=><option key={m} value={m}>{m}</option>)}
+            {modulos.map(m=><option key={m} value={m}>{moduloLabel(m, isEs)}</option>)}
           </select>
         </div>
         <div>
@@ -285,7 +303,7 @@ export default function Auditoria({ onNavigate }) {
                         {r.usuario_rol && <span className="text-xs text-gray-400 ml-1">({r.usuario_rol})</span>}
                       </td>
                       <td className="px-4 py-2.5 text-xs">
-                        <span className="px-2 py-0.5 rounded-full font-medium" style={{background:'#1B3A6B1A', color:'var(--brand)'}}>{r.modulo}</span>
+                        <span className="px-2 py-0.5 rounded-full font-medium" style={{background:'#1B3A6B1A', color:'var(--brand)'}}>{moduloLabel(r.modulo, isEs)}</span>
                       </td>
                       <td className="px-4 py-2.5 text-sm text-gray-700">{r.label}</td>
                       <td className="px-4 py-2.5 text-sm text-gray-500 max-w-[260px] truncate">{r.detalle || '—'}</td>

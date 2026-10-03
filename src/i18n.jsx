@@ -60,6 +60,8 @@ const ES = {
   dash_approved_sent_received: 'Aprobadas / Enviadas / Recibidas',
   dash_cancelled: 'Canceladas',
   dash_fifo: 'FIFO',
+  no_data: 'Sin datos para mostrar',
+  uncategorized: 'Sin categoría',
 
   // PROYECTOS
   proy_title: 'Proyectos',
@@ -961,6 +963,8 @@ const EN = {
   dash_approved_sent_received: 'Approved / Sent / Received',
   dash_cancelled: 'Cancelled',
   dash_fifo: 'FIFO',
+  no_data: 'No data to show',
+  uncategorized: 'Uncategorized',
 
   // PROJECTS
   proy_title: 'Projects',
@@ -1811,7 +1815,7 @@ const EN = {
 export const LangContext = createContext()
 
 // Detecta el idioma inicial: localStorage → DB → idioma del sistema → ES
-function detectInitialLang() {
+export function detectInitialLang() {
   const saved = localStorage.getItem(LS_KEY)
   if (saved === 'ES' || saved === 'EN') return saved
   const browser = (navigator.language || navigator.languages?.[0] || 'es').toLowerCase()

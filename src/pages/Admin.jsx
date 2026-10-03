@@ -468,12 +468,12 @@ export default function Admin() {
               {(drawer === 'new_user' || drawer === 'edit_user') && <>
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">{T.fullName} *</label>
-                  <input className={inputCls} value={form.nombre||''} onChange={set('nombre')} placeholder="Juan Pérez" />
+                  <input className={inputCls} value={form.nombre||''} onChange={set('nombre')} placeholder={isEs ? 'Juan Pérez' : 'John Smith'} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">{T.emailCol} *</label>
                   <input type="email" className={inputCls} value={form.email||''} onChange={set('email')}
-                    placeholder="juan@empresa.com" disabled={drawer === 'edit_user'} />
+                    placeholder={isEs ? 'juan@empresa.com' : 'john@company.com'} disabled={drawer === 'edit_user'} />
                   {drawer === 'edit_user' && <p className="text-xs text-gray-400 mt-1">{T.emailLocked}</p>}
                 </div>
                 {drawer === 'new_user' && (

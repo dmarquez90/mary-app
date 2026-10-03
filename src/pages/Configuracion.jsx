@@ -227,7 +227,7 @@ export default function Configuracion({ onNavigate }) {
           }
         )
         const result = await res.json()
-        if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
+        if (!res.ok) throw new Error(result.error || (isEs ? 'Error al crear usuario' : 'Error creating user'))
         showSuccess(t('cfg_users_success_created', { nombre: form.nombre }))
       }
       await loadData(); setDrawer(null)
@@ -257,7 +257,7 @@ export default function Configuracion({ onNavigate }) {
       payload: { id: modalSol.sol.id, comentario: comentarioAdmin, reviewedBy: perfil?.id }
     })
     setModalSol(null); setComentarioAdmin('')
-    showSuccess('Solicitud rechazada.')
+    showSuccess(isEs ? 'Solicitud rechazada.' : 'Request rejected.')
   }
 
   const usuariosActivos = usuarios.filter(u => u.activo).length
@@ -433,11 +433,11 @@ export default function Configuracion({ onNavigate }) {
             <div className="flex-1 p-6 flex flex-col gap-4">
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">{t('cfg_users_form_name')} *</label>
-                <input className={inputCls} value={form.nombre||''} onChange={set('nombre')} placeholder="Juan Pérez" />
+                <input className={inputCls} value={form.nombre||''} onChange={set('nombre')} placeholder={isEs ? 'Juan Pérez' : 'John Smith'} />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">{t('cfg_users_form_email')} *</label>
-                <input type="email" className={inputCls} value={form.email||''} onChange={set('email')} placeholder="juan@empresa.com" disabled={drawer==='edit'} />
+                <input type="email" className={inputCls} value={form.email||''} onChange={set('email')} placeholder={isEs ? 'juan@empresa.com' : 'john@company.com'} disabled={drawer==='edit'} />
                 {drawer==='edit' && <p className="text-xs text-gray-400 mt-1">{t('cfg_users_form_email_locked')}</p>}
               </div>
               {drawer==='new' && (
@@ -571,7 +571,7 @@ export default function Configuracion({ onNavigate }) {
           </div>
 
           {loading ? (
-            <div className="text-center py-16 text-gray-400 text-sm">Cargando...</div>
+            <div className="text-center py-16 text-gray-400 text-sm">{isEs ? 'Cargando...' : 'Loading...'}</div>
           ) : (
             <div className="m-card overflow-x-auto">
               <table className="w-full">
@@ -812,7 +812,7 @@ export default function Configuracion({ onNavigate }) {
                       className={inputCls}
                       value={resetEmail}
                       onChange={e => setResetEmail(e.target.value)}
-                      placeholder="tu@correo.com"
+                      placeholder={isEs ? 'tu@correo.com' : 'you@email.com'}
                     />
                   </div>
                   {pwError && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600">{pwError}</div>}

@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -105,7 +105,7 @@ function styleSectionTitle(cell) {
   cell.border    = border()
 }
 
-function addHeaderBlock(ws, titulo, empresa, proyecto, periodo, fecha, cols) {
+function addHeaderBlock(ws, titulo, empresa, proyecto, periodo, fecha, cols, isEs = true) {
   // Fila 1 — Logo / Empresa
   ws.mergeCells(1, 1, 1, Math.floor(cols / 3))
   const c1 = ws.getCell(1, 1)
@@ -141,13 +141,13 @@ function addHeaderBlock(ws, titulo, empresa, proyecto, periodo, fecha, cols) {
   if (proyecto) {
     ws.mergeCells(2, 1, 2, Math.floor(cols / 2))
     const p = ws.getCell(2, 1)
-    p.value = `Proyecto: ${proyecto}`
+    p.value = isEs ? `Proyecto: ${proyecto}` : `Project: ${proyecto}`
     styleLabel(p)
   }
   if (periodo) {
     ws.mergeCells(2, Math.floor(cols / 2) + 1, 2, cols)
     const pe = ws.getCell(2, Math.floor(cols / 2) + 1)
-    pe.value = `Período: ${periodo}`
+    pe.value = isEs ? `Período: ${periodo}` : `Period: ${periodo}`
     styleLabel(pe)
   } else if (!proyecto) {
     ws.mergeCells(2, 1, 2, cols)
@@ -188,7 +188,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   const ws1 = wb.addWorksheet(isEs?'Presupuesto vs Real':'Budget vs Actual')
   setCols(ws1, [32, 18, 14, 14, 14, 14, 12])
 
-  let row = addHeaderBlock(ws1, isEs?'Reporte Financiero':'Financial Report', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, COLS)
+  let row = addHeaderBlock(ws1, isEs?'Reporte Financiero':'Financial Report', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, COLS, isEs)
 
   // KPIs
   row = addSectionTitle(ws1, row, isEs?'RESUMEN EJECUTIVO':'EXECUTIVE SUMMARY', COLS)
@@ -266,7 +266,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   // ── HOJA 2: Detalle por categoría ──
   const ws2 = wb.addWorksheet(isEs?'Detalle por Categoría':'Detail by Category')
   setCols(ws2, [14, 20, 35, 22, 16, 16, 16])
-  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
+  let r2 = addHeaderBlock(ws2, isEs?'Detalle de Costos':'Cost Detail', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7, isEs)
 
   const addDetalle = (ws, rowRef, titulo, headers, rows, subtotal) => {
     rowRef = addSectionTitle(ws, rowRef, titulo, 7)
@@ -345,7 +345,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   if (data.avsProy?.length > 0) {
     const ws3 = wb.addWorksheet(isEs?'Avalúo Financiero':'Financial Valuation')
     setCols(ws3, [14, 36, 12, 14, 16, 16, 16, 16, 16])
-    let r3 = addHeaderBlock(ws3, isEs?'Avalúo Financiero Acumulado':'Accumulated Financial Valuation', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 9)
+    let r3 = addHeaderBlock(ws3, isEs?'Avalúo Financiero Acumulado':'Accumulated Financial Valuation', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 9, isEs)
     ws3.getRow(r3).height = 18
     ;[isEs?'Avalúo':'Valuation',isEs?'Actividad':'Activity',isEs?'Unidad':'Unit','P.U.',isEs?'Contrato $':'Contract $',isEs?'Ant. $':'Prev. $',isEs?'Periodo $':'Period $',isEs?'Acumulado $':'Accumulated $',isEs?'Saldo $':'Balance $'].forEach((h,i) => {
       const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
@@ -395,7 +395,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   if (data.comparacionInd?.length > 0) {
     const ws4 = wb.addWorksheet(isEs?'Indirectos Pres vs Ejec':'Indirect Costs Bud vs Act')
     setCols(ws4, [40, 20, 20, 20, 16])
-    let r4 = addHeaderBlock(ws4, isEs?'Costos Indirectos: Presupuestado vs Ejecutado':'Indirect Costs: Budgeted vs Executed', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 5)
+    let r4 = addHeaderBlock(ws4, isEs?'Costos Indirectos: Presupuestado vs Ejecutado':'Indirect Costs: Budgeted vs Executed', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 5, isEs)
     ws4.getRow(r4).height = 18
     ;[isEs?'Categoría':'Category',isEs?'Presupuestado':'Budgeted',isEs?'Ejecutado':'Executed',isEs?'Diferencia':'Difference',isEs?'Estado':'Status'].forEach((h,i) => {
       const c = ws4.getCell(r4,i+1); c.value=h; styleHeader(c)
@@ -427,7 +427,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   if (data.ocsDelProy?.length > 0) {
     const ws5 = wb.addWorksheet(isEs ? 'Órdenes de Cambio' : 'Change Orders')
     setCols(ws5, [16, 12, 14, 32, 16, 16, 12])
-    let r5 = addHeaderBlock(ws5, isEs ? 'Órdenes de Cambio' : 'Change Orders', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
+    let r5 = addHeaderBlock(ws5, isEs ? 'Órdenes de Cambio' : 'Change Orders', nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7, isEs)
 
     // KPI resumen en la hoja
     ws5.getRow(r5).height = 20
@@ -488,7 +488,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     const ws6 = wb.addWorksheet(isEs ? 'Detalle Subcontratos' : 'Subcontract Detail')
     setCols(ws6, [28, 30, 16, 16, 16, 12, 16, 16])
     let r6 = addHeaderBlock(ws6, isEs ? 'Detalle de Subcontratos' : 'Subcontract Detail',
-      nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8)
+      nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8, isEs)
     // Headers
     ws6.getRow(r6).height = 18
     ;[isEs?'Subcontratista':'Subcontractor',
@@ -1675,7 +1675,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='
   const ws1 = wb.addWorksheet(isEs ? 'Subcontratos Resumen' : 'Subcontracts Summary')
   setCols(ws1, [28, 30, 16, 16, 12, 16, 16, 14])
   let r1 = addHeaderBlock(ws1, isEs ? 'Retenciones de Garantía — Subcontratos' : 'Retention Bonds — Subcontracts',
-    nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8)
+    nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8, isEs)
   ws1.getRow(r1).height = 18
   ;[isEs?'Subcontratista':'Subcontractor',
     isEs?'Descripción':'Description',
@@ -1735,7 +1735,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='
   const ws2 = wb.addWorksheet(isEs ? 'Detalle Retenciones' : 'Retention Detail')
   setCols(ws2, [28, 12, 14, 14, 16, 16, 16, 14])
   let r2 = addHeaderBlock(ws2, isEs ? 'Detalle de Retenciones por Avalúo' : 'Retention Detail by Valuation',
-    nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8)
+    nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 8, isEs)
   ws2.getRow(r2).height = 18
   ;[isEs?'Subcontratista':'Subcontractor',
     isEs?'Avalúo #':'Valuation #',
@@ -1796,7 +1796,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='
     const ws3 = wb.addWorksheet(isEs ? 'Órdenes de Pago' : 'Payment Orders')
     setCols(ws3, [22, 22, 16, 14, 12, 16, 14])
     let r3 = addHeaderBlock(ws3, isEs ? 'Órdenes de Pago de Retención' : 'Retention Payment Orders',
-      nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7)
+      nombreEmpresa, proyLabel, periodoLabel, fechaHoy, 7, isEs)
     ws3.getRow(r3).height = 18
     ;[isEs?'Número Orden':'Order Number',
       isEs?'Subcontratista':'Subcontractor',
@@ -1855,7 +1855,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   // HOJA 1: Stock
   const ws1 = wb.addWorksheet(isEs?'Stock Actual':'Current Stock')
   setCols(ws1, [14, 35, 10, 24, 14, 14, 10])
-  let r1 = addHeaderBlock(ws1, isEs?'Stock Actual de Materiales':'Current Material Stock', nombreEmpresa, null, periodoLabel, fechaHoy, 7)
+  let r1 = addHeaderBlock(ws1, isEs?'Stock Actual de Materiales':'Current Material Stock', nombreEmpresa, null, periodoLabel, fechaHoy, 7, isEs)
   ws1.getRow(r1).height = 18
   ;[isEs?'Código':'Code',isEs?'Descripción':'Description',isEs?'Unidad':'Unit',isEs?'Ubicación en bodega':'Warehouse location',isEs?'Stock actual':'Current stock',isEs?'Stock mínimo':'Min stock',isEs?'Estado':'Status'].forEach((h,i) => {
     const c = ws1.getCell(r1,i+1); c.value=h; styleHeader(c)
@@ -1866,7 +1866,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
     const even = i%2===1
     const crit = parseFloat(m.stock_actual||0) <= parseFloat(m.stock_minimo||0)
     const vals = [m.codigo, m.descripcion, m.unidad, m.ubicacion_bodega||'—',
-      parseFloat(m.stock_actual)||0, parseFloat(m.stock_minimo)||0, crit?'CRÍTICO':'OK']
+      parseFloat(m.stock_actual)||0, parseFloat(m.stock_minimo)||0, crit?(isEs?'CRÍTICO':'CRITICAL'):'OK']
     vals.forEach((v,ci) => {
       const c = ws1.getCell(r1,ci+1)
       const isNum = ci>=4 && ci<=5
@@ -1880,7 +1880,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   // HOJA 2: Entradas
   const ws2 = wb.addWorksheet(isEs?'Entradas de Materiales':'Material Entries')
   setCols(ws2, [12, 12, 32, 12, 8, 14, 14, 14, 22, 12])
-  let r2 = addHeaderBlock(ws2, isEs?'Entradas de Materiales':'Material Entries', nombreEmpresa, null, periodoLabel, fechaHoy, 10)
+  let r2 = addHeaderBlock(ws2, isEs?'Entradas de Materiales':'Material Entries', nombreEmpresa, null, periodoLabel, fechaHoy, 10, isEs)
   ws2.getRow(r2).height = 18
   ;[isEs?'Fecha':'Date',isEs?'Código':'Code',isEs?'Material':'Material',isEs?'Cantidad':'Quantity',isEs?'Unidad':'Unit',isEs?'Precio unit.':'Unit price',isEs?'Total':'Total',isEs?'Factura':'Invoice',isEs?'Proveedor':'Supplier',isEs?'Proyecto':'Project'].forEach((h,i) => {
     const c = ws2.getCell(r2,i+1); c.value=h; styleHeader(c)
@@ -1912,7 +1912,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   // HOJA 3: Salidas
   const ws3 = wb.addWorksheet(isEs?'Salidas de Materiales':'Material Exits')
   setCols(ws3, [12, 12, 32, 12, 8, 14, 40])
-  let r3 = addHeaderBlock(ws3, isEs?'Salidas de Materiales':'Material Exits', nombreEmpresa, null, periodoLabel, fechaHoy, 7)
+  let r3 = addHeaderBlock(ws3, isEs?'Salidas de Materiales':'Material Exits', nombreEmpresa, null, periodoLabel, fechaHoy, 7, isEs)
   ws3.getRow(r3).height = 18
   ;[isEs?'Fecha':'Date',isEs?'Código':'Code',isEs?'Material':'Material',isEs?'Cantidad':'Quantity',isEs?'Unidad':'Unit',isEs?'Proyecto':'Project',isEs?'Actividad':'Activity'].forEach((h,i) => {
     const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
@@ -1978,7 +1978,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 
   const ws = wb.addWorksheet(isEs?'Resumen General':'General Summary')
   setCols(ws, [28, 20, 32, 20, 16, 16, 16])
-  let row = addHeaderBlock(ws, isEs?'Resumen General del Proyecto':'General Project Summary', nombreEmpresa, proyLabel, null, fechaHoy, COLS)
+  let row = addHeaderBlock(ws, isEs?'Resumen General del Proyecto':'General Project Summary', nombreEmpresa, proyLabel, null, fechaHoy, COLS, isEs)
 
   // Info proyecto
   row = addSectionTitle(ws, row, isEs?'INFORMACIÓN DEL PROYECTO':'PROJECT INFORMATION', COLS)
@@ -2353,7 +2353,7 @@ export default function Reportes() {
       } else if (reportType==='retenciones' && datosFinanciero) {
         await buildRetenciones({ data: datosFinanciero, proy, moneda, lang, nombreEmpresa })
       }
-    } catch(e) { console.error(e); alert('Error generando el reporte: ' + e.message) }
+    } catch(e) { console.error(e); alert((isEs ? 'Error generando el reporte: ' : 'Error generating the report: ') + e.message) }
     setLoading(false)
   }
 
@@ -2517,7 +2517,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                     <td className={tdC+' text-right font-mono'}>{fmt(a.real,moneda)}</td>
                     <td className={tdC+' text-right font-mono font-medium'} style={{color:saldoColor}}>{saldo>=0?'+':''}{fmt(saldo,moneda)}</td>
                     <td className={tdC+' text-right'} style={{color:saldoColor}}>{saldoPct>=0?'+':''}{saldoPct.toFixed(1)}%</td>
-                    <td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status==='ok'?'bg-green-100 text-green-700':status==='alerta'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600'}`}>{status==='ok'?'✓ OK':status==='alerta'?'⚠ Alerta':'⚠ Crítico'}</span></td>
+                    <td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status==='ok'?'bg-green-100 text-green-700':status==='alerta'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600'}`}>{status==='ok'?'✓ OK':status==='alerta'?(isEs?'⚠ Alerta':'⚠ Alert'):(isEs?'⚠ Crítico':'⚠ Critical')}</span></td>
                   </tr>)
                 })}
               </tbody>
@@ -2669,22 +2669,22 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
   return(
     <div className="flex flex-col gap-4">
       <div className="m-tabbar">
-        {['Stock actual','Entradas','Salidas'].map((label,i)=>(
+        {(isEs ? ['Stock actual','Entradas','Salidas'] : ['Current stock','Entries','Exits']).map((label,i)=>(
           <button key={i} onClick={()=>setSubTab(i)} className={`m-tab ${subTab===i?'m-tab-active':''}`}>
             {label} <span className="ml-1 text-xs text-gray-400">({[data.mats.length,data.entradas.length,data.salidas.length][i]})</span>
           </button>
         ))}
       </div>
       {subTab===0&&<div className="m-card overflow-x-auto"><table className="w-full">
-        <thead><tr style={thS}>{['Código','Descripción','Unidad','Ubicación','Stock actual','Stock mín.','Estado'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
-        <tbody>{data.mats.map((m,i)=>{const crit=parseFloat(m.stock_actual||0)<=parseFloat(m.stock_minimo||0);return(<tr key={m.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC+' font-mono text-xs'}>{m.codigo}</td><td className={tdC}>{m.descripcion}</td><td className={tdC}>{m.unidad}</td><td className={tdC}>{m.ubicacion_bodega||'—'}</td><td className={tdC+' font-mono font-medium'} style={{color:crit?'#ef4444':'#1D9E75'}}>{fmtNum(m.stock_actual)}</td><td className={tdC+' font-mono'}>{fmtNum(m.stock_minimo)}</td><td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit?'bg-red-100 text-red-600':'bg-green-100 text-green-700'}`}>{crit?'Crítico':'OK'}</span></td></tr>)})}</tbody>
+        <thead><tr style={thS}>{(isEs ? ['Código','Descripción','Unidad','Ubicación','Stock actual','Stock mín.','Estado'] : ['Code','Description','Unit','Location','Current stock','Min. stock','Status']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
+        <tbody>{data.mats.map((m,i)=>{const crit=parseFloat(m.stock_actual||0)<=parseFloat(m.stock_minimo||0);return(<tr key={m.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC+' font-mono text-xs'}>{m.codigo}</td><td className={tdC}>{m.descripcion}</td><td className={tdC}>{m.unidad}</td><td className={tdC}>{m.ubicacion_bodega||'—'}</td><td className={tdC+' font-mono font-medium'} style={{color:crit?'#ef4444':'#1D9E75'}}>{fmtNum(m.stock_actual)}</td><td className={tdC+' font-mono'}>{fmtNum(m.stock_minimo)}</td><td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit?'bg-red-100 text-red-600':'bg-green-100 text-green-700'}`}>{crit?(isEs?'Crítico':'Critical'):'OK'}</span></td></tr>)})}</tbody>
       </table></div>}
       {subTab===1&&<div className="m-card overflow-x-auto"><table className="w-full">
-        <thead><tr style={thS}>{['Fecha','Código','Material','Cantidad','Precio unit.','Total','Factura','Proveedor','Proyecto'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
+        <thead><tr style={thS}>{(isEs ? ['Fecha','Código','Material','Cantidad','Precio unit.','Total','Factura','Proveedor','Proyecto'] : ['Date','Code','Material','Quantity','Unit price','Total','Invoice','Supplier','Project']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
         <tbody>{data.entradas.map((e,i)=>{const m=materiales.find(x=>x.id===e.material_id);const p=proyectos.find(x=>x.id===e.proyecto_id);const total=round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0));return(<tr key={e.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(e.fecha_recepcion)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-green-600'}>+{fmtNum(e.cantidad)}</td><td className={tdC+' font-mono'}>${fmtNum(e.precio_unitario)}</td><td className={tdC+' font-mono font-medium'}>${fmtNum(total)}</td><td className={tdC}>{e.numero_factura||'—'}</td><td className={tdC}>{e.proveedor||'—'}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td></tr>)})}</tbody>
       </table></div>}
       {subTab===2&&<div className="m-card overflow-x-auto"><table className="w-full">
-        <thead><tr style={thS}>{['Fecha','Código','Material','Cantidad','Proyecto','Actividad'].map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
+        <thead><tr style={thS}>{(isEs ? ['Fecha','Código','Material','Cantidad','Proyecto','Actividad'] : ['Date','Code','Material','Quantity','Project','Activity']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
         <tbody>{data.salidas.map((s,i)=>{const m=materiales.find(x=>x.id===s.material_id);const p=proyectos.find(x=>x.id===s.proyecto_id);const act=presupuesto.find(x=>x.id===s.actividad_id);return(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(s.fecha_salida)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-red-500'}>-{fmtNum(s.cantidad)}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td><td className={tdC+' text-xs'}>{act?`${act.code} — ${act.descripcion}`:'—'}</td></tr>)})}</tbody>
       </table></div>}
     </div>
@@ -2723,7 +2723,7 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
       <div className="m-card p-5">
         <p className="text-sm font-semibold text-gray-700 mb-3">{isEs?'Información del proyecto':'Project information'}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          {[[isEs?'Código':'Code',proy?.project_code],[isEs?'Cliente':'Client',proy?.cliente_externo||'—'],[isEs?'Estado':'Status',t(`estado_${proy?.estado}`)],[isEs?'Moneda':'Currency',moneda],[isEs?'Inicio':'Start',proy?.fecha_inicio||'—'],[isEs?'Fin est.':'Est. end',proy?.fecha_fin_estimada||'—'],[isEs?'Ciudad':'City',proy?.ciudad||'—'],[isEs?'País':'Country',proy?.pais||'—']].map(([k,v],i)=>(
+          {[[isEs?'Código':'Code',proy?.project_code],[isEs?'Cliente':'Client',proy?.cliente_externo||'—'],[isEs?'Estado':'Status',t(`estado_${proy?.estado}`)],[isEs?'Moneda':'Currency',moneda],[isEs?'Inicio':'Start',proy?.fecha_inicio||'—'],[isEs?'Fin est.':'Est. end',proy?.fecha_fin_estimada||'—'],[isEs?'Ciudad':'City',proy?.ciudad||'—'],[isEs?'País':'Country',getPaisLabel(proy?.pais, lang)||'—']].map(([k,v],i)=>(
             <div key={i}><p className="text-xs text-gray-400">{k}</p><p className="font-medium text-gray-700">{v}</p></div>
           ))}
         </div>

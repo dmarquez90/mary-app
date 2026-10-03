@@ -65,6 +65,9 @@ const T = {
     reg_ref_code:      '¿Tienes un código de referido? (opcional)',
     reg_ref_code_ph:   'Ej: GABR202601',
     reg_ref_applied:   'Código aplicado',
+    reg_name_ph:       'Juan Pérez',
+    reg_company_ph:    'Constructora XYZ',
+    reg_email_ph:      'juan@empresa.com',
     // Panel izquierdo
     left_badge:        'ERP de construcción · 22 países',
     left_headline_login:   'Construye con control, no con hojas de cálculo',
@@ -134,6 +137,9 @@ const T = {
     reg_ref_code:      'Do you have a referral code? (optional)',
     reg_ref_code_ph:   'E.g.: GABR202601',
     reg_ref_applied:   'Code applied',
+    reg_name_ph:       'John Smith',
+    reg_company_ph:    'XYZ Construction',
+    reg_email_ph:      'john@company.com',
     // Left panel
     left_badge:        'Construction ERP · 22 countries',
     left_headline_login:   'Build under control, not under spreadsheets',
@@ -1224,11 +1230,11 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={labelStyle}>{t.reg_name} *</label>
-                      <input style={inputBaseNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder="Juan Pérez" />
+                      <input style={inputBaseNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder={t.reg_name_ph} />
                     </div>
                     <div>
                       <label style={labelStyle}>{t.reg_company} *</label>
-                      <input style={inputBaseNoIcon} value={reg.empresa} onChange={setR('empresa')} placeholder="Constructora XYZ" />
+                      <input style={inputBaseNoIcon} value={reg.empresa} onChange={setR('empresa')} placeholder={t.reg_company_ph} />
                     </div>
                   </div>
 
@@ -1250,7 +1256,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
                   <div>
                     <label style={labelStyle}>{t.reg_email} *</label>
-                    <input type="email" style={inputBaseNoIcon} value={reg.email} onChange={setR('email')} placeholder="juan@empresa.com" />
+                    <input type="email" style={inputBaseNoIcon} value={reg.email} onChange={setR('email')} placeholder={t.reg_email_ph} />
                   </div>
 
                   <div>

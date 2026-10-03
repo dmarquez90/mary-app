@@ -1,6 +1,11 @@
 import { createContext, useContext, useReducer, useEffect, useState, useRef } from 'react'
 import { supabase } from './supabase'
 import { uuid, genProjectCode, genOCCode, genBudgetCode, today, r2, calcGrandTotal, calcIndirectos } from './utils'
+import { detectInitialLang } from './i18n'
+
+// El StoreProvider vive por fuera del LangProvider, así que para los pocos
+// avisos nativos (alert) resolvemos el idioma con el detector compartido.
+const isEsBoot = () => detectInitialLang() === 'ES'
 
 const INIT = {
   proyectos: [], fases: [], presupuesto: [],
@@ -1137,7 +1142,7 @@ useEffect(() => {
       case 'ADD_MATERIAL_CON_ENTRADA': {
         const { material, entrada } = action.payload
         const existe = state.materiales.find(m => m.codigo === material.codigo && m.activo !== false)
-        if (existe) { alert('Error: El código de material ya existe.'); return }
+        if (existe) { alert(isEsBoot() ? 'Error: El código de material ya existe.' : 'Error: That material code already exists.'); return }
         const cleanMat = {
           ...Object.fromEntries(Object.entries(material).filter(([k]) => !k.startsWith('_'))),
           created_at: today(), tenant_id: tenantId,
@@ -1161,7 +1166,7 @@ useEffect(() => {
       }
       case 'ADD_MATERIAL': {
         const existe = state.materiales.find(m => m.codigo === action.payload.codigo && m.activo !== false)
-        if (existe) { alert('Error: El código de material ya existe.'); return }
+        if (existe) { alert(isEsBoot() ? 'Error: El código de material ya existe.' : 'Error: That material code already exists.'); return }
         const stockInicial = parseFloat(action.payload.stock_actual) || 0
         const cleanP = Object.fromEntries(Object.entries(action.payload).filter(([k]) => !k.startsWith('_')))
         const item = {
@@ -1418,8 +1423,8 @@ useEffect(() => {
         // Notificar a gerentes y coordinadores
         await notify({
           tipo: 'solicitud',
-          titulo: '📋 Nueva solicitud de compra',
-          mensaje: `Proyecto: ${sol.proyecto_id ? (action.payload.proyecto_nombre || '') : ''}`,
+          titulo: '📋 New purchase request | 📋 Nueva solicitud de compra',
+          mensaje: `Project: ${sol.proyecto_id ? (action.payload.proyecto_nombre || '') : ''} | Proyecto: ${sol.proyecto_id ? (action.payload.proyecto_nombre || '') : ''}`,
           modulo: 'compras',
           referencia_id: sol.id,
           roles: ['client_admin', 'coordinador', 'gerente'],
@@ -1436,8 +1441,9 @@ useEffect(() => {
           const esDividida = action.payload.estado === 'dividida'
           await notify({
             tipo:          'despacho',
-            titulo:        '📦 Material listo para despachar',
-            mensaje:       `${folio ? `Solicitud ${folio}` : 'Una solicitud'}${proyecto ? ` — ${proyecto}` : ''}: ${esDividida ? 'parte del material está en bodega y debe despacharse' : 'el material está en bodega y debe despacharse'}. Ve a Inventario → Salidas.`,
+            titulo:        '📦 Material ready to dispatch | 📦 Material listo para despachar',
+            mensaje:       `${folio ? `Request ${folio}` : 'A request'}${proyecto ? ` — ${proyecto}` : ''}: ${esDividida ? 'part of the material is in the warehouse and must be dispatched' : 'the material is in the warehouse and must be dispatched'}. Go to Inventory → Exits.`
+                           + ` | ${folio ? `Solicitud ${folio}` : 'Una solicitud'}${proyecto ? ` — ${proyecto}` : ''}: ${esDividida ? 'parte del material está en bodega y debe despacharse' : 'el material está en bodega y debe despacharse'}. Ve a Inventario → Salidas.`,
             modulo:        'inventario',
             referencia_id: action.payload.id,
             roles:         ['bodeguero', 'client_admin'],
@@ -1610,8 +1616,9 @@ useEffect(() => {
           // Notificación de OC aprobada
           await notify({
             tipo:         'aprobacion',
-            titulo:       '✅ Orden de Compra aprobada',
-            mensaje:      `La OC ha sido aprobada y está lista para recibir materiales.${itemsEquipo.length > 0 ? ` Los equipos han sido registrados en Financiero.` : ''}`,
+            titulo:       '✅ Purchase Order approved | ✅ Orden de Compra aprobada',
+            mensaje:      `The PO has been approved and is ready to receive materials.${itemsEquipo.length > 0 ? ` The equipment has been registered in Financial.` : ''}`
+                          + ` | La OC ha sido aprobada y está lista para recibir materiales.${itemsEquipo.length > 0 ? ` Los equipos han sido registrados en Financiero.` : ''}`,
             modulo:       'compras',
             referencia_id: oc.id,
             roles:        ['residente', 'bodeguero', 'coordinador'],
@@ -1620,8 +1627,8 @@ useEffect(() => {
         } else if (action.payload.estado === 'rechazada') {
           await notify({
             tipo:         'rechazo',
-            titulo:       '❌ Orden de Compra rechazada',
-            mensaje:      `La OC fue rechazada. Revisa los detalles.`,
+            titulo:       '❌ Purchase Order rejected | ❌ Orden de Compra rechazada',
+            mensaje:      'The PO was rejected. Review the details. | La OC fue rechazada. Revisa los detalles.',
             modulo:       'compras',
             referencia_id: action.payload.id,
             roles:        ['residente', 'coordinador'],
@@ -1747,8 +1754,9 @@ useEffect(() => {
         dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo, retencion } })
         await notify({
           tipo: 'aprobacion',
-          titulo: '✅ Avalúo de subcontrato aprobado',
-          mensaje: `Avalúo #${av.numero} de ${contrato.subcontratista} fue aprobado.`,
+          titulo: '✅ Subcontract valuation approved | ✅ Avalúo de subcontrato aprobado',
+          mensaje: `Valuation #${av.numero} for ${contrato.subcontratista} was approved.`
+                   + ` | Avalúo #${av.numero} de ${contrato.subcontratista} fue aprobado.`,
           modulo: 'financiero',
           referencia_id: av.id,
           roles: ['client_admin', 'gerente', 'contador'],
@@ -2124,8 +2132,8 @@ useEffect(() => {
 
           await notify({
             tipo: 'aprobacion',
-            titulo: '✅ Orden de Cambio aprobada',
-            mensaje: `La orden de cambio fue aprobada y aplicada al presupuesto.`,
+            titulo: '✅ Change Order approved | ✅ Orden de Cambio aprobada',
+            mensaje: 'The change order was approved and applied to the budget. | La orden de cambio fue aprobada y aplicada al presupuesto.',
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador', 'contador'],
@@ -2134,8 +2142,8 @@ useEffect(() => {
         } else if (action.payload.estado === 'rechazada') {
           await notify({
             tipo: 'rechazo',
-            titulo: '❌ Orden de Cambio rechazada',
-            mensaje: `La orden de cambio fue rechazada.`,
+            titulo: '❌ Change Order rejected | ❌ Orden de Cambio rechazada',
+            mensaje: 'The change order was rejected. | La orden de cambio fue rechazada.',
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador'],
@@ -2143,8 +2151,8 @@ useEffect(() => {
         } else if (action.payload.estado === 'presentada') {
           await notify({
             tipo: 'info',
-            titulo: '📤 Orden de Cambio presentada al cliente',
-            mensaje: `Una orden de cambio fue presentada al cliente para aprobación.`,
+            titulo: '📤 Change Order submitted to client | 📤 Orden de Cambio presentada al cliente',
+            mensaje: 'A change order was submitted to the client for approval. | Una orden de cambio fue presentada al cliente para aprobación.',
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
             roles: ['client_admin', 'gerente'],
@@ -2174,8 +2182,8 @@ useEffect(() => {
         if (action.payload.estado === 'aprobado') {
           await notify({
             tipo: 'aprobacion',
-            titulo: '✅ Avalúo aprobado',
-            mensaje: `El avalúo de cliente fue aprobado.`,
+            titulo: '✅ Valuation approved | ✅ Avalúo aprobado',
+            mensaje: 'The client valuation was approved. | El avalúo de cliente fue aprobado.',
             modulo: 'financiero',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador', 'contador'],
@@ -2183,8 +2191,8 @@ useEffect(() => {
         } else if (action.payload.estado === 'rechazado') {
           await notify({
             tipo: 'rechazo',
-            titulo: '❌ Avalúo rechazado',
-            mensaje: `El avalúo fue rechazado. Requiere correcciones.`,
+            titulo: '❌ Valuation rejected | ❌ Avalúo rechazado',
+            mensaje: 'The valuation was rejected. Corrections required. | El avalúo fue rechazado. Requiere correcciones.',
             modulo: 'financiero',
             referencia_id: action.payload.id,
             roles: ['residente', 'coordinador'],

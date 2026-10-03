@@ -2,7 +2,7 @@ import { useState, useContext, useMemo, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, MONEDAS, calcGrandTotal, calcIndirectos, PAIS_MONEDA, MONEDA_SIMBOLO } from '../utils'
+import { today, MONEDAS, calcGrandTotal, calcIndirectos, PAIS_MONEDA, MONEDA_SIMBOLO, getPaisLabel } from '../utils'
 import {
   Drawer, Modal, EmptyState, Chip, Field, PrimaryBtn, SecondaryBtn,
   TBtn, Confirm, Icons, inputCls, selectCls, PageHeader, Toolbar, SearchInput,
@@ -244,10 +244,10 @@ export default function Proyectos({ onNavigate }) {
           <div className="p-5 flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3.5">
               <Field label={t('proy_form_name')} required className="md:col-span-2">
-                <input className={inputCls} value={form.nombre} onChange={set('nombre')} placeholder="Ej: Residencial Las Palmas" />
+                <input className={inputCls} value={form.nombre} onChange={set('nombre')} placeholder={isEs ? 'Ej: Residencial Las Palmas' : 'e.g. Las Palmas Residences'} />
               </Field>
               <Field label={t('proy_form_client')} className="md:col-span-2">
-                <input className={inputCls} value={form.cliente_externo} onChange={set('cliente_externo')} placeholder="Ej: Constructora ABC" />
+                <input className={inputCls} value={form.cliente_externo} onChange={set('cliente_externo')} placeholder={isEs ? 'Ej: Constructora ABC' : 'e.g. ABC Construction'} />
               </Field>
               <Field label={t('proy_form_city')}>
                 <input className={inputCls} value={form.ciudad} onChange={set('ciudad')} placeholder="Sacramento" />
@@ -259,7 +259,7 @@ export default function Proyectos({ onNavigate }) {
                   setForm(f => ({ ...f, pais, estado_usa: '', moneda }))
                 }}>
                   <option value="">— {t('lbl_select')} —</option>
-                  {PAISES_AMERICA.map(p => <option key={p} value={p}>{p}</option>)}
+                  {PAISES_AMERICA.map(p => <option key={p} value={p}>{getPaisLabel(p, lang)}</option>)}
                 </select>
               </Field>
               {form.pais === 'United States' && (
@@ -412,7 +412,7 @@ export default function Proyectos({ onNavigate }) {
                 <div className="flex items-center gap-1.5 text-[11.5px] mb-3.5" style={{ color: 'var(--txt-3)' }}>
                   <span className="w-3.5 h-3.5 inline-block">{Icons.projects}</span>
                   <span className="truncate">
-                    {p.ciudad}{p.ciudad && (p.estado_usa || p.pais) ? ', ' : ''}{p.estado_usa || p.pais || '—'}
+                    {p.ciudad}{p.ciudad && (p.estado_usa || p.pais) ? ', ' : ''}{p.estado_usa || getPaisLabel(p.pais, lang) || '—'}
                   </span>
                   <span>·</span>
                   <span className="font-semibold">{p.moneda}</span>
@@ -491,7 +491,7 @@ export default function Proyectos({ onNavigate }) {
                       {p.nombre}
                     </button>
                     <p className="text-[11px]" style={{ color: 'var(--txt-3)' }}>
-                      {p.ciudad}{p.ciudad && (p.estado_usa || p.pais) ? ', ' : ''}{p.estado_usa || p.pais}
+                      {p.ciudad}{p.ciudad && (p.estado_usa || p.pais) ? ', ' : ''}{p.estado_usa || getPaisLabel(p.pais, lang)}
                     </p>
                   </td>
                   <td>{p.cliente_externo || '—'}</td>
@@ -564,7 +564,7 @@ export default function Proyectos({ onNavigate }) {
               {[
                 [t('lbl_client'),        proyecto.cliente_externo || '—'],
                 [t('proy_form_city'),    proyecto.ciudad || '—'],
-                [t('proy_form_country'), proyecto.pais || '—'],
+                [t('proy_form_country'), getPaisLabel(proyecto.pais, lang) || '—'],
                 ...(proyecto.estado_usa ? [[t('proy_state_usa'), proyecto.estado_usa]] : []),
                 [t('proy_form_start'),   proyecto.fecha_inicio || '—'],
                 [t('proy_form_end'),     proyecto.fecha_fin_estimada || '—'],

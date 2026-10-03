@@ -11,11 +11,13 @@ const BRAND = 'var(--brand)'
 
 // ── BADGE DE FLUJO ────────────────────────────────────────
 function FlujoBadge({ flujo }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   if (!flujo || flujo === 'sin_determinar') return null
   const config = {
-    stock_total:   { label: 'En Bodega',     cls: 'bg-green-100 text-green-700' },
-    sin_stock:     { label: 'OC Requerida',  cls: 'bg-amber-100 text-amber-700' },
-    stock_parcial: { label: 'Dividida',      cls: 'bg-blue-100 text-blue-700'   },
+    stock_total:   { label: isEs ? 'En Bodega'    : 'In Warehouse', cls: 'bg-green-100 text-green-700' },
+    sin_stock:     { label: isEs ? 'OC Requerida' : 'PO Required',  cls: 'bg-amber-100 text-amber-700' },
+    stock_parcial: { label: isEs ? 'Dividida'     : 'Split',        cls: 'bg-blue-100 text-blue-700'   },
   }
   const c = config[flujo] || { label: flujo, cls: 'bg-gray-100 text-gray-600' }
   return (
@@ -25,21 +27,23 @@ function FlujoBadge({ flujo }) {
 
 // ── PANEL DE FLUJO POR ITEM ───────────────────────────────
 function ItemFlujoBadge({ item, materiales }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const mat = materiales.find(m => m.id === item.material_id)
   if (!item.flujo_item || item.flujo_item === 'sin_determinar') return null
   return (
     <div className="mt-1 flex flex-wrap gap-1 items-center">
       <FlujoBadge flujo={item.flujo_item} />
       {item.flujo_item === 'stock_total' && (
-        <span className="text-xs text-green-600">✓ {item.cantidad_bodega} {item.unidad} disponibles en bodega</span>
+        <span className="text-xs text-green-600">✓ {item.cantidad_bodega} {item.unidad} {isEs ? 'disponibles en bodega' : 'available in warehouse'}</span>
       )}
       {item.flujo_item === 'sin_stock' && (
-        <span className="text-xs text-amber-600">⚠ {item.cantidad_oc} {item.unidad} requieren OC</span>
+        <span className="text-xs text-amber-600">⚠ {item.cantidad_oc} {item.unidad} {isEs ? 'requieren OC' : 'require a PO'}</span>
       )}
       {item.flujo_item === 'stock_parcial' && (
         <div className="flex gap-2 text-xs">
-          <span className="text-green-600">✓ {item.cantidad_bodega} de bodega</span>
-          <span className="text-amber-600">+ {item.cantidad_oc} por OC</span>
+          <span className="text-green-600">✓ {item.cantidad_bodega} {isEs ? 'de bodega' : 'from warehouse'}</span>
+          <span className="text-amber-600">+ {item.cantidad_oc} {isEs ? 'por OC' : 'via PO'}</span>
         </div>
       )}
     </div>
@@ -57,6 +61,8 @@ const printStyles = `
 
 // ── BUSCADOR DE MATERIAL ──────────────────────────────────
 function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const [query, setQuery] = useState('')
   const [open, setOpen]   = useState(false)
   const ref               = useRef(null)
@@ -88,14 +94,14 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
           <button onClick={clear} className="text-gray-300 hover:text-red-400 flex-shrink-0 text-sm">✕</button>
         </div>
       ) : (
-        <input className={inputCls} placeholder={placeholder || 'Search material...'}
+        <input className={inputCls} placeholder={placeholder || (isEs ? 'Buscar material...' : 'Search material...')}
           value={query} onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)} autoComplete="off" />
       )}
       {open && (
         <div className="absolute z-50 left-0 right-0 top-full mt-1 m-card shadow-xl max-h-56 overflow-y-auto">
           {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-gray-400 text-center">No results</div>
+            <div className="px-4 py-3 text-sm text-gray-400 text-center">{isEs ? 'Sin resultados' : 'No results'}</div>
           ) : filtered.map(m => (
             <button key={m.id} onClick={() => select(m)}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0">
@@ -119,6 +125,8 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
 
 // ── BUSCADOR DE SOLICITUD ─────────────────────────────────
 function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyectos, value, onChange }) {
+  const { lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const [query, setQuery] = useState('')
   const [open, setOpen]   = useState(false)
   const ref               = useRef(null)
@@ -175,14 +183,14 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
           </div>
         </div>
       ) : (
-        <input className={inputCls} placeholder="Search by folio, project, requester or date..."
+        <input className={inputCls} placeholder={isEs ? 'Buscar por folio, proyecto, solicitante o fecha...' : 'Search by folio, project, requester or date...'}
           value={query} onChange={e => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)} autoComplete="off" />
       )}
       {open && (
         <div className="absolute z-50 left-0 right-0 top-full mt-1 m-card shadow-xl max-h-80 overflow-y-auto">
           {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-gray-400 text-center">No approved requests</div>
+            <div className="px-4 py-3 text-sm text-gray-400 text-center">{isEs ? 'No hay solicitudes aprobadas' : 'No approved requests'}</div>
           ) : filtered.map(s => {
             const proy  = proyectos.find(p => p.id === s.proyecto_id)
             const items = getItems(s.id)
@@ -213,7 +221,8 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
 
 export default function Compras() {
   const { state, dispatch } = useStore()
-  const { t } = useContext(LangContext)
+  const { t, lang } = useContext(LangContext)
+  const isEs = lang === 'ES'
   const { can } = usePermissions()
   const { perfil } = useAuth()
   const nombreEmpresa = perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'
@@ -560,7 +569,7 @@ export default function Compras() {
         title={t('comp_title')}
         subtitle={`${t('comp_sub_pending', { n: pendSol })} · ${t('comp_sub_oc', { n: pendOC })}`}
         actions={<>
-          <button onClick={syncSolicitudes} disabled={syncing} title="Recargar desde servidor"
+          <button onClick={syncSolicitudes} disabled={syncing} title={isEs ? 'Recargar desde servidor' : 'Reload from server'}
             className="m-btn m-btn-ghost" style={{ padding: 9 }}>
             {syncing ? '⟳' : '↺'}
           </button>
@@ -663,7 +672,7 @@ export default function Compras() {
                           {sol.estado === 'dividida' && can('oc_crear') && (
                             <div className="flex gap-1">
                               <span className="text-xs text-blue-600 font-medium px-1 flex items-center">📦+🛒</span>
-                              <TBtn onClick={() => openOCDrawer(sol)}>OC Faltante</TBtn>
+                              <TBtn onClick={() => openOCDrawer(sol)}>{isEs ? 'OC Faltante' : 'Missing PO'}</TBtn>
                             </div>
                           )}
 
@@ -949,12 +958,12 @@ export default function Compras() {
                         <input type="checkbox" className="w-3.5 h-3.5 accent-[#1B3A6B]"
                           checked={it.crear_en_catalogo||false}
                           onChange={e => setSolItem(idx, 'crear_en_catalogo', e.target.checked)} />
-                        <span className="text-xs text-gray-500">Agregar al catalogo de materiales</span>
+                        <span className="text-xs text-gray-500">{isEs ? 'Agregar al catálogo de materiales' : 'Add to material catalog'}</span>
                       </label>
                     )}
                     {it.crear_en_catalogo && (
                       <input className={inputCls}
-                        placeholder="Codigo del material (ej: MAT-001) *"
+                        placeholder={isEs ? 'Código del material (ej: MAT-001) *' : 'Material code (e.g. MAT-001) *'}
                         value={it.codigo_nuevo||''}
                         onChange={e => setSolItem(idx, 'codigo_nuevo', e.target.value.toUpperCase())} />
                     )}
@@ -1061,17 +1070,17 @@ export default function Compras() {
 
         {/* CONDICIONES DE PAGO */}
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('btn_cancel')==='Cancel' ? 'Payment conditions' : 'Condiciones de pago'}>
+          <Field label={!isEs ? 'Payment conditions' : 'Condiciones de pago'}>
             <select className={selectCls} value={form.condiciones_pago||'contado'} onChange={set('condiciones_pago')}>
-              <option value="contado">{t('btn_cancel')==='Cancel' ? 'Cash' : 'Contado'}</option>
-              <option value="15_dias">{t('btn_cancel')==='Cancel' ? '15 days credit' : 'Crédito 15 días'}</option>
-              <option value="30_dias">{t('btn_cancel')==='Cancel' ? '30 days credit' : 'Crédito 30 días'}</option>
-              <option value="45_dias">{t('btn_cancel')==='Cancel' ? '45 days credit' : 'Crédito 45 días'}</option>
-              <option value="60_dias">{t('btn_cancel')==='Cancel' ? '60 days credit' : 'Crédito 60 días'}</option>
-              <option value="otro">{t('btn_cancel')==='Cancel' ? 'Other' : 'Otro'}</option>
+              <option value="contado">{!isEs ? 'Cash' : 'Contado'}</option>
+              <option value="15_dias">{!isEs ? '15 days credit' : 'Crédito 15 días'}</option>
+              <option value="30_dias">{!isEs ? '30 days credit' : 'Crédito 30 días'}</option>
+              <option value="45_dias">{!isEs ? '45 days credit' : 'Crédito 45 días'}</option>
+              <option value="60_dias">{!isEs ? '60 days credit' : 'Crédito 60 días'}</option>
+              <option value="otro">{!isEs ? 'Other' : 'Otro'}</option>
             </select>
           </Field>
-          <Field label={t('btn_cancel')==='Cancel' ? 'Tax (%)' : 'Impuesto (%)'}>
+          <Field label={!isEs ? 'Tax (%)' : 'Impuesto (%)'}>
             <input type="number" className={inputCls} value={form.impuesto_pct||''} onChange={set('impuesto_pct')} placeholder="15" min="0" max="100" step="0.01" />
           </Field>
         </div>
@@ -1080,7 +1089,7 @@ export default function Compras() {
         {ocItems.length > 0 && (
           <div className="border-t border-gray-100 pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              {t('btn_cancel')==='Cancel' ? 'Items & Prices (from proforma)' : 'Ítems y Precios (de la proforma)'}
+              {!isEs ? 'Items & Prices (from proforma)' : 'Ítems y Precios (de la proforma)'}
             </p>
 
             {/* Aviso si la OC tiene equipos */}
@@ -1122,15 +1131,15 @@ export default function Compras() {
                       <div>
                         <p className="text-xs text-gray-400 mb-1">
                           {isEquipo
-                            ? (t('btn_cancel')==='Cancel' ? 'Daily rate *' : 'Tarifa diaria *')
-                            : (t('btn_cancel')==='Cancel' ? 'Unit price *' : 'Precio unitario *')}
+                            ? (!isEs ? 'Daily rate *' : 'Tarifa diaria *')
+                            : (!isEs ? 'Unit price *' : 'Precio unitario *')}
                         </p>
                         <input type="number" className={inputCls} value={it.precio_unitario||''} min="0" step="0.01"
                           placeholder="0.00"
                           onChange={e => setOcItem(idx,'precio_unitario',e.target.value)} />
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 mb-1">{t('btn_cancel')==='Cancel' ? 'Tax % (override)' : 'Imp. % (individual)'}</p>
+                        <p className="text-xs text-gray-400 mb-1">{!isEs ? 'Tax % (override)' : 'Imp. % (individual)'}</p>
                         <input type="number" className={inputCls} value={it.impuesto_pct||''} min="0" max="100" step="0.01"
                           placeholder={form.impuesto_pct||'—'}
                           onChange={e => setOcItem(idx,'impuesto_pct',e.target.value)} />
@@ -1150,8 +1159,8 @@ export default function Compras() {
             {/* TOTALES */}
             <div className="mt-3 border border-gray-200 rounded-xl overflow-hidden">
               {[
-                [t('btn_cancel')==='Cancel' ? 'Subtotal' : 'Subtotal', fmt2(ocSubtotal)],
-                [t('btn_cancel')==='Cancel' ? `Tax (${ocImpPct}%)` : `Impuesto (${ocImpPct}%)`, fmt2(ocImpMonto)],
+                [!isEs ? 'Subtotal' : 'Subtotal', fmt2(ocSubtotal)],
+                [!isEs ? `Tax (${ocImpPct}%)` : `Impuesto (${ocImpPct}%)`, fmt2(ocImpMonto)],
               ].map(([label, val], i) => (
                 <div key={i} className="flex justify-between px-4 py-2 border-b border-gray-100 text-sm">
                   <span className="text-gray-500">{label}</span>
@@ -1228,7 +1237,7 @@ export default function Compras() {
                     <span className="text-gray-700 flex items-center gap-1.5">
                       {isEquipo && <span className="text-xs">🚜</span>}
                       {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
-                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{t('btn_cancel')==='Cancel'?'Additional':'Adicional'}</span>}
+                      {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{!isEs?'Additional':'Adicional'}</span>}
                       {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{t('comp_eq_badge')}</span>}
                     </span>
                     <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
@@ -1237,7 +1246,7 @@ export default function Compras() {
                   {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin) && (
                     <p className="text-xs text-orange-600 mt-0.5">
                       📅 {it.eq_fecha_inicio || '—'} → {it.eq_fecha_fin || '—'}
-                      {it.eq_dias_uso ? ` · ${it.eq_dias_uso} días` : ''}
+                      {it.eq_dias_uso ? ` · ${it.eq_dias_uso} ${isEs ? 'días' : 'days'}` : ''}
                     </p>
                   )}
                   {it.observaciones && <p className="text-xs text-gray-400 italic mt-0.5">{it.observaciones}</p>}
@@ -1262,7 +1271,7 @@ export default function Compras() {
                           it.estado_oc === 'no_aplica' ? 'bg-gray-100 text-gray-400' :
                           'bg-amber-100 text-amber-700'
                         }`}>
-                          OC: {it.estado_oc === 'recibida' ? '✓ Recibida' : it.estado_oc === 'aprobada' ? '✓ Aprobada' : it.estado_oc === 'no_aplica' ? '—' : '⏳ Pendiente'}
+                          {isEs ? 'OC' : 'PO'}: {it.estado_oc === 'recibida' ? (isEs ? '✓ Recibida' : '✓ Received') : it.estado_oc === 'aprobada' ? (isEs ? '✓ Aprobada' : '✓ Approved') : it.estado_oc === 'no_aplica' ? '—' : (isEs ? '⏳ Pendiente' : '⏳ Pending')}
                         </span>
                       )}
                     </div>
@@ -1308,7 +1317,7 @@ export default function Compras() {
                   {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin) && (
                     <p className="text-xs text-orange-600 mt-0.5">
                       📅 {it.eq_fecha_inicio || '—'} → {it.eq_fecha_fin || '—'}
-                      {it.eq_dias_uso ? ` · ${it.eq_dias_uso} días` : ''}
+                      {it.eq_dias_uso ? ` · ${it.eq_dias_uso} ${isEs ? 'días' : 'days'}` : ''}
                     </p>
                   )}
                 </div>

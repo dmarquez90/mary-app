@@ -254,7 +254,7 @@ export default function OrdenesCambio() {
       const { data: tenantData } = await supabase.from('tenants').select('nombre_empresa').eq('id', proy?.tenant_id).single()
       const empresa = tenantData?.nombre_empresa || 'MARY ERP'
       await exportOCExcel({ oc, items: ocItems, inds: ocInds, proy, moneda, empresa, lang })
-    } catch(e) { console.error(e); alert('Error al generar Excel: ' + e.message) }
+    } catch(e) { console.error(e); alert((isEs ? 'Error al generar Excel: ' : 'Error generating Excel: ') + e.message) }
     setExportando(false)
   }
 
