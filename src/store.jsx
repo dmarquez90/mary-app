@@ -641,8 +641,18 @@ useEffect(() => {
     // nada se hubiera persistido. sbThrow() aborta el case (sin llegar al
     // dispatch local) y el catch de más abajo avisa al usuario.
     async function sbThrow(promise) {
-      const { error } = await promise
+      // RLS no da error cuando bloquea un UPDATE/DELETE: simplemente afecta 0 filas.
+      // Si la operación apunta a un registro concreto (id=eq.X) pedimos las filas
+      // afectadas y, si no hay ninguna, lo tratamos como error en vez de "éxito".
+      let q = promise
+      const porId = (q?.method === 'PATCH' || q?.method === 'DELETE') &&
+        q?.url?.searchParams?.get('id')?.startsWith('eq.') && typeof q.select === 'function'
+      if (porId) q = q.select('id')
+      const { data, error } = await q
       if (error) throw error
+      if (porId && Array.isArray(data) && data.length === 0) {
+        throw new Error('Sin permiso para modificar este registro (no se guardó) / No permission to modify this record (not saved)')
+      }
       return true
     }
 
