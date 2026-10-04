@@ -264,22 +264,39 @@ export default function Presupuesto() {
   // Se guarda el %, por eso la bolsa se recalcula sola si cambia el directo.
   const [indPct,   setIndPct]   = useState('')
   const [indMonto, setIndMonto] = useState('')
-  useEffect(() => {
+  // % exacto cuando el usuario escribe el MONTO: el campo % muestra 2 decimales,
+  // pero se guarda el valor exacto para que la bolsa quede igual al monto escrito.
+  const [indPctExacto, setIndPctExacto] = useState(null)
+  const [indPctError,  setIndPctError]  = useState('')
+  const resetIndFields = () => {
     const p = parseFloat(proy?.indirecto_pct || 0)
-    setIndPct(p ? String(p) : '')
+    setIndPctExacto(p || null)
+    setIndPct(p ? String(r2(p)) : '')
     setIndMonto(p ? String(montoDesdePct(p, grandTotal)) : '')
-  }, [proy?.id, proy?.indirecto_pct, grandTotal])
+  }
+  useEffect(resetIndFields, [proy?.id, proy?.indirecto_pct, grandTotal])
 
   const onIndPctChange = v => {
+    setIndPctError(''); setIndPctExacto(null)
     setIndPct(v)
     setIndMonto(v === '' ? '' : String(montoDesdePct(v, grandTotal)))
   }
   const onIndMontoChange = v => {
+    setIndPctError('')
     setIndMonto(v)
-    setIndPct(v === '' ? '' : String(pctDesdeMonto(v, grandTotal)))
+    if (v === '' || !(grandTotal > 0)) { setIndPct(''); setIndPctExacto(null); return }
+    const exacto = (parseFloat(v) || 0) * 100 / grandTotal
+    setIndPctExacto(exacto)
+    setIndPct(String(r2(exacto)))
   }
   const saveIndPct = () => {
-    const v = parseFloat(indPct) || 0
+    const bruto = indPctExacto ?? (parseFloat(indPct) || 0)
+    if (!(bruto >= 0 && bruto <= 100)) {
+      setIndPctError(t('pres_ci_pct_invalid'))
+      resetIndFields()
+      return
+    }
+    const v = Math.round(bruto * 1e10) / 1e10
     if (!proy || v === (parseFloat(proy.indirecto_pct) || 0)) return
     dispatch({ type: 'UPD_PROYECTO', payload: { ...proy, indirecto_pct: v } })
   }
@@ -580,13 +597,13 @@ export default function Presupuesto() {
             <div className="p-3 rounded-lg bg-gray-50 mb-4">
               <div className="flex items-center gap-2 flex-wrap">
                 <label className="text-xs font-semibold text-gray-600 mr-1">{t('pres_ci_label')}</label>
-                <input type="number" className={inputCls + ' w-20'} placeholder="0" min="0" step="0.01"
+                <input type="number" className={inputCls} style={{ width: 96 }} placeholder="0" min="0" max="100" step="0.01"
                   disabled={!puedeEditar || closed}
                   value={indPct} onChange={e => onIndPctChange(e.target.value)}
                   onBlur={saveIndPct} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} />
                 <span className="text-xs text-gray-500">%</span>
                 <span className="text-gray-300">=</span>
-                <input type="number" className={inputCls + ' w-36 font-mono'} placeholder="0.00" min="0" step="0.01"
+                <input type="number" className={inputCls + ' font-mono'} style={{ width: 170 }} placeholder="0.00" min="0" step="0.01"
                   disabled={!puedeEditar || closed}
                   value={indMonto} onChange={e => onIndMontoChange(e.target.value)}
                   onBlur={saveIndPct} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} />
@@ -594,6 +611,7 @@ export default function Presupuesto() {
                   {t('pres_ci_of_direct')} <span className="font-mono">{fmt(grandTotal, moneda)}</span>
                 </span>
               </div>
+              {indPctError && <p className="mt-2 text-xs text-red-500">{indPctError}</p>}
 
               {indCalc.modo === 'pct' ? (
                 <div className="mt-3">

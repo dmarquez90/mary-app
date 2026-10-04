@@ -240,12 +240,15 @@ export default function AvaluosCliente() {
     ordenes_cambio_items.filter(i => ocAprobadas.some(o => o.id === i.oc_id)),
     [ordenes_cambio_items, ocAprobadas]
   )
-  const presupuestoOriginal = useMemo(() => calcGrandTotal(todosItems), [todosItems])
+  // Al aprobarse, una OC ya modifica el presupuesto (cantidades y partidas nuevas con
+  // origen_oc_id), así que el presupuesto actual ES el efectivo. El original se
+  // reconstruye restando el directo de las OCs aprobadas (solo informativo).
+  const presupuestoEfectivo = useMemo(() => calcGrandTotal(todosItems), [todosItems])
   const totalOCAprobadas    = useMemo(() => ocAprobadas.reduce((s,o) => s + parseFloat(o.total_oc||0), 0), [ocAprobadas])
-  const presupuestoEfectivo = presupuestoOriginal + totalOCAprobadas
+  const presupuestoOriginal = presupuestoEfectivo - totalOCAprobadas
   const totalIndirectos = useMemo(() =>
-    calcIndirectos(proy, presupuestoOriginal, presupuesto_indirectos.filter(i => i.proyecto_id === proyId)).total,
-    [proy, presupuestoOriginal, presupuesto_indirectos, proyId]
+    calcIndirectos(proy, presupuestoEfectivo, presupuesto_indirectos.filter(i => i.proyecto_id === proyId)).total,
+    [proy, presupuestoEfectivo, presupuesto_indirectos, proyId]
   )
 
   const avs = useMemo(() =>
@@ -265,11 +268,8 @@ export default function AvaluosCliente() {
     }, 0)
   }
 
-  const cantidadTotal = (act) => {
-    const base    = parseFloat(act.cantidad || 0)
-    const ocExtra = ocItemsAprobados.filter(i => i.actividad_id === act.id).reduce((s,i) => s + parseFloat(i.diferencia || 0), 0)
-    return base + ocExtra
-  }
+  // La cantidad de la actividad ya incluye las OCs aprobadas (se actualiza al aprobar)
+  const cantidadTotal = (act) => parseFloat(act.cantidad || 0)
 
   const precioUnitario = (act) =>
     r2(parseFloat(act.costo_mo||0) + parseFloat(act.costo_materiales||0) + parseFloat(act.costo_equipos||0))
@@ -286,7 +286,10 @@ export default function AvaluosCliente() {
         cantidad_total: total, precio_unitario: pu, monto_contrato: r2(total * pu),
         cantidad_anterior: ant, cantidad_periodo: '', es_oc: false, oc_item_id: null }
     })
-    const itemsNuevos = ocItemsAprobados.filter(i => i.tipo === 'nueva').map(i => ({
+    // Partidas nuevas de OC: al aprobar se crean en el presupuesto (origen_oc_id) y ya
+    // vienen en itemsBase. Solo se agregan aparte las de OCs antiguas que no la tengan.
+    const yaEnPresupuesto = (i) => actividades.some(a => a.origen_oc_id === i.oc_id && a.descripcion === i.descripcion)
+    const itemsNuevos = ocItemsAprobados.filter(i => i.tipo === 'nueva' && !yaEnPresupuesto(i)).map(i => ({
       actividad_id: null, descripcion: i.descripcion, unidad: i.unidad || 'und',
       cantidad_total: parseFloat(i.cantidad_nueva || 0), precio_unitario: parseFloat(i.precio_unitario || 0),
       monto_contrato: r2(parseFloat(i.cantidad_nueva || 0) * parseFloat(i.precio_unitario || 0)),
@@ -831,7 +834,7 @@ export default function AvaluosCliente() {
                   {[
                     { label: isEs?'Pres. directo':'Direct budget',     value: fmt(presupuestoEfectivo, moneda),   color: BRAND },
                     { label: isEs?'Indirectos':'Indirect costs',        value: fmt(totalIndirectos, moneda),       color: '#6b7280' },
-                    { label: isEs?'OC aprobadas':'Approved COs',        value: `${totalOCAprobadas >= 0 ? '+' : ''}${fmt(totalOCAprobadas, moneda)}`, color: totalOCAprobadas > 0 ? '#D97706' : '#6b7280' },
+                    { label: isEs?'OC aprobadas (incluidas)':'Approved COs (included)', value: `${totalOCAprobadas >= 0 ? '+' : ''}${fmt(totalOCAprobadas, moneda)}`, color: totalOCAprobadas > 0 ? '#D97706' : '#6b7280' },
                     { label: isEs?'Saldo por cobrar':'Balance to bill', value: fmt(saldoPorCobrar, moneda),       color: saldoPorCobrar > 0 ? '#D97706' : '#1D9E75' },
                   ].map(k => (
                     <div key={k.label} className="bg-gray-50 rounded-lg p-3">

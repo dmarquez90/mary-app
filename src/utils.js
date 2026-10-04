@@ -364,3 +364,51 @@ export const getUnitLabel = (value, lang = 'ES') => {
   if (!cfg) return value
   return lang === 'ES' ? cfg.es : cfg.en
 }
+
+// ── Costo de materiales consumidos (FIFO) ────────────────────────────────────
+// Cada salida consume las capas de entradas de su material en orden de llegada
+// (fecha_recepcion, luego registrado_en) y su costo es lo que consumió de cada capa.
+// Es el mismo criterio del valor de inventario del Dashboard, así que costo
+// consumido + valor en bodega = total comprado.
+// Las salidas "sin costo" (sobrante transferido / reserva general, costo_cargo = 0)
+// consumen stock pero no cargan costo al proyecto.
+// Si se acaban las capas, el excedente se valora al último precio conocido
+// (o al precio de catálogo si el material no tiene entradas).
+export const salidaSinCosto = (s) =>
+  ['sobrante_transferido', 'uso_general'].includes(s?.tipo_salida) || s?.costo_cargo === 0
+
+export const costosSalidasFIFO = (entradas = [], salidas = [], materiales = []) => {
+  // Orden: fecha del movimiento, luego instante de registro (registrado_en) y created_at
+  // (un movimiento recién creado aún sin registrado_en cuenta como el más reciente)
+  const orden = (fecha, m) => `${fecha || ''}|${m.registrado_en || '9999'}|${m.created_at || ''}`
+  const capas = {}
+  ;[...entradas]
+    .sort((a, b) => orden(a.fecha_recepcion, a).localeCompare(orden(b.fecha_recepcion, b)))
+    .forEach(e => {
+      ;(capas[e.material_id] ||= []).push({
+        cant: parseFloat(e.cantidad) || 0, precio: parseFloat(e.precio_unitario) || 0,
+      })
+    })
+  const precioCatalogo = Object.fromEntries(materiales.map(m => [m.id, parseFloat(m.precio_unitario) || 0]))
+  const costos = {}
+  ;[...salidas]
+    .sort((a, b) => orden(a.fecha_salida, a).localeCompare(orden(b.fecha_salida, b)))
+    .forEach(s => {
+      const cola = capas[s.material_id] || []
+      let pendiente = parseFloat(s.cantidad) || 0
+      let costo = 0
+      let ultimoPrecio = precioCatalogo[s.material_id] || 0
+      for (const capa of cola) {
+        if (pendiente <= 0) break
+        if (capa.cant <= 0) { ultimoPrecio = capa.precio; continue }
+        const toma = Math.min(capa.cant, pendiente)
+        costo += toma * capa.precio
+        capa.cant -= toma
+        pendiente -= toma
+        ultimoPrecio = capa.precio
+      }
+      if (pendiente > 0) costo += pendiente * (cola.length ? cola[cola.length - 1].precio : ultimoPrecio)
+      costos[s.id] = salidaSinCosto(s) ? 0 : r2(costo)
+    })
+  return costos
+}

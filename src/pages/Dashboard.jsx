@@ -148,7 +148,7 @@ export default function Dashboard({ onNavigate }) {
       if (stock <= 0) return total
       const entsOrdenadas = [...entradas]
         .filter(e => e.material_id === mat.id)
-        .sort((a, b) => new Date(a.fecha_recepcion) - new Date(b.fecha_recepcion))
+        .sort((a, b) => `${a.fecha_recepcion || ''}|${a.registrado_en || '9999'}`.localeCompare(`${b.fecha_recepcion || ''}|${b.registrado_en || '9999'}`))
       if (entsOrdenadas.length === 0) return total + (stock * parseFloat(mat.precio_unitario || 0))
 
       const totalSalidasMat = salidas

@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -432,7 +432,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     // KPI resumen en la hoja
     ws5.getRow(r5).height = 20
     const kOrig = ws5.getCell(r5, 1); kOrig.value = isEs ? 'Presupuesto original' : 'Original budget'; styleLabel(kOrig)
-    const vOrig = ws5.getCell(r5, 2); vOrig.value = budget; vOrig.numFmt = '"$"#,##0.00'; styleData(vOrig, { bold: true, align: 'right' })
+    const vOrig = ws5.getCell(r5, 2); vOrig.value = data.budgetOriginal ?? budget; vOrig.numFmt = '"$"#,##0.00'; styleData(vOrig, { bold: true, align: 'right' })
     const kDelta = ws5.getCell(r5, 3); kDelta.value = isEs ? 'Variación OCs' : 'CO variation'; styleLabel(kDelta)
     const vDelta = ws5.getCell(r5, 4); vDelta.value = data.deltaOCs; vDelta.numFmt = '"$"#,##0.00'
     styleData(vDelta, { bold: true, align: 'right', color: data.deltaOCs > 0 ? GREEN_HX : RED_HX })
@@ -480,7 +480,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
     ws5.mergeCells(r5, 1, r5, 5)
     const tl5 = ws5.getCell(r5, 1); tl5.value = isEs ? 'TOTAL APROBADO' : 'TOTAL APPROVED'; styleTotal(tl5)
     const tv5 = ws5.getCell(r5, 6); tv5.value = data.deltaOCs; tv5.numFmt = '"$"#,##0.00'; styleTotal(tv5)
-    const tp5 = ws5.getCell(r5, 7); tp5.value = budget > 0 ? data.deltaOCs / budget : 0; tp5.numFmt = '0.00%'; styleTotal(tp5)
+    const tp5 = ws5.getCell(r5, 7); tp5.value = (data.budgetOriginal ?? budget) > 0 ? data.deltaOCs / (data.budgetOriginal ?? budget) : 0; tp5.numFmt = '0.00%'; styleTotal(tp5)
   }
 
   // ── HOJA 6: Subcontratos detallados (nuevo sistema) ──────────────────────────
@@ -1943,7 +1943,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
 // ── EXPORT RESUMEN GENERAL ────────────────────────────────
 async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
   subcontratos, subcontratos_contratos = [], subcontratos_avaluos = [],
-  equipos, costos_indirectos, salidas, entradas, budget, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  equipos, costos_indirectos, salidas, entradas, materiales = [], budget, moneda, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs = lang === 'ES'
 
   const wb       = new ExcelJS.Workbook()
@@ -1953,17 +1953,15 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   const fechaHoy  = new Date().toLocaleDateString(isEs?'es':'en-US')
   const COLS      = 7
 
-  const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>{
-    const e=entradas.find(en=>en.material_id===sa.material_id)
-    return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))
-  },0)
+  const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
+  const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0))
   const dirs     = costos_directos.filter(c=>c.proyecto_id===proyId)
   const noms     = nominas.filter(n=>n.proyecto_id===proyId)
   const subs     = subcontratos.filter(s=>s.proyecto_id===proyId)
   const eqs      = equipos.filter(e=>e.proyecto_id===proyId)
   const inds     = costos_indirectos.filter(c=>c.proyecto_id===proyId)
   const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
-  const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
+  const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0),0) // bruto = costo de la empresa
   // totalSub: avalúos aprobados del nuevo sistema + fallback al sistema anterior
   const scIdsRes = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
   const totalSub = subcontratos_avaluos
@@ -2226,6 +2224,11 @@ export default function Reportes() {
   const granTotalPres  = round2(subtotalPres + utilidadMonto)
   const impuestoMonto  = round2(granTotalPres * (impuestoPct / 100))
   const budget         = round2(granTotalPres + impuestoMonto)
+  const totalConMarkups = (directo) => {
+    const sub     = directo + calcIndirectos(proy, directo, indsDelProy).total
+    const conUtil = round2(sub + round2(sub * (utilidadPct / 100)))
+    return round2(conUtil + round2(conUtil * (impuestoPct / 100)))
+  }
 
   const datosFinanciero = useMemo(() => {
     if (!proyId) return null
@@ -2238,12 +2241,10 @@ export default function Reportes() {
     const eqs   = equipos.filter(e => e.proyecto_id===proyId && filtro(e.created_at?.slice(0,10)))
     const inds  = costos_indirectos.filter(c => c.proyecto_id===proyId && filtro(c.fecha||c.created_at?.slice(0,10)))
 
-    const totalMat = salidas.filter(s=>s.proyecto_id===proyId&&filtro(s.fecha_salida)).reduce((s,sa)=>{
-      const e=entradas.find(en=>en.material_id===sa.material_id)
-      return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))
-    },0)
+    const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
+    const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId&&filtro(s.fecha_salida)).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0))
     const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
-    const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
+    const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0),0) // bruto = costo de la empresa
     // totalSub: avalúos aprobados del nuevo sistema + monto_pagado del sistema anterior
     const scIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
     const totalSubNuevo = subcontratos_avaluos
@@ -2267,7 +2268,7 @@ export default function Reportes() {
       const realScAntiguo = subcontratos.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
         .reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
       const real=salidas.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
-        .reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))},0)
+        .reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0)
         +costos_directos.filter(c=>c.proyecto_id===proyId&&c.actividad_id===act.id).reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
         +realScNuevo+realScAntiguo
         +eqs.filter(e=>e.actividad_id===act.id).reduce((s,e)=>s+costoEfectivoEq(e),0)
@@ -2305,7 +2306,10 @@ export default function Reportes() {
     const ocsDelProy      = ordenes_cambio.filter(o => o.proyecto_id === proyId)
     const ocsAprobadas    = ocsDelProy.filter(o => o.estado === 'aprobada')
     const deltaOCs        = ocsAprobadas.reduce((s, o) => s + parseFloat(o.total_oc || 0), 0)
-    const budgetRevisado  = budget + deltaOCs
+    // Al aprobarse, una OC ya modifica el presupuesto: el actual ES el revisado y el
+    // original se reconstruye restando el directo de las OCs (con sus recargos).
+    const budgetRevisado  = budget
+    const budgetOriginal  = deltaOCs !== 0 ? totalConMarkups(totalDirectos - deltaOCs) : budget
     const ocsItems        = ordenes_cambio_items.filter(i => ocsDelProy.some(o => o.id === i.oc_id))
 
     // Subcontratos nuevo sistema para el reporte
@@ -2327,10 +2331,10 @@ export default function Reportes() {
       ],
       actividades, totalReal, dirs, noms, subs, eqs, inds,
       avsProy, avsItems, indsPres, comparacionInd,
-      ocsDelProy, ocsAprobadas, deltaOCs, budgetRevisado, ocsItems,
+      ocsDelProy, ocsAprobadas, deltaOCs, budgetRevisado, budgetOriginal, ocsItems,
       scContratos, scAvaluosDetalle, retenciones, ordenesPago,
     }
-  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
+  }, [proyId, desde, hasta, lang, presupuesto, salidas, entradas, materiales, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, subcontratos_items, subcontratos_avaluo_items, subcontratos_retenciones, ordenes_pago_retencion, equipos, costos_indirectos, avaluos_cliente, avaluos_cliente_items, presupuesto_indirectos, ordenes_cambio, ordenes_cambio_items, t])
 
   const datosInventario = useMemo(() => ({
     mats:    materiales.filter(m=>m.activo!==false),
@@ -2349,7 +2353,7 @@ export default function Reportes() {
       } else if (reportType==='general' && proyId) {
         await buildResumenGeneral({ proy, proyectos, presupuesto, costos_directos, nominas,
           subcontratos, subcontratos_contratos, subcontratos_avaluos,
-          equipos, costos_indirectos, salidas, entradas, budget, moneda, lang, nombreEmpresa })
+          equipos, costos_indirectos, salidas, entradas, materiales, budget, moneda, lang, nombreEmpresa })
       } else if (reportType==='retenciones' && datosFinanciero) {
         await buildRetenciones({ data: datosFinanciero, proy, moneda, lang, nombreEmpresa })
       }
@@ -2444,7 +2448,7 @@ export default function Reportes() {
         </div>
       )}
       {reportType==='general' && proyId && (
-        <VistaGeneral proy={proy} presupuesto={presupuesto} costos_directos={costos_directos}
+        <VistaGeneral proy={proy} presupuesto={presupuesto} costos_directos={costos_directos} materiales={materiales}
           nominas={nominas} subcontratos={subcontratos} equipos={equipos}
           costos_indirectos={costos_indirectos} salidas={salidas} entradas={entradas}
           subcontratos_contratos={subcontratos_contratos}
@@ -2597,7 +2601,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
             </p>
             {data.deltaOCs !== 0 && (
               <div className="flex items-center gap-4 text-xs">
-                <span className="text-gray-400">{isEs ? 'Pres. original:' : 'Original budget:'} <span className="font-mono font-medium text-gray-700">{fmt(budget, moneda)}</span></span>
+                <span className="text-gray-400">{isEs ? 'Pres. original:' : 'Original budget:'} <span className="font-mono font-medium text-gray-700">{fmt(data.budgetOriginal, moneda)}</span></span>
                 <span style={{color:'#F59E0B'}}>{isEs ? 'Variación OCs:' : 'CO variation:'} <span className="font-mono font-medium">{data.deltaOCs >= 0 ? '+' : ''}{fmt(data.deltaOCs, moneda)}</span></span>
                 <span style={{color:BRAND}}>{isEs ? 'Pres. revisado:' : 'Revised budget:'} <span className="font-mono font-bold">{fmt(data.budgetRevisado, moneda)}</span></span>
               </div>
@@ -2648,7 +2652,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                   {data.deltaOCs > 0 ? `+${fmt(data.deltaOCs, moneda)}` : fmt(data.deltaOCs, moneda)}
                 </td>
                 <td className={tdC+' text-right text-xs font-medium'} style={{color:'#1D9E75'}}>
-                  {budget > 0 ? `${((data.deltaOCs / budget) * 100).toFixed(2)}%` : '—'}
+                  {data.budgetOriginal > 0 ? `${((data.deltaOCs / data.budgetOriginal) * 100).toFixed(2)}%` : '—'}
                 </td>
               </tr>
             </tbody>
@@ -2691,21 +2695,22 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
   )
 }
 
-function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, subcontratos_contratos = [], subcontratos_avaluos = [], budget, moneda, fmt, fmtNum }) {
+function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontratos, equipos, costos_indirectos, salidas, entradas, materiales = [], subcontratos_contratos = [], subcontratos_avaluos = [], budget, moneda, fmt, fmtNum }) {
   const { lang, t } = useContext(LangContext)
   const isEs = lang === 'ES'
   const proyId=proy?.id
   const thS={background:BRAND}
   const thC='px-4 py-2.5 text-left text-xs font-semibold text-white'
   const tdC='px-4 py-2.5 text-sm text-gray-700'
-  const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>{const e=entradas.find(en=>en.material_id===sa.material_id);return s+round2((parseFloat(sa.cantidad)||0)*(parseFloat(e?.precio_unitario)||0))},0)
+  const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
+  const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0)
   const dirs=costos_directos.filter(c=>c.proyecto_id===proyId)
   const noms=nominas.filter(n=>n.proyecto_id===proyId)
   const subs=subcontratos.filter(s=>s.proyecto_id===proyId)
   const eqs=equipos.filter(e=>e.proyecto_id===proyId)
   const inds=costos_indirectos.filter(c=>c.proyecto_id===proyId)
   const totalDir=dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
-  const totalNom=noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0),0)
+  const totalNom=noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0),0) // bruto = costo de la empresa
   // totalSub: avalúos aprobados del nuevo sistema + fallback sistema anterior
   const scIdsVG = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
   const totalSubNuevo = subcontratos_avaluos

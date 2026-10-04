@@ -1664,8 +1664,7 @@ useEffect(() => {
       }
 
       case 'ADD_COSTO_DIRECTO': {
-        const { fecha, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
+        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await sbThrow(supabase.from('costos_directos').insert(item))
         dispatch({ type: 'ADD_COSTO_DIRECTO', payload: item })
         break
@@ -1957,8 +1956,7 @@ useEffect(() => {
       }
 
       case 'ADD_COSTO_INDIRECTO': {
-        const { fecha, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
+        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
         await sbThrow(supabase.from('costos_indirectos').insert(item))
         dispatch({ type: 'ADD_COSTO_INDIRECTO', payload: item })
         break

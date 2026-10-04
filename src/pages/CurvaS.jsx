@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems } from '../utils'
+import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, costosSalidasFIFO } from '../utils'
 import { EmptyState, StatCard, Icons, PageHeader } from '../components'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
@@ -35,7 +35,7 @@ function generarPeriodosSemanales(fechaInicio, fechaFin) {
 export default function CurvaS() {
   const { state } = useStore()
   const { t } = useContext(LangContext)
-  const { proyectos, presupuesto, salidas, entradas, costos_directos, nominas, subcontratos, equipos, costos_indirectos,
+  const { proyectos, presupuesto, salidas, entradas, materiales = [], costos_directos, nominas, subcontratos, equipos, costos_indirectos,
     avaluos_cliente = [], avaluos_cliente_items = [], presupuesto_indirectos = [],
     subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [], subcontratos_avaluo_items = [],
     ordenes_cambio = [] } = state
@@ -48,33 +48,38 @@ export default function CurvaS() {
   const items          = presupuesto.filter(b => b.proyecto_id === proyId)
   const totalDirectos  = calcGrandTotal(items)
   const indsDelProy    = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
-  const totalIndPres   = calcIndirectos(proy, totalDirectos, indsDelProy).total
-  const subtotalPres   = totalDirectos + totalIndPres
   const utilidadPct    = parseFloat(proy?.utilidad_pct || 0)
   const impuestoPct    = parseFloat(proy?.impuesto_pct || 0)
-  const utilidadMonto  = r2(subtotalPres * (utilidadPct / 100))
-  const granTotalPres  = r2(subtotalPres + utilidadMonto)
-  const impuestoMonto  = r2(granTotalPres * (impuestoPct / 100))
-  const budget         = r2(granTotalPres + impuestoMonto)
+  // Directo -> total con indirectos, utilidad e impuesto (mismo cálculo del Presupuesto)
+  const totalConMarkups = (directo) => {
+    const subtotal = directo + calcIndirectos(proy, directo, indsDelProy).total
+    const conUtil  = r2(subtotal + r2(subtotal * (utilidadPct / 100)))
+    return r2(conUtil + r2(conUtil * (impuestoPct / 100)))
+  }
 
-  // ── Presupuesto revisado por Órdenes de Cambio aprobadas ─────────────────
+  // ── Órdenes de Cambio aprobadas ──────────────────────────────────────────
+  // Al aprobarse, una OC ya modifica el presupuesto (cantidades y partidas nuevas),
+  // así que el presupuesto actual ES el revisado. El original se reconstruye
+  // restando el directo de las OCs aprobadas.
   const ocsAprobadas   = ordenes_cambio.filter(o => o.proyecto_id === proyId && o.estado === 'aprobada')
   const deltaOCs       = ocsAprobadas.reduce((s, o) => s + parseFloat(o.total_oc || 0), 0)
-  const budgetRevisado = budget + deltaOCs
+  const budgetRevisado = totalConMarkups(totalDirectos)
+  const budget         = deltaOCs !== 0 ? totalConMarkups(totalDirectos - deltaOCs) : budgetRevisado
+
+  const costosFIFO = useMemo(() => costosSalidasFIFO(entradas, salidas, materiales), [entradas, salidas, materiales])
 
   const allCosts = useMemo(() => {
     if (!proyId) return []
     const costs = []
     salidas.filter(s => s.proyecto_id === proyId).forEach(s => {
-      const e = entradas.find(en => en.material_id === s.material_id)
-      const monto = r2((parseFloat(s.cantidad)||0) * (parseFloat(e?.precio_unitario)||0))
+      const monto = costosFIFO[s.id] || 0
       if (monto > 0) costs.push({ fecha: s.fecha_salida, monto })
     })
     costos_directos.filter(c => c.proyecto_id === proyId).forEach(c =>
       costs.push({ fecha: c.fecha || c.created_at?.slice(0,10), monto: parseFloat(c.monto)||0 })
     )
     nominas.filter(n => n.proyecto_id === proyId).forEach(n =>
-      costs.push({ fecha: n.periodo_fin, monto: (parseFloat(n.salario_base)||0) - (parseFloat(n.deducciones)||0) })
+      costs.push({ fecha: n.periodo_fin, monto: parseFloat(n.salario_base)||0 })  // bruto = costo de la empresa
     )
     subcontratos.filter(s => s.proyecto_id === proyId).forEach(s =>
       s.monto_pagado > 0 && costs.push({ fecha: s.created_at?.slice(0,10), monto: parseFloat(s.monto_pagado)||0 })
@@ -95,7 +100,7 @@ export default function CurvaS() {
       costs.push({ fecha: c.fecha || c.created_at?.slice(0,10), monto: parseFloat(c.monto)||0 })
     )
     return costs.filter(c => c.fecha && c.monto > 0).sort((a,b) => a.fecha.localeCompare(b.fecha))
-  }, [proyId, salidas, entradas, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos])
+  }, [proyId, salidas, costosFIFO, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos])
 
   const chartData = useMemo(() => {
     if (!proy?.fecha_inicio) return []
@@ -243,10 +248,8 @@ export default function CurvaS() {
     if (!proyId) return []
     return flatBudgetItems(items).filter(i => i.tipo === 'actividad').map(act => {
       const presupuestado = r2((act.cantidad||0) * ((act.costo_mo||0) + (act.costo_materiales||0) + (act.costo_equipos||0)))
-      const matCost = salidas.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id).reduce((s,sa) => {
-        const e = entradas.find(en => en.material_id === sa.material_id)
-        return s + r2((parseFloat(sa.cantidad)||0) * (parseFloat(e?.precio_unitario)||0))
-      }, 0)
+      const matCost = salidas.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id)
+        .reduce((s,sa) => s + (costosFIFO[sa.id] || 0), 0)
       const dirCost = costos_directos.filter(c => c.proyecto_id===proyId && c.actividad_id===act.id).reduce((s,c) => s + (parseFloat(c.monto)||0), 0)
       // Costo real de subcontratos para ESTA actividad: se toma el monto_actual de cada
       // item del avalúo cuyo subcontratos_items.actividad_id === act.id (no el monto_total
@@ -268,7 +271,7 @@ export default function CurvaS() {
       const dev  = real - presupuestado
       return { code: act.code, descripcion: act.descripcion, presupuestado, real, dev, devPct: presupuestado ? (dev/presupuestado)*100 : 0 }
     }).filter(a => a.presupuestado > 0 || a.real > 0)
-  }, [items, salidas, entradas, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, subcontratos_avaluo_items, equipos, proyId])
+  }, [items, salidas, costosFIFO, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, subcontratos_avaluo_items, equipos, proyId])
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null

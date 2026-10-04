@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, r2, calcGrandTotal, calcIndirectos } from '../utils'
+import { today, fmt, fmtNum, r2, calcGrandTotal, calcIndirectos, costosSalidasFIFO } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { useAuth } from '../auth'
 import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
@@ -19,7 +19,7 @@ export default function Financiero() {
   const isEs                    = lang === 'ES'
 
   const { proyectos, presupuesto, costos_directos, nominas, subcontratos,
-    equipos, equipos_ajustes = [], costos_indirectos, salidas, entradas,
+    equipos, equipos_ajustes = [], costos_indirectos, salidas, entradas, materiales = [],
     ordenes_compra = [],
     cajas_chicas = [], gastos_caja_chica = [], liquidaciones_caja_chica = [], reembolsos_personal = [], usuarios = [],
     presupuesto_indirectos = [] } = state
@@ -79,7 +79,10 @@ export default function Financiero() {
   const inds    = costos_indirectos.filter(c => c.proyecto_id === proyId)
 
   const totalDir = directs.reduce((s,c) => s+(parseFloat(c.monto)||0), 0)
-  const totalNom = noms.reduce((s,n) => s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0), 0)
+  // Costo de mano de obra = salario bruto: las deducciones se retienen al trabajador
+  // pero siguen siendo costo de la empresa. El neto solo se muestra en la tabla.
+  const totalNom     = noms.reduce((s,n) => s+(parseFloat(n.salario_base)||0), 0)
+  const totalNomNeto = noms.reduce((s,n) => s+(parseFloat(n.salario_base)||0)-(parseFloat(n.deducciones)||0), 0)
   // totalSub: suma de avalúos APROBADOS del nuevo sistema de subcontratos
   const scContratosDelProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
   const scContratosIds     = scContratosDelProy.map(sc => sc.id)
@@ -122,10 +125,8 @@ export default function Financiero() {
   // Nivel bolsa: siempre comparable, aunque no exista ni una categoría.
   const bolsaDiferencia = r2(totalIndPres - totalInd)
   const bolsaPctUsado   = totalIndPres > 0 ? (totalInd / totalIndPres) * 100 : 0
-  const totalMat = salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => {
-    const idx = entradas.find(e=>e.material_id===sa.material_id)
-    return s+r2((parseFloat(sa.cantidad)||0)*(parseFloat(idx?.precio_unitario)||0))
-  }, 0)
+  const costosFIFO = useMemo(() => costosSalidasFIFO(entradas, salidas, materiales), [entradas, salidas, materiales])
+  const totalMat = r2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => s + (costosFIFO[sa.id] || 0), 0))
   const totalReal = totalMat + totalDir + totalNom + totalSub + totalEq + totalInd
 
   // ── Días trabajados para nómina ───────────────────────────────────────
@@ -181,14 +182,16 @@ export default function Financiero() {
   }
 
   const save = () => {
+    // Campos opcionales vacíos ('') van como null: Postgres rechaza '' en numeric/uuid/date
+    const datos = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v === '' ? null : v]))
     if (editId) {
-      dispatch({ type: UPD_TYPES[tab], payload: { ...form, id: editId } })
+      dispatch({ type: UPD_TYPES[tab], payload: { ...datos, id: editId } })
     } else {
-      if (tab===0) { if (!form.descripcion||!form.monto) return; dispatch({ type:'ADD_COSTO_DIRECTO', payload:form }) }
-      if (tab===1) { if (!form.trabajador||!form.salario_base) return; dispatch({ type:'ADD_NOMINA', payload:form }) }
-      if (tab===2) { if (!form.subcontratista||!form.monto_contrato) return; dispatch({ type:'ADD_SUBCONTRATO', payload:form }) }
-      if (tab===3) { if (!form.descripcion||!form.costo_total) return; dispatch({ type:'ADD_EQUIPO', payload:form }) }
-      if (tab===4) { if (!form.categoria||!form.monto) return; dispatch({ type:'ADD_COSTO_INDIRECTO', payload:form }) }
+      if (tab===0) { if (!form.descripcion||!form.monto) return; dispatch({ type:'ADD_COSTO_DIRECTO', payload:datos }) }
+      if (tab===1) { if (!form.trabajador||!form.salario_base) return; dispatch({ type:'ADD_NOMINA', payload:datos }) }
+      if (tab===2) { if (!form.subcontratista||!form.monto_contrato) return; dispatch({ type:'ADD_SUBCONTRATO', payload:datos }) }
+      if (tab===3) { if (!form.descripcion||!form.costo_total) return; dispatch({ type:'ADD_EQUIPO', payload:datos }) }
+      if (tab===4) { if (!form.categoria||!form.monto) return; dispatch({ type:'ADD_COSTO_INDIRECTO', payload:datos }) }
     }
     setDrawer(false)
     setEditId(null)
@@ -377,7 +380,7 @@ export default function Financiero() {
                     })}
                     <tr className="bg-gray-50">
                       <td colSpan={8} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')} {isEs?'neto':'net'}</td>
-                      <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalNom,moneda)}</td>
+                      <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalNomNeto,moneda)}</td>
                       {puedeEditar&&<td/>}
                     </tr>
                   </tbody>

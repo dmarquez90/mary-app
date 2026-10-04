@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   r2, calcSubtotal, calcGrandTotal, calcIndirectos, montoDesdePct, pctDesdeMonto,
-  flatBudgetItems, genBudgetCode, genProjectCode, genOCCode,
+  flatBudgetItems, genBudgetCode, genProjectCode, genOCCode, costosSalidasFIFO,
 } from './utils'
 
 // ── Fictitious budget ────────────────────────────────────────────────────────
@@ -189,5 +189,36 @@ describe('code generators', () => {
     const y = new Date().getFullYear()
     expect(genOCCode([{ oc_number: `OC-${y}-007` }, { oc_number: `OC-${y}-002` }])).toBe(`OC-${y}-008`)
     expect(genOCCode([])).toBe(`OC-${y}-001`)
+  })
+})
+
+describe('costosSalidasFIFO', () => {
+  const ents = [
+    { material_id: 'REB', cantidad: 2000, precio_unitario: 0.95, fecha_recepcion: '2026-10-01' },
+    { material_id: 'REB', cantidad: 10000, precio_unitario: 0.92, fecha_recepcion: '2026-10-04' },
+  ]
+  it('consumes oldest layers first (9,000 lb = 2,000 @0.95 + 7,000 @0.92)', () => {
+    const c = costosSalidasFIFO(ents, [{ id: 's1', material_id: 'REB', cantidad: 9000, fecha_salida: '2026-10-04' }])
+    expect(c.s1).toBe(8340)
+  })
+  it('later exits continue from where earlier ones left off', () => {
+    const c = costosSalidasFIFO(ents, [
+      { id: 'a', material_id: 'REB', cantidad: 1500, fecha_salida: '2026-10-02' },
+      { id: 'b', material_id: 'REB', cantidad: 1000, fecha_salida: '2026-10-05' },
+    ])
+    expect(c.a).toBe(1425)              // 1,500 @0.95
+    expect(c.b).toBe(r2(500 * 0.95 + 500 * 0.92))
+  })
+  it('"no cost" exits consume stock but cost 0', () => {
+    const c = costosSalidasFIFO(ents, [
+      { id: 'g', material_id: 'REB', cantidad: 2000, fecha_salida: '2026-10-02', tipo_salida: 'uso_general', costo_cargo: 0 },
+      { id: 'd', material_id: 'REB', cantidad: 1000, fecha_salida: '2026-10-05', tipo_salida: 'uso_directo' },
+    ])
+    expect(c.g).toBe(0)
+    expect(c.d).toBe(920)               // the 0.95 layer was used by the reserve exit
+  })
+  it('falls back to catalog price when there are no entries', () => {
+    const c = costosSalidasFIFO([], [{ id: 'x', material_id: 'M', cantidad: 3 }], [{ id: 'M', precio_unitario: 10 }])
+    expect(c.x).toBe(30)
   })
 })
