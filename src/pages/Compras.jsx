@@ -224,6 +224,9 @@ export default function Compras() {
   const { t, lang } = useContext(LangContext)
   const isEs = lang === 'ES'
   const { can } = usePermissions()
+  // Borrar: solo quien puede crear solicitudes/OC (antes el botón lo veía cualquier rol)
+  const puedeBorrarSol = can('solicitud_crear') || can('oc_crear')
+  const puedeBorrarOC  = can('oc_crear')
   const { perfil } = useAuth()
   const nombreEmpresa = perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions LLC'
   const { solicitudes, solicitud_items, ordenes_compra, ordenes_compra_items = [], proyectos, presupuesto, materiales, materiales_presupuestados = [] } = state
@@ -681,7 +684,7 @@ export default function Compras() {
                             <TBtn onClick={() => openOCDrawer(sol)}>{t('comp_generate_oc')}</TBtn>
                           )}
 
-                          <TBtn danger onClick={() => setConfirmDel({ type:'sol', id:sol.id })}>{t('btn_delete')}</TBtn>
+                          {puedeBorrarSol && <TBtn danger onClick={() => setConfirmDel({ type:'sol', id:sol.id })}>{t('btn_delete')}</TBtn>}
                         </div>
                       </td>
                     </tr>
@@ -731,7 +734,7 @@ export default function Compras() {
                             <TBtn danger onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'cancelada' } })}>{t('comp_cancel_oc')}</TBtn>
                           </>}
                           {oc.estado === 'aprobada' && <span className="text-xs text-green-600 font-medium px-2">{t('comp_ready_receive')}</span>}
-                          <TBtn danger onClick={() => setConfirmDel({ type:'oc', id:oc.id })}>{t('btn_delete')}</TBtn>
+                          {puedeBorrarOC && <TBtn danger onClick={() => setConfirmDel({ type:'oc', id:oc.id })}>{t('btn_delete')}</TBtn>}
                         </div>
                       </td>
                     </tr>
@@ -1283,7 +1286,7 @@ export default function Compras() {
           {detSol.observaciones_generales && <div><p className="text-xs text-gray-400">{t('comp_sol_general_remarks')}</p><p className="text-sm text-gray-700">{detSol.observaciones_generales}</p></div>}
           <div className="flex gap-2">
             <PrimaryBtn onClick={() => openPrintSol(detSol)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
-            <button onClick={() => setConfirmDel({ type:'sol', id:detSol.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>
+            {puedeBorrarSol && <button onClick={() => setConfirmDel({ type:'sol', id:detSol.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>}
           </div>
         </>}
       </Drawer>
@@ -1328,7 +1331,7 @@ export default function Compras() {
           {detOC.estado === 'aprobada' && <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">{t('comp_oc_approved_msg')}</div>}
           <div className="flex gap-2">
             <PrimaryBtn onClick={() => openPrintOC(detOC)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
-            <button onClick={() => setConfirmDel({ type:'oc', id:detOC.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>
+            {puedeBorrarOC && <button onClick={() => setConfirmDel({ type:'oc', id:detOC.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>}
           </div>
         </>}
       </Drawer>

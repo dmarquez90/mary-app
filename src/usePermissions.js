@@ -14,7 +14,7 @@ const MATRIX = {
   inventario_editar:  { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: true,  contador: false, lectura: false },
   mat_pres_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
   mat_pres_editar:    { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  compras_ver:        { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true  },
+  compras_ver:        { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true },
   solicitud_crear:    { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
   oc_crear:           { client_admin: true,  coordinador: false, gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
   oc_aprobar:         { client_admin: true,  coordinador: false, gerente: 'cond',residente: false, bodeguero: false, contador: false, lectura: false, supervisor: true },
@@ -35,15 +35,16 @@ const MATRIX = {
 }
 
 export const NAV_PERMISOS = {
-  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','auditoria','chat'],
-  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','auditoria','chat'],
-  coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','ordenes_cambio','reportes','chat'],
-  gerente:      ['dashboard','proyectos','presupuesto','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
-  residente:    ['dashboard','compras','ordenes_cambio','avaluos','financiero','chat'],
+  // Alineado con los permisos *_ver de MATRIX: cada rol ve en el menú lo que puede ver
+  super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','auditoria','chat'],
+  client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','auditoria','chat'],
+  coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','ordenes_cambio','avaluos','curvas','reportes','supervision','chat'],
+  gerente:      ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','chat'],
+  residente:    ['dashboard','compras','ordenes_cambio','avaluos','financiero','supervision','chat'],
   bodeguero:    ['dashboard','inventario','compras','chat'],
-  contador:     ['dashboard','proyectos','presupuesto','financiero','curvas','reportes','chat'],
-  lectura:      ['dashboard','proyectos','presupuesto','inventario','compras','financiero','curvas','chat'],
-  supervisor:   ['dashboard','proyectos','presupuesto','ordenes_cambio','avaluos','supervision','chat'],
+  contador:     ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','chat'],
+  lectura:      ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','chat'],
+  supervisor:   ['dashboard','proyectos','presupuesto','compras','ordenes_cambio','avaluos','supervision','chat'],
 }
 
 export const MODULOS_PERMISOS = [

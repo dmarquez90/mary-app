@@ -1,7 +1,7 @@
 import { useContext, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt } from '../utils'
+import { fmt, fmtFecha } from '../utils'
 import {
   PageHeader, KpiCard, Card, CardHeader, Chip, Icons, Progress, Donut,
   EmptyState, Segmented, TONES,
@@ -201,7 +201,7 @@ export default function Dashboard({ onNavigate }) {
     if (serie.length < 2) return null
     const ult = serie[serie.length - 1]
     const prev = serie[serie.length - 2]
-    if (!prev) return ult > 0 ? 100 : null
+    if (!prev) return null   // sin base de comparación no hay % (antes mostraba ↑100%)
     return ((ult - prev) / prev) * 100
   }
 
@@ -214,14 +214,16 @@ export default function Dashboard({ onNavigate }) {
 
   // ── Solicitudes y OC ────────────────────────────────────────────────────
   const solicitudesStats = useMemo(() => ({
-    pendientes: solicitudes.filter(s => !s.estado || s.estado === '').length,
+    // Pendiente = todavía no tiene OC generada ni fue rechazada (incluye los estados
+    // intermedios de bodega/división; antes solo contaba estado vacío y daba 0)
+    pendientes: solicitudes.filter(s => !['oc_generada','rechazada','completada','entregada'].includes(s.estado)).length,
     ocGenerada: solicitudes.filter(s => s.estado === 'oc_generada').length,
     rechazadas: solicitudes.filter(s => s.estado === 'rechazada').length,
   }), [solicitudes])
 
   const ocStats = useMemo(() => ({
-    pendientes: ordenes_compra.filter(o => ['pending','draft','pendiente','borrador'].includes(o.estado)).length,
-    aprobadas:  ordenes_compra.filter(o => ['approved','sent','received','aprobada','enviada','recibida','recibida_parcial'].includes(o.estado)).length,
+    pendientes: ordenes_compra.filter(o => ['pending','draft','pendiente','borrador','pendiente_aprobacion'].includes(o.estado)).length,
+    aprobadas:  ordenes_compra.filter(o => ['approved','sent','received','aprobada','enviada','recibida','recibida_parcial','cerrada','cerrada_parcial'].includes(o.estado)).length,
     canceladas: ordenes_compra.filter(o => ['cancelled','cancelada','Cancelada'].includes(o.estado)).length,
   }), [ordenes_compra])
 
@@ -242,9 +244,7 @@ export default function Dashboard({ onNavigate }) {
   }), [activos])
 
   // ── Actividad reciente combinada ────────────────────────────────────────
-  const fmtDate = (d) => d
-    ? new Date(d).toLocaleDateString(isEs ? 'es' : 'en', { month: 'short', day: 'numeric' })
-    : '—'
+  const fmtDate = (d) => fmtFecha(d, lang, { month: 'short', day: 'numeric' })
 
   const nombreMaterial = (id) => materiales.find(m => m.id === id)?.descripcion || '—'
 
@@ -337,8 +337,6 @@ export default function Dashboard({ onNavigate }) {
               label={t('dash_purchase_orders')} value={ordenes_compra.length}
               sub={`${ocStats.pendientes} ${isEs ? 'por aprobar' : 'to approve'}`}
               icon={Icons.purchases} tone={ocStats.pendientes > 0 ? 'warn' : 'accent'}
-              trend={tendencia(serieEntradas)}
-              spark={serieEntradas}
               onClick={() => irA('compras')}
             />
           </div>

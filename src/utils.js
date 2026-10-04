@@ -5,7 +5,17 @@ export const uuid = () => crypto.randomUUID()
 // floating-point). Siempre aplícalo al RESULTADO de cada multiplicación antes
 // de acumular sumas.
 // Ejemplo: r2(2.667) → 2.67   r2(1.344) → 1.34   2.67+1.34 = 4.01 ✓
-export const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
+export const r2 = (n) => {
+  const v = parseFloat(n) || 0
+  // toPrecision(15) quita el error binario (1.005*100 = 100.49999999999999 -> 100.5)
+  // y el redondeo es simétrico para negativos (-2.675 -> -2.68)
+  return Math.sign(v) * Math.round(Number((Math.abs(v) * 100).toPrecision(15))) / 100
+}
+
+// Número desde input/BD: '' / null / texto -> 0
+const n0 = (v) => parseFloat(v) || 0
+// Importe de una actividad: cantidad × (MO + materiales + equipos), redondeado
+const importeActividad = (a) => r2(n0(a.cantidad) * (n0(a.costo_mo) + n0(a.costo_materiales) + n0(a.costo_equipos)))
 
 // Mapa de países a moneda
 export const PAIS_MONEDA = {
@@ -50,11 +60,26 @@ export const PAIS_LABEL_EN = {
   'Perú':                 'Peru',
   'República Dominicana': 'Dominican Republic',
   'Trinidad y Tobago':    'Trinidad and Tobago',
+  'España':               'Spain',
+  'Otro':                 'Other',
 }
 
+// Las claves son mayormente en español; la de EE. UU. quedó en inglés.
+const PAIS_LABEL_ES = { 'United States': 'Estados Unidos' }
+
+// Nombres de país antiguos o en el otro idioma -> clave canónica
+const PAIS_ALIAS = {
+  'Estados Unidos': 'United States', 'Mexico': 'México', 'Panama': 'Panamá', 'Peru': 'Perú',
+  'Spain': 'España', 'Other': 'Otro', 'Belize': 'Belice', 'Brazil': 'Brasil', 'Canada': 'Canadá',
+  'Haiti': 'Haití', 'Dominican Republic': 'República Dominicana', 'Trinidad and Tobago': 'Trinidad y Tobago',
+}
+export const normalizarPais = (pais) => PAIS_ALIAS[pais] || pais
+
 // Etiqueta legible de un país según el idioma ('ES' | 'EN')
-export const getPaisLabel = (pais, lang = 'ES') =>
-  lang === 'ES' ? pais : (PAIS_LABEL_EN[pais] || pais)
+export const getPaisLabel = (pais, lang = 'ES') => {
+  const k = normalizarPais(pais)
+  return lang === 'ES' ? (PAIS_LABEL_ES[k] || k) : (PAIS_LABEL_EN[k] || k)
+}
 
 // Símbolo de moneda
 export const MONEDA_SIMBOLO = {
@@ -110,9 +135,15 @@ export const fmtNum = (n) =>
 
 export const today = () => new Date().toISOString().split('T')[0]
 
+// Siguiente número = mayor existente + 1 (contar filas repetía códigos tras borrar)
+const siguienteNumero = (codigos, regex) => {
+  const nums = codigos.map(c => { const m = String(c || '').match(regex); return m ? parseInt(m[1], 10) : 0 })
+  return (nums.length ? Math.max(0, ...nums) : 0) + 1
+}
+
 export const genProjectCode = (proyectos) => {
   const year = new Date().getFullYear()
-  const n = (proyectos || []).length + 1
+  const n = siguienteNumero((proyectos || []).map(p => p.project_code || p.code), new RegExp('^P-' + year + '-(\\d+)$'))
   return `P-${year}-${String(n).padStart(3,'0')}`
 }
 
@@ -128,20 +159,21 @@ export const genOCCode = (ocs) => {
 
 export const genBudgetCode = (items, tipo, parentId) => {
   // items ya viene filtrado por proyecto desde el store (byProject)
+  const ultimoSegmento = /\.?(\d+)$/
   if (tipo === 'etapa') {
-    const n = items.filter(i => i.tipo === 'etapa').length + 1
+    const n = siguienteNumero(items.filter(i => i.tipo === 'etapa').map(i => i.code), /^(\d+)$/)
     return String(n).padStart(2,'0')
   }
   if (tipo === 'sub_etapa') {
     const parent = items.find(i => i.id === parentId)
     const pc = parent?.code || '01'
-    const n = items.filter(i => i.tipo === 'sub_etapa' && i.parent_id === parentId).length + 1
+    const n = siguienteNumero(items.filter(i => i.tipo === 'sub_etapa' && i.parent_id === parentId).map(i => i.code), ultimoSegmento)
     return `${pc}.${String(n).padStart(2,'0')}`
   }
   if (tipo === 'actividad') {
     const parent = items.find(i => i.id === parentId)
     const pc = parent?.code || '01'
-    const n = items.filter(i => i.tipo === 'actividad' && i.parent_id === parentId).length + 1
+    const n = siguienteNumero(items.filter(i => i.tipo === 'actividad' && i.parent_id === parentId).map(i => i.code), ultimoSegmento)
     return `${pc}.${String(n).padStart(3,'0')}`
   }
 }
@@ -172,8 +204,8 @@ export const flatBudgetItems = (items) => {
 
 export const calcSubtotal = (items, id, tipo) => {
   if (tipo === 'sub_etapa') {
-    return items.filter(i => i.tipo === 'actividad' && i.parent_id === id)
-      .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
+    return r2(items.filter(i => i.tipo === 'actividad' && i.parent_id === id)
+      .reduce((s, a) => s + importeActividad(a), 0))
   }
   if (tipo === 'etapa') {
     // Suma sub-etapas
@@ -181,17 +213,20 @@ export const calcSubtotal = (items, id, tipo) => {
       .reduce((s, ss) => s + calcSubtotal(items, ss.id, 'sub_etapa'), 0)
     // Suma actividades directas bajo etapa (sin sub-etapa intermedia)
     const directTotal = items.filter(i => i.tipo === 'actividad' && i.parent_id === id)
-      .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
-    return subTotal + directTotal
+      .reduce((s, a) => s + importeActividad(a), 0)
+    return r2(subTotal + directTotal)
   }
   return 0
 }
 
+// Solo cuenta actividades visibles en la tabla del presupuesto: colgadas de una
+// etapa, o de una sub-etapa cuya etapa existe (igual que flatBudgetItems).
 export const calcGrandTotal = (items) => {
-  const validIds = new Set(items.map(i => i.id))
-  return items
-    .filter(i => i.tipo === 'actividad' && validIds.has(i.parent_id))
-    .reduce((s, a) => s + r2((a.cantidad||0) * ((a.costo_mo||0)+(a.costo_materiales||0)+(a.costo_equipos||0))), 0)
+  const etapas    = new Set(items.filter(i => i.tipo === 'etapa').map(i => i.id))
+  const subEtapas = new Set(items.filter(i => i.tipo === 'sub_etapa' && etapas.has(i.parent_id)).map(i => i.id))
+  return r2(items
+    .filter(i => i.tipo === 'actividad' && (etapas.has(i.parent_id) || subEtapas.has(i.parent_id)))
+    .reduce((s, a) => s + importeActividad(a), 0))
 }
 
 // Costo indirecto presupuestado de un proyecto.
@@ -227,8 +262,10 @@ export const calcIndirectos = (proy, directo, inds = []) => {
 
 // Monto de una categoría expresado como % de la bolsa, y viceversa.
 export const montoDesdePct = (pct, bolsa) => r2((parseFloat(pct) || 0) * (bolsa || 0) / 100)
+// Sin redondear a 2 decimales: así monto -> % -> monto conserva el monto exacto.
+// Para mostrar el % en pantalla, redondear con r2().
 export const pctDesdeMonto = (monto, bolsa) =>
-  (bolsa || 0) > 0 ? r2((parseFloat(monto) || 0) * 100 / bolsa) : 0
+  (bolsa || 0) > 0 ? Math.round((parseFloat(monto) || 0) * 100 / bolsa * 1e10) / 1e10 : 0
 
 export const ESTADO_COLORS = {
   planificacion:          'bg-blue-100 text-blue-700',
@@ -411,4 +448,22 @@ export const costosSalidasFIFO = (entradas = [], salidas = [], materiales = []) 
       costos[s.id] = salidaSinCosto(s) ? 0 : r2(costo)
     })
   return costos
+}
+
+// ── Fechas ───────────────────────────────────────────────────────────────────
+// Una fecha sin hora ('2026-10-04') con new Date() se interpreta como medianoche
+// UTC y en América se muestra como el día anterior. fechaLocal la interpreta
+// como fecha local; los timestamps completos se dejan igual.
+export const fechaLocal = (v) => {
+  if (!v) return null
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, m, d] = v.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(v)
+}
+export const localeDe = (lang) => (lang === 'ES' ? 'es' : 'en-US')
+export const fmtFecha = (v, lang = 'ES', opts) => {
+  const d = fechaLocal(v)
+  return d && !isNaN(d) ? d.toLocaleDateString(localeDe(lang), opts) : '—'
 }

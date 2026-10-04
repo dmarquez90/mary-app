@@ -1833,19 +1833,25 @@ export function LangProvider({ children }) {
     if (!localStorage.getItem(LS_KEY)) {
       localStorage.setItem(LS_KEY, lang)
     }
-    // Luego sincronizar con Supabase — DB gana solo cuando tiene valor explícito
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Luego sincronizar con Supabase — DB gana solo cuando tiene valor explícito.
+    // Se hace al cargar y también en cada inicio de sesión (antes solo al cargar la
+    // página, así que tras un login se quedaba el idioma del usuario anterior).
+    const cargarDeBD = (user) => {
       if (!user) return
       supabase.from('usuarios').select('lang').eq('id', user.id).single()
         .then(({ data }) => {
           if (data?.lang) {
-            // DB wins over localStorage/system detection only when DB has an explicit value
             setLang(data.lang)
             localStorage.setItem(LS_KEY, data.lang)
           }
-          // If no row or no lang field (e.g. super_admin), keep detected value — already set above
+          // Sin fila o sin lang (p. ej. super_admin): se mantiene el detectado
         })
+    }
+    supabase.auth.getUser().then(({ data: { user } }) => cargarDeBD(user))
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') cargarDeBD(session?.user)
     })
+    return () => sub?.subscription?.unsubscribe()
   }, [])
 
   const toggleLang = () => {

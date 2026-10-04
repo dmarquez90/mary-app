@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: perfil } = await supabaseClient
       .from('usuarios')
-      .select('rol, tenant_id')
+      .select('rol, tenant_id, lang')
       .eq('id', user.id)
       .single()
 
@@ -52,7 +52,9 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { email, password, nombre, rol, tenant_id } = await req.json()
+    const { email, password, nombre, rol, tenant_id, lang } = await req.json()
+    // Idioma del nuevo usuario: el indicado, o el de quien lo crea (antes quedaba siempre 'ES')
+    const userLang = lang === 'EN' || lang === 'ES' ? lang : (perfil.lang === 'EN' ? 'EN' : 'ES')
 
     // Validar que client_admin solo crea usuarios de su propio tenant
     if (perfil.rol === 'client_admin' && tenant_id !== perfil.tenant_id) {
@@ -84,6 +86,7 @@ Deno.serve(async (req: Request) => {
         email,
         rol,
         activo: true,
+        lang: userLang,
       })
 
     if (insertError) {

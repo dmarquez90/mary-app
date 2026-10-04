@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useAuth } from '../auth'
+import { fmtFecha, getPaisLabel } from '../utils'
+import { PLAN_LIMITES } from '../plans'
 
 
 const BRAND       = 'var(--brand)'
@@ -10,11 +12,8 @@ const BRAND_DARK  = '#122848'
 const ROLES  = ['client_admin','coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
 const PLANES = ['starter','pro','enterprise']
 
-const PLAN_LIMITS = {
-  starter:    { max_usuarios: 5,   max_proyectos: 2   },
-  pro:        { max_usuarios: 15,  max_proyectos: 10  },
-  enterprise: { max_usuarios: 999, max_proyectos: 999 },
-}
+// Misma fuente que el resto de la app y register-trial (antes: 5/15/999 usuarios aquí)
+const PLAN_LIMITS = PLAN_LIMITES
 
 const PLAN_COLORS = {
   starter:    'bg-gray-100 text-gray-600',
@@ -606,7 +605,7 @@ export default function Admin() {
                         <td className="px-4 py-3">
                           <p className="text-sm font-medium text-gray-800">{t.nombre_empresa}</p>
                           {(t.telefono || t.pais) && (
-                            <p className="text-xs text-gray-400 mt-0.5">{[t.pais, t.telefono].filter(Boolean).join(' · ')}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{[t.pais && getPaisLabel(t.pais, isEs ? 'ES' : 'EN'), t.telefono].filter(Boolean).join(' · ')}</p>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -702,7 +701,7 @@ export default function Admin() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400">
-                        {u.fecha_acceso ? new Date(u.fecha_acceso).toLocaleDateString(isEs ? 'es' : 'en') : '—'}
+                        {fmtFecha(u.fecha_acceso, isEs ? 'ES' : 'EN')}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">

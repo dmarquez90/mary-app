@@ -766,11 +766,19 @@ export default function Inventario() {
                     const matExistente = materiales.find(m => m.id === it.material_id)
                     const nombre = matExistente?.descripcion || it.descripcion || `Material #${idx+1}`
                     const seleccionado = form.material_id === it.material_id && form._oc_item_id === it.id
+                    // Ya recibido de esta línea (entradas de la misma OC y material)
+                    const recibido  = entradas.filter(e => e.oc_id === form.oc_id && e.material_id === it.material_id)
+                      .reduce((s, e) => s + (parseFloat(e.cantidad) || 0), 0)
+                    const pendiente = Math.max(0, (parseFloat(it.cantidad) || 0) - recibido)
                     return (
                       <button key={it.id} onClick={() => setForm(f => ({
                         ...f,
                         material_id: it.material_id || '',
                         proyecto_id: oc?.proyecto_id || '',
+                        // Prellenar con lo pendiente de la OC (antes había que escribirlo todo)
+                        cantidad:        pendiente > 0 ? String(pendiente) : f.cantidad,
+                        precio_unitario: it.precio_unitario ? String(it.precio_unitario) : f.precio_unitario,
+                        proveedor:       f.proveedor || oc?.proveedor || '',
                         _oc_item_id: it.id,
                         _oc_item_desc: nombre,
                         _oc_item_unidad: it.unidad || 'und',
@@ -782,7 +790,9 @@ export default function Inventario() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{nombre}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">{it.cantidad} {it.unidad}</span>
+                            <span className="text-xs text-gray-400">{recibido > 0 ? `${recibido} / ` : ''}{it.cantidad} {it.unidad}</span>
+                            {recibido >= (parseFloat(it.cantidad) || 0) && recibido > 0 &&
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{isEs ? 'Recibido' : 'Received'}</span>}
                             {!matExistente && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{isEs ? 'Crear en catalogo' : 'Create in catalog'}</span>}
                             {matExistente  && <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">{isEs ? 'En catalogo' : 'In catalog'}</span>}
                           </div>

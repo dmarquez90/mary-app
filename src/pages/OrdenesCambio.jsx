@@ -294,10 +294,13 @@ export default function OrdenesCambio() {
   const totalPresentadas = ocs.filter(o=>o.estado==='presentada').length
   const totalBorradores  = ocs.filter(o=>o.estado==='borrador').length
 
+  // Prefijo distinto al de las Órdenes de Compra ("OC-"): CO (Change Order) / ODC
+  // (Orden De Cambio). Número = mayor existente del año + 1, para no repetir tras borrar.
   const genNumero = () => {
     const year = new Date().getFullYear()
-    const n = ocs.length + 1
-    return `OC-${year}-${String(n).padStart(3,'0')}`
+    const nums = ocs.map(o => { const m = String(o.numero || '').match(new RegExp('-' + year + '-(\\d+)$')); return m ? parseInt(m[1], 10) : 0 })
+    const n = (nums.length ? Math.max(0, ...nums) : 0) + 1
+    return `${isEs ? 'ODC' : 'CO'}-${year}-${String(n).padStart(3,'0')}`
   }
 
   const setItem = (idx, k, v) => setItems(prev => prev.map((it,i) => i===idx ? {...it,[k]:v} : it))

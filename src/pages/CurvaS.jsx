@@ -1,18 +1,18 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, costosSalidasFIFO } from '../utils'
+import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, costosSalidasFIFO, localeDe } from '../utils'
 import { EmptyState, StatCard, Icons, PageHeader } from '../components'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
-function generarPeriodosMensuales(fechaInicio, fechaFin) {
+function generarPeriodosMensuales(fechaInicio, fechaFin, lang = 'ES') {
   const periodos = []
   const fin = new Date(fechaFin + 'T00:00:00')
   const cur = new Date(fechaInicio + 'T00:00:00')
   cur.setDate(1)
   while (cur <= fin) {
     const key   = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`
-    const label = cur.toLocaleDateString('es', { month:'short', year:'2-digit' })
+    const label = cur.toLocaleDateString(localeDe(lang), { month:'short', year:'2-digit' })
     periodos.push({ key, label })
     cur.setMonth(cur.getMonth() + 1)
   }
@@ -34,7 +34,7 @@ function generarPeriodosSemanales(fechaInicio, fechaFin) {
 
 export default function CurvaS() {
   const { state } = useStore()
-  const { t } = useContext(LangContext)
+  const { t, lang } = useContext(LangContext)
   const { proyectos, presupuesto, salidas, entradas, materiales = [], costos_directos, nominas, subcontratos, equipos, costos_indirectos,
     avaluos_cliente = [], avaluos_cliente_items = [], presupuesto_indirectos = [],
     subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [], subcontratos_avaluo_items = [],
@@ -108,7 +108,7 @@ export default function CurvaS() {
     const fechaFin    = proy.fecha_fin_estimada || new Date().toISOString().slice(0,10)
 
     const periodos = granularity === 'mes'
-      ? generarPeriodosMensuales(fechaInicio, fechaFin)
+      ? generarPeriodosMensuales(fechaInicio, fechaFin, lang)
       : generarPeriodosSemanales(fechaInicio, fechaFin)
 
     if (periodos.length === 0) return []

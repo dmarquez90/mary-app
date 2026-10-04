@@ -5,7 +5,7 @@ import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 } from '../utils'
+import { today, fmt, fmtNum, calcGrandTotal, calcIndirectos, r2, flatBudgetItems } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
 const BRAND = 'var(--brand)'
@@ -228,8 +228,9 @@ export default function AvaluosCliente() {
     presupuesto.filter(b => b.proyecto_id === proyId),
     [presupuesto, proyId]
   )
+  // En el orden del presupuesto (etapa → sub-etapa → actividad)
   const actividades  = useMemo(() =>
-    todosItems.filter(b => b.tipo === 'actividad'),
+    flatBudgetItems(todosItems).filter(b => b.tipo === 'actividad'),
     [todosItems]
   )
   const ocAprobadas  = useMemo(() =>
@@ -282,7 +283,8 @@ export default function AvaluosCliente() {
     })
     const itemsBase = actividades.map(act => {
       const ant = acumuladoPrevio(act.id); const total = cantidadTotal(act); const pu = precioUnitario(act)
-      return { actividad_id: act.id, descripcion: act.descripcion, unidad: act.unidad || 'und',
+      // Con código: hay actividades con el mismo nombre en distintas etapas
+      return { actividad_id: act.id, descripcion: act.code ? `${act.code} — ${act.descripcion}` : act.descripcion, unidad: act.unidad || 'und',
         cantidad_total: total, precio_unitario: pu, monto_contrato: r2(total * pu),
         cantidad_anterior: ant, cantidad_periodo: '', es_oc: false, oc_item_id: null }
     })

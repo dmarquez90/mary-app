@@ -171,19 +171,20 @@ describe('code generators', () => {
       { id: 'a', tipo: 'etapa', code: '01' },
       { id: 'c', tipo: 'etapa', code: '03' },  // '02' was deleted
     ]
-    expect(genBudgetCode(items, 'etapa')).not.toBe('03')
+    expect(genBudgetCode(items, 'etapa')).toBe('04')
   })
   it('no duplicate activity code after deleting one', () => {
     const items = [
       { id: 'S', tipo: 'sub_etapa', code: '01.01' },
       { id: 'x', tipo: 'actividad', parent_id: 'S', code: '01.01.002' },  // 001 was deleted
     ]
-    expect(genBudgetCode(items, 'actividad', 'S')).not.toBe('01.01.002')
+    expect(genBudgetCode(items, 'actividad', 'S')).toBe('01.01.003')
   })
   it('no duplicate project code after deleting a project', () => {
     const y = new Date().getFullYear()
-    const proyectos = [{ code: `P-${y}-002` }]   // P-…-001 was deleted
-    expect(genProjectCode(proyectos)).not.toBe(`P-${y}-002`)
+    const proyectos = [{ project_code: `P-${y}-002` }]   // P-…-001 was deleted
+    expect(genProjectCode(proyectos)).toBe(`P-${y}-003`)
+    expect(genProjectCode([])).toBe(`P-${y}-001`)
   })
   it('PO codes use max + 1, so deletions do not cause duplicates', () => {
     const y = new Date().getFullYear()

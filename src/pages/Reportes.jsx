@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO, fmtFecha } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -41,7 +41,7 @@ const inPeriodo = (f, d, h) => {
   if (h && f > h) return false
   return true
 }
-const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('es') : '—'
+const fmtDate = (d, lang = 'ES') => fmtFecha(d, lang)
 const pct = (v, t) => t > 0 ? `${((v / t) * 100).toFixed(1)}%` : '—'
 
 // ── EXCEL HELPERS ─────────────────────────────────────────
@@ -1984,7 +1984,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
     [isEs?'Código':'Code', proy?.project_code||''], [isEs?'Nombre':'Name', proy?.nombre||''],
     [isEs?'Cliente':'Client', proy?.cliente_externo||'—'], [isEs?'Estado':'Status', fmtEstado(proy?.estado, lang)],
     [isEs?'Fecha inicio':'Start date', proy?.fecha_inicio||'—'], [isEs?'Fecha fin estimada':'Est. end date', proy?.fecha_fin_estimada||'—'],
-    [isEs?'Ciudad / País':'City / Country', `${proy?.ciudad||''} ${proy?.pais||''}`.trim()||'—'], [isEs?'Moneda':'Currency', moneda],
+    [isEs?'Ciudad / País':'City / Country', `${proy?.ciudad||''} ${proy?.pais ? getPaisLabel(proy.pais, lang) : ''}`.trim()||'—'], [isEs?'Moneda':'Currency', moneda],
   ]
   infoRows.forEach((r, i) => {
     ws.getRow(row).height = 17
@@ -2685,11 +2685,11 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
       </table></div>}
       {subTab===1&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{(isEs ? ['Fecha','Código','Material','Cantidad','Precio unit.','Total','Factura','Proveedor','Proyecto'] : ['Date','Code','Material','Quantity','Unit price','Total','Invoice','Supplier','Project']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
-        <tbody>{data.entradas.map((e,i)=>{const m=materiales.find(x=>x.id===e.material_id);const p=proyectos.find(x=>x.id===e.proyecto_id);const total=round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0));return(<tr key={e.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(e.fecha_recepcion)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-green-600'}>+{fmtNum(e.cantidad)}</td><td className={tdC+' font-mono'}>${fmtNum(e.precio_unitario)}</td><td className={tdC+' font-mono font-medium'}>${fmtNum(total)}</td><td className={tdC}>{e.numero_factura||'—'}</td><td className={tdC}>{e.proveedor||'—'}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td></tr>)})}</tbody>
+        <tbody>{data.entradas.map((e,i)=>{const m=materiales.find(x=>x.id===e.material_id);const p=proyectos.find(x=>x.id===e.proyecto_id);const total=round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0));return(<tr key={e.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(e.fecha_recepcion, lang)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-green-600'}>+{fmtNum(e.cantidad)}</td><td className={tdC+' font-mono'}>${fmtNum(e.precio_unitario)}</td><td className={tdC+' font-mono font-medium'}>${fmtNum(total)}</td><td className={tdC}>{e.numero_factura||'—'}</td><td className={tdC}>{e.proveedor||'—'}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td></tr>)})}</tbody>
       </table></div>}
       {subTab===2&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{(isEs ? ['Fecha','Código','Material','Cantidad','Proyecto','Actividad'] : ['Date','Code','Material','Quantity','Project','Activity']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
-        <tbody>{data.salidas.map((s,i)=>{const m=materiales.find(x=>x.id===s.material_id);const p=proyectos.find(x=>x.id===s.proyecto_id);const act=presupuesto.find(x=>x.id===s.actividad_id);return(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(s.fecha_salida)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-red-500'}>-{fmtNum(s.cantidad)}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td><td className={tdC+' text-xs'}>{act?`${act.code} — ${act.descripcion}`:'—'}</td></tr>)})}</tbody>
+        <tbody>{data.salidas.map((s,i)=>{const m=materiales.find(x=>x.id===s.material_id);const p=proyectos.find(x=>x.id===s.proyecto_id);const act=presupuesto.find(x=>x.id===s.actividad_id);return(<tr key={s.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC}>{fmtDate(s.fecha_salida, lang)}</td><td className={tdC+' font-mono text-xs'}>{m?.codigo||'—'}</td><td className={tdC}>{m?.descripcion||'—'}</td><td className={tdC+' font-mono text-red-500'}>-{fmtNum(s.cantidad)}</td><td className={tdC+' text-xs'}>{p?.project_code||'—'}</td><td className={tdC+' text-xs'}>{act?`${act.code} — ${act.descripcion}`:'—'}</td></tr>)})}</tbody>
       </table></div>}
     </div>
   )

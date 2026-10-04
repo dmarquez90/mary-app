@@ -312,7 +312,7 @@ export default function Presupuesto() {
   // En la categoría, el % es sobre la bolsa (no sobre el costo directo).
   const onCatMontoChange = v => {
     setIndForm(f => ({ ...f, monto_presupuestado: v }))
-    setIndCatPct(v === '' ? '' : String(pctDesdeMonto(v, indCalc.total)))
+    setIndCatPct(v === '' ? '' : String(r2(pctDesdeMonto(v, indCalc.total))))
   }
   const onCatPctChange = v => {
     setIndCatPct(v)
@@ -333,7 +333,7 @@ export default function Presupuesto() {
   }
   const editIndRow = (ind) => {
     setIndForm({ categoria: ind.categoria, subcategoria: ind.subcategoria || '', monto_presupuestado: ind.monto_presupuestado })
-    setIndCatPct(String(pctDesdeMonto(ind.monto_presupuestado, indCalc.total)))
+    setIndCatPct(String(r2(pctDesdeMonto(ind.monto_presupuestado, indCalc.total))))
     setIndEdit(ind.id)
   }
 

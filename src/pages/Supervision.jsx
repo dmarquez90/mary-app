@@ -5,7 +5,7 @@ import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
 import { EmptyState, Icons, Field, PrimaryBtn, Confirm, inputCls, PageHeader } from '../components'
-import { uuid } from '../utils'
+import { uuid, fmtFecha as fmtFechaU } from '../utils'
 
 const BRAND = 'var(--brand)'
 
@@ -58,7 +58,7 @@ export default function Supervision() {
     return p ? `${p.project_code} — ${p.nombre}` : (isEs ? '[Proyecto eliminado]' : '[Deleted project]')
   }
 
-  const fmtFecha = (iso) => new Date(iso).toLocaleDateString(isEs ? 'es' : 'en-US', { dateStyle: 'medium' })
+  const fmtFecha = (iso) => fmtFechaU(iso, lang, { dateStyle: 'medium' })
 
   const crearEntrada = async () => {
     if (!fProyecto || !nuevoTexto.trim()) return

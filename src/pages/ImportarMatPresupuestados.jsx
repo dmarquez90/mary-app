@@ -45,7 +45,8 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
         let headerRow = -1
         for (let r = 1; r <= 10; r++) {
           const val = String(getCellValue('A', r) ?? '').toLowerCase()
-          if (val.includes('material code') || val.includes('código') || val.includes('codigo')) {
+          // Debe EMPEZAR con el encabezado: la fila de instrucciones también menciona "Material Code"
+          if (/^(material code|c[oó]digo)/.test(val.trim())) {
             headerRow = r; break
           }
         }
@@ -77,6 +78,17 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           const val = getCellValue(cl, firstRealRow)
           if (typeof val === 'number' && val > 0) { cantColLetter = cl; break }
         }
+
+        // Columnas opcionales (por encabezado): costo unitario y código de actividad
+        let costoColLetter = null, actColLetter = null
+        for (const cl of colLetters) {
+          const h = String(getCellValue(cl, headerRow) ?? '').toLowerCase()
+          if (!costoColLetter && (h.includes('unit cost') || h.includes('costo unit'))) costoColLetter = cl
+          if (!actColLetter && (h.includes('activity') || h.includes('actividad'))) actColLetter = cl
+        }
+        const itemsProy = state.presupuesto.filter(b => b.proyecto_id === proyId)
+        const actPorCodigo = {}
+        itemsProy.filter(b => b.tipo === 'actividad').forEach(a => { if (a.code) actPorCodigo[String(a.code).trim()] = a })
 
         const parsed = []
         const errs   = []
@@ -110,15 +122,31 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
           const nombreFinal  = nom || matVinculado?.descripcion || cod
           const unidadFinal  = unit || matVinculado?.unidad || 'und'
 
+          // Costo unitario: el de la plantilla; si no viene, el precio del catálogo
+          const rawCosto = costoColLetter ? getCellValue(costoColLetter, r) : null
+          const costoPlantilla = typeof rawCosto === 'number' ? rawCosto : parseFloat(String(rawCosto ?? '').replace(',', '.'))
+          const costoFinal = costoPlantilla > 0 ? costoPlantilla : (parseFloat(matVinculado?.precio_unitario) || null)
+
+          // Actividad por código (p. ej. 02.02.002) -> también su sub-etapa y etapa
+          const codAct = actColLetter ? String(getCellValue(actColLetter, r) ?? '').trim() : ''
+          const act    = codAct ? actPorCodigo[codAct] : null
+          if (codAct && !act) {
+            errs.push(`${isEs ? 'Fila' : 'Row'} ${r}: ${isEs ? `actividad "${codAct}" no existe en el presupuesto (se importa sin actividad)` : `activity "${codAct}" not found in the budget (imported without activity)`}`)
+          }
+          const padre  = act ? itemsProy.find(b => b.id === act.parent_id) : null
+          const subEt  = padre?.tipo === 'sub_etapa' ? padre : null
+          const etapa  = subEt ? itemsProy.find(b => b.id === subEt.parent_id) : (padre?.tipo === 'etapa' ? padre : null)
+
           parsed.push({
             proyecto_id:            proyId,
             nombre_libre:           nombreFinal,
             unidad_libre:           unidadFinal,
             cantidad_presupuestada: cant,
             material_id:            matVinculado?.id || null,
-            actividad_id:           null,
-            etapa_id:               null,
-            sub_etapa_id:           null,
+            costo_unitario:         costoFinal,
+            actividad_id:           act?.id   || null,
+            etapa_id:               etapa?.id || null,
+            sub_etapa_id:           subEt?.id || null,
             es_adicional:           false,
             _codigo:                cod,
             _vinculado:             !!matVinculado,

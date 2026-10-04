@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { MODULOS_PERMISOS } from '../usePermissions'
 import { PageHeader } from '../components'
+import { fmtFecha } from '../utils'
 
 const BRAND = 'var(--brand)'
 const ROLES  = ['coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
@@ -596,7 +597,7 @@ export default function Configuracion({ onNavigate }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400">
-                        {u.fecha_acceso ? new Date(u.fecha_acceso).toLocaleDateString('es') : '—'}
+                        {fmtFecha(u.fecha_acceso, lang)}
                       </td>
                       <td className="px-4 py-3">
                         {u.id !== perfil?.id ? (
@@ -876,8 +877,8 @@ export default function Configuracion({ onNavigate }) {
               <p className="text-xs text-gray-400 mt-1">
                 {tenant?.es_trial
                   ? (isEs
-                      ? `Trial activo · vence ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('es') : '—'}`
-                      : `Trial active · expires ${tenant?.trial_fin ? new Date(tenant.trial_fin).toLocaleDateString('en') : '—'}`)
+                      ? `Trial activo · vence ${tenant?.trial_fin ? fmtFecha(tenant.trial_fin, 'ES') : '—'}`
+                      : `Trial active · expires ${tenant?.trial_fin ? fmtFecha(tenant.trial_fin, 'EN') : '—'}`)
                   : (isEs
                       ? `${tenant?.billing_cycle === 'anual' ? 'Facturación anual' : 'Facturación mensual'}`
                       : `${tenant?.billing_cycle === 'anual' ? 'Annual billing' : 'Monthly billing'}`)}

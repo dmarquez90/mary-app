@@ -1,19 +1,15 @@
 import { useState } from 'react'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
+import { getPaisLabel } from '../utils'
 
-const PAISES = {
-  ES: [
-    'Estados Unidos','México','Guatemala','El Salvador','Honduras','Nicaragua',
-    'Costa Rica','Panamá','Colombia','Venezuela','Ecuador','Perú','Bolivia',
-    'Chile','Argentina','Uruguay','Paraguay','España','Otro'
-  ],
-  EN: [
-    'United States','Mexico','Guatemala','El Salvador','Honduras','Nicaragua',
-    'Costa Rica','Panama','Colombia','Venezuela','Ecuador','Peru','Bolivia',
-    'Chile','Argentina','Uruguay','Paraguay','Spain','Other'
-  ]
-}
+// Se guarda la clave canónica (la de PAIS_MONEDA) y se muestra la etiqueta del idioma.
+// Antes se guardaba el texto del idioma ('Estados Unidos', 'Mexico'...) y no coincidía.
+const PAISES = [
+  'United States','México','Guatemala','El Salvador','Honduras','Nicaragua',
+  'Costa Rica','Panamá','Colombia','Venezuela','Ecuador','Perú','Bolivia',
+  'Chile','Argentina','Uruguay','Paraguay','España','Otro'
+]
 
 const T = {
   ES: {
@@ -1247,8 +1243,8 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
                       <label style={labelStyle}>{t.reg_country} *</label>
                       <select style={selectStyle} value={reg.pais} onChange={setR('pais')}>
                         <option value="" style={{ backgroundColor: NAVY_900, color: WHITE }}>{t.reg_select}</option>
-                        {PAISES[lang].map(p => (
-                          <option key={p} value={p} style={{ backgroundColor: NAVY_900, color: WHITE }}>{p}</option>
+                        {PAISES.map(p => (
+                          <option key={p} value={p} style={{ backgroundColor: NAVY_900, color: WHITE }}>{getPaisLabel(p, lang)}</option>
                         ))}
                       </select>
                     </div>

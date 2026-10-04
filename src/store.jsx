@@ -614,7 +614,10 @@ useEffect(() => {
       'MARK_NOTIF_READ','MARK_ALL_NOTIF_READ','ADD_NOTIF',
       'DEL_ENTRADA_LOCAL','DEL_SALIDA_LOCAL',
     ])
-    if (!AUDIT_SKIP.has(action.type)) {
+    // Se registra DESPUÉS de que la acción terminó bien (antes se registraba antes de
+    // ejecutarla, así que las acciones fallidas quedaban en la auditoría como hechas).
+    const registrarAuditoria = async () => {
+      if (AUDIT_SKIP.has(action.type)) return
       try {
         const { data: { user: auditUser } } = await supabase.auth.getUser()
         const usuarioActual = (state.usuarios||[]).find(u => u.id === auditUser?.id)
@@ -2239,6 +2242,7 @@ useEffect(() => {
 
       default: dispatch(action)
     }
+    await registrarAuditoria()
     } catch (err) {
       console.error(`[dbDispatch:${action.type}]`, err)
       avisar(`No se pudo completar la acción / Action could not be completed: ${err?.message || action.type}`)
