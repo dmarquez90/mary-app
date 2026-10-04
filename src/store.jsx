@@ -1052,7 +1052,11 @@ useEffect(() => {
       }
 
       case 'ADD_FASE': {
-        const item = { ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId }
+        const item = {
+          ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId,
+          fecha_inicio: action.payload.fecha_inicio || null,
+          fecha_fin:    action.payload.fecha_fin    || null,
+        }
         await sbThrow(supabase.from('fases').insert(item))
         dispatch({ type: 'ADD_FASE', payload: item })
         break
@@ -1523,7 +1527,13 @@ useEffect(() => {
         })
         await sbThrow(supabase.from('ordenes_compra').insert(oc))
         if (ocItems.length) {
-          await sbThrow(supabase.from('ordenes_compra_items').insert(ocItems))
+          // Si los artículos fallan, no dejar la OC huérfana (encabezado sin ítems)
+          try {
+            await sbThrow(supabase.from('ordenes_compra_items').insert(ocItems))
+          } catch (e) {
+            await supabase.from('ordenes_compra').delete().eq('id', oc.id)
+            throw e
+          }
         }
         if (oc.solicitud_id) {
           await sbThrow(supabase.from('solicitudes').update({ estado: 'oc_generada' }).eq('id', oc.solicitud_id))
