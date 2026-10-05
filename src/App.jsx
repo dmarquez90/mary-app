@@ -59,6 +59,14 @@ const NAV = [
   { id: 'chat',           labelEs: 'Chat',                labelEn: 'Chat',               icon: 'chat'      },
 ]
 
+// Nombre del rol en el encabezado [ES, EN] (antes mostraba la clave interna: "residente")
+const ROL_LABEL = {
+  super_admin: ['Super Admin', 'Super Admin'], client_admin: ['Administrador', 'Administrator'],
+  coordinador: ['Coordinador', 'Project Coordinator'], gerente: ['Gerente de Proyecto', 'Project Manager'],
+  residente: ['Residente de Obra', 'Site Superintendent'], bodeguero: ['Bodeguero', 'Warehouse Manager'],
+  contador: ['Contador', 'Accountant'], supervisor: ['Supervisor', 'Supervisor'], lectura: ['Solo Lectura', 'Read Only'],
+}
+
 // Agrupación del menú lateral por área de trabajo
 const NAV_GROUPS = [
   { id: 'general',  labelEs: 'General',      labelEn: 'General',      items: ['dashboard', 'proyectos'] },
@@ -568,7 +576,7 @@ function Layout() {
                     {perfil?.nombre || (isEs ? 'Usuario' : 'User')}
                   </span>
                   <span className="block text-[11px] mt-0.5 capitalize" style={{ color: 'var(--txt-3)' }}>
-                    {perfil?.rol?.replace('_', ' ') || ''}
+                    {perfil?.rol ? (ROL_LABEL[perfil.rol]?.[isEs ? 0 : 1] || perfil.rol) : ''}
                   </span>
                 </span>
                 <span className="w-3.5 h-3.5 transition-transform duration-200 hidden md:block"

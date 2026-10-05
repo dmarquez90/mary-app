@@ -24,6 +24,7 @@ import { useState, useEffect, useCallback, useContext } from 'react'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
+import { usePermissions } from '../usePermissions'
 
 // ─── Botón de idioma inline ────────────────────────────────────────────────
 function LangBtn({ lang, toggleLang }) {
@@ -68,13 +69,13 @@ const CONTENT = {
     counter:  (c, t) => `Paso ${c} de ${t}`,
     finalMsg: 'Ya conoces los módulos principales de MARY. ¡Comienza a gestionar tus proyectos!',
     modules: [
-      { icon: '🏗️', titulo: 'Dashboard',           color: 'var(--brand)', desc: 'Tu centro de mando. Resumen de proyectos activos, avance presupuestal vs. costo real, alertas de stock crítico y órdenes de compra pendientes en tiempo real.' },
-      { icon: '📁', titulo: 'Proyectos',             color: '#1D9E75', desc: 'Cada proyecto funciona como una sub-empresa con su propio personal, inventario y finanzas. Crea proyectos, define la ruta crítica y gestiona todo el ciclo de vida.' },
-      { icon: '📊', titulo: 'Presupuesto',           color: '#2563EB', desc: 'Define el presupuesto base con etapas, sub-etapas y actividades. MARY genera la Curva S automáticamente comparando presupuesto vs. costo real.' },
-      { icon: '📦', titulo: 'Inventario',            color: '#7C3AED', desc: 'Control completo de bodega: catálogo de materiales, entradas por orden de compra, salidas asignadas a actividades. Alertas automáticas por stock bajo mínimo.' },
-      { icon: '🛒', titulo: 'Solicitudes y OC',      color: '#D97706', desc: 'Residente solicita materiales → se genera la OC → Admin la aprueba → Bodega la recibe. Flujo completo documentado y trazable.' },
-      { icon: '💰', titulo: 'Control Financiero',    color: '#DC2626', desc: 'Registra nóminas, subcontratos, equipos, caja chica y costos indirectos. Cada gasto vinculado a su proyecto y actividad.' },
-      { icon: '👥', titulo: 'Usuarios y Roles',      color: '#059669', desc: 'Gestiona el equipo: Admin, Gerente, Residente, Bodeguero y Contador. Cada rol con permisos específicos. Los usuarios creados por el Admin también verán este tour.' },
+      { id: 'dashboard', icon: '🏗️', titulo: 'Dashboard',           color: 'var(--brand)', desc: 'Tu centro de mando. Resumen de proyectos activos, avance presupuestal vs. costo real, alertas de stock crítico y órdenes de compra pendientes en tiempo real.' },
+      { id: 'proyectos', icon: '📁', titulo: 'Proyectos',             color: '#1D9E75', desc: 'Cada proyecto funciona como una sub-empresa con su propio personal, inventario y finanzas. Crea proyectos, define la ruta crítica y gestiona todo el ciclo de vida.' },
+      { id: 'presupuesto', icon: '📊', titulo: 'Presupuesto',           color: '#2563EB', desc: 'Define el presupuesto base con etapas, sub-etapas y actividades. MARY genera la Curva S automáticamente comparando presupuesto vs. costo real.' },
+      { id: 'inventario', icon: '📦', titulo: 'Inventario',            color: '#7C3AED', desc: 'Control completo de bodega: catálogo de materiales, entradas por orden de compra, salidas asignadas a actividades. Alertas automáticas por stock bajo mínimo.' },
+      { id: 'compras', icon: '🛒', titulo: 'Solicitudes y OC',      color: '#D97706', desc: 'Residente solicita materiales → se genera la OC → Admin la aprueba → Bodega la recibe. Flujo completo documentado y trazable.' },
+      { id: 'financiero', icon: '💰', titulo: 'Control Financiero',    color: '#DC2626', desc: 'Registra nóminas, subcontratos, equipos, caja chica y costos indirectos. Cada gasto vinculado a su proyecto y actividad.' },
+      { id: 'usuarios', icon: '👥', titulo: 'Usuarios y Roles',      color: '#059669', desc: 'Gestiona el equipo: Admin, Gerente, Residente, Bodeguero y Contador. Cada rol con permisos específicos. Los usuarios creados por el Admin también verán este tour.' },
     ],
   },
   EN: {
@@ -89,13 +90,13 @@ const CONTENT = {
     counter:  (c, t) => `Step ${c} of ${t}`,
     finalMsg: "You've seen MARY's main modules. Start managing your projects!",
     modules: [
-      { icon: '🏗️', titulo: 'Dashboard',          color: 'var(--brand)', desc: 'Your command center. Summary of active projects, budget vs. actual cost, critical stock alerts, and pending purchase orders in real time.' },
-      { icon: '📁', titulo: 'Projects',            color: '#1D9E75', desc: 'Each project works as its own sub-company with its own staff, inventory, and finances. Create projects, define the critical path, and manage the full lifecycle.' },
-      { icon: '📊', titulo: 'Budget',              color: '#2563EB', desc: 'Define the base budget with stages, sub-stages, and activities. MARY automatically generates the S-Curve comparing budget vs. actual cost.' },
-      { icon: '📦', titulo: 'Inventory',           color: '#7C3AED', desc: 'Full warehouse control: material catalog, entries by purchase order, exits assigned to activities. Automatic alerts when stock falls below minimum.' },
-      { icon: '🛒', titulo: 'Requests & POs',      color: '#D97706', desc: 'Foreman requests materials → PO is generated → Admin approves → Warehouse receives. The entire flow documented and traceable.' },
-      { icon: '💰', titulo: 'Financial Control',   color: '#DC2626', desc: 'Record payroll, subcontracts, equipment, petty cash, and indirect costs. Every expense linked to its project and activity.' },
-      { icon: '👥', titulo: 'Users & Roles',       color: '#059669', desc: 'Manage the team: Admin, Manager, Foreman, Warehouse, Accountant. Each role has specific permissions. Users created by the Admin also see this tour.' },
+      { id: 'dashboard', icon: '🏗️', titulo: 'Dashboard',          color: 'var(--brand)', desc: 'Your command center. Summary of active projects, budget vs. actual cost, critical stock alerts, and pending purchase orders in real time.' },
+      { id: 'proyectos', icon: '📁', titulo: 'Projects',            color: '#1D9E75', desc: 'Each project works as its own sub-company with its own staff, inventory, and finances. Create projects, define the critical path, and manage the full lifecycle.' },
+      { id: 'presupuesto', icon: '📊', titulo: 'Budget',              color: '#2563EB', desc: 'Define the base budget with stages, sub-stages, and activities. MARY automatically generates the S-Curve comparing budget vs. actual cost.' },
+      { id: 'inventario', icon: '📦', titulo: 'Inventory',           color: '#7C3AED', desc: 'Full warehouse control: material catalog, entries by purchase order, exits assigned to activities. Automatic alerts when stock falls below minimum.' },
+      { id: 'compras', icon: '🛒', titulo: 'Requests & POs',      color: '#D97706', desc: 'Foreman requests materials → PO is generated → Admin approves → Warehouse receives. The entire flow documented and traceable.' },
+      { id: 'financiero', icon: '💰', titulo: 'Financial Control',   color: '#DC2626', desc: 'Record payroll, subcontracts, equipment, petty cash, and indirect costs. Every expense linked to its project and activity.' },
+      { id: 'usuarios', icon: '👥', titulo: 'Users & Roles',       color: '#059669', desc: 'Manage the team: Admin, Manager, Foreman, Warehouse, Accountant. Each role has specific permissions. Users created by the Admin also see this tour.' },
     ],
   },
 }
@@ -119,10 +120,15 @@ export default function WelcomeTour() {
   const [checking,  setChecking]  = useState(true)
 
   const c     = CONTENT[lang] || CONTENT.ES
-  const TOTAL = c.modules.length          // 7
+  // Solo los módulos que este rol puede ver (antes se mostraban todos a todos)
+  const { navVisible, rol } = usePermissions()
+  const modulos = c.modules.filter(m => m.id === 'usuarios'
+    ? ['client_admin', 'super_admin'].includes(rol)
+    : navVisible(m.id))
+  const TOTAL = modulos.length
   const esIntro  = step === 0
   const esFinal  = step === TOTAL + 1
-  const mod      = (!esIntro && !esFinal) ? c.modules[step - 1] : null
+  const mod      = (!esIntro && !esFinal) ? modulos[step - 1] : null
 
   // ── Verificar si debe mostrarse ──────────────────────────────────────────
   useEffect(() => {
@@ -269,7 +275,7 @@ export default function WelcomeTour() {
           {/* INTRO — grid de módulos */}
           {esIntro && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {c.modules.map((m, i) => (
+              {modulos.map((m, i) => (
                 <button key={i} onClick={() => setStep(i + 1)} style={{
                   ...btnBase,
                   display: 'flex', alignItems: 'center', gap: 9,
@@ -311,7 +317,7 @@ export default function WelcomeTour() {
               </p>
               {/* Dots */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 18 }}>
-                {c.modules.map((m, i) => (
+                {modulos.map((m, i) => (
                   <button key={i} onClick={() => setStep(i + 1)} style={{
                     ...btnBase,
                     width: (i + 1 === step) ? 22 : 7, height: 7,

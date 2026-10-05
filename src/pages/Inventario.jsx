@@ -548,13 +548,14 @@ export default function Inventario() {
                           ? <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{isEs ? 'Stock inicial' : 'Initial stock'}</span>
                           : e.numero_factura || '---'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{e.proveedor || '---'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{esStockInicial ? '---' : (e.proveedor || '---')}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {proy?.project_code || <span className="text-amber-600 font-medium">{isEs ? 'Sin proyecto' : 'No project'}</span>}
                       </td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const tipo = e.tipo_entrada || 'compra_proyecto'
+                          // Stock inicial del catálogo = reserva general (no es compra de un proyecto)
+                          const tipo = esStockInicial && !e.proyecto_id ? 'compra_general' : (e.tipo_entrada || 'compra_proyecto')
                           const cfg = {
                             compra_proyecto:   { label: isEs ? 'Compra proyecto' : 'Project purchase', cls: 'bg-blue-100 text-blue-700' },
                             compra_general:    { label: isEs ? 'Reserva general' : 'General reserve',  cls: 'bg-amber-100 text-amber-700' },

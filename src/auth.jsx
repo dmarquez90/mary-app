@@ -115,9 +115,12 @@ export function AuthProvider({ children }) {
       loadPerfil(session?.user ?? null).finally(() => setLoading(false))
     })
 
+    // Las consultas a Supabase se difieren (setTimeout 0): hacerlas dentro del callback
+    // de onAuthStateChange puede bloquear el cliente (advertencia de supabase-js) y el
+    // primer "Sign In" tras cerrar sesión a veces no avanzaba.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      loadPerfil(session?.user ?? null)
+      setTimeout(() => loadPerfil(session?.user ?? null), 0)
     })
 
     return () => subscription.unsubscribe()

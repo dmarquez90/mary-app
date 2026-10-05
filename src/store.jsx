@@ -1198,7 +1198,7 @@ useEffect(() => {
           const entrada = {
             id: uuid(), material_id: item.id, cantidad: stockInicial,
             precio_unitario: parseFloat(cleanP.precio_unitario) || 0,
-            numero_factura: 'STOCK-INICIAL', proveedor: 'Stock inicial',
+            numero_factura: 'STOCK-INICIAL', proveedor: 'Stock inicial', tipo_entrada: 'compra_general',
             fecha_recepcion: today(), created_at: today(), tenant_id: tenantId,
           }
           await sbThrow(supabase.from('entradas').insert(entrada))
@@ -1732,28 +1732,26 @@ useEffect(() => {
       case 'APROBAR_SC_AVALUO': {
         const av       = action.payload.avaluo
         const contrato = action.payload.contrato
-        await sbThrow(supabase.from('subcontratos_avaluos').update({ estado: 'aprobado' }).eq('id', av.id))
-        const nuevoPagado = parseFloat(contrato.monto_pagado||0) + parseFloat(av.monto_total||0)
-        await sbThrow(supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id))
+        // Costo directo del avalúo (tipo 'subcontrato': los totales lo excluyen para no
+        // duplicarlo con los avalúos aprobados). Antes llevaba columnas inexistentes
+        // (categoria, proveedor, referencia) y el INSERT fallaba a mitad de la aprobación.
         const costo = {
-          id: uuid(), proyecto_id: contrato.proyecto_id, categoria: 'Subcontratos',
+          id: uuid(), proyecto_id: contrato.proyecto_id,
           tipo: 'subcontrato',
           descripcion: `Avalúo #${av.numero} — ${contrato.subcontratista}`,
-          proveedor: contrato.subcontratista, monto: parseFloat(av.monto_total||0),
-          fecha: av.fecha_elaboracion || today(), referencia: `SC-AV-${av.numero}`,
+          monto: parseFloat(av.monto_total||0),
+          fecha: av.fecha_elaboracion || today(), numero_documento: `SC-AV-${av.numero}`,
           created_at: today(), tenant_id: tenantId,
         }
-        await sbThrow(supabase.from('costos_directos').insert(costo))
-        // ── Crear registro de retención si el avalúo tiene retención ──
+        // ── Retención si el avalúo la tiene ──
         let retencion = null
         const montoRetenido = parseFloat(av.retencion_monto||0)
         if (montoRetenido > 0) {
-          // Calcular fecha estimada de devolución
           const fechaBase  = av.fecha_elaboracion || today()
           const plazoMeses = parseInt(contrato.plazo_garantia_meses || 6)
-          const fechaEst   = new Date(fechaBase)
-          fechaEst.setMonth(fechaEst.getMonth() + plazoMeses)
-          const fechaEstStr = fechaEst.toISOString().split('T')[0]
+          const [yy, mm, dd] = String(fechaBase).slice(0, 10).split('-').map(Number)
+          const fechaEst   = new Date(yy, (mm - 1) + plazoMeses, dd)
+          const fechaEstStr = `${fechaEst.getFullYear()}-${String(fechaEst.getMonth()+1).padStart(2,'0')}-${String(fechaEst.getDate()).padStart(2,'0')}`
           retencion = {
             id:                   uuid(),
             tenant_id:            tenantId,
@@ -1771,7 +1769,19 @@ useEffect(() => {
             monto_devuelto:       0,
             created_at:           today(),
           }
-          await sbThrow(supabase.from('subcontratos_retenciones').insert(retencion))
+        }
+        // Primero los registros nuevos y al final el cambio de estado; si algo falla
+        // se deshace lo insertado para no dejar la aprobación a medias.
+        await sbThrow(supabase.from('costos_directos').insert(costo))
+        try {
+          if (retencion) await sbThrow(supabase.from('subcontratos_retenciones').insert(retencion))
+          await sbThrow(supabase.from('subcontratos_avaluos').update({ estado: 'aprobado' }).eq('id', av.id))
+          const nuevoPagado = parseFloat(contrato.monto_pagado||0) + parseFloat(av.monto_total||0)
+          await sbThrow(supabase.from('subcontratos_contratos').update({ monto_pagado: nuevoPagado }).eq('id', contrato.id))
+        } catch (e) {
+          if (retencion) await supabase.from('subcontratos_retenciones').delete().eq('id', retencion.id)
+          await supabase.from('costos_directos').delete().eq('id', costo.id)
+          throw e
         }
         dispatch({ type: 'APROBAR_SC_AVALUO', payload: { avaluo: av, contrato, costo, retencion } })
         await notify({
@@ -2245,7 +2255,8 @@ useEffect(() => {
     await registrarAuditoria()
     } catch (err) {
       console.error(`[dbDispatch:${action.type}]`, err)
-      avisar(`No se pudo completar la acción / Action could not be completed: ${err?.message || action.type}`)
+      const esES = (() => { try { return localStorage.getItem('mary_lang') !== 'EN' } catch { return true } })()
+      avisar(`${esES ? 'No se pudo completar la acción' : 'Action could not be completed'}: ${err?.message || action.type}`)
     }
   }
 

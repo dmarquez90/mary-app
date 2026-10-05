@@ -969,7 +969,7 @@ const EN = {
 
   // PROJECTS
   proy_title: 'Projects',
-  proy_sub: '{n} projects registered',
+  proy_sub: '{n} project(s) registered',
   proy_new: '+ New Project',
   proy_detail: 'View detail',
   proy_empty_title: 'No projects registered',
@@ -1734,7 +1734,7 @@ const EN = {
   // ROLES
   role_coordinador: 'Project Coordinator',
   role_gerente: 'Project Manager',
-  role_residente: 'Site Supervisor',
+  role_residente: 'Site Superintendent',
   role_bodeguero: 'Warehouse Manager',
   role_contador: 'Accountant',
   role_supervisor: 'Supervisor',
@@ -1849,10 +1849,17 @@ export function LangProvider({ children }) {
     }
     supabase.auth.getUser().then(({ data: { user } }) => cargarDeBD(user))
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') cargarDeBD(session?.user)
+      if (event === 'SIGNED_IN') setTimeout(() => cargarDeBD(session?.user), 0)  // diferido: ver auth.jsx
     })
     return () => sub?.subscription?.unsubscribe()
   }, [])
+
+  // Título de la pestaña en el idioma activo (index.html trae el de español)
+  useEffect(() => {
+    document.title = lang === 'ES'
+      ? 'MARY — ERP de construcción: presupuesto, compras y Curva S'
+      : 'MARY — Construction ERP: budget, purchasing & S-Curve'
+  }, [lang])
 
   const toggleLang = () => {
     const newLang = lang === 'ES' ? 'EN' : 'ES'

@@ -116,7 +116,7 @@ export default function Admin() {
     role_client_admin: isEs ? 'Administrador' : 'Administrator',
     role_coordinador:  isEs ? 'Coordinador' : 'Coordinator',
     role_gerente:      isEs ? 'Gerente' : 'Manager',
-    role_residente:    isEs ? 'Residente' : 'Site Supervisor',
+    role_residente:    isEs ? 'Residente' : 'Site Superintendent',
     role_bodeguero:    isEs ? 'Bodeguero' : 'Warehouse',
     role_contador:     isEs ? 'Contador' : 'Accountant',
     role_supervisor:   isEs ? 'Supervisor' : 'Supervisor',

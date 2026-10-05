@@ -314,6 +314,22 @@ select.m-cell-input { cursor: pointer; }
 [data-theme="dark"] .bg-purple-100,
 [data-theme="dark"] .bg-violet-100 { background-color: var(--accent-soft) !important; }
 
+/* Variantes con opacidad (bg-green-50/60, bg-gray-50/50...): Tailwind genera otra
+   clase y no la cubrían las reglas de arriba; quedaban claras con texto claro encima. */
+[data-theme="dark"] [class*="bg-white/"],
+[data-theme="dark"] [class*="bg-gray-50/"],
+[data-theme="dark"] [class*="bg-gray-100/"] { background-color: var(--surface-2) !important; }
+[data-theme="dark"] [class*="bg-green-50/"],
+[data-theme="dark"] [class*="bg-emerald-50/"] { background-color: var(--ok-soft) !important; }
+[data-theme="dark"] [class*="bg-amber-50/"],
+[data-theme="dark"] [class*="bg-yellow-50/"],
+[data-theme="dark"] [class*="bg-orange-50/"] { background-color: var(--warn-soft) !important; }
+[data-theme="dark"] [class*="bg-blue-50/"],
+[data-theme="dark"] [class*="bg-sky-50/"],
+[data-theme="dark"] [class*="bg-indigo-50/"] { background-color: var(--info-soft) !important; }
+[data-theme="dark"] [class*="bg-red-50/"] { background-color: var(--danger-soft) !important; }
+[data-theme="dark"] [class*="bg-purple-50/"] { background-color: var(--accent-soft) !important; }
+
 [data-theme="dark"] .text-green-600,
 [data-theme="dark"] .text-green-700,
 [data-theme="dark"] .text-green-800,

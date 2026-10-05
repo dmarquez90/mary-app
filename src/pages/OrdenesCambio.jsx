@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
 import { today, fmt, fmtNum, r2 } from '../utils'
+import { labelCategoriaInd } from './categoriasIndirectos'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
 const BRAND = 'var(--brand)'
@@ -465,7 +466,7 @@ export default function OrdenesCambio() {
                   return (
                     <div key={ind.id} className="px-4 py-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-700 truncate">{ind.categoria}</p>
+                        <p className="text-sm text-gray-700 truncate">{labelCategoriaInd(ind.categoria, lang)}</p>
                         <p className="text-xs text-gray-400 font-mono">
                           {isEs ? 'Actual:' : 'Current:'} {fmt(ind.monto_presupuestado, moneda)}
                           {ajuste !== 0 && (
@@ -568,7 +569,7 @@ export default function OrdenesCambio() {
                                     setItem(idx, 'descripcion', act.descripcion)
                                     setItem(idx, 'unidad', act.unidad || 'und')
                                     setItem(idx, 'cantidad_original', act.cantidad || '')
-                                    const puAct = (act.costo_mo||0)+(act.costo_materiales||0)+(act.costo_equipos||0)
+                                    const puAct = r2((parseFloat(act.costo_mo)||0)+(parseFloat(act.costo_materiales)||0)+(parseFloat(act.costo_equipos)||0))
                                     setItem(idx, 'precio_unitario', puAct || '')
                                   }}
                                 />
@@ -989,7 +990,7 @@ export default function OrdenesCambio() {
                       {indsDetalle.map(ind => (
                         <div key={ind.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
                           <div>
-                            <span className="text-sm text-gray-700">{ind.categoria}</span>
+                            <span className="text-sm text-gray-700">{labelCategoriaInd(ind.categoria, lang)}</span>
                             <span className="ml-2 text-xs text-gray-400 font-mono">
                               {fmt(ind.monto_actual, moneda)} → {fmt(parseFloat(ind.monto_actual||0) + parseFloat(ind.ajuste||0), moneda)}
                             </span>

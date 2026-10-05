@@ -47,6 +47,8 @@ const compacto = (n, moneda) => {
   return money(n, moneda)
 }
 
+const FASE_LABEL = { pendiente: ['Pendiente', 'Pending'], activa: ['Activa', 'Active'], completada: ['Completada', 'Completed'] }
+
 export default function Proyectos({ onNavigate }) {
   const { state, dispatch } = useStore()
   const { t, lang }         = useContext(LangContext)
@@ -634,10 +636,10 @@ export default function Proyectos({ onNavigate }) {
                             <select className="m-input" style={{ width: 'auto', padding: '4px 26px 4px 8px', fontSize: 11.5 }}
                               value={f.estado}
                               onChange={e => dispatch({ type: 'UPD_FASE', payload: { id: f.id, estado: e.target.value } })}>
-                              {['pendiente','activa','completada'].map(s => <option key={s} value={s}>{s}</option>)}
+                              {['pendiente','activa','completada'].map(s => <option key={s} value={s}>{FASE_LABEL[s][isEs ? 0 : 1]}</option>)}
                             </select>
                           ) : (
-                            <Chip tone={tone}>{f.estado}</Chip>
+                            <Chip tone={tone}>{FASE_LABEL[f.estado]?.[isEs ? 0 : 1] || f.estado}</Chip>
                           )}
                           {puedeEliminar && (
                             <IconBtn icon={Icons.x} danger tip={t('btn_delete')}

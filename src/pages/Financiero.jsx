@@ -1159,7 +1159,7 @@ function SubcontratosModule({ can, rol,
       numero:            numAvaluo,
       periodo_inicio:    avForm.periodo_inicio || null,
       periodo_fin:       avForm.periodo_fin || null,
-      fecha_elaboracion: avForm.fecha_elaboracion || new Date().toISOString().split('T')[0],
+      fecha_elaboracion: avForm.fecha_elaboracion || today(),
       subtotal:          avSubtotal,
       impuesto_monto:    avImpMonto,
       monto_total:       avTotal,
@@ -1210,7 +1210,7 @@ function SubcontratosModule({ can, rol,
     setAvForm({
       periodo_inicio:    av.periodo_inicio || '',
       periodo_fin:       av.periodo_fin    || '',
-      fecha_elaboracion: av.fecha_elaboracion || new Date().toISOString().split('T')[0],
+      fecha_elaboracion: av.fecha_elaboracion || today(),
       notas:             av.notas || '',
       _editId:           av.id,
       _editAvaluoNum:    av.numero,
@@ -1540,7 +1540,7 @@ function SubcontratosModule({ can, rol,
               setAvForm({
                 periodo_inicio: '',
                 periodo_fin: '',
-                fecha_elaboracion: new Date().toISOString().split('T')[0],
+                fecha_elaboracion: today(),
               })
               setAvItems(itemsContrato.map(it => {
                 const acumuladoPrevio = subcontratos_avaluos
@@ -1655,7 +1655,7 @@ Total: `)
               {/* Tabla de retenciones por avalúo */}
               <table className="w-full text-xs mb-3">
                 <thead><tr className="border-b border-amber-200">
-                  {['Avalúo', isEs?'Retenido':'Retained', isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status', isEs?'Orden de pago':'Payment order'].map((h,i) =>
+                  {[isEs?'Avalúo':'Valuation', isEs?'Retenido':'Retained', isEs?'Devolución est.':'Est. release', isEs?'Estado':'Status', isEs?'Orden de pago':'Payment order'].map((h,i) =>
                     <th key={i} className="px-2 py-1 text-left text-amber-600 font-medium">{h}</th>
                   )}
                 </tr></thead>
@@ -1959,7 +1959,7 @@ Total: `)
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr className="m-thead-row">
-                {[isEs?'Descripción':'Description', isEs?'UM':'UM',
+                {[isEs?'Descripción':'Description', isEs?'UM':'Unit',
                   isEs?'Cant. Contrato':'Contract Qty',
                   isEs?'C. Unitario':'Unit Cost',
                   isEs?'Período Anterior':'Prev. Period',

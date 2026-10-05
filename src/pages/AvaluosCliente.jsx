@@ -517,7 +517,7 @@ export default function AvaluosCliente() {
             {avIndirecto > 0 && (
               <div className="flex justify-between text-sm py-1">
                 <span className="text-gray-500">
-                  {isEs ? `Costo indirecto proporcional (${(pctAvancePeriodo*100).toFixed(1)}%)` : `Proportional indirect cost (${(pctAvancePeriodo*100).toFixed(1)}%)`}
+                  {isEs ? `Costo indirecto proporcional (avance del período: ${(pctAvancePeriodo*100).toFixed(1)}%)` : `Proportional indirect cost (period progress: ${(pctAvancePeriodo*100).toFixed(1)}%)`}
                 </span>
                 <span className="font-mono text-gray-600">{fmt(avIndirecto, moneda)}</span>
               </div>

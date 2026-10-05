@@ -267,7 +267,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
               <thead className="m-thead-row sticky top-0">
                 <tr>
                   {[isEs?'Tipo':'Type', isEs?'Codigo':'Code', isEs?'Descripcion':'Description', isEs?'Unidad':'Unit',
-                    isEs?'Cantidad':'Qty', 'M.O.', isEs?'Mat.':'Mat.', isEs?'Equip.':'Equip.'].map((h,i) => (
+                    isEs?'Cantidad':'Qty', isEs?'M.O.':'Labor', isEs?'Mat.':'Mat.', isEs?'Equip.':'Equip.'].map((h,i) => (
                     <th key={i} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>
                   ))}
                 </tr>

@@ -237,7 +237,7 @@ export default function ImportarCatalogo({ onDone }) {
             <table className="w-full text-xs">
               <thead className="m-thead-row sticky top-0">
                 <tr>
-                  {['Codigo', isEs ? 'Descripcion' : 'Description', isEs ? 'Categoria' : 'Category',
+                  {[isEs ? 'Código' : 'Code', isEs ? 'Descripción' : 'Description', isEs ? 'Categoría' : 'Category',
                     isEs ? 'Unidad' : 'Unit', 'Stock', 'Min.', isEs ? 'P.U.' : 'U.P.'].map((h,i) => (
                     <th key={i} className="px-2 py-1.5 text-left text-gray-500 font-medium whitespace-nowrap">{h}</th>
                   ))}

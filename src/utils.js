@@ -133,7 +133,12 @@ export const fmtNum = (n) =>
     maximumFractionDigits: 2,
   }).format(n || 0)
 
-export const today = () => new Date().toISOString().split('T')[0]
+// Fecha de HOY en la zona horaria del usuario (YYYY-MM-DD). toISOString() da la fecha
+// UTC: en América, por la tarde/noche, devolvía el día siguiente.
+export const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // Siguiente número = mayor existente + 1 (contar filas repetía códigos tras borrar)
 const siguienteNumero = (codigos, regex) => {

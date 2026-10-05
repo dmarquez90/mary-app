@@ -40,6 +40,7 @@ const T = {
     reg_terms:         'He leído y acepto los',
     reg_terms_link:    'Términos de Servicio',
     reg_and:           'y la',
+    reg_of_mary:       ' de MARY.',
     reg_privacy_link:  'Política de Privacidad',
     reg_terms_required:'Debes aceptar los Términos de Servicio y la Política de Privacidad para continuar.',
     err_email_taken:   'Este correo ya está registrado.',
@@ -112,6 +113,7 @@ const T = {
     reg_terms:         'I have read and accept the',
     reg_terms_link:    'Terms of Service',
     reg_and:           'and the',
+    reg_of_mary:       ' of MARY.',
     reg_privacy_link:  'Privacy Policy',
     reg_terms_required:'You must accept the Terms of Service and Privacy Policy to continue.',
     err_email_taken:   'This email is already registered.',
@@ -1309,7 +1311,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
                         style={{ background: 'none', border: 'none', color: BLUE_200, cursor: 'pointer', textDecoration: 'underline', fontSize: 12, padding: 0 }}>
                         {t.reg_privacy_link}
                       </button>
-                      {' '}de MARY.
+                      {t.reg_of_mary}
                     </label>
                   </div>
 

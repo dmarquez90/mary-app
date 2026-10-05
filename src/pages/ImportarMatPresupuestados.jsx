@@ -224,7 +224,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
               <span className="text-blue-600">
                 {rows.filter(r => r._vinculado).length} {isEs ? 'vinculados al catálogo' : 'linked to catalog'}
               </span>
-              {errors.length > 0 && <span className="text-amber-600 ml-2">({errors.length} {isEs?'omitidos':'skipped'})</span>}
+              {errors.length > 0 && <span className="text-amber-600 ml-2">({errors.length} {isEs?'avisos':'warnings'})</span>}
             </span>
             <div className="flex gap-2">
               <button onClick={reset} className="m-btn m-btn-sm m-btn-ghost">
@@ -238,7 +238,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
 
           {errors.length > 0 && (
             <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-700">
-              <p className="font-medium mb-1">{isEs ? 'Filas omitidas:' : 'Skipped rows:'}</p>
+              <p className="font-medium mb-1">{isEs ? 'Avisos / filas omitidas:' : 'Warnings / skipped rows:'}</p>
               {errors.map((e, i) => <p key={i}>• {e}</p>)}
             </div>
           )}

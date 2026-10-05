@@ -211,6 +211,10 @@ export default function Configuracion({ onNavigate }) {
       if (!form.id && activos >= (tenant?.max_usuarios || 5)) {
         throw new Error(t('cfg_users_limit_reached'))
       }
+      // Mismo mínimo que el registro (8)
+      if (!form.id && form.password && form.password.length < 8) {
+        throw new Error(isEs ? 'La contraseña debe tener mínimo 8 caracteres.' : 'Password must be at least 8 characters.')
+      }
       if (form.id) {
         await supabase.from('usuarios').update({ nombre:form.nombre, rol:form.rol, activo:form.activo }).eq('id', form.id)
         showSuccess(t('cfg_users_success_updated'))
@@ -248,7 +252,7 @@ export default function Configuracion({ onNavigate }) {
       payload: { id: modalSol.sol.id, comentario: comentarioAdmin, reviewedBy: perfil?.id }
     })
     setModalSol(null); setComentarioAdmin('')
-    showSuccess('Solicitud aprobada. El registro fue eliminado.')
+    showSuccess(isEs ? 'Solicitud aprobada. El registro fue eliminado.' : 'Request approved. The record was deleted.')
   }
 
   const rechazarSolicitud = () => {
@@ -309,7 +313,7 @@ export default function Configuracion({ onNavigate }) {
     setPwError(''); setPwSuccess('')
     const { actual, nueva, confirmar } = pwForm
     if (!actual || !nueva || !confirmar) { setPwError(isEs ? 'Completa todos los campos.' : 'Fill in all fields.'); return }
-    if (nueva.length < 6) { setPwError(isEs ? 'La nueva contraseña debe tener mínimo 6 caracteres.' : 'New password must be at least 6 characters.'); return }
+    if (nueva.length < 8) { setPwError(isEs ? 'La nueva contraseña debe tener mínimo 8 caracteres.' : 'New password must be at least 8 characters.'); return }
     if (nueva !== confirmar) { setPwError(isEs ? 'Las contraseñas no coinciden.' : 'Passwords do not match.'); return }
     setPwSaving(true)
     try {
@@ -372,7 +376,7 @@ export default function Configuracion({ onNavigate }) {
                 <p className="text-xs text-gray-400 mb-1">{isEs ? 'Justificación del bodeguero' : 'Warehouse keeper justification'}</p>
                 <p className="text-sm text-gray-700 m-card p-2">{modalSol.sol.justificacion}</p>
               </div>
-              <div><p className="text-xs text-gray-400">{isEs ? 'Fecha solicitud' : 'Request date'}</p><p className="text-sm">{modalSol.sol.created_at}</p></div>
+              <div><p className="text-xs text-gray-400">{isEs ? 'Fecha solicitud' : 'Request date'}</p><p className="text-sm">{fmtFecha(modalSol.sol.created_at, lang)}</p></div>
             </div>
 
             <div className="mb-4">
@@ -444,7 +448,7 @@ export default function Configuracion({ onNavigate }) {
               {drawer==='new' && (
                 <div>
                   <label className="text-xs font-medium text-gray-500 block mb-1">{t('cfg_users_form_password')}</label>
-                  <input type="password" className={inputCls} value={form.password||''} onChange={set('password')} placeholder="Min. 6 chars" />
+                  <input type="password" className={inputCls} value={form.password||''} onChange={set('password')} placeholder={isEs ? 'Mín. 8 caracteres' : 'Min. 8 chars'} />
                   <p className="text-xs text-gray-400 mt-1">{t('cfg_users_form_password_hint')}</p>
                 </div>
               )}
@@ -669,7 +673,7 @@ export default function Configuracion({ onNavigate }) {
                 <tbody>
                   {[...(state.solicitudes_eliminacion||[])].reverse().map(sol => (
                     <tr key={sol.id} className="m-tr">
-                      <td className="px-4 py-3 text-xs text-gray-400">{sol.created_at}</td>
+                      <td className="px-4 py-3 text-xs text-gray-400">{fmtFecha(sol.created_at, lang)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{sol.solicitante_nombre || '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sol.tipo==='entrada'?'bg-green-100 text-green-700':'bg-red-100 text-red-600'}`}>

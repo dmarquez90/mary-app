@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, costosSalidasFIFO, localeDe } from '../utils'
+import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, costosSalidasFIFO, localeDe, today } from '../utils'
 import { EmptyState, StatCard, Icons, PageHeader } from '../components'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Dot } from 'recharts'
 
@@ -75,7 +75,7 @@ export default function CurvaS() {
       const monto = costosFIFO[s.id] || 0
       if (monto > 0) costs.push({ fecha: s.fecha_salida, monto })
     })
-    costos_directos.filter(c => c.proyecto_id === proyId).forEach(c =>
+    costos_directos.filter(c => c.proyecto_id === proyId && c.tipo !== 'subcontrato').forEach(c =>
       costs.push({ fecha: c.fecha || c.created_at?.slice(0,10), monto: parseFloat(c.monto)||0 })
     )
     nominas.filter(n => n.proyecto_id === proyId).forEach(n =>
@@ -105,7 +105,7 @@ export default function CurvaS() {
   const chartData = useMemo(() => {
     if (!proy?.fecha_inicio) return []
     const fechaInicio = proy.fecha_inicio
-    const fechaFin    = proy.fecha_fin_estimada || new Date().toISOString().slice(0,10)
+    const fechaFin    = proy.fecha_fin_estimada || today()
 
     const periodos = granularity === 'mes'
       ? generarPeriodosMensuales(fechaInicio, fechaFin, lang)
@@ -250,7 +250,7 @@ export default function CurvaS() {
       const presupuestado = r2((act.cantidad||0) * ((act.costo_mo||0) + (act.costo_materiales||0) + (act.costo_equipos||0)))
       const matCost = salidas.filter(s => s.proyecto_id===proyId && s.actividad_id===act.id)
         .reduce((s,sa) => s + (costosFIFO[sa.id] || 0), 0)
-      const dirCost = costos_directos.filter(c => c.proyecto_id===proyId && c.actividad_id===act.id).reduce((s,c) => s + (parseFloat(c.monto)||0), 0)
+      const dirCost = costos_directos.filter(c => c.proyecto_id===proyId && c.actividad_id===act.id && c.tipo!=='subcontrato').reduce((s,c) => s + (parseFloat(c.monto)||0), 0)
       // Costo real de subcontratos para ESTA actividad: se toma el monto_actual de cada
       // item del avalúo cuyo subcontratos_items.actividad_id === act.id (no el monto_total
       // completo del avalúo, que incluye otras actividades del mismo subcontrato).

@@ -262,6 +262,12 @@ export default function Chat({ onNavigate }) {
         tenant_id: tenantId, nombre: 'General', tipo: 'general',
       }).select().single()
       general = nuevo
+      // Si otra carga simultánea ya lo creó (índice único por tenant), usar ese
+      if (!general) {
+        const { data: otro } = await supabase.from('chat_canales')
+          .select('*').eq('tenant_id', tenantId).eq('tipo', 'general').order('created_at').limit(1)
+        general = otro?.[0] || null
+      }
     }
 
     // Asegurar que el usuario esté en canal general

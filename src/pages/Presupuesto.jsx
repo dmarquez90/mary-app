@@ -74,6 +74,8 @@ export default function Presupuesto() {
   }
 
   const proy   = proyectos.find(p => p.id === proyId)
+  // Unidad por defecto según el país del proyecto (EE. UU. usa sistema imperial)
+  const unidadDefecto = proy?.pais === 'United States' ? 'ft²' : 'm²'
   const items  = useMemo(() => presupuesto.filter(b => b.proyecto_id === proyId), [presupuesto, proyId])
   const flat   = useMemo(() => flatBudgetItems(items), [items])
   const closed = proy?.estado === 'completado' || proy?.estado === 'cancelado'
@@ -159,7 +161,7 @@ export default function Presupuesto() {
     const parent_id = tipo === 'sub_etapa' ? (ultima('etapa')?.id || '')
       : tipo === 'actividad' ? (ultima('sub_etapa')?.id || ultima('etapa')?.id || '')
       : ''
-    setDraft({ tipo, parent_id, descripcion: '', unidad: 'm²', cantidad: '', costo_mo: '', costo_materiales: '', costo_equipos: '' })
+    setDraft({ tipo, parent_id, descripcion: '', unidad: unidadDefecto, cantidad: '', costo_mo: '', costo_materiales: '', costo_equipos: '' })
     setEditVal('')
     setEdit({ id: DRAFT_ID, campo: 'descripcion' })
   }
@@ -173,11 +175,11 @@ export default function Presupuesto() {
     if (!draftListo(d)) return
     dispatch({ type: 'ADD_BUDGET', payload: {
       proyectoId: proyId, tipo: d.tipo, parent_id: d.parent_id || null,
-      descripcion: String(d.descripcion).trim(), unidad: d.unidad || 'm²',
+      descripcion: String(d.descripcion).trim(), unidad: d.unidad || unidadDefecto,
       cantidad: num(d.cantidad), costo_mo: num(d.costo_mo),
       costo_materiales: num(d.costo_materiales), costo_equipos: num(d.costo_equipos),
     } })
-    setDraft({ tipo: d.tipo, parent_id: d.parent_id, descripcion: '', unidad: d.unidad || 'm²',
+    setDraft({ tipo: d.tipo, parent_id: d.parent_id, descripcion: '', unidad: d.unidad || unidadDefecto,
       cantidad: '', costo_mo: '', costo_materiales: '', costo_equipos: '' })
     setEditVal('')
     setEdit({ id: DRAFT_ID, campo: 'descripcion' })
@@ -523,8 +525,9 @@ export default function Presupuesto() {
                                 {item.descripcion || <span className="text-gray-300">{tipoLabel(item.tipo)}…</span>}
                               </span>
                               {item.origen_oc_id && (
-                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 border border-amber-200">
-                                  OC
+                                <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 border border-amber-200"
+                                  title={lang === 'ES' ? 'Agregada por orden de cambio' : 'Added by change order'}>
+                                  {lang === 'ES' ? 'ODC' : 'CO'}
                                 </span>
                               )}
                             </div>

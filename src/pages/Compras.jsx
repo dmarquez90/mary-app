@@ -394,10 +394,13 @@ export default function Compras() {
     const itemsParaOC = sol.estado === 'dividida'
       ? allItems.filter(i => i.flujo_item === 'sin_stock' || i.flujo_item === 'stock_parcial')
       : allItems
+    // Prellenar: quien elabora = usuario actual; impuesto = el del proyecto
+    const proySol = proyectos.find(p => p.id === sol.proyecto_id)
     setForm({
       solicitud_id:       sol.id,
       proveedor:          '',
-      elaboro_nombre:     '',
+      impuesto_pct:       proySol?.impuesto_pct ? String(proySol.impuesto_pct) : '',
+      elaboro_nombre:     perfil?.nombre || '',
       elaboro_cargo:      '',
       solicitante_nombre: sol.nombre_solicitante || '',
       solicitante_cargo:  sol.cargo_solicitante  || '',
@@ -578,7 +581,7 @@ export default function Compras() {
           </button>
         {tab === 0 && can('solicitud_crear') && (
           <PrimaryBtn onClick={() => {
-            setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
+            setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante: perfil?.nombre || '', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
             setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
             setDrawer('sol')
           }}>{t('comp_new_sol')}</PrimaryBtn>
@@ -609,7 +612,7 @@ export default function Compras() {
       {tab === 0 && (
         solicitudes.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={can('solicitud_crear') ? t('comp_new_sol') : null} onAction={can('solicitud_crear') ? () => {
-            setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante:'', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
+            setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante: perfil?.nombre || '', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
             setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
             setDrawer('sol')
           } : null} />
@@ -662,7 +665,7 @@ export default function Compras() {
                           {/* FLUJO A: Todo en bodega — solo despacho */}
                           {sol.estado === 'pendiente_bodega' && (
                             <span className="text-xs text-green-600 font-medium px-2 flex items-center gap-1">
-                              📦 En Bodega
+                              📦 {isEs ? 'En Bodega' : 'In Warehouse'}
                             </span>
                           )}
 
@@ -1084,7 +1087,7 @@ export default function Compras() {
             </select>
           </Field>
           <Field label={!isEs ? 'Tax (%)' : 'Impuesto (%)'}>
-            <input type="number" className={inputCls} value={form.impuesto_pct||''} onChange={set('impuesto_pct')} placeholder="15" min="0" max="100" step="0.01" />
+            <input type="number" className={inputCls} value={form.impuesto_pct||''} onChange={set('impuesto_pct')} placeholder="0" min="0" max="100" step="0.01" />
           </Field>
         </div>
 

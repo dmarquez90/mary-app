@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO, fmtFecha } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO, fmtFecha, today } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -180,7 +180,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   wb.created = new Date()
 
   const proyLabel    = `${proy?.project_code} — ${proy?.nombre}`
-  const periodoLabel = desde || hasta ? `${desde||( isEs?'inicio':'start')} al ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
+  const periodoLabel = desde || hasta ? `${desde||(isEs?'inicio':'start')} ${isEs?'al':'to'} ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
   const fechaHoy     = new Date().toLocaleDateString(isEs?'es':'en-US')
   const COLS         = 7
 
@@ -549,7 +549,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
   }
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `${isEs?'Reporte_Financiero':'Financial_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Financiero':'Financial_Report'}_${proy?.project_code}_${today()}.xlsx`)
 }
 
 // ── EXPORT ORDEN DE PAGO DE RETENCIÓN (OPR) ──────────────
@@ -1841,7 +1841,7 @@ async function buildRetenciones({ data, proy, moneda, lang='ES', nombreEmpresa='
   }
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `${isEs?'Reporte_Retenciones':'Retention_Report'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Retenciones':'Retention_Report'}_${proy?.project_code}_${today()}.xlsx`)
 }
 
 // ── EXPORT INVENTARIO ─────────────────────────────────────
@@ -1849,7 +1849,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   const isEs = lang === 'ES'
   const wb       = new ExcelJS.Workbook()
   wb.creator     = 'MARY ERP'
-  const periodoLabel = desde||hasta ? `${desde||(isEs?'inicio':'start')} al ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
+  const periodoLabel = desde||hasta ? `${desde||(isEs?'inicio':'start')} ${isEs?'al':'to'} ${hasta||(isEs?'hoy':'today')}` : (isEs?'Todo el período':'Full period')
   const fechaHoy = new Date().toLocaleDateString(isEs?'es':'en-US')
 
   // HOJA 1: Stock
@@ -1937,7 +1937,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
   })
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `${isEs?'Reporte_Inventario':'Inventory_Report'}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Reporte_Inventario':'Inventory_Report'}_${today()}.xlsx`)
 }
 
 // ── EXPORT RESUMEN GENERAL ────────────────────────────────
@@ -1955,7 +1955,8 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
 
   const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
   const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0))
-  const dirs     = costos_directos.filter(c=>c.proyecto_id===proyId)
+  // tipo 'subcontrato' = costo generado al aprobar un avalúo; ya se cuenta en subcontratos
+  const dirs     = costos_directos.filter(c=>c.proyecto_id===proyId && c.tipo!=='subcontrato')
   const noms     = nominas.filter(n=>n.proyecto_id===proyId)
   const subs     = subcontratos.filter(s=>s.proyecto_id===proyId)
   const eqs      = equipos.filter(e=>e.proyecto_id===proyId)
@@ -2184,7 +2185,7 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   footer.alignment={ horizontal:'center' }
 
   const buf = await wb.xlsx.writeBuffer()
-  saveAs(new Blob([buf]), `${isEs?'Resumen_General':'General_Summary'}_${proy?.project_code}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  saveAs(new Blob([buf]), `${isEs?'Resumen_General':'General_Summary'}_${proy?.project_code}_${today()}.xlsx`)
 }
 
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────
@@ -2235,7 +2236,7 @@ export default function Reportes() {
     const isEs  = lang === 'ES'
     const filtro = f => inPeriodo(f, desde, hasta)
 
-    const dirs  = costos_directos.filter(c => c.proyecto_id===proyId && filtro(c.fecha||c.created_at?.slice(0,10)))
+    const dirs  = costos_directos.filter(c => c.proyecto_id===proyId && c.tipo!=='subcontrato' && filtro(c.fecha||c.created_at?.slice(0,10)))
     const noms  = nominas.filter(n => n.proyecto_id===proyId && filtro(n.periodo_fin))
     const subs  = subcontratos.filter(s => s.proyecto_id===proyId && filtro(s.created_at?.slice(0,10)))
     const eqs   = equipos.filter(e => e.proyecto_id===proyId && filtro(e.created_at?.slice(0,10)))
@@ -2269,7 +2270,7 @@ export default function Reportes() {
         .reduce((s,sc)=>s+(parseFloat(sc.monto_pagado)||0),0)
       const real=salidas.filter(s=>s.proyecto_id===proyId&&s.actividad_id===act.id)
         .reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0)
-        +costos_directos.filter(c=>c.proyecto_id===proyId&&c.actividad_id===act.id).reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+        +costos_directos.filter(c=>c.proyecto_id===proyId&&c.actividad_id===act.id&&c.tipo!=='subcontrato').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
         +realScNuevo+realScAntiguo
         +eqs.filter(e=>e.actividad_id===act.id).reduce((s,e)=>s+costoEfectivoEq(e),0)
       const dev=real-pres
@@ -2704,7 +2705,7 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
   const tdC='px-4 py-2.5 text-sm text-gray-700'
   const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
   const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0)
-  const dirs=costos_directos.filter(c=>c.proyecto_id===proyId)
+  const dirs=costos_directos.filter(c=>c.proyecto_id===proyId && c.tipo!=='subcontrato')
   const noms=nominas.filter(n=>n.proyecto_id===proyId)
   const subs=subcontratos.filter(s=>s.proyecto_id===proyId)
   const eqs=equipos.filter(e=>e.proyecto_id===proyId)

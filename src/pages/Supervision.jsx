@@ -5,7 +5,7 @@ import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
 import { supabase } from '../supabase'
 import { EmptyState, Icons, Field, PrimaryBtn, Confirm, inputCls, PageHeader } from '../components'
-import { uuid, fmtFecha as fmtFechaU } from '../utils'
+import { uuid, fmtFecha as fmtFechaU, today } from '../utils'
 
 const BRAND = 'var(--brand)'
 
@@ -29,7 +29,7 @@ export default function Supervision() {
   )
 
   const [fProyecto, setFProyecto]         = useState('')
-  const [nuevaFecha, setNuevaFecha]       = useState(() => new Date().toISOString().slice(0, 10))
+  const [nuevaFecha, setNuevaFecha]       = useState(() => today())
   const [nuevoTexto, setNuevoTexto]       = useState('')
   const [nuevosArchivos, setNuevosArchivos] = useState([])
   const [subiendo, setSubiendo]           = useState(false)
@@ -87,7 +87,7 @@ export default function Supervision() {
           id: uuid(),
           proyecto_id: entrada.proyecto_id,
           parent_id: entrada.id,
-          fecha: new Date().toISOString().slice(0, 10),
+          fecha: today(),
           texto: textoRespuesta.trim(),
         },
       })

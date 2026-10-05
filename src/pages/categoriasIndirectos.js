@@ -63,3 +63,11 @@ export function getCategoriaLabel(categoriaKey, lang = 'ES') {
   if (!cat) return categoriaKey
   return lang === 'ES' ? cat.es : cat.en
 }
+
+// La categoría se guarda con su nombre en español; esto da la etiqueta en el idioma
+// indicado aceptando la clave o cualquiera de los dos nombres.
+export function labelCategoriaInd(valor, lang = 'ES') {
+  const key = CAT_KEYS.find(k => k === valor || CATEGORIAS_IND[k].es === valor || CATEGORIAS_IND[k].en === valor)
+  if (!key) return valor
+  return lang === 'ES' ? CATEGORIAS_IND[key].es : CATEGORIAS_IND[key].en
+}

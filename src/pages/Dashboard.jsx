@@ -251,29 +251,30 @@ export default function Dashboard({ onNavigate }) {
   const actividad = useMemo(() => {
     const items = [
       ...entradas.map(e => ({
-        tipo: 'entrada', fecha: e.fecha_recepcion || e.created_at,
+        tipo: 'entrada', fecha: e.fecha_recepcion || e.created_at, orden: e.registrado_en || e.created_at,
         titulo: nombreMaterial(e.material_id),
         detalle: `${isEs ? 'Entrada' : 'Receipt'} · ${parseFloat(e.cantidad || 0)}`,
       })),
       ...salidas.map(s => ({
-        tipo: 'salida', fecha: s.fecha_salida || s.created_at,
+        tipo: 'salida', fecha: s.fecha_salida || s.created_at, orden: s.registrado_en || s.created_at,
         titulo: nombreMaterial(s.material_id),
         detalle: `${isEs ? 'Salida' : 'Issue'} · ${parseFloat(s.cantidad || 0)}`,
       })),
       ...ordenes_compra.map(o => ({
-        tipo: 'oc', fecha: o.fecha_emision || o.created_at,
-        titulo: `${isEs ? 'OC' : 'PO'} ${o.numero_oc || o.id?.slice(0, 6) || ''}`,
+        tipo: 'oc', fecha: o.fecha_elaboracion || o.fecha_emision || o.created_at, orden: o.created_at,
+        titulo: `${isEs ? 'OC' : 'PO'} ${o.oc_number || o.numero_oc || o.id?.slice(0, 6) || ''}`,
         detalle: o.proveedor || o.estado || '',
       })),
       ...bitacora_log.filter(b => !b.parent_id).map(b => ({
-        tipo: 'bitacora', fecha: b.fecha || b.created_at,
-        titulo: (b.descripcion || b.titulo || (isEs ? 'Registro de bitácora' : 'Field log entry')).slice(0, 70),
+        tipo: 'bitacora', fecha: b.fecha || b.created_at, orden: b.created_at,
+        titulo: (b.texto || b.descripcion || b.titulo || (isEs ? 'Registro de bitácora' : 'Field log entry')).slice(0, 70),
         detalle: isEs ? 'Bitácora de supervisión' : 'Supervision log',
       })),
     ]
     return items
       .filter(i => i.fecha)
-      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+      // Más reciente primero: por fecha y, dentro del mismo día, por momento de registro
+      .sort((a, b) => `${b.fecha}|${b.orden || ''}`.localeCompare(`${a.fecha}|${a.orden || ''}`))
       .slice(0, 8)
   }, [entradas, salidas, ordenes_compra, bitacora_log, materiales, isEs])
 
