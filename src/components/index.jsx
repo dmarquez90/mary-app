@@ -301,7 +301,7 @@ export function KpiCard({ label, value, sub, icon, tone = 'brand', trend, spark,
   const up = trend != null && trend >= 0
   return (
     <div onClick={onClick}
-      className={`m-card m-card-hover p-4 ${onClick ? 'cursor-pointer' : ''} ${className}`}>
+      className={`m-card m-kpi p-4 ${onClick ? 'cursor-pointer' : ''} ${className}`} style={{ '--c': t.fg }}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium" style={{ color: 'var(--txt-3)' }}>{label}</p>
         {icon && (
@@ -311,7 +311,7 @@ export function KpiCard({ label, value, sub, icon, tone = 'brand', trend, spark,
           </span>
         )}
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight" style={{ color: 'var(--txt)', fontVariantNumeric: 'tabular-nums' }}>
+      <p className="mt-2 text-2xl font-bold tracking-tight" style={{ color: 'var(--txt)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-d)' }}>
         {value}
       </p>
       <div className="flex items-end justify-between gap-2 mt-1">
@@ -678,7 +678,7 @@ export function Avatar({ name = '', size = 32, src }) {
     <span className="rounded-full flex items-center justify-center font-bold flex-shrink-0"
       style={{
         width: size, height: size, fontSize: size * 0.38,
-        background: 'var(--brand-grad)', color: '#fff', boxShadow: 'var(--sh-xs)',
+        background: 'linear-gradient(135deg, var(--gold-2), var(--gold))', color: '#0E1B3D', boxShadow: 'var(--sh-xs)',
       }}>
       {iniciales}
     </span>

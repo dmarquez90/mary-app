@@ -197,6 +197,18 @@ function Layout() {
   useEffect(() => {
     try { localStorage.setItem('mary_sidebar', sideOpen ? 'open' : 'closed') } catch { /* ignorar */ }
   }, [sideOpen])
+  // Brillo dorado de las tarjetas: sigue al cursor (lo pintan .m-kpi y .m-card-hover en index.css)
+  useEffect(() => {
+    const onMove = e => {
+      const c = e.target.closest?.('.m-kpi, .m-card-hover')
+      if (!c) return
+      const r = c.getBoundingClientRect()
+      c.style.setProperty('--mx', `${e.clientX - r.left}px`)
+      c.style.setProperty('--my', `${e.clientY - r.top}px`)
+    }
+    document.addEventListener('mousemove', onMove, { passive: true })
+    return () => document.removeEventListener('mousemove', onMove)
+  }, [])
   // Ref con la página actual para que los callbacks realtime no lean un valor congelado
   const pageRef = useRef(page)
   useEffect(() => { pageRef.current = page }, [page])
@@ -342,7 +354,7 @@ function Layout() {
       {/* ══ SIDEBAR ══════════════════════════════════════════════ */}
       <aside className={`flex flex-col flex-shrink-0 transition-all duration-200 ${sideOpen ? 'w-60' : 'w-[68px]'}`}
         style={{
-          background: `linear-gradient(180deg, var(--nav-bg) 0%, var(--nav-bg-2) 100%)`,
+          background: `radial-gradient(420px 260px at 0% 0%, rgba(201,162,75,0.16), transparent 70%), radial-gradient(360px 300px at 100% 100%, rgba(59,115,245,0.14), transparent 70%), linear-gradient(180deg, var(--nav-bg) 0%, var(--nav-bg-2) 100%)`,
           borderRight: '1px solid var(--nav-bd)',
         }}>
 
@@ -353,7 +365,7 @@ function Layout() {
             <svg viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg" style={{ height: 34, width: 'auto' }} aria-label="MARY"><g transform="translate(4,3)"><rect x="14" y="29" width="8" height="16" rx="1.5" fill="#7a8fa6" opacity="0.75"/><rect x="24" y="23" width="8" height="22" rx="1.5" fill="#a0b4c8" opacity="0.75"/><rect x="34" y="17" width="8" height="28" rx="1.5" fill="#c0d0e0" opacity="0.75"/><ellipse cx="29" cy="33" rx="18" ry="5.5" fill="none" stroke="#3a8adc" strokeWidth="1.5" opacity="0.85"/><rect x="26" y="17" width="10" height="10" rx="2" fill="#3bb876" opacity="0.95"/><rect x="36" y="11" width="8" height="8" rx="2" fill="#26d4ff" opacity="0.9"/><line x1="36" y1="20" x2="48" y2="6" stroke="#3bb876" strokeWidth="1.8" opacity="0.9"/><polygon points="48,3 51,9 45,9" fill="#3bb876" opacity="0.9"/></g><text x="62" y="37" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="32" fill="#ffffff" letterSpacing="1">MARY</text></svg>
           ) : (
             <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm"
-              style={{ background: 'linear-gradient(135deg, #1A5EB4, #2E78D6)', boxShadow: '0 4px 14px -4px rgba(26,94,180,0.9)' }}>M</div>
+              style={{ background: 'linear-gradient(135deg, #E6C879, #C9A24B)', color: '#0E1B3D', boxShadow: '0 4px 14px -4px rgba(201,162,75,0.7)' }}>M</div>
           )}
         </div>
 
@@ -365,7 +377,7 @@ function Layout() {
             </p>
             <div className="mt-1.5 flex items-center gap-1.5">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                style={{ background: 'rgba(127,168,212,0.16)', color: '#A9C6E6', border: '1px solid rgba(127,168,212,0.22)' }}>
+                style={{ background: 'rgba(201,162,75,0.16)', color: '#E6C879', border: '1px solid rgba(230,200,121,0.30)' }}>
                 {planInfo.nombre}
               </span>
               {isSuperAdmin && (
@@ -382,7 +394,7 @@ function Layout() {
             <div key={grupo.id} className="mb-3">
               {sideOpen && (
                 <p className="px-3 mb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
-                  style={{ color: 'rgba(169,198,230,0.45)' }}>
+                  style={{ color: 'rgba(230,200,121,0.62)' }}>
                   {isEs ? grupo.labelEs : grupo.labelEn}
                 </p>
               )}
@@ -396,16 +408,16 @@ function Layout() {
                       data-tip={!sideOpen ? label : undefined}
                       className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left transition-all duration-150 ${!sideOpen ? 'm-tip justify-center' : ''}`}
                       style={{
-                        background: active ? 'linear-gradient(120deg, rgba(46,120,214,0.30), rgba(26,158,92,0.12))' : 'transparent',
+                        background: active ? 'linear-gradient(90deg, rgba(201,162,75,0.28), rgba(201,162,75,0.08))' : 'transparent',
                         color: active ? 'var(--nav-txt-active)' : bloqueado ? 'rgba(169,198,230,0.45)' : 'var(--nav-txt)',
-                        border: `1px solid ${active ? 'rgba(46,120,214,0.45)' : 'transparent'}`,
-                        boxShadow: active ? '0 6px 18px -10px rgba(26,94,180,0.9)' : 'none',
+                        border: `1px solid ${active ? 'rgba(230,200,121,0.35)' : 'transparent'}`,
+                        boxShadow: active ? '0 8px 24px -12px rgba(201,162,75,0.7)' : 'none',
                       }}
                       onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(127,168,212,0.09)' }}
                       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
                       {active && sideOpen && (
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-                          style={{ background: 'linear-gradient(180deg, #3BB876, #26D4FF)' }} />
+                          style={{ background: 'var(--gold-2)', boxShadow: '0 0 14px var(--gold)' }} />
                       )}
                       <span className="w-[18px] h-[18px] flex-shrink-0 relative">
                         {bloqueado ? (
@@ -517,7 +529,8 @@ function Layout() {
         {/* HEADER */}
         <header className="flex items-center justify-between px-5 flex-shrink-0 relative z-20"
           style={{
-            background: 'var(--surface)',
+            background: 'color-mix(in srgb, var(--surface) 84%, transparent)',
+            backdropFilter: 'blur(14px) saturate(1.3)',
             borderBottom: '1px solid var(--bd)',
             height: 64,
             boxShadow: 'var(--sh-xs)',
@@ -529,7 +542,7 @@ function Layout() {
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="font-bold text-[15px] leading-tight truncate" style={{ color: 'var(--txt)' }}>
+                <p className="font-bold text-[16px] leading-tight truncate" style={{ color: 'var(--txt)', fontFamily: 'var(--font-d)', letterSpacing: '-0.01em' }}>
                   {tituloPagina}
                 </p>
                 {[...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(page) && !canUsePlan(page) && (
@@ -660,7 +673,7 @@ function Layout() {
           <SubscriptionContext.Provider value={{ isReadOnly }}>
             {pageBlockedByPlan
               ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
-              : <Suspense fallback={<PageSpinner />}><Page onNavigate={setPage} /></Suspense>
+              : <div key={page} className="m-fade-up"><Suspense fallback={<PageSpinner />}><Page onNavigate={setPage} /></Suspense></div>
             }
           </SubscriptionContext.Provider>
         </main>
