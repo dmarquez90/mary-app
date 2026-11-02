@@ -5,6 +5,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const esc = (s: unknown) =>
+  String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
+// ── Correo de bienvenida (best-effort, solo si RESEND_API_KEY está configurada) ──
+async function enviarBienvenida(to: string, nombre: string, password: string, lang: string, empresa: string) {
+  const apiKey = Deno.env.get('RESEND_API_KEY')
+  if (!apiKey) return { skipped: true }
+
+  const isEs = lang !== 'EN'
+  const appUrl = Deno.env.get('APP_URL') ?? ''
+  const from = Deno.env.get('WELCOME_FROM') ?? 'Marquez Project Solutions <no-reply@marquezprojectsolutions.com>'
+  const org = esc(empresa || 'tu empresa')
+  const orgEn = esc(empresa || 'your company')
+  const subject = isEs ? `${empresa || 'Tu empresa'} te ha dado acceso a MARY` : `${empresa || 'Your company'} has given you access to MARY`
+  const html = isEs
+    ? `<p>¡Hola${nombre ? `, ${esc(nombre)}` : ''}!</p>
+       <p><b>${org}</b> te ha dado acceso a la plataforma MARY. Estos son tus datos de acceso:</p>
+       <p><b>Correo:</b> ${esc(to)}<br><b>Contraseña temporal:</b> ${esc(password)}</p>
+       ${appUrl ? `<p><a href="${esc(appUrl)}">Ingresar a MARY</a></p>` : ''}
+       <p>Por seguridad, cambia tu contraseña después de iniciar sesión.</p>`
+    : `<p>Hi${nombre ? `, ${esc(nombre)}` : ''}!</p>
+       <p><b>${orgEn}</b> has given you access to the MARY platform. Here are your login details:</p>
+       <p><b>Email:</b> ${esc(to)}<br><b>Temporary password:</b> ${esc(password)}</p>
+       ${appUrl ? `<p><a href="${esc(appUrl)}">Log in to MARY</a></p>` : ''}
+       <p>For security, please change your password after signing in.</p>`
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [to], subject, html }),
+  })
+  if (!res.ok) throw new Error(`resend_${res.status}: ${await res.text()}`)
+  return { sent: true }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -64,9 +99,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // Crear usuario en Auth
+    const passwordFinal = password || Math.random().toString(36).slice(-10) + 'A1!'
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: password || Math.random().toString(36).slice(-10) + 'A1!',
+      password: passwordFinal,
       email_confirm: true,
     })
 
@@ -97,8 +133,19 @@ Deno.serve(async (req: Request) => {
       })
     }
 
+    // El correo no debe bloquear la creación del usuario
+    let emailEnviado = false
+    try {
+      const { data: tenant } = await supabaseAdmin
+        .from('tenants').select('nombre_empresa').eq('id', tenant_id).single()
+      const r = await enviarBienvenida(email, nombre, passwordFinal, userLang, tenant?.nombre_empresa ?? '')
+      emailEnviado = !!r.sent
+    } catch (e) {
+      console.error('welcome email failed', e)
+    }
+
     return new Response(
-      JSON.stringify({ user: { id: authData.user.id, email, nombre, rol, tenant_id } }),
+      JSON.stringify({ user: { id: authData.user.id, email, nombre, rol, tenant_id }, email_enviado: emailEnviado }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
