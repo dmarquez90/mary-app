@@ -251,9 +251,12 @@ select.m-cell-input { cursor: pointer; }
 @keyframes mSlideIn{ from { transform: translateX(100%); opacity: .4 } to { transform: none; opacity: 1 } }
 @keyframes mSpin   { to { transform: rotate(360deg) } }
 
-.m-fade-up { animation: mFadeUp .38s cubic-bezier(.22,1,.36,1) both; }
+/* `backwards` (no `both`): al terminar no deja un transform aplicado. Un transform retenido
+   convierte al elemento en el contenedor de sus hijos `position: fixed`, y los modales de
+   cada página quedaban recortados dentro de ella en lugar de cubrir la pantalla. */
+.m-fade-up { animation: mFadeUp .38s cubic-bezier(.22,1,.36,1) backwards; }
 .m-fade    { animation: mFade .28s ease both; }
-.m-pop     { animation: mPop .22s cubic-bezier(.22,1.2,.4,1) both; }
+.m-pop     { animation: mPop .22s cubic-bezier(.22,1.2,.4,1) backwards; }
 .m-spin    { animation: mSpin .8s linear infinite; }
 .drawer-enter { animation: mSlideIn .26s cubic-bezier(.22,1,.36,1); }
 
