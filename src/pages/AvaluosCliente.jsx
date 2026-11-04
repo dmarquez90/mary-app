@@ -169,7 +169,33 @@ async function exportAvaluoExcel({ avaluo, items, proy, moneda, empresa, lang = 
   const totalCell = ws.getCell(row, 12)
   styleCell(totalCell, { fill: GREEN, font: { name: 'Arial', size: 11, bold: true, color: { argb: `FF${WHITE}` } }, align: 'right', numFmt: '"$"#,##0.00' })
   totalCell.value = parseFloat(avaluo.total || 0)
-  row += 2
+  row++
+
+  // ── Retención y pago ──
+  const retencion = parseFloat(avaluo.retencion_monto || 0)
+  const neto      = Math.round((parseFloat(avaluo.total || 0) - retencion) * 100) / 100
+  const pagado    = avaluo.monto_pagado != null ? parseFloat(avaluo.monto_pagado) : null
+  const filasPago = [
+    ...(retencion > 0 ? [
+      [isEs ? `Retención (${parseFloat(avaluo.retencion_pct || 0)}%)` : `Retainage (${parseFloat(avaluo.retencion_pct || 0)}%)`, -retencion, false],
+      [isEs ? 'NETO A RECIBIR' : 'NET TO RECEIVE', neto, true],
+    ] : []),
+    ...(pagado != null ? [
+      [`${isEs ? 'Pagado' : 'Paid'}${avaluo.fecha_pago ? ` (${avaluo.fecha_pago})` : ''}`, pagado, false],
+      [isEs ? 'Pendiente' : 'Outstanding', Math.round((neto - pagado) * 100) / 100, true],
+    ] : []),
+  ]
+  filasPago.forEach(([label, val, bold]) => {
+    ws.getRow(row).height = 16
+    merge(row, 1, row, 11)
+    styleCell(ws.getCell(row, 1), { fill: LGRAY, font: { name: 'Arial', size: 9, bold, color: { argb: 'FF374151' } }, align: 'right' })
+    ws.getCell(row, 1).value = label
+    const c = ws.getCell(row, 12)
+    styleCell(c, { fill: LGRAY, font: { name: 'Arial', size: 9, bold, color: { argb: 'FF374151' } }, align: 'right', numFmt: '"$"#,##0.00' })
+    c.value = val
+    row++
+  })
+  row++
 
   // ── Footer ──
   merge(row, 1, row, COLS)
@@ -216,6 +242,7 @@ export default function AvaluosCliente() {
   const [avForm, setAvForm]             = useState({})
   const [avItems, setAvItems]           = useState([])
   const [mostrarTodas, setMostrarTodas] = useState(false)
+  const [pagoForm, setPagoForm]         = useState(null)   // edición del pago recibido (vista detalle)
 
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
@@ -281,6 +308,8 @@ export default function AvaluosCliente() {
       numero: numAvaluo, periodo_inicio: '', periodo_fin: '',
       fecha_elaboracion: today(), presentado_a: '',
       impuesto_pct: '', impuesto_descripcion: '', notas: '',
+      // La retención suele ser la misma en todo el contrato: se propone la del último avalúo
+      retencion_pct: parseFloat(avs[0]?.retencion_pct || 0) > 0 ? String(avs[0].retencion_pct) : '',
     })
     const itemsBase = actividades.map(act => {
       const ant = acumuladoPrevio(act.id); const total = cantidadTotal(act); const pu = precioUnitario(act)
@@ -317,6 +346,11 @@ export default function AvaluosCliente() {
   const avBase3      = r2(avBase2 + avUtilidad)
   const avImpuesto   = r2(avBase3 * impuestoPct)
   const avTotal      = r2(avBase3 + avImpuesto)
+  // Retención: % del trabajo realizado (antes de impuesto), como la línea 5a del G702.
+  // El cliente la paga al final, así que el neto a recibir es el total menos la retención.
+  const avRetPct     = parseFloat(avForm.retencion_pct || 0)
+  const avRetencion  = r2(avBase3 * avRetPct / 100)
+  const avNeto       = r2(avTotal - avRetencion)
 
   // Mantener compatibilidad con campos guardados
   const avImpPct     = parseFloat(avForm.impuesto_pct || 0)
@@ -355,6 +389,8 @@ export default function AvaluosCliente() {
       utilidad_monto:   avUtilidad,
       impuesto_monto:   avImpuesto,
       total:            avTotal,
+      retencion_pct:    avRetPct,
+      retencion_monto:  avRetencion,
       pct_avance:       pctAvancePeriodo,
     }
     dispatch({
@@ -381,6 +417,22 @@ export default function AvaluosCliente() {
     dispatch({ type: 'UPD_AVALUO_CLIENTE_ESTADO', payload: { id, estado, numero } })
 
   const totalCobrado   = avs.filter(a=>a.estado==='aprobado').reduce((s,a)=>s+(parseFloat(a.total)||0),0)
+  // Neto a recibir de un avalúo (total menos retención) y lo que falta por pagar
+  const netoAv         = (a) => r2(parseFloat(a.total || 0) - parseFloat(a.retencion_monto || 0))
+  const pendienteAv    = (a) => r2(netoAv(a) - parseFloat(a.monto_pagado || 0))
+  const avsAprobados   = avs.filter(a => a.estado === 'aprobado')
+  const retencionAcum  = r2(avsAprobados.reduce((s,a) => s + (parseFloat(a.retencion_monto) || 0), 0))
+  const pagadoAcum     = r2(avsAprobados.reduce((s,a) => s + (parseFloat(a.monto_pagado) || 0), 0))
+  const pendientePago  = r2(avsAprobados.reduce((s,a) => s + pendienteAv(a), 0))
+
+  const guardarPago = () => {
+    if (!pagoForm || !avDetalle) return
+    dispatch({ type: 'UPD_AVALUO_CLIENTE_PAGO', payload: { id: avDetalle.id, cambios: {
+      fecha_pago:   pagoForm.fecha_pago || null,
+      monto_pagado: pagoForm.monto_pagado === '' ? null : r2(parseFloat(pagoForm.monto_pagado) || 0),
+    } } })
+    setPagoForm(null)
+  }
 
   // Presupuesto total real = directo + indirectos + utilidad + impuesto
   const presupuestoTotalReal = useMemo(() => {
@@ -424,10 +476,16 @@ export default function AvaluosCliente() {
               <input type="date" className={inputCls} value={avForm.fecha_elaboracion||''} onChange={setAvF('fecha_elaboracion')} />
             </Field>
           </div>
-          <Field label={isEs ? 'Presentado a' : 'Submitted to'}>
-            <input className={inputCls} value={avForm.presentado_a||''} onChange={setAvF('presentado_a')}
-              placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
-          </Field>
+          <div className="grid grid-cols-3 gap-4">
+            <Field label={isEs ? 'Presentado a' : 'Submitted to'} className="col-span-2">
+              <input className={inputCls} value={avForm.presentado_a||''} onChange={setAvF('presentado_a')}
+                placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
+            </Field>
+            <Field label={isEs ? 'Retención (%)' : 'Retainage (%)'}>
+              <input type="number" min="0" max="100" step="0.01" className={inputCls}
+                value={avForm.retencion_pct||''} onChange={setAvF('retencion_pct')} placeholder="0" />
+            </Field>
+          </div>
           {totalOCAprobadas !== 0 && (
             <div className="grid grid-cols-3 gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
               <div><p className="text-blue-500">{isEs?'Presupuesto original':'Original budget'}</p><p className="font-bold font-mono text-blue-700">{fmt(presupuestoOriginal, moneda)}</p></div>
@@ -543,6 +601,16 @@ export default function AvaluosCliente() {
               <span>{isEs ? 'Total a cobrar' : 'Total to bill'}</span>
               <span style={{color:BRAND}}>{fmt(avTotal, moneda)}</span>
             </div>
+            {avRetencion > 0 && <>
+              <div className="flex justify-between text-sm py-1">
+                <span className="text-gray-500">{isEs ? `Retención (${avRetPct}%)` : `Retainage (${avRetPct}%)`}</span>
+                <span className="font-mono text-red-500">−{fmt(avRetencion, moneda)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold">
+                <span>{isEs ? 'Neto a recibir' : 'Net to receive'}</span>
+                <span className="font-mono" style={{color:BRAND}}>{fmt(avNeto, moneda)}</span>
+              </div>
+            </>}
           </div>
           <Field label={isEs?'Notas':'Notes'}>
             <textarea className={inputCls} rows={2} value={avForm.notas||''} onChange={setAvF('notas')} />
@@ -662,6 +730,51 @@ export default function AvaluosCliente() {
           </div>
         )}
 
+        {/* ── PAGO RECIBIDO ── */}
+        {avDetalle.estado === 'aprobado' && (
+          <div className="m-card p-5 mb-5">
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{isEs ? 'Pago recibido' : 'Payment received'}</p>
+              {puedeEditar && !pagoForm && (
+                <TBtn onClick={() => setPagoForm({
+                  fecha_pago:   avDetalle.fecha_pago || today(),
+                  monto_pagado: avDetalle.monto_pagado != null ? String(avDetalle.monto_pagado) : String(netoAv(avDetalle)),
+                })}>{avDetalle.monto_pagado != null ? (isEs ? 'Editar pago' : 'Edit payment') : (isEs ? 'Registrar pago' : 'Record payment')}</TBtn>
+              )}
+            </div>
+            {pagoForm ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <Field label={isEs ? 'Fecha de pago' : 'Payment date'}>
+                  <input type="date" className={inputCls} value={pagoForm.fecha_pago||''}
+                    onChange={e => setPagoForm(f => ({ ...f, fecha_pago: e.target.value }))} />
+                </Field>
+                <Field label={isEs ? 'Monto pagado' : 'Amount paid'}>
+                  <input type="number" min="0" step="0.01" className={inputCls} value={pagoForm.monto_pagado}
+                    onChange={e => setPagoForm(f => ({ ...f, monto_pagado: e.target.value }))} />
+                </Field>
+                <div className="flex gap-2">
+                  <SecondaryBtn onClick={() => setPagoForm(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
+                  <PrimaryBtn onClick={guardarPago} className="flex-1">{t('btn_save')}</PrimaryBtn>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                {[
+                  [isEs ? 'Neto a recibir' : 'Net to receive', fmt(netoAv(avDetalle), moneda), BRAND],
+                  [isEs ? 'Pagado' : 'Paid', avDetalle.monto_pagado != null ? fmt(avDetalle.monto_pagado, moneda) : '—', '#1D9E75'],
+                  [isEs ? 'Fecha de pago' : 'Payment date', avDetalle.fecha_pago || '—', undefined],
+                  [isEs ? 'Pendiente' : 'Outstanding', fmt(pendienteAv(avDetalle), moneda), pendienteAv(avDetalle) > 0.005 ? '#D97706' : '#1D9E75'],
+                ].map(([k, v, color]) => (
+                  <div key={k} className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-400 mb-0.5">{k}</p>
+                    <p className="font-mono font-medium" style={{ color }}>{v}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col gap-5">
           <div className="m-card p-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -744,6 +857,16 @@ export default function AvaluosCliente() {
                 <span>{isEs?'Total cobrado':'Total billed'}</span>
                 <span style={{color:'#1D9E75'}}>{fmt(avTotal2, moneda)}</span>
               </div>
+              {parseFloat(avDetalle.retencion_monto || 0) > 0 && <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">{isEs ? `Retención (${parseFloat(avDetalle.retencion_pct || 0)}%)` : `Retainage (${parseFloat(avDetalle.retencion_pct || 0)}%)`}</span>
+                  <span className="font-mono text-red-500">−{fmt(avDetalle.retencion_monto, moneda)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold">
+                  <span>{isEs ? 'Neto a recibir' : 'Net to receive'}</span>
+                  <span className="font-mono" style={{color:BRAND}}>{fmt(netoAv(avDetalle), moneda)}</span>
+                </div>
+              </>}
             </div>
           </div>
         </div>
@@ -839,6 +962,9 @@ export default function AvaluosCliente() {
                     { label: isEs?'Indirectos':'Indirect costs',        value: fmt(totalIndirectos, moneda),       color: '#6b7280' },
                     { label: isEs?'OC aprobadas (incluidas)':'Approved COs (included)', value: `${totalOCAprobadas >= 0 ? '+' : ''}${fmt(totalOCAprobadas, moneda)}`, color: totalOCAprobadas > 0 ? '#D97706' : '#6b7280' },
                     { label: isEs?'Saldo por cobrar':'Balance to bill', value: fmt(saldoPorCobrar, moneda),       color: saldoPorCobrar > 0 ? '#D97706' : '#1D9E75' },
+                    { label: isEs?'Retención retenida':'Retainage held', value: fmt(retencionAcum, moneda),       color: '#6b7280' },
+                    { label: isEs?'Pagado por el cliente':'Paid by client', value: fmt(pagadoAcum, moneda),       color: '#1D9E75' },
+                    { label: isEs?'Pendiente de pago (aprobado)':'Unpaid (approved)', value: fmt(pendientePago, moneda), color: pendientePago > 0.005 ? '#D97706' : '#1D9E75' },
                   ].map(k => (
                     <div key={k.label} className="bg-gray-50 rounded-lg p-3">
                       <p className="text-xs text-gray-400 mb-0.5">{k.label}</p>
@@ -865,6 +991,7 @@ export default function AvaluosCliente() {
                   <tr className="m-thead-row">
                     {['#', isEs?'Periodo':'Period', isEs?'Fecha':'Date', isEs?'Presentado a':'Submitted to',
                       isEs?'Subtotal':'Subtotal', isEs?'Impuesto':'Tax', isEs?'Total':'Total',
+                      isEs?'Retención':'Retainage', isEs?'Pagado':'Paid', isEs?'Fecha pago':'Paid on',
                       isEs?'Estado':'Status', ''].map((h,i) => <th key={i} className={thCls}>{h}</th>)}
                   </tr>
                 </thead>
@@ -882,6 +1009,16 @@ export default function AvaluosCliente() {
                         {parseFloat(av.impuesto_monto||0) > 0 ? fmt(av.impuesto_monto, moneda) : '—'}
                       </td>
                       <td className={tdCls + ' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(av.total, moneda)}</td>
+                      <td className={tdCls + ' font-mono text-gray-500'}>
+                        {parseFloat(av.retencion_monto||0) > 0 ? fmt(av.retencion_monto, moneda) : '—'}
+                      </td>
+                      <td className={tdCls + ' font-mono'}>
+                        {av.monto_pagado != null ? fmt(av.monto_pagado, moneda) : '—'}
+                        {av.estado === 'aprobado' && av.monto_pagado != null && pendienteAv(av) > 0.005 && (
+                          <span className="block text-[11px] text-amber-600">{isEs ? 'Pendiente' : 'Outstanding'} {fmt(pendienteAv(av), moneda)}</span>
+                        )}
+                      </td>
+                      <td className={tdCls + ' text-xs text-gray-400'}>{av.fecha_pago || '—'}</td>
                       <td className={tdCls}><EstadoBadge estado={av.estado} isEs={isEs} /></td>
                       <td className={tdCls}>
                         <div className="flex gap-1 flex-wrap">

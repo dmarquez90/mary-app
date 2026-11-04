@@ -269,6 +269,11 @@ function reducer(state, action) {
       avaluos_cliente: (state.avaluos_cliente||[]).map(a =>
         a.id === action.payload.id ? { ...a, estado: action.payload.estado } : a)
     }
+    case 'UPD_AVALUO_CLIENTE_PAGO': return {
+      ...state,
+      avaluos_cliente: (state.avaluos_cliente||[]).map(a =>
+        a.id === action.payload.id ? { ...a, ...action.payload.cambios } : a)
+    }
     case 'DEL_AVALUO_CLIENTE': return {
       ...state,
       avaluos_cliente:       (state.avaluos_cliente||[]).filter(a => a.id !== action.payload),
@@ -2228,6 +2233,11 @@ useEffect(() => {
         await sbThrow(supabase.from('avaluos_cliente').insert(av))
         if (avi.length) await sbThrow(supabase.from('avaluos_cliente_items').insert(avi))
         dispatch({ type: 'ADD_AVALUO_CLIENTE', payload: { avaluo: av, items: avi } })
+        break
+      }
+      case 'UPD_AVALUO_CLIENTE_PAGO': {
+        await sbThrow(supabase.from('avaluos_cliente').update(action.payload.cambios).eq('id', action.payload.id))
+        dispatch(action)
         break
       }
       case 'UPD_AVALUO_CLIENTE_ESTADO': {

@@ -64,6 +64,7 @@ const OVERRIDE_LABELS = {
   ADD_SOL_ELIM:               { es: 'Solicitó eliminación',                 en: 'Requested deletion',               modulo: 'Inventario' },
   ADD_MATERIAL_CON_ENTRADA:   { es: 'Creó material con entrada inicial',    en: 'Created material with initial entry', modulo: 'Inventario' },
   UPD_AVALUO_CLIENTE_ESTADO:  { es: 'Cambió estado de avalúo de cliente',   en: 'Changed client valuation status',  modulo: 'Avalúos' },
+  UPD_AVALUO_CLIENTE_PAGO:    { es: 'Registró pago de avalúo de cliente',   en: 'Recorded client valuation payment', modulo: 'Avalúos' },
   UPD_OC_ESTADO:              { es: 'Cambió estado de orden de compra',     en: 'Changed purchase order status',    modulo: 'Compras' },
   UPD_ORDEN_CAMBIO_ESTADO:    { es: 'Cambió estado de orden de cambio',     en: 'Changed change order status',      modulo: 'Órdenes de Cambio' },
   UPD_SOLICITUD_ESTADO:       { es: 'Cambió estado de solicitud',           en: 'Changed request status',           modulo: 'Compras' },
