@@ -352,8 +352,9 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
       const c = ws3.getCell(r3,i+1); c.value=h; styleHeader(c)
     })
     r3++
+    // Total facturado = suma de lo del período de cada avalúo (sumar los acumulados contaba
+    // varias veces lo mismo). Saldo = presupuesto del proyecto − facturado.
     let totalAcum = 0
-    let totalSaldo = 0
     data.avsProy.forEach(av => {
       const avItems = data.avsItems.filter(i => i.avaluo_id === av.id)
       avItems.forEach((it, idx) => {
@@ -363,7 +364,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
         const acumulado = parseFloat(it.monto_acumulado||0)
         const saldo     = contrato - acumulado
         const vals = [
-          av.numero_avaluo || av.folio || '—',
+          `#${av.numero}`,
           it.descripcion || '—',
           unidadCorta(it.unidad, lang) || '—',
           parseFloat(it.precio_unitario||0),
@@ -382,14 +383,13 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
             c.font = { ...c.font, color: { argb: v < 0 ? 'FFDC2626' : 'FF374151' } }
           }
         })
-        totalAcum  += acumulado
-        totalSaldo += saldo
+        totalAcum  += parseFloat(it.monto_periodo||0)
         r3++
       })
     })
     ws3.mergeCells(r3,1,r3,7); const at=ws3.getCell(r3,1); at.value=isEs?'TOTAL ACUMULADO COBRADO':'TOTAL ACCUMULATED BILLED'; styleTotal(at)
-    const av=ws3.getCell(r3,8);  av.value=totalAcum;   av.numFmt='"$"#,##0.00'; styleTotal(av)
-    const avs=ws3.getCell(r3,9); avs.value=totalSaldo; avs.numFmt='"$"#,##0.00'; styleTotal(avs)
+    const av=ws3.getCell(r3,8);  av.value=round2(totalAcum);   av.numFmt='"$"#,##0.00'; styleTotal(av)
+    const avs=ws3.getCell(r3,9); avs.value=round2(budget - totalAcum); avs.numFmt='"$"#,##0.00'; styleTotal(avs)
   }
 
   // ── HOJA 4: Costos indirectos presupuestados vs ejecutados ──
@@ -2279,8 +2279,10 @@ export default function Reportes() {
     }).filter(a=>a.pres>0||a.real>0)
 
     // Avalúos del proyecto
-    const avsProy  = avaluos_cliente.filter(a => a.proyecto_id === proyId)
-    const avsItems = avaluos_cliente_items.filter(i => avsProy.some(a => a.id === i.avaluo_id))
+    // Solo los aprobados cuentan como facturados; de cada uno, las partidas con avance en su período
+    const avsProy  = avaluos_cliente.filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
+      .sort((a, b) => (a.numero || 0) - (b.numero || 0))
+    const avsItems = avaluos_cliente_items.filter(i => avsProy.some(a => a.id === i.avaluo_id) && parseFloat(i.monto_periodo || 0) !== 0)
 
     // Indirectos presupuestados
     const indsPres = presupuesto_indirectos.filter(p => p.proyecto_id === proyId)
@@ -2548,7 +2550,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                   const avItems = data.avsItems.filter(i => i.avaluo_id === av.id)
                   return avItems.map((it,idx) => (
                     <tr key={it.id} className={idx%2===0?'bg-white':'bg-gray-50/50'}>
-                      <td className={tdC+' text-xs font-mono'}>{av.numero_avaluo||av.folio||'—'}</td>
+                      <td className={tdC+' text-xs font-mono'}>#{av.numero}</td>
                       <td className={tdC+' max-w-[160px] truncate'}>{it.descripcion}</td>
                       <td className={tdC+' text-right font-mono'}>{fmt(it.monto_contrato,moneda)}</td>
                       <td className={tdC+' text-right font-mono text-gray-400'}>{parseFloat(it.monto_anterior||0)>0?fmt(it.monto_anterior,moneda):'—'}</td>

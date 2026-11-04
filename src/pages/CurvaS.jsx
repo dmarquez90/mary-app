@@ -102,10 +102,21 @@ export default function CurvaS() {
     return costs.filter(c => c.fecha && c.monto > 0).sort((a,b) => a.fecha.localeCompare(b.fecha))
   }, [proyId, salidas, costosFIFO, costos_directos, nominas, subcontratos, subcontratos_contratos, subcontratos_avaluos, equipos, costos_indirectos])
 
+  // Fecha con la que un avalúo entra en la curva: fin del período que cubre o, si no lo
+  // tiene, su fecha de elaboración (antes solo contaban los que tenían periodo_fin).
+  const fechaAvaluo = (a) => a.periodo_fin || a.fecha_elaboracion || a.created_at?.slice(0,10)
+
   const chartData = useMemo(() => {
     if (!proy?.fecha_inicio) return []
-    const fechaInicio = proy.fecha_inicio
-    const fechaFin    = proy.fecha_fin_estimada || today()
+    const inicioPlan = proy.fecha_inicio
+    const finPlan    = proy.fecha_fin_estimada || today()
+    const avsAprobados = avaluos_cliente.filter(a => a.proyecto_id === proyId && a.estado === 'aprobado' && fechaAvaluo(a))
+
+    // El eje cubre el plan y también los costos o avalúos fuera de él (p. ej. un anticipo
+    // facturado antes del inicio): antes esos montos se perdían porque no tenían período.
+    const fechasDatos = [...allCosts.map(c => c.fecha), ...avsAprobados.map(fechaAvaluo)].sort()
+    const fechaInicio = [inicioPlan, fechasDatos[0]].filter(Boolean).sort()[0]
+    const fechaFin    = [finPlan, fechasDatos[fechasDatos.length - 1]].filter(Boolean).sort().slice(-1)[0]
 
     const periodos = granularity === 'mes'
       ? generarPeriodosMensuales(fechaInicio, fechaFin, lang)
@@ -113,106 +124,61 @@ export default function CurvaS() {
 
     if (periodos.length === 0) return []
 
-    const periodKey = (fecha) => {
-      const dt = new Date(fecha + 'T00:00:00')
-      if (granularity === 'mes') {
-        return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`
-      }
-      const m = String(dt.getMonth()+1).padStart(2,'0')
-      const d = String(dt.getDate()).padStart(2,'0')
-      return `${dt.getFullYear()}-${m}-${d}`
-    }
-
-    const closestPeriod = (fecha) => {
-      const k = periodKey(fecha)
-      if (granularity === 'semana') {
-        return periodos.reduce((prev, cur) =>
-          Math.abs(cur.key.localeCompare(k)) < Math.abs(prev.key.localeCompare(k)) ? cur : prev
-        ).key
-      }
+    // Período al que pertenece una fecha: su mes, o la semana cuyo inicio es el último <= fecha.
+    // (Antes la semana se elegía con localeCompare, que solo devuelve -1/0/1, y casi todo
+    // caía en la primera semana.)
+    const periodoDe = (fecha) => {
+      if (granularity === 'mes') return fecha.slice(0, 7)
+      let k = periodos[0].key
+      for (const p of periodos) { if (p.key <= fecha) k = p.key; else break }
       return k
     }
-
-    // ── Distribución del presupuesto por avance físico de avalúos ──────
-    // Usa el % de avance físico de cada avalúo para distribuir el presupuesto
-    // Si no hay avalúos, cae a distribución lineal uniforme
-    const avsDelProy = avaluos_cliente.filter(a => a.proyecto_id === proyId)
-      .sort((a, b) => (a.fecha_elaboracion||a.created_at||'').localeCompare(b.fecha_elaboracion||b.created_at||''))
-
-    const presPorPeriodo = {}
-
-    if (avsDelProy.length > 0) {
-      // Distribuir según el avance físico de cada avalúo (pct_avance = avance del
-      // período, fracción 0-1, guardado en AvaluosCliente.jsx). Se asigna a cada
-      // período el presupuesto correspondiente a ESE avance individual, no acumulado.
-      avsDelProy.forEach(av => {
-        const fecha    = av.fecha_elaboracion || av.created_at?.slice(0,10)
-        if (!fecha) return
-        const key         = closestPeriod(fecha)
-        const pctPeriodo  = Math.max(0, parseFloat(av.pct_avance || 0))
-        presPorPeriodo[key] = (presPorPeriodo[key] || 0) + (budget * pctPeriodo)
-      })
-      // Asignar el saldo restante al último período
-      const totalDistribuido = Object.values(presPorPeriodo).reduce((s,v) => s+v, 0)
-      const saldo = budget - totalDistribuido
-      if (saldo > 0 && avsDelProy.length > 0) {
-        const ultimaFecha = avsDelProy[avsDelProy.length-1].fecha_elaboracion || avsDelProy[avsDelProy.length-1].created_at?.slice(0,10)
-        if (ultimaFecha) {
-          const k = closestPeriod(ultimaFecha)
-          presPorPeriodo[k] = (presPorPeriodo[k] || 0) + saldo
-        }
+    // Último día de cada período, para leer el plan acumulado a esa fecha
+    const finDePeriodo = (key) => {
+      if (granularity === 'mes') {
+        const [y, m] = key.split('-').map(Number)
+        return new Date(y, m, 0)
       }
-    } else {
-      // Distribución en curva S real usando CDF beta(2,2) acumulada
-      // La CDF garantiza que siempre empiece en 0 y termine en budget,
-      // independientemente del número de períodos
-      const n = periodos.length
-      if (n === 1) {
-        presPorPeriodo[periodos[0].key] = budget
-      } else {
-        // CDF beta(2,2): F(x) = 3x² - 2x³  (integra la PDF 6x(1-x))
-        // Genera valores acumulados 0→1 con forma de S suave
-        const betaCDF = (x) => 3 * x * x - 2 * x * x * x
-        // Calcular el presupuesto incremental por período usando la diferencia de la CDF
-        periodos.forEach(({ key }, i) => {
-          const x0 = i / n       // inicio del período normalizado
-          const x1 = (i + 1) / n // fin del período normalizado
-          presPorPeriodo[key] = budget * (betaCDF(x1) - betaCDF(x0))
-        })
-      }
+      const d = new Date(key + 'T00:00:00'); d.setDate(d.getDate() + 6); return d
+    }
+
+    // ── Plan: curva S (CDF beta(2,2)) entre el inicio y el fin estimado del proyecto ──
+    // Es la línea base y no depende de lo facturado. Antes se armaba con los propios
+    // avalúos y el saldo se cargaba al último, así que el plan copiaba lo real.
+    const betaCDF = (x) => 3 * x * x - 2 * x * x * x
+    const t0 = new Date(inicioPlan + 'T00:00:00').getTime()
+    const t1 = new Date(finPlan + 'T00:00:00').getTime()
+    const planAcumA = (key) => {
+      if (t1 <= t0) return budget
+      const x = Math.min(1, Math.max(0, (finDePeriodo(key).getTime() - t0) / (t1 - t0)))
+      return budget * betaCDF(x)
     }
 
     // Costos reales por período
     const realPorPeriodo = {}
     allCosts.forEach(c => {
-      const k = closestPeriod(c.fecha)
+      const k = periodoDe(c.fecha)
       realPorPeriodo[k] = (realPorPeriodo[k] || 0) + c.monto
     })
 
-    // Ingresos cobrados — avalúos aprobados agrupados por periodo_fin
+    // Facturado: avalúos aprobados (monto bruto, antes de retención)
     const ingresoPorPeriodo = {}
-    avaluos_cliente
-      .filter(a => a.proyecto_id === proyId && a.estado === 'aprobado' && a.periodo_fin)
-      .forEach(a => {
-        const k = closestPeriod(a.periodo_fin)
-        ingresoPorPeriodo[k] = (ingresoPorPeriodo[k] || 0) + parseFloat(a.total || a.monto_total || 0)
-      })
+    avsAprobados.forEach(a => {
+      const k = periodoDe(fechaAvaluo(a))
+      ingresoPorPeriodo[k] = (ingresoPorPeriodo[k] || 0) + parseFloat(a.total || a.monto_total || 0)
+    })
 
-    let presAcum    = 0
-    let presRevAcum = 0
-    let realAcum    = 0
-    let ingresoAcum = 0
+    let planPrevio   = 0
+    let realAcum     = 0
+    let ingresoAcum  = 0
     let realStarted    = false
     let ingresoStarted = false
+    const factorRev = budgetRevisado > 0 && budget > 0 ? budgetRevisado / budget : 1
 
     return periodos.map(({ key, label }) => {
-      const montoPres    = presPorPeriodo[key] || 0
-      // Presupuesto revisado: misma distribución proporcional aplicada al budgetRevisado
-      const montoPresRev = budgetRevisado > 0 && budget > 0
-        ? montoPres * (budgetRevisado / budget)
-        : montoPres
-      presAcum    += montoPres
-      presRevAcum += montoPresRev
+      const presAcum  = planAcumA(key)
+      const montoPres = presAcum - planPrevio
+      planPrevio = presAcum
       realAcum    += (realPorPeriodo[key] || 0)
       ingresoAcum += (ingresoPorPeriodo[key] || 0)
 
@@ -226,13 +192,13 @@ export default function CurvaS() {
         pres_periodo:   Math.round(montoPres * 100) / 100,
         real_periodo:   Math.round((realPorPeriodo[key] || 0) * 100) / 100,
         ingreso_periodo:Math.round((ingresoPorPeriodo[key] || 0) * 100) / 100,
-        presAcum:       Math.round(Math.min(presAcum, budget) * 100) / 100,
-        presRevAcum:    deltaOCs > 0 ? Math.round(Math.min(presRevAcum, budgetRevisado) * 100) / 100 : undefined,
+        presAcum:       Math.round(presAcum * 100) / 100,
+        presRevAcum:    deltaOCs > 0 ? Math.round(presAcum * factorRev * 100) / 100 : undefined,
         realAcum:       realStarted    ? Math.round(realAcum * 100) / 100    : null,
         ingresoAcum:    ingresoStarted ? Math.round(ingresoAcum * 100) / 100 : null,
       }
     })
-  }, [allCosts, budget, budgetRevisado, deltaOCs, granularity, proy, avaluos_cliente, proyId])
+  }, [allCosts, budget, budgetRevisado, deltaOCs, granularity, proy, avaluos_cliente, proyId, lang])
 
   const totalReal      = allCosts.reduce((s,c) => s + c.monto, 0)
   const isEs           = useContext(LangContext).lang === 'ES'
@@ -240,9 +206,22 @@ export default function CurvaS() {
   const totalIngresado = avaluos_cliente
     .filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
     .reduce((s,a) => s + parseFloat(a.total || a.monto_total || 0), 0)
-  const flujo      = totalIngresado - totalReal
-  // Desviación contra presupuesto revisado (con OCs) si hay OCs, sino contra base
-  const desviacion = totalReal - budgetRevisado
+  // Flujo de caja: lo que el cliente realmente pagó (pagos registrados en los avalúos aprobados)
+  // menos lo gastado. Lo facturado no es caja: incluye retención y pagos pendientes.
+  const totalPagado = r2(avaluos_cliente
+    .filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
+    .reduce((s,a) => s + (parseFloat(a.monto_pagado) || 0), 0))
+  const flujo      = r2(totalPagado - totalReal)
+
+  // Avance físico por actividad: cantidad acumulada en los avalúos aprobados
+  const avanceAct = useMemo(() => {
+    const aprobados = new Set(avaluos_cliente.filter(a => a.proyecto_id === proyId && a.estado === 'aprobado').map(a => a.id))
+    const cant = {}
+    avaluos_cliente_items.forEach(i => {
+      if (aprobados.has(i.avaluo_id) && i.actividad_id) cant[i.actividad_id] = (cant[i.actividad_id] || 0) + (parseFloat(i.cantidad_periodo) || 0)
+    })
+    return { hayAvance: aprobados.size > 0, cant }
+  }, [avaluos_cliente, avaluos_cliente_items, proyId])
 
   const actDeviations = useMemo(() => {
     if (!proyId) return []
@@ -268,10 +247,36 @@ export default function CurvaS() {
         return s + costoEq
       }, 0)
       const real = matCost + dirCost + subCost + eqCost
-      const dev  = real - presupuestado
-      return { code: act.code, descripcion: act.descripcion, presupuestado, real, dev, devPct: presupuestado ? (dev/presupuestado)*100 : 0 }
+      // El costo real se compara con lo que vale el trabajo hecho (valor ganado = presupuesto ×
+      // avance físico de los avalúos aprobados), no con todo el presupuesto: si no, una partida
+      // a medias o sin costos cargados siempre salía como "ahorro" y OK.
+      const cantidad = parseFloat(act.cantidad) || 0
+      const avance   = cantidad > 0 ? Math.min(1, (avanceAct.cant[act.id] || 0) / cantidad) : 0
+      const ganado   = r2(presupuestado * avance)
+      const base     = avanceAct.hayAvance ? ganado : presupuestado
+      const dev      = r2(real - base)
+      return { id: act.id, code: act.code, descripcion: act.descripcion, presupuestado, avance, ganado, real, base, dev,
+        devPct: base ? (dev/base)*100 : 0 }
     }).filter(a => a.presupuestado > 0 || a.real > 0)
-  }, [items, salidas, costosFIFO, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, subcontratos_avaluo_items, equipos, proyId])
+  }, [items, salidas, costosFIFO, costos_directos, subcontratos, subcontratos_items, subcontratos_avaluos, subcontratos_avaluo_items, equipos, proyId, avanceAct])
+
+  // Estado de cada partida: sin costos cargados no es "OK", es falta de información
+  const estadoDev = (a) => {
+    if (a.real === 0) return a.base > 0 ? 'sin_costos' : 'sin_iniciar'
+    if (a.dev <= 0) return 'ok'
+    return a.base > 0 && a.dev / a.base < 0.15 ? 'alerta' : 'critico'
+  }
+  const totDev = actDeviations.reduce((s, a) => ({
+    presupuestado: s.presupuestado + a.presupuestado, ganado: s.ganado + a.ganado, real: s.real + a.real, base: s.base + a.base,
+  }), { presupuestado: 0, ganado: 0, real: 0, base: 0 })
+  // Costos del proyecto sin partida (planilla, indirectos, gastos sin actividad): cuentan en el total
+  const realSinActividad = r2(totalReal - totDev.real)
+
+  // KPI de desviación: costo real vs valor ganado (con la parte proporcional de indirectos);
+  // sin avalúos aprobados no hay avance medido y se compara contra el presupuesto revisado
+  const indirectosProy = calcIndirectos(proy, totalDirectos, indsDelProy).total
+  const valorGanado    = totalDirectos > 0 ? r2(totDev.ganado * (totalDirectos + indirectosProy) / totalDirectos) : 0
+  const desviacion     = avanceAct.hayAvance ? r2(totalReal - valorGanado) : r2(totalReal - budgetRevisado)
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null
@@ -299,7 +304,7 @@ export default function CurvaS() {
           <span className="font-mono font-medium">{fmt(real.value, moneda)}</span>
         </div>}
         {ing && ing.value > 0 && <div className="flex justify-between gap-4 mb-1">
-          <span style={{ color: '#7C3AED' }}>● {isEs ? 'Cobrado' : 'Billed'}</span>
+          <span style={{ color: '#7C3AED' }}>● {isEs ? 'Facturado' : 'Billed'}</span>
           <span className="font-mono font-medium">{fmt(ing.value, moneda)}</span>
         </div>}
         {realPer?.value > 0 && <div className="flex justify-between gap-4 mt-1.5 pt-1.5 border-t border-gray-100 text-gray-400">
@@ -358,7 +363,11 @@ export default function CurvaS() {
               label={t('curva_kpi_deviation')}
               value={`${desviacion>=0?'+':''}${fmt(desviacion,moneda)}`}
               color={desviacion > 0 ? '#ef4444' : desviacion < 0 ? '#1D9E75' : '#6b7280'}
-              sub={deltaOCs > 0
+              sub={totalReal === 0
+                ? (isEs ? 'sin costos registrados' : 'no costs recorded')
+                : avanceAct.hayAvance
+                ? `${desviacion > 0 ? t('curva_overcost') : desviacion < 0 ? t('curva_saving') : t('curva_on_budget')} · ${isEs ? 'vs valor ganado' : 'vs earned value'} ${fmt(valorGanado, moneda)}`
+                : deltaOCs > 0
                 ? (isEs ? 'vs presupuesto revisado' : 'vs revised budget')
                 : (desviacion > 0 ? t('curva_overcost') : desviacion < 0 ? t('curva_saving') : t('curva_on_budget'))}
             />
@@ -368,15 +377,15 @@ export default function CurvaS() {
               sub={t('curva_kpi_execution_sub')}
             />
             <StatCard
-              label={isEs ? 'Cobrado (aprobado)' : 'Billed (approved)'}
+              label={isEs ? 'Facturado (aprobado)' : 'Billed (approved)'}
               value={fmt(totalIngresado, moneda)}
               color='#7C3AED'
             />
             <StatCard
-              label={isEs ? 'Flujo (cobrado - gasto)' : 'Cash flow (billed - cost)'}
+              label={isEs ? 'Flujo (pagado - gasto)' : 'Cash flow (paid - cost)'}
               value={`${flujo>=0?'+':''}${fmt(flujo,moneda)}`}
               color={flujo >= 0 ? '#1D9E75' : '#ef4444'}
-              sub={flujo >= 0 ? (isEs?'Flujo positivo':'Positive flow') : (isEs?'Flujo negativo':'Negative flow')}
+              sub={`${isEs ? 'Pagado por el cliente' : 'Paid by client'}: ${fmt(totalPagado, moneda)}`}
             />
           </div>
 
@@ -391,17 +400,19 @@ export default function CurvaS() {
               <h2 className="text-sm font-semibold text-gray-700 mb-4">
                 {t('curva_chart_title')} ({moneda})
               </h2>
-              {avsDelProy?.length > 0 ? (
               <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
-                <span>📊</span>
-                {isEs ? 'Distribución del presupuesto basada en avance físico de avalúos registrados.' : 'Budget distribution based on physical progress from registered billings.'}
-              </p>
-            ) : (
-              <p className="text-xs text-blue-500 mb-3 flex items-center gap-1">
                 <span>📈</span>
-                {isEs ? 'Curva S calculada con distribución beta — registra avalúos para mayor precisión.' : 'S-Curve using beta distribution — register billings for higher accuracy.'}
+                {isEs
+                  ? `Plan: curva S entre el inicio (${proy?.fecha_inicio || '—'}) y el fin estimado (${proy?.fecha_fin_estimada || '—'}). Facturado: avalúos aprobados. Real: costos registrados.`
+                  : `Plan: S-curve from start (${proy?.fecha_inicio || '—'}) to estimated finish (${proy?.fecha_fin_estimada || '—'}). Billed: approved valuations. Real: recorded costs.`}
               </p>
-            )}
+              {avsDelProy?.length > 0 && totalReal === 0 && (
+                <p className="text-xs text-amber-600 mb-3">
+                  {isEs
+                    ? 'Este proyecto no tiene costos registrados (salidas de bodega, gastos, planilla, subcontratos o equipos), por eso la línea Real no aparece.'
+                    : 'This project has no recorded costs (warehouse exits, expenses, payroll, subcontracts or equipment), so the Real line does not appear.'}
+                </p>
+              )}
             <ResponsiveContainer width="100%" height={340}>
                 <ComposedChart data={chartData} margin={{ top:10, right:20, left:10, bottom:5 }}>
                   <defs>
@@ -474,7 +485,7 @@ export default function CurvaS() {
                   <Line
                     type="monotone"
                     dataKey="ingresoAcum"
-                    name={isEs ? 'Cobrado acumulado' : 'Accumulated billed'}
+                    name={isEs ? 'Facturado acumulado' : 'Accumulated billed'}
                     stroke="#7C3AED"
                     strokeWidth={2}
                     strokeDasharray="6 3"
@@ -495,37 +506,77 @@ export default function CurvaS() {
             <div className="m-card overflow-x-auto">
               <div className="px-5 py-4 border-b border-gray-50">
                 <h2 className="text-sm font-semibold text-gray-700">{t('curva_dev_title')}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {avanceAct.hayAvance
+                    ? (isEs ? 'Desviación = costo real − valor ganado (presupuesto × avance físico de los avalúos aprobados).'
+                            : 'Deviation = real cost − earned value (budget × physical progress from approved valuations).')
+                    : (isEs ? 'Sin avalúos aprobados: la desviación se mide contra el presupuesto completo.'
+                            : 'No approved valuations: deviation is measured against the full budget.')}
+                </p>
               </div>
               <table className="w-full">
                 <thead><tr className="m-thead-row">
-                  {[t('curva_col_code'),t('curva_col_activity'),t('curva_col_budget'),t('curva_col_real'),t('curva_col_dev'),t('curva_col_dev_pct'),t('curva_col_status')].map((h,i) => (
+                  {[t('curva_col_code'), t('curva_col_activity'), t('curva_col_budget'),
+                    ...(avanceAct.hayAvance ? [isEs ? '% Avance' : '% Progress', isEs ? 'Valor ganado' : 'Earned value'] : []),
+                    t('curva_col_real'), t('curva_col_dev'), t('curva_col_dev_pct'), t('curva_col_status')].map((h,i) => (
                     <th key={i} className="px-4 py-3 text-left">{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
-                  {actDeviations.map((a,i) => {
-                    const status = a.dev <= 0 ? 'ok' : a.presupuestado > 0 && a.dev/a.presupuestado < 0.15 ? 'alerta' : 'critico'
+                  {actDeviations.map(a => {
+                    const status = estadoDev(a)
+                    const sinDatos = status === 'sin_costos' || status === 'sin_iniciar'
+                    const color = sinDatos ? '#9ca3af' : a.dev > 0 ? '#ef4444' : a.dev < 0 ? '#1D9E75' : '#6b7280'
                     return (
-                      <tr key={i} className="m-tr">
+                      <tr key={a.id} className="m-tr">
                         <td className="px-4 py-3 text-xs font-mono text-gray-500">{a.code}</td>
                         <td className="px-4 py-3 text-sm text-gray-800 max-w-[180px] truncate">{a.descripcion}</td>
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(a.presupuestado, moneda)}</td>
+                        {avanceAct.hayAvance && <>
+                          <td className="px-4 py-3 text-sm font-mono text-gray-600">{(a.avance * 100).toFixed(1)}%</td>
+                          <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(a.ganado, moneda)}</td>
+                        </>}
                         <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(a.real, moneda)}</td>
-                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: a.dev>0?'#ef4444':a.dev<0?'#1D9E75':'#6b7280' }}>
-                          {a.dev>0?'+':''}{fmt(a.dev, moneda)}
+                        <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color }}>
+                          {sinDatos ? '—' : `${a.dev>0?'+':''}${fmt(a.dev, moneda)}`}
                         </td>
-                        <td className="px-4 py-3 text-sm font-mono" style={{ color: a.dev>0?'#ef4444':a.dev<0?'#1D9E75':'#6b7280' }}>
-                          {a.dev>0?'+':''}{a.devPct.toFixed(1)}%
+                        <td className="px-4 py-3 text-sm font-mono" style={{ color }}>
+                          {sinDatos ? '—' : `${a.dev>0?'+':''}${a.devPct.toFixed(1)}%`}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                            ${status==='ok'?'bg-green-100 text-green-700':status==='alerta'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600'}`}>
-                            {status==='ok' ? `✓ ${t('curva_status_ok')}` : status==='alerta' ? `⚠ ${t('curva_status_alert')}` : `⚠ ${t('curva_status_critical')}`}
+                            ${status==='ok'?'bg-green-100 text-green-700':status==='alerta'?'bg-amber-100 text-amber-700':status==='critico'?'bg-red-100 text-red-600':'bg-gray-100 text-gray-500'}`}>
+                            {status==='ok' ? `✓ ${t('curva_status_ok')}`
+                              : status==='alerta' ? `⚠ ${t('curva_status_alert')}`
+                              : status==='critico' ? `⚠ ${t('curva_status_critical')}`
+                              : status==='sin_costos' ? (isEs ? 'Sin costos' : 'No costs')
+                              : (isEs ? 'Sin iniciar' : 'Not started')}
                           </span>
                         </td>
                       </tr>
                     )
                   })}
+                  {realSinActividad > 0.005 && (
+                    <tr className="m-tr">
+                      <td className="px-4 py-3 text-xs font-mono text-gray-400">—</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 italic" colSpan={avanceAct.hayAvance ? 4 : 2}>
+                        {isEs ? 'Costos sin partida asignada (planilla, indirectos, gastos generales)' : 'Costs not assigned to an activity (payroll, indirect, general expenses)'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(realSinActividad, moneda)}</td>
+                      <td colSpan={3} />
+                    </tr>
+                  )}
+                  <tr className="m-tr font-semibold">
+                    <td className="px-4 py-3" />
+                    <td className="px-4 py-3 text-sm text-gray-800">{isEs ? 'Total' : 'Total'}</td>
+                    <td className="px-4 py-3 text-sm font-mono">{fmt(totDev.presupuestado, moneda)}</td>
+                    {avanceAct.hayAvance && <>
+                      <td className="px-4 py-3 text-sm font-mono">{totDev.presupuestado > 0 ? ((totDev.ganado / totDev.presupuestado) * 100).toFixed(1) : '0.0'}%</td>
+                      <td className="px-4 py-3 text-sm font-mono">{fmt(totDev.ganado, moneda)}</td>
+                    </>}
+                    <td className="px-4 py-3 text-sm font-mono">{fmt(totalReal, moneda)}</td>
+                    <td colSpan={3} />
+                  </tr>
                 </tbody>
               </table>
             </div>
