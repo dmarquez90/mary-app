@@ -246,7 +246,7 @@ export default function Financiero() {
   const tdCls = 'px-4 py-3 text-sm text-gray-700'
 
   return (
-    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1400px] mx-auto">
       <PageHeader
         title={t('fin_title')}
         subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}
@@ -961,7 +961,7 @@ export default function Financiero() {
       {/* ── MODAL AJUSTE / CIERRE PARCIAL DE EQUIPO ────────────────── */}
       {ajusteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-xl shadow-2xl p-5 sm:p-6 max-w-md w-full mx-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-lg">🔧</div>
               <div>
@@ -1376,7 +1376,7 @@ function SubcontratosModule({ can, rol,
             <p className="text-xs text-amber-600 mt-1">{t('fin_sc_form_warranty_hint')}</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_sc_form_contract_date')}</label>
             <input type="date" className="m-input"
@@ -1571,7 +1571,7 @@ function SubcontratosModule({ can, rol,
         </div>
 
         {/* Resumen financiero */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
           {[
             [t('fin_sc_col_contract'), fmt(scSelected.monto_total, moneda), 'var(--brand)'],
             [t('fin_sc_valued'), fmt(totalPagado, moneda), '#1D9E75'],
@@ -1637,7 +1637,7 @@ Total: `)
               </div>
 
               {/* KPIs */}
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                 <div>
                   <p className="text-xs text-amber-600">{t('fin_sc_retained')}</p>
                   <p className="text-base font-bold font-mono text-amber-700">{fmt(retencionTotal, moneda)}</p>
@@ -1937,7 +1937,7 @@ Total: `)
 
         <div className="m-card p-5 flex flex-col gap-4">
           {/* Cabecera */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">{t('fin_av_period_start')}</label>
               <input type="date" className="m-input"

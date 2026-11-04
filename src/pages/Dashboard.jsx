@@ -283,7 +283,7 @@ export default function Dashboard({ onNavigate }) {
   const hayDatos = proyectos.length > 0 || materiales.length > 0
 
   return (
-    <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
       <PageHeader
         title={t('dash_title')}
         subtitle={new Date().toLocaleDateString(isEs ? 'es' : 'en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -315,7 +315,7 @@ export default function Dashboard({ onNavigate }) {
         <>
           {/* ══ KPIs ══════════════════════════════════════════════ */}
           <div className="grid gap-3.5 m-stagger"
-            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))' }}>
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))' }} data-kpi-grid>
             <KpiCard
               label={t('dash_projects')} value={proyectosActivos.length}
               sub={`${proyectos.length} ${isEs ? 'en total' : 'total'}`}

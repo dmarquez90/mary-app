@@ -397,7 +397,7 @@ export default function Presupuesto() {
   }
 
   return (
-    <div className="p-5 md:p-6 max-w-full">
+    <div className="p-3 sm:p-5 md:p-6 max-w-full">
       <PageHeader
         title={t('pres_title')}
         subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}

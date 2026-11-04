@@ -390,7 +390,7 @@ export default function Configuracion({ onNavigate }) {
 
   return (
     <>
-    <div className="p-5 md:p-6 max-w-5xl mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-5xl mx-auto">
 
       {/* SUCCESS TOAST */}
       {success && (
@@ -402,7 +402,7 @@ export default function Configuracion({ onNavigate }) {
       {/* MODAL APROBAR/RECHAZAR SOLICITUD */}
       {modalSol && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full mx-4">
+          <div className="bg-white rounded-xl shadow-2xl p-5 sm:p-6 max-w-lg w-full mx-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-lg">⚠</div>
               <div>
@@ -460,7 +460,7 @@ export default function Configuracion({ onNavigate }) {
       {/* CONFIRM TOGGLE USUARIO */}
       {confirmAct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-white rounded-xl shadow-xl p-5 sm:p-6 max-w-sm w-full mx-4 max-h-[90dvh] overflow-y-auto">
             <p className="text-sm font-semibold text-gray-800 mb-1">{confirmAct.title}</p>
             <p className="text-sm text-gray-500 mb-5">{confirmAct.msg}</p>
             <div className="flex justify-end gap-2">
@@ -538,7 +538,7 @@ export default function Configuracion({ onNavigate }) {
 
       {/* KPIs — solo para admins */}
       {esAdmin && (
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <div className="m-card p-4">
           <p className="text-xs text-gray-400 mb-1">{t('cfg_users_plan')}</p>
           <p className="text-lg font-bold capitalize" style={{ color: BRAND }}>{tenant?.plan || '—'}</p>
@@ -1008,7 +1008,7 @@ export default function Configuracion({ onNavigate }) {
           </div>
 
           {/* Tarjetas de planes */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {[
               {
                 id: 'starter',
@@ -1212,7 +1212,7 @@ export default function Configuracion({ onNavigate }) {
     {permDrawer && (
       <div className="fixed inset-0 z-50 flex">
         <div className="flex-1 bg-black/30" onClick={() => setPermDrawer(null)} />
-        <div className="w-[480px] bg-white h-full shadow-2xl flex flex-col overflow-hidden">
+        <div className="w-full max-w-[480px] bg-white h-full shadow-2xl flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div>
               <p className="font-semibold text-gray-800">{isEs ? 'Permisos de acceso' : 'Access permissions'}</p>

@@ -211,7 +211,7 @@ export default function Auditoria({ onNavigate }) {
 
   if (!puedeVer) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-3 sm:p-6 max-w-3xl mx-auto">
         <EmptyState icon={Icons.financial}
           title={isEs ? 'Acceso restringido' : 'Restricted access'}
           subtitle={isEs
@@ -222,7 +222,7 @@ export default function Auditoria({ onNavigate }) {
   }
 
   return (
-    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1400px] mx-auto">
       <button onClick={() => onNavigate?.('configuracion')}
         className="text-xs mb-3 flex items-center gap-1 font-medium"
         style={{ color: 'var(--txt-3)' }}>

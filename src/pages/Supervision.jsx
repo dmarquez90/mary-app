@@ -125,7 +125,7 @@ export default function Supervision() {
 
   if (!puedeVer) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-3 sm:p-6 max-w-3xl mx-auto">
         <EmptyState icon={Icons.supervision}
           title={isEs ? 'Acceso restringido' : 'Restricted access'}
           subtitle={isEs
@@ -136,7 +136,7 @@ export default function Supervision() {
   }
 
   return (
-    <div className="p-5 md:p-6 max-w-4xl mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-4xl mx-auto">
       <PageHeader
         title={isEs ? 'Supervisión — Bitácora' : 'Supervision — Log'}
         subtitle={isEs

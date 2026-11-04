@@ -454,7 +454,7 @@ export default function AvaluosCliente() {
   // ── VISTA NUEVO ──────────────────────────────────────────────────────────
   if (vista === 'nuevo') {
     return (
-      <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+      <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <div>
@@ -465,7 +465,7 @@ export default function AvaluosCliente() {
           </div>
         </div>
         <div className="m-card p-5 flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <Field label={isEs ? 'Periodo inicio' : 'Period start'}>
               <input type="date" className={inputCls} value={avForm.periodo_inicio||''} onChange={setAvF('periodo_inicio')} />
             </Field>
@@ -476,8 +476,8 @@ export default function AvaluosCliente() {
               <input type="date" className={inputCls} value={avForm.fecha_elaboracion||''} onChange={setAvF('fecha_elaboracion')} />
             </Field>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <Field label={isEs ? 'Presentado a' : 'Submitted to'} className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <Field label={isEs ? 'Presentado a' : 'Submitted to'} className="sm:col-span-2">
               <input className={inputCls} value={avForm.presentado_a||''} onChange={setAvF('presentado_a')}
                 placeholder={isEs ? 'Nombre del supervisor o cliente' : 'Supervisor or client name'} />
             </Field>
@@ -487,7 +487,7 @@ export default function AvaluosCliente() {
             </Field>
           </div>
           {totalOCAprobadas !== 0 && (
-            <div className="grid grid-cols-3 gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
               <div><p className="text-blue-500">{isEs?'Presupuesto original':'Original budget'}</p><p className="font-bold font-mono text-blue-700">{fmt(presupuestoOriginal, moneda)}</p></div>
               <div><p className="text-blue-500">{isEs?'OC aprobadas':'Approved COs'}</p><p className="font-bold font-mono text-blue-700">{totalOCAprobadas>=0?'+':''}{fmt(totalOCAprobadas, moneda)}</p></div>
               <div><p className="text-blue-500">{isEs?'Presupuesto efectivo':'Effective budget'}</p><p className="font-bold font-mono text-blue-800">{fmt(presupuestoEfectivo, moneda)}</p></div>
@@ -632,7 +632,7 @@ export default function AvaluosCliente() {
     const avSubtotal2 = parseFloat(avDetalle.subtotal || 0)
     const avImp2      = parseFloat(avDetalle.impuesto_monto || 0)
     return (
-      <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+      <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
@@ -876,7 +876,7 @@ export default function AvaluosCliente() {
 
   // ── LISTA ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
       <PageHeader
         title={isEs ? 'Avalúos al Cliente' : 'Client Valuations'}
         subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}

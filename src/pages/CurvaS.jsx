@@ -322,7 +322,7 @@ export default function CurvaS() {
   const noData = budget === 0 && allCosts.length === 0
 
   return (
-    <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
       <PageHeader
         title={t('curva_title')}
         subtitle={proy ? `${proy.project_code} — ${proy.nombre}` : null}

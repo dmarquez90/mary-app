@@ -177,7 +177,7 @@ export function Toolbar({ children, className = '' }) {
 
 export function SearchInput({ value, onChange, placeholder, className = '', width = 240 }) {
   return (
-    <div className={`relative ${className}`} style={{ width }}>
+    <div className={`relative ${className}`} style={{ width, maxWidth: '100%' }}>
       <span className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--txt-3)' }}>
         {Icons.search}
       </span>
@@ -322,7 +322,7 @@ export function KpiCard({ label, value, sub, icon, tone = 'brand', trend, spark,
           </span>
         )}
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight" style={{ color: 'var(--txt)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-d)' }}>
+      <p className="mt-2 text-2xl font-bold tracking-tight [overflow-wrap:anywhere]" style={{ color: 'var(--txt)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-d)' }}>
         {value}
       </p>
       <div className="flex items-end justify-between gap-2 mt-1">
@@ -466,8 +466,8 @@ export function Drawer({ open, onClose, title, subtitle, children, width = 420, 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 m-fade" style={{ background: 'rgba(8,18,32,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="relative m-drawer drawer-enter z-50 flex flex-col" style={{ width, maxWidth: '96vw' }}>
-        <div className="flex items-start justify-between gap-3 px-5 py-4 sticky top-0 z-10"
+      <div className="relative m-drawer drawer-enter z-50 flex flex-col" style={{ width, maxWidth: '100vw' }}>
+        <div className="flex items-start justify-between gap-3 px-4 sm:px-5 py-4 sticky top-0 z-10"
           style={{ borderBottom: '1px solid var(--bd)', background: 'var(--surface)' }}>
           <div className="min-w-0">
             <h3 className="font-semibold text-sm truncate" style={{ color: 'var(--txt)' }}>{title}</h3>
@@ -475,9 +475,9 @@ export function Drawer({ open, onClose, title, subtitle, children, width = 420, 
           </div>
           <IconBtn icon={Icons.x} onClick={onClose} />
         </div>
-        <div className="flex-1 p-5 flex flex-col gap-4 overflow-y-auto">{children}</div>
+        <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 overflow-y-auto">{children}</div>
         {footer && (
-          <div className="px-5 py-4 flex items-center justify-end gap-2"
+          <div className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-end gap-2"
             style={{ borderTop: '1px solid var(--bd)', background: 'var(--surface-2)' }}>
             {footer}
           </div>
@@ -511,7 +511,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
         )}
         <div className="px-5 py-4 overflow-y-auto">{children}</div>
         {footer && (
-          <div className="px-5 py-3.5 flex items-center justify-end gap-2"
+          <div className="px-5 py-3.5 flex flex-wrap items-center justify-end gap-2"
             style={{ borderTop: '1px solid var(--bd)', background: 'var(--surface-2)' }}>
             {footer}
           </div>

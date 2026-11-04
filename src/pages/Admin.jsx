@@ -395,7 +395,7 @@ export default function Admin() {
       {/* CONFIRM MODAL */}
       {confirmDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-white rounded-xl shadow-xl p-5 sm:p-6 max-w-sm w-full mx-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-3">
               {confirmDel.isDangerous && (
                 <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg flex-shrink-0">⚠</div>
@@ -559,7 +559,7 @@ export default function Admin() {
       <div className="max-w-7xl mx-auto px-8 py-8">
 
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {[
             { label: T.companiesReg, value: tenants.length,  sub: `${tenants.filter(t=>t.activo).length} ${T.active}` },
             { label: T.totalUsers,   value: usuarios.length, sub: `${usuarios.filter(u=>u.activo).length} ${T.activeU}` },

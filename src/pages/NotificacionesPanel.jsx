@@ -158,8 +158,8 @@ export default function NotificacionesPanel({ onNavigate }) {
 
       {/* Panel */}
       {open && (
-        <div className="absolute right-0 top-11 w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col overflow-hidden"
-          style={{ maxHeight: '520px' }}>
+        <div className="fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-11 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col overflow-hidden"
+          style={{ maxHeight: 'min(520px, calc(100dvh - 72px))' }}>
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">

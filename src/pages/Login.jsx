@@ -467,13 +467,14 @@ function LeftPanel({ t, variant, onExitToLanding }) {
     : t.left_sub_forgot
 
   return (
-    <div style={leftPanelStyle}>
+    <div className="m-auth-left" style={leftPanelStyle}>
       <div style={leftGridStyle} />
       <div style={leftGlowStyle} />
 
       {/* Logo mark + wordmark */}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <button
+          className="m-auth-extra"
           onClick={() => onExitToLanding?.()}
           disabled={!onExitToLanding}
           style={{
@@ -502,16 +503,16 @@ function LeftPanel({ t, variant, onExitToLanding }) {
           </button>
         )}
 
-        <PillBadge>{t.left_badge}</PillBadge>
+        <div className="m-auth-extra"><PillBadge>{t.left_badge}</PillBadge></div>
 
-        <h1 style={{
+        <h1 className="m-auth-title" style={{
           fontSize: 22, fontWeight: 700, color: WHITE,
           lineHeight: 1.3, letterSpacing: '-0.3px',
           margin: '0 0 12px',
         }}>
           {headline}
         </h1>
-        <p style={{
+        <p className="m-auth-extra" style={{
           fontSize: 13.5, color: `rgba(147,184,216,0.65)`,
           lineHeight: 1.6, margin: '0 0 1.75rem',
         }}>
@@ -520,7 +521,7 @@ function LeftPanel({ t, variant, onExitToLanding }) {
 
         {/* Bullets */}
         {variant === 'login' && (
-          <div>
+          <div className="m-auth-extra">
             <CheckBullet>{t.left_bullet1}</CheckBullet>
             <CheckBullet>{t.left_bullet2}</CheckBullet>
             <CheckBullet>{t.left_bullet3}</CheckBullet>
@@ -529,7 +530,7 @@ function LeftPanel({ t, variant, onExitToLanding }) {
         )}
 
         {variant === 'register' && (
-          <div style={{
+          <div className="m-auth-extra" style={{
             background: `rgba(26,94,180,0.12)`,
             border: `1px solid rgba(26,94,180,0.28)`,
             borderRadius: 10, padding: '14px 16px',
@@ -546,7 +547,7 @@ function LeftPanel({ t, variant, onExitToLanding }) {
         )}
 
         {variant === 'forgot' && (
-          <div>
+          <div className="m-auth-extra">
             <CheckBullet>{t.left_bullet1}</CheckBullet>
             <CheckBullet>{t.left_bullet2}</CheckBullet>
             <CheckBullet>{t.left_bullet3}</CheckBullet>
@@ -555,7 +556,7 @@ function LeftPanel({ t, variant, onExitToLanding }) {
       </div>
 
       {/* Footer del panel izquierdo */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div className="m-auth-extra" style={{ position: 'relative', zIndex: 1 }}>
         <a
           href="https://www.marquezprojectsolutions.com"
           target="_blank"
@@ -1033,7 +1034,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
       {/* ── LOGIN ─────────────────────────────────────────────────────────── */}
       {view === 'login' && (
-        <div style={splitWrapStyle}>
+        <div className="m-auth-split" style={splitWrapStyle}>
           {/* Blueprint grid (full page background) */}
           <div style={{
             position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
@@ -1043,7 +1044,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
           <LeftPanel t={t} variant="login" onExitToLanding={onExitToLanding} />
 
-          <div style={rightPanelStyle}>
+          <div className="m-auth-right" style={rightPanelStyle}>
             <LangToggle lang={lang} setLang={setLang} />
             <div style={cardInnerStyle}>
 
@@ -1140,7 +1141,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
       {/* ── REGISTER ──────────────────────────────────────────────────────── */}
       {view === 'register' && (
-        <div style={splitWrapStyle}>
+        <div className="m-auth-split" style={splitWrapStyle}>
           <div style={{
             position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
             backgroundImage: `linear-gradient(rgba(127,168,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(127,168,212,0.04) 1px, transparent 1px)`,
@@ -1149,7 +1150,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
           <LeftPanel t={t} variant="register" onExitToLanding={onExitToLanding} />
 
-          <div style={{ ...rightPanelStyle, paddingTop: '3rem', paddingBottom: '3rem' }}>
+          <div className="m-auth-right" style={{ ...rightPanelStyle, paddingTop: '3rem', paddingBottom: '3rem' }}>
             <LangToggle lang={lang} setLang={setLang} />
             <div style={{ ...cardInnerStyle, maxWidth: 460 }}>
 
@@ -1225,7 +1226,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
                 </div>
               ) : (
                 <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="m-auth-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={labelStyle}>{t.reg_name} *</label>
                       <input style={inputBaseNoIcon} value={reg.nombre} onChange={setR('nombre')} placeholder={t.reg_name_ph} />
@@ -1236,7 +1237,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="m-auth-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={labelStyle}>{t.reg_phone} *</label>
                       <input style={inputBaseNoIcon} value={reg.telefono} onChange={setR('telefono')} placeholder="+1 555 000 0000" />
@@ -1346,7 +1347,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
       {/* ── FORGOT PASSWORD ───────────────────────────────────────────────── */}
       {view === 'forgot' && (
-        <div style={splitWrapStyle}>
+        <div className="m-auth-split" style={splitWrapStyle}>
           <div style={{
             position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
             backgroundImage: `linear-gradient(rgba(127,168,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(127,168,212,0.04) 1px, transparent 1px)`,
@@ -1355,7 +1356,7 @@ export default function Login({ onNavigate, initialView = 'login', onExitToLandi
 
           <LeftPanel t={t} variant="forgot" onExitToLanding={onExitToLanding} />
 
-          <div style={rightPanelStyle}>
+          <div className="m-auth-right" style={rightPanelStyle}>
             <LangToggle lang={lang} setLang={setLang} />
             <div style={cardInnerStyle}>
 

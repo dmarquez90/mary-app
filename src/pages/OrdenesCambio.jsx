@@ -417,7 +417,7 @@ export default function OrdenesCambio() {
   // ── VISTA NUEVA OC ──────────────────────────────────────────────────────
   if (vista === 'nueva') {
     return (
-      <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+      <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <div>
@@ -652,7 +652,7 @@ export default function OrdenesCambio() {
                           <tr className="border-b border-amber-100 bg-amber-50/30">
                             <td></td>
                             <td colSpan={9} className="px-2 pb-3">
-                              <div className="grid grid-cols-3 gap-2 p-2 bg-white rounded-lg border border-amber-100 max-w-xl">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2 bg-white rounded-lg border border-amber-100 max-w-xl">
                                 <div>
                                   <label className="text-xs text-gray-500 block mb-1">
                                     {isEs ? 'Costo MO / unidad' : 'Labor cost / unit'}
@@ -678,7 +678,7 @@ export default function OrdenesCambio() {
                                     placeholder="0.00" min="0" step="0.01" />
                                 </div>
                                 {pu > 0 && (
-                                  <div className="col-span-3 flex items-center gap-2 text-xs pt-1 border-t border-amber-100">
+                                  <div className="sm:col-span-3 flex items-center gap-2 text-xs pt-1 border-t border-amber-100">
                                     <span className="text-gray-500">{isEs ? 'P.U. calculado:' : 'Calculated unit price:'}</span>
                                     <span className="font-mono font-bold" style={{ color: BRAND }}>{fmt(pu, moneda)}</span>
                                     <span className="text-gray-400">{isEs ? '(MO + Materiales + Equipo)' : '(Labor + Materials + Equipment)'}</span>
@@ -728,7 +728,7 @@ export default function OrdenesCambio() {
   }
 
   return (
-    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1400px] mx-auto">
 
       {/* Header */}
       <PageHeader

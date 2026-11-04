@@ -2368,7 +2368,7 @@ export default function Reportes() {
   const inputCls = 'm-input'
 
   return (
-    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1400px] mx-auto">
       <PageHeader
         title={isEs ? 'Reportes' : 'Reports'}
         subtitle={isEs

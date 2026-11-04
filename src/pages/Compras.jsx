@@ -532,13 +532,13 @@ export default function Compras() {
   }
 
   return (
-    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1400px] mx-auto">
       <style>{printStyles}</style>
 
       {/* CONFIRM DELETE */}
       {confirmDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-white rounded-xl shadow-xl p-5 sm:p-6 max-w-sm w-full mx-4 max-h-[90dvh] overflow-y-auto">
             <p className="text-sm font-semibold text-gray-800 mb-1">
               {confirmDel.type === 'sol' ? t('comp_del_sol_title') : t('comp_del_oc_title')}
             </p>

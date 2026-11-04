@@ -208,7 +208,7 @@ export default function Proyectos({ onNavigate }) {
   const conteoEstado = (e) => e === 'todos' ? proyectos.length : proyectos.filter(p => p.estado === e).length
 
   return (
-    <div className="p-5 md:p-6 max-w-[1500px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
 
       <PageHeader
         title={t('proy_title')}
@@ -325,7 +325,7 @@ export default function Proyectos({ onNavigate }) {
       )}
 
       {proyectos.length > 0 && (
-        <div className="grid gap-3.5 mb-4 m-stagger" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        <div className="grid gap-3.5 mb-4 m-stagger" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }} data-kpi-grid>
           <KpiCard label={isEs ? 'Proyectos' : 'Projects'} value={resumen.total}
             sub={`${resumen.completados} ${isEs ? 'completados' : 'completed'}`} icon={Icons.projects} tone="brand" />
           <KpiCard label={isEs ? 'En ejecución' : 'In progress'} value={resumen.enCurso}

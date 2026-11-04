@@ -40,6 +40,9 @@ const PageSpinner = () => (
   </div>
 )
 
+// Debajo de este ancho (breakpoint lg de Tailwind) el menú lateral es un panel deslizable
+const MOBILE_MQ = '(max-width: 1023.98px)'
+
 const BRAND       = '#1B3A6B'
 const BRAND_LIGHT = '#2E5FA3'
 const BRAND_DARK  = '#122848'
@@ -194,6 +197,25 @@ function Layout() {
   const [chatUnread, setChatUnread] = useState(0)
   const [userMenu, setUserMenu] = useState(false)
   const userMenuRef             = useRef(null)
+
+  // Teléfonos y tabletas (< lg): el menú lateral se vuelve un panel deslizable sobre el contenido,
+  // siempre con sus etiquetas; el colapsado a iconos solo aplica en escritorio.
+  const [isMobile, setIsMobile]     = useState(() => window.matchMedia(MOBILE_MQ).matches)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_MQ)
+    const onChange = e => { setIsMobile(e.matches); if (!e.matches) setDrawerOpen(false) }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  useEffect(() => {
+    if (!drawerOpen) return
+    const onKey = e => { if (e.key === 'Escape') setDrawerOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawerOpen])
+  const expanded = isMobile || sideOpen
+  const goTo = (id) => { setPage(id); setDrawerOpen(false) }
 
   useEffect(() => {
     try { localStorage.setItem('mary_sidebar', sideOpen ? 'open' : 'closed') } catch { /* ignorar */ }
@@ -353,28 +375,46 @@ function Layout() {
   }, [userMenu])
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
+    <div className="flex h-screen h-[100dvh] overflow-hidden" style={{ background: 'var(--bg)' }}>
+
+      {/* Fondo del menú deslizable (móvil / tableta) */}
+      {isMobile && drawerOpen && (
+        <div className="fixed inset-0 z-40 m-fade" onClick={() => setDrawerOpen(false)}
+          style={{ background: 'rgba(8,18,32,0.5)', backdropFilter: 'blur(2px)' }} />
+      )}
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════ */}
-      <aside className={`flex flex-col flex-shrink-0 transition-all duration-200 ${sideOpen ? 'w-60' : 'w-[68px]'}`}
+      <aside
+        className={isMobile
+          ? `fixed inset-y-0 left-0 z-50 flex flex-col w-[280px] max-w-[86vw] transition-transform duration-200 ${drawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`
+          : `flex flex-col flex-shrink-0 transition-all duration-200 ${expanded ? 'w-60' : 'w-[68px]'}`}
+        aria-hidden={isMobile && !drawerOpen ? true : undefined}
+        inert={isMobile && !drawerOpen ? '' : undefined}
         style={{
           background: `radial-gradient(420px 260px at 0% 0%, rgba(201,162,75,0.16), transparent 70%), radial-gradient(360px 300px at 100% 100%, rgba(59,115,245,0.14), transparent 70%), linear-gradient(180deg, var(--nav-bg) 0%, var(--nav-bg-2) 100%)`,
           borderRight: '1px solid var(--nav-bd)',
         }}>
 
         {/* Logo */}
-        <div className={`flex items-center px-4 flex-shrink-0 ${sideOpen ? 'justify-start' : 'justify-center'}`}
+        <div className={`flex items-center px-4 flex-shrink-0 ${expanded ? 'justify-start' : 'justify-center'}`}
           style={{ borderBottom: '1px solid var(--nav-bd)', height: 64 }}>
-          {sideOpen ? (
+          {expanded ? (
             <svg viewBox="0 0 200 56" xmlns="http://www.w3.org/2000/svg" style={{ height: 34, width: 'auto' }} aria-label="MARY"><g transform="translate(4,3)"><rect x="14" y="29" width="8" height="16" rx="1.5" fill="#7a8fa6" opacity="0.75"/><rect x="24" y="23" width="8" height="22" rx="1.5" fill="#a0b4c8" opacity="0.75"/><rect x="34" y="17" width="8" height="28" rx="1.5" fill="#c0d0e0" opacity="0.75"/><ellipse cx="29" cy="33" rx="18" ry="5.5" fill="none" stroke="#3a8adc" strokeWidth="1.5" opacity="0.85"/><rect x="26" y="17" width="10" height="10" rx="2" fill="#3bb876" opacity="0.95"/><rect x="36" y="11" width="8" height="8" rx="2" fill="#26d4ff" opacity="0.9"/><line x1="36" y1="20" x2="48" y2="6" stroke="#3bb876" strokeWidth="1.8" opacity="0.9"/><polygon points="48,3 51,9 45,9" fill="#3bb876" opacity="0.9"/></g><text x="62" y="37" fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="32" fill="#ffffff" letterSpacing="1">MARY</text></svg>
           ) : (
             <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm"
               style={{ background: 'linear-gradient(135deg, #E6C879, #C9A24B)', color: '#0E1B3D', boxShadow: '0 4px 14px -4px rgba(201,162,75,0.7)' }}>M</div>
           )}
+          {isMobile && (
+            <button onClick={() => setDrawerOpen(false)} aria-label={isEs ? 'Cerrar menú' : 'Close menu'}
+              className="ml-auto w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ color: 'var(--nav-txt)' }}>
+              <span className="w-5 h-5">{Icons.x}</span>
+            </button>
+          )}
         </div>
 
         {/* Empresa + plan */}
-        {sideOpen && (
+        {expanded && (
           <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--nav-bd)' }}>
             <p className="text-xs font-semibold truncate" style={{ color: '#fff' }}>
               {perfil?.tenants?.nombre_empresa || 'Marquez Project Solutions'}
@@ -396,7 +436,7 @@ function Layout() {
         <nav className="flex-1 py-3 px-2 overflow-y-auto scrollbar-thin">
           {gruposVisibles.map(grupo => (
             <div key={grupo.id} className="mb-3">
-              {sideOpen && (
+              {expanded && (
                 <p className="px-3 mb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
                   style={{ color: 'rgba(230,200,121,0.62)' }}>
                   {isEs ? grupo.labelEs : grupo.labelEn}
@@ -408,9 +448,9 @@ function Layout() {
                   const bloqueado = [...MODULOS_PRO_PLUS, ...MODULOS_ENTERPRISE].includes(item.id) && !canUsePlan(item.id)
                   const label     = isEs ? item.labelEs : item.labelEn
                   return (
-                    <button key={item.id} onClick={() => setPage(item.id)}
-                      data-tip={!sideOpen ? label : undefined}
-                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left transition-all duration-150 ${!sideOpen ? 'm-tip justify-center' : ''}`}
+                    <button key={item.id} onClick={() => goTo(item.id)}
+                      data-tip={!expanded ? label : undefined}
+                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-left transition-all duration-150 ${!expanded ? 'm-tip justify-center' : ''}`}
                       style={{
                         background: active ? 'linear-gradient(90deg, rgba(201,162,75,0.28), rgba(201,162,75,0.08))' : 'transparent',
                         color: active ? 'var(--nav-txt-active)' : bloqueado ? 'rgba(169,198,230,0.45)' : 'var(--nav-txt)',
@@ -419,7 +459,7 @@ function Layout() {
                       }}
                       onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(127,168,212,0.09)' }}
                       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-                      {active && sideOpen && (
+                      {active && expanded && (
                         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
                           style={{ background: 'var(--gold-2)', boxShadow: '0 0 14px var(--gold)' }} />
                       )}
@@ -429,14 +469,14 @@ function Layout() {
                             <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                           </svg>
                         ) : Icons[item.icon]}
-                        {item.id === 'chat' && chatUnread > 0 && !sideOpen && (
+                        {item.id === 'chat' && chatUnread > 0 && !expanded && (
                           <span className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] rounded-full text-white text-[9px] font-bold flex items-center justify-center px-0.5"
                             style={{ background: '#E5484D' }}>
                             {chatUnread > 9 ? '9+' : chatUnread}
                           </span>
                         )}
                       </span>
-                      {sideOpen && (
+                      {expanded && (
                         <span className="text-[13px] font-medium truncate flex-1 flex items-center justify-between gap-2">
                           <span className="truncate">{label}</span>
                           {bloqueado && (
@@ -466,9 +506,9 @@ function Layout() {
         {/* Configuración / Admin */}
         <div className="px-2 py-2 flex flex-col gap-0.5" style={{ borderTop: '1px solid var(--nav-bd)' }}>
           {(isClientAdmin || perfil?.rol) && (
-            <button onClick={() => setPage('configuracion')}
-              data-tip={!sideOpen ? (isEs ? 'Configuración' : 'Settings') : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-colors ${!sideOpen ? 'm-tip justify-center' : ''}`}
+            <button onClick={() => goTo('configuracion')}
+              data-tip={!expanded ? (isEs ? 'Configuración' : 'Settings') : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-colors ${!expanded ? 'm-tip justify-center' : ''}`}
               style={{
                 background: page === 'configuracion' ? 'rgba(46,120,214,0.28)' : 'transparent',
                 color: page === 'configuracion' ? '#fff' : 'var(--nav-txt)',
@@ -476,29 +516,29 @@ function Layout() {
               onMouseEnter={e => { if (page !== 'configuracion') e.currentTarget.style.background = 'rgba(127,168,212,0.09)' }}
               onMouseLeave={e => { if (page !== 'configuracion') e.currentTarget.style.background = 'transparent' }}>
               <span className="w-[18px] h-[18px] flex-shrink-0">{Icons.settings}</span>
-              {sideOpen && <span className="text-[13px] font-medium">{isEs ? 'Configuración' : 'Settings'}</span>}
+              {expanded && <span className="text-[13px] font-medium">{isEs ? 'Configuración' : 'Settings'}</span>}
             </button>
           )}
 
           {isSuperAdmin && (
             <a href="/admin"
-              data-tip={!sideOpen ? (isEs ? 'Panel Admin' : 'Admin Panel') : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-colors ${!sideOpen ? 'm-tip justify-center' : ''}`}
+              data-tip={!expanded ? (isEs ? 'Panel Admin' : 'Admin Panel') : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl w-full transition-colors ${!expanded ? 'm-tip justify-center' : ''}`}
               style={{ color: '#F5B345' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(245,179,69,0.12)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span className="w-[18px] h-[18px] flex-shrink-0">{Icons.settings}</span>
-              {sideOpen && <span className="text-[13px] font-medium">{isEs ? 'Panel Admin' : 'Admin Panel'}</span>}
+              {expanded && <span className="text-[13px] font-medium">{isEs ? 'Panel Admin' : 'Admin Panel'}</span>}
             </a>
           )}
         </div>
 
         {/* Idioma + tema + colapsar */}
         <div className="px-2 pb-2 pt-2 flex flex-col gap-1.5" style={{ borderTop: '1px solid var(--nav-bd)' }}>
-          <div className={`flex gap-1.5 ${sideOpen ? '' : 'flex-col'}`}>
+          <div className={`flex gap-1.5 ${expanded ? '' : 'flex-col'}`}>
             <button onClick={toggleLang}
-              data-tip={!sideOpen ? 'ES / EN' : undefined}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors ${!sideOpen ? 'm-tip' : ''}`}
+              data-tip={!expanded ? 'ES / EN' : undefined}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors ${!expanded ? 'm-tip' : ''}`}
               style={{ background: 'rgba(127,168,212,0.08)', color: 'var(--nav-txt)', border: '1px solid var(--nav-bd)' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(127,168,212,0.16)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(127,168,212,0.08)'}>
@@ -506,41 +546,53 @@ function Layout() {
             </button>
 
             <button onClick={toggle}
-              data-tip={!sideOpen ? (isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')) : undefined}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors ${!sideOpen ? 'm-tip' : ''}`}
+              data-tip={!expanded ? (isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')) : undefined}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-colors ${!expanded ? 'm-tip' : ''}`}
               style={{ background: 'rgba(127,168,212,0.08)', color: 'var(--nav-txt)', border: '1px solid var(--nav-bd)' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(127,168,212,0.16)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(127,168,212,0.08)'}>
               <span className="w-[15px] h-[15px]">{isDark ? Icons.sun : Icons.moon}</span>
-              {sideOpen && <span className="text-[11px] font-semibold">{isDark ? (isEs ? 'Claro' : 'Light') : (isEs ? 'Oscuro' : 'Dark')}</span>}
+              {expanded && <span className="text-[11px] font-semibold">{isDark ? (isEs ? 'Claro' : 'Light') : (isEs ? 'Oscuro' : 'Dark')}</span>}
             </button>
           </div>
 
-          <button onClick={() => setSideOpen(!sideOpen)}
+          {!isMobile && <button onClick={() => setSideOpen(!sideOpen)}
             className="flex items-center justify-center py-2 rounded-lg transition-colors"
             style={{ color: 'rgba(169,198,230,0.7)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(127,168,212,0.09)'; e.currentTarget.style.color = '#fff' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(169,198,230,0.7)' }}>
             <span className="w-4 h-4 inline-block transition-transform duration-200"
               style={{ transform: sideOpen ? 'rotate(180deg)' : 'none' }}>{Icons.chevron}</span>
-          </button>
+          </button>}
         </div>
       </aside>
 
       {/* ══ MAIN ═════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
 
         {/* HEADER */}
-        <header className="flex items-center justify-between px-5 flex-shrink-0 relative z-20"
+        <header className="flex items-center justify-between gap-2 px-3 sm:px-5 flex-shrink-0 relative z-20"
           style={{
             background: 'color-mix(in srgb, var(--surface) 84%, transparent)',
             backdropFilter: 'blur(14px) saturate(1.3)',
             borderBottom: '1px solid var(--bd)',
-            height: 64,
+            height: isMobile ? 56 : 64,
             boxShadow: 'var(--sh-xs)',
           }}>
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            {isMobile && (
+              <button onClick={() => setDrawerOpen(true)} data-mobile-menu
+                aria-label={isEs ? 'Abrir menú' : 'Open menu'} aria-expanded={drawerOpen}
+                className="m-icon-btn flex-shrink-0 relative" style={{ width: 40, height: 40, color: 'var(--txt)' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+                </svg>
+                {chatUnread > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style={{ background: '#E5484D', boxShadow: '0 0 0 2px var(--surface)' }} />
+                )}
+              </button>
+            )}
+            <span className="w-9 h-9 rounded-xl hidden sm:flex items-center justify-center flex-shrink-0"
               style={{ background: 'var(--brand-soft)', color: 'var(--brand)' }}>
               <span className="w-[18px] h-[18px]">{Icons[currentNav?.icon] || Icons.dashboard}</span>
             </span>
@@ -563,14 +615,14 @@ function Layout() {
           </div>
 
           {perfil?.tenants?.logo_url && (
-            <div className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none">
+            <div className="hidden lg:flex absolute inset-0 items-center justify-center pointer-events-none">
               <img src={perfil.tenants.logo_url} alt={perfil?.tenants?.nombre_empresa || 'Logo'}
                 style={{ maxHeight: 44, maxWidth: 220, objectFit: 'contain' }} />
             </div>
           )}
 
-          <div className="flex items-center gap-2 relative z-10">
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl"
+          <div className="flex items-center gap-1 sm:gap-2 relative z-10 flex-shrink-0">
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl"
               style={{ background: 'var(--surface-2)', border: '1px solid var(--bd)' }}>
               <span className="w-3.5 h-3.5" style={{ color: 'var(--brand)' }}>{Icons.calendar}</span>
               <span className="text-[11.5px] font-medium capitalize" style={{ color: 'var(--txt-2)' }}>
@@ -578,14 +630,17 @@ function Layout() {
               </span>
             </div>
 
-            <button onClick={toggle} className="m-icon-btn m-tip"
-              data-tip={isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')}>
-              <span className="w-[17px] h-[17px]">{isDark ? Icons.sun : Icons.moon}</span>
-            </button>
+            {/* En teléfonos el tema se cambia desde el menú de usuario o el lateral */}
+            <span className="hidden sm:inline-flex">
+              <button onClick={toggle} className="m-icon-btn m-tip"
+                data-tip={isDark ? (isEs ? 'Modo claro' : 'Light mode') : (isEs ? 'Modo oscuro' : 'Dark mode')}>
+                <span className="w-[17px] h-[17px]">{isDark ? Icons.sun : Icons.moon}</span>
+              </button>
+            </span>
 
-            <NotificacionesPanel onNavigate={setPage} />
+            <NotificacionesPanel onNavigate={goTo} />
 
-            <div className="w-px h-7 mx-0.5" style={{ background: 'var(--bd)' }} />
+            <div className="w-px h-7 mx-0.5 hidden sm:block" style={{ background: 'var(--bd)' }} />
 
             {/* Menú de usuario */}
             <div className="relative" ref={userMenuRef}>
@@ -652,7 +707,7 @@ function Layout() {
 
         {/* Banner de suscripción */}
         {(isReadOnly || subWarning) && (
-          <div className="flex items-center justify-between gap-3 px-5 py-2.5 text-xs font-medium flex-shrink-0 m-fade"
+          <div className="flex items-center justify-between gap-3 px-3 sm:px-5 py-2.5 text-xs font-medium flex-shrink-0 m-fade"
             style={{
               background: isReadOnly ? 'var(--danger-soft)' : 'var(--warn-soft)',
               borderBottom: `1px solid ${isReadOnly ? 'var(--danger)' : 'var(--warn)'}`,
@@ -660,7 +715,7 @@ function Layout() {
             }}>
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-4 h-4 flex-shrink-0">{Icons.alert}</span>
-              <span className="truncate">
+              <span className="line-clamp-2 sm:truncate">
                 {isReadOnly && (isEs
                   ? 'Suscripción vencida. Modo lectura activo — no puedes crear ni editar datos.'
                   : 'Subscription expired. Read-only mode — no creating or editing.')}
@@ -684,7 +739,7 @@ function Layout() {
           <SubscriptionContext.Provider value={{ isReadOnly }}>
             {pageBlockedByPlan
               ? <PlanUpgradeScreen moduloId={page} isEs={isEs} />
-              : <div key={page} className="m-fade-up"><Suspense fallback={<PageSpinner />}><Page onNavigate={setPage} /></Suspense></div>
+              : <div key={page} className={`m-fade-up ${page === 'chat' ? 'h-full' : ''}`}><Suspense fallback={<PageSpinner />}><Page onNavigate={setPage} /></Suspense></div>
             }
           </SubscriptionContext.Provider>
         </main>

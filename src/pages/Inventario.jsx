@@ -29,7 +29,7 @@ function ModalJustificacion({ open, onClose, onConfirm, tipo, isEs }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
+      <div className="bg-white rounded-xl shadow-2xl p-5 sm:p-6 max-w-md w-full mx-4 max-h-[90dvh] overflow-y-auto">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-lg">!</div>
           <div>
@@ -282,7 +282,7 @@ export default function Inventario() {
   }
 
   return (
-    <div className="p-5 md:p-6 max-w-[1400px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1400px] mx-auto">
 
       <ModalJustificacion
         open={!!modalElim}
