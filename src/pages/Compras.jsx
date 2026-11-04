@@ -6,6 +6,7 @@ import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons
 import { supabase } from '../supabase'
 import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
+import { getLogoGlobal } from '../logoUtils'
 
 const BRAND = 'var(--brand)'
 
@@ -1389,6 +1390,7 @@ function PrintSolicitud({ doc, materiales, presupuesto, t, nombreEmpresa = 'Marq
       <table style={{ width:'100%', borderCollapse:'collapse', border:`2px solid ${BRAND}` }}>
         <tbody><tr>
           <td style={{ padding:'10px 14px', width:'40%', borderRight:`2px solid ${BRAND}` }}>
+            {getLogoGlobal() && <img src={getLogoGlobal()} alt="" style={{ maxHeight:'44px', maxWidth:'160px', objectFit:'contain', display:'block', marginBottom:'4px' }} />}
             <p style={{ margin:0, fontSize:'16px', fontWeight:'bold', color:BRAND }}>{nombreEmpresa}</p>
             <p style={{ margin:'2px 0 0', fontSize:'10px', color:'#666' }}>MARY ERP — Management And Resources Yield</p>
           </td>
@@ -1581,6 +1583,7 @@ function PrintOC({ doc, materiales, presupuesto, t, nombreEmpresa = 'Marquez Pro
       <table style={{ width:'100%', borderCollapse:'collapse', border:`2px solid ${BRAND}` }}>
         <tbody><tr>
           <td style={{ padding:'10px 14px', width:'40%', borderRight:`2px solid ${BRAND}` }}>
+            {getLogoGlobal() && <img src={getLogoGlobal()} alt="" style={{ maxHeight:'44px', maxWidth:'160px', objectFit:'contain', display:'block', marginBottom:'4px' }} />}
             <p style={{ margin:0, fontSize:'16px', fontWeight:'bold', color:BRAND }}>{nombreEmpresa}</p>
             <p style={{ margin:'2px 0 0', fontSize:'10px', color:'#666' }}>MARY ERP — Management And Resources Yield</p>
           </td>

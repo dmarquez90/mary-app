@@ -9,6 +9,11 @@ const TIPO_CONFIG = {
   rechazo:    { bg: 'bg-red-100',   text: 'text-red-600',   icon: '❌' },
   solicitud:  { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '📋' },
   info:       { bg: 'bg-amber-100', text: 'text-amber-700', icon: '📌' },
+  // Tipos que además se envían por correo (ver supabase/functions/enviar-notificacion)
+  solicitud_nueva:      { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '📋' },
+  avaluo_sub_nuevo:     { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '🧾' },
+  avaluo_cliente_nuevo: { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '💵' },
+  oc_cambio_nueva:      { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '📝' },
 }
 
 const MODULO_LABELS = {

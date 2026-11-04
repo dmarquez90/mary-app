@@ -1,5 +1,6 @@
 import { useState, useContext, useMemo, useEffect, Fragment } from 'react'
 import ExcelJS from 'exceljs'
+import { filaLogoExcel } from '../logoUtils'
 import { saveAs } from 'file-saver'
 import { supabase } from '../supabase'
 import { useStore } from '../store'
@@ -101,7 +102,7 @@ async function exportOCExcel({ oc, items, inds, proy, moneda, empresa, lang = 'E
 
   const merge = (r1, c1, r2, c2) => ws.mergeCells(r1, c1, r2, c2)
   const COLS = 7
-  let row = 1
+  let row = filaLogoExcel(ws, 1)
 
   // ── Banner ──
   ws.getRow(row).height = 36

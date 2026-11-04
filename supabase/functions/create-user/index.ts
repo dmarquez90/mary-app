@@ -14,7 +14,7 @@ async function enviarBienvenida(to: string, nombre: string, password: string, la
   if (!apiKey) return { skipped: true }
 
   const isEs = lang !== 'EN'
-  const appUrl = Deno.env.get('APP_URL') ?? ''
+  const appUrl = Deno.env.get('APP_URL') ?? Deno.env.get('SITE_URL') ?? ''
   const from = Deno.env.get('WELCOME_FROM') ?? 'Marquez Project Solutions <no-reply@marquezprojectsolutions.com>'
   const org = esc(empresa || 'tu empresa')
   const orgEn = esc(empresa || 'your company')

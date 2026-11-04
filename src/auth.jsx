@@ -158,6 +158,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, perfil, loading, login, logout,
+      refreshPerfil: () => loadPerfil(user),
       isSuperAdmin, isClientAdmin, rol, tenantId,
       blockedReason, setBlockedReason,
       // Plan

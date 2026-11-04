@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
 import { PageHeader, Card, Icons } from '../components'
+import { headerConLogo } from '../logoUtils'
 
 const BRAND    = 'var(--brand)'
 const BRAND_HX = '1B3A6B'
@@ -111,7 +112,7 @@ function addHeaderBlock(ws, titulo, empresa, proyecto, periodo, fecha, cols, isE
   const c1 = ws.getCell(1, 1)
   c1.value = empresa
   c1.font  = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND_HX } }
-  c1.alignment = { vertical: 'middle' }
+  c1.alignment = { vertical: 'middle' }; headerConLogo(ws, c1)
   c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } }
   c1.border = thickBorder()
   ws.getRow(1).height = 28
@@ -596,7 +597,7 @@ export async function buildOPR({ orden, retenciones, contrato, proy, usuario, la
   h1.value     = nombreEmpresa
   h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
   h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
-  h1.alignment = { vertical: 'middle' }
+  h1.alignment = { vertical: 'middle' }; headerConLogo(ws, h1)
   h1.border    = thickB()
 
   merge(1, 4, 1, 5)
@@ -883,7 +884,7 @@ export async function buildPettyCashReceipt({ caja, proy, responsable, lang='ES'
   h1.value     = nombreEmpresa
   h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
   h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
-  h1.alignment = { vertical: 'middle' }
+  h1.alignment = { vertical: 'middle' }; headerConLogo(ws, h1)
   h1.border    = thickB()
 
   merge(1, 3, 1, 4)
@@ -1092,7 +1093,7 @@ export async function buildAvaluoComprobante({ avaluo, contrato, itemsContrato, 
   h1.value     = nombreEmpresa
   h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
   h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
-  h1.alignment = { vertical: 'middle' }
+  h1.alignment = { vertical: 'middle' }; headerConLogo(ws, h1)
   h1.border    = thickB()
 
   merge(1, 4, 1, 5)
@@ -1383,7 +1384,7 @@ export async function buildSubcontratoDoc({ contrato, itemsContrato, avaluos, av
   h1.value     = nombreEmpresa
   h1.font      = { bold: true, size: 13, name: 'Arial', color: { argb: 'FF' + BRAND } }
   h1.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + LIGHT } }
-  h1.alignment = { vertical: 'middle' }
+  h1.alignment = { vertical: 'middle' }; headerConLogo(ws, h1)
   h1.border    = thickB()
 
   merge(1, 4, 1, 5)

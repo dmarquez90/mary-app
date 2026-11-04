@@ -360,6 +360,11 @@ export default function Admin() {
         const result = await res.json()
         if (!res.ok) throw new Error(result.error || 'Error al crear usuario')
         showSuccess(isEs ? `Usuario ${form.nombre} creado.` : `User ${form.nombre} created.`)
+        if (!result.email_enviado) {
+          window.alert(isEs
+            ? `El usuario se creó, pero no se pudo enviar el correo de bienvenida a ${form.email}. Compártele sus datos de acceso manualmente.`
+            : `The user was created, but the welcome email to ${form.email} could not be sent. Please share the login details manually.`)
+        }
       }
       await loadAll(); setDrawer(null)
     } catch (e) { setError(e.message) }

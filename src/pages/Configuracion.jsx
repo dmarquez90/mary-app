@@ -6,6 +6,7 @@ import { LangContext } from '../i18n'
 import { MODULOS_PERMISOS } from '../usePermissions'
 import { PageHeader } from '../components'
 import { fmtFecha } from '../utils'
+import { resizeLogo } from '../logoUtils'
 
 const BRAND = 'var(--brand)'
 const ROLES  = ['coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
@@ -23,7 +24,7 @@ const inputCls  = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm fo
 const selectCls = inputCls
 
 export default function Configuracion({ onNavigate }) {
-  const { perfil, isClientAdmin, isSuperAdmin } = useAuth()
+  const { perfil, isClientAdmin, isSuperAdmin, refreshPerfil } = useAuth()
   const { state, dispatch } = useStore()
   const { t, lang }       = useContext(LangContext)
   const isEs = lang === 'ES'
@@ -203,6 +204,48 @@ export default function Configuracion({ onNavigate }) {
 
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3500) }
 
+  // ── Logo de la empresa ───────────────────────────────
+  const [logoSaving, setLogoSaving] = useState(false)
+  const [logoError, setLogoError]   = useState('')
+
+  const guardarLogo = async (dataUrl) => {
+    const { error } = await supabase.from('tenants').update({ logo_url: dataUrl }).eq('id', perfil.tenant_id)
+    if (error) throw error
+    setTenant(tn => ({ ...tn, logo_url: dataUrl }))
+    await refreshPerfil?.()
+  }
+
+  const handleLogoFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setLogoError('')
+    setLogoSaving(true)
+    try {
+      const dataUrl = await resizeLogo(file)
+      await guardarLogo(dataUrl)
+      showSuccess(isEs ? 'Logo actualizado' : 'Logo updated')
+    } catch (err) {
+      setLogoError(
+        err.message === 'invalid_type' ? (isEs ? 'Usa una imagen PNG, JPG o WEBP.' : 'Use a PNG, JPG or WEBP image.')
+        : err.message === 'too_big'    ? (isEs ? 'La imagen no puede pesar más de 5 MB.' : 'Image must be under 5 MB.')
+        : `${isEs ? 'No se pudo guardar el logo.' : 'Could not save the logo.'} ${err.message || ''}`)
+    }
+    setLogoSaving(false)
+  }
+
+  const quitarLogo = async () => {
+    setLogoError('')
+    setLogoSaving(true)
+    try {
+      await guardarLogo(null)
+      showSuccess(isEs ? 'Logo eliminado' : 'Logo removed')
+    } catch {
+      setLogoError(isEs ? 'No se pudo eliminar el logo.' : 'Could not remove the logo.')
+    }
+    setLogoSaving(false)
+  }
+
   const saveUsuario = async () => {
     if (!form.nombre || !form.email || !form.rol) return
     setSaving(true); setError('')
@@ -234,6 +277,11 @@ export default function Configuracion({ onNavigate }) {
         const result = await res.json()
         if (!res.ok) throw new Error(result.error || (isEs ? 'Error al crear usuario' : 'Error creating user'))
         showSuccess(t('cfg_users_success_created', { nombre: form.nombre }))
+        if (!result.email_enviado) {
+          window.alert(isEs
+            ? `El usuario se creó, pero no se pudo enviar el correo de bienvenida a ${form.email}. Compártele sus datos de acceso manualmente.`
+            : `The user was created, but the welcome email to ${form.email} could not be sent. Please share the login details manually.`)
+        }
       }
       await loadData(); setDrawer(null)
     } catch (e) { setError(e.message) }
@@ -546,6 +594,7 @@ export default function Configuracion({ onNavigate }) {
           esAdmin && { id:'usuarios',    label: t('cfg_users_sub') },
           esAdmin && { id:'solicitudes', label: `${isEs ? 'Solicitudes de eliminación' : 'Deletion requests'}${solicitudesPendientes.length > 0 ? ` (${solicitudesPendientes.length})` : ''}` },
           { id:'micuenta',   label: isEs ? 'Mi cuenta' : 'My account' },
+          esAdmin && { id:'empresa', label: isEs ? 'Empresa' : 'Company' },
           esAdmin && { id:'suscripcion', label: isEs ? 'Suscripción' : 'Subscription' },
         ].filter(Boolean).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -723,6 +772,41 @@ export default function Configuracion({ onNavigate }) {
       )}
 
       {/* ── TAB MI CUENTA ────────────────────────────────────────────────── */}
+      {/* ── TAB EMPRESA (logo) ───────────────────────────────────────────── */}
+      {activeTab === 'empresa' && esAdmin && (
+        <div className="m-card p-5 max-w-xl">
+          <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--txt)' }}>
+            {isEs ? 'Logo de la empresa' : 'Company logo'}
+          </h3>
+          <p className="text-xs mb-4" style={{ color: 'var(--txt-3)' }}>
+            {isEs
+              ? 'Se muestra en el centro de la barra superior y en los reportes y documentos que se generen.'
+              : 'Shown in the center of the top bar and on all generated reports and documents.'}
+          </p>
+          <div className="flex items-center justify-center rounded-xl mb-4"
+            style={{ height: 120, background: '#fff', border: '1px dashed var(--bd)' }}>
+            {tenant?.logo_url
+              ? <img src={tenant.logo_url} alt="Logo" style={{ maxHeight: 100, maxWidth: '90%', objectFit: 'contain' }} />
+              : <span className="text-xs" style={{ color: '#9ca3af' }}>{isEs ? 'Sin logo' : 'No logo'}</span>}
+          </div>
+          {logoError && <p className="text-xs text-red-500 mb-3">{logoError}</p>}
+          <div className="flex gap-2">
+            <label className={`m-btn m-btn-primary cursor-pointer ${logoSaving ? 'opacity-60 pointer-events-none' : ''}`}>
+              {logoSaving ? (isEs ? 'Guardando…' : 'Saving…') : (tenant?.logo_url ? (isEs ? 'Cambiar logo' : 'Change logo') : (isEs ? 'Subir logo' : 'Upload logo'))}
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoFile} />
+            </label>
+            {tenant?.logo_url && (
+              <button onClick={quitarLogo} disabled={logoSaving} className="m-btn m-btn-ghost">
+                {isEs ? 'Quitar' : 'Remove'}
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] mt-3" style={{ color: 'var(--txt-3)' }}>
+            {isEs ? 'PNG, JPG o WEBP. Se recomienda fondo transparente y formato horizontal.' : 'PNG, JPG or WEBP. Transparent background and horizontal layout recommended.'}
+          </p>
+        </div>
+      )}
+
       {activeTab === 'micuenta' && (
         <div className="max-w-md mx-auto">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">

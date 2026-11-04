@@ -1437,15 +1437,17 @@ useEffect(() => {
           await sbThrow(supabase.from('solicitud_items').insert(items))
         }
         dispatch({ type: 'ADD_SOLICITUD', payload: { solicitud: sol, items } })
-        // Notificar a gerentes y coordinadores
-        await notify({
-          tipo: 'solicitud',
-          titulo: '📋 New purchase request | 📋 Nueva solicitud de compra',
-          mensaje: `Project: ${sol.proyecto_id ? (action.payload.proyecto_nombre || '') : ''} | Proyecto: ${sol.proyecto_id ? (action.payload.proyecto_nombre || '') : ''}`,
+        // Notificar a quienes aprueban (admin y gerente, también por correo) y al coordinador
+        const proySol   = state.proyectos.find(p => p.id === sol.proyecto_id)
+        const nombreSol = action.payload.proyecto_nombre || proySol?.project_code || proySol?.nombre || ''
+        const avisoSol  = {
+          titulo: `📋 New material request ${sol.folio || ''} | 📋 Nueva solicitud de materiales ${sol.folio || ''}`,
+          mensaje: `A material request is pending approval. Project: ${nombreSol} | Hay una solicitud de materiales pendiente de aprobación. Proyecto: ${nombreSol}`,
           modulo: 'compras',
           referencia_id: sol.id,
-          roles: ['client_admin', 'coordinador', 'gerente'],
-        })
+        }
+        await notify({ ...avisoSol, tipo: 'solicitud_nueva', roles: ['client_admin', 'gerente'] })
+        await notify({ ...avisoSol, tipo: 'solicitud', roles: ['coordinador'] })
         break
       }
       case 'UPD_SOLICITUD_ESTADO': {
@@ -1727,6 +1729,16 @@ useEffect(() => {
         await sbThrow(supabase.from('subcontratos_avaluos').insert(av))
         if (avi.length) await sbThrow(supabase.from('subcontratos_avaluo_items').insert(avi))
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
+        const subc = action.payload.contrato?.subcontratista || ''
+        await notify({
+          tipo: 'avaluo_sub_nuevo',
+          titulo: `🧾 Subcontract valuation #${av.numero ?? ''} pending approval | 🧾 Avalúo de subcontrato #${av.numero ?? ''} pendiente de autorización`,
+          mensaje: `Valuation #${av.numero ?? ''} from ${subc} for ${r2(av.monto_a_pagar ?? av.monto_total ?? 0)} needs your approval.`
+                   + ` | El avalúo #${av.numero ?? ''} de ${subc} por ${r2(av.monto_a_pagar ?? av.monto_total ?? 0)} requiere tu autorización.`,
+          modulo: 'financiero',
+          referencia_id: av.id,
+          roles: ['client_admin', 'gerente'],
+        })
         break
       }
       case 'APROBAR_SC_AVALUO': {
@@ -2055,6 +2067,17 @@ useEffect(() => {
         }
 
         dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items, indirectos } })
+        const proyOC = state.proyectos.find(p => p.id === orden.proyecto_id)
+        const nombreOC = proyOC?.project_code || proyOC?.nombre || ''
+        await notify({
+          tipo: 'oc_cambio_nueva',
+          titulo: `📝 New Change Order ${orden.numero || ''} | 📝 Nueva Orden de Cambio ${orden.numero || ''}`,
+          mensaje: `A change order for ${r2(orden.total_oc || 0)} was created. Project: ${nombreOC}. ${orden.motivo || ''}`
+                   + ` | Se creó una orden de cambio por ${r2(orden.total_oc || 0)}. Proyecto: ${nombreOC}. ${orden.motivo || ''}`,
+          modulo: 'ordenes_cambio',
+          referencia_id: orden.id,
+          roles: ['client_admin', 'gerente'],
+        })
         break
       }
       case 'FETCH_OC_ITEMS': {
@@ -2210,7 +2233,17 @@ useEffect(() => {
       case 'UPD_AVALUO_CLIENTE_ESTADO': {
         await sbThrow(supabase.from('avaluos_cliente').update({ estado: action.payload.estado }).eq('id', action.payload.id))
         dispatch(action)
-        if (action.payload.estado === 'aprobado') {
+        if (action.payload.estado === 'presentado') {
+          const num = action.payload.numero ?? ''
+          await notify({
+            tipo: 'avaluo_cliente_nuevo',
+            titulo: `💵 Payment application #${num} pending approval | 💵 Avalúo de cobro #${num} pendiente de aprobación`,
+            mensaje: `Client valuation #${num} was submitted and needs your approval. | El avalúo de cliente #${num} fue presentado y requiere tu aprobación.`,
+            modulo: 'financiero',
+            referencia_id: action.payload.id,
+            roles: ['client_admin', 'gerente'],
+          })
+        } else if (action.payload.estado === 'aprobado') {
           await notify({
             tipo: 'aprobacion',
             titulo: '✅ Valuation approved | ✅ Avalúo aprobado',

@@ -8,6 +8,7 @@ import { MODULOS_PRO_PLUS, MODULOS_ENTERPRISE, PLAN_INFO } from './plans'
 import { Icons, Avatar, Spinner } from './components'
 import { useTheme } from './theme'
 import { supabase } from './supabase'
+import { setLogoGlobal } from './logoUtils'
 import AuthRouter from './pages/AuthRouter'
 import NotificacionesPanel from './pages/NotificacionesPanel'
 import WelcomeTour from './pages/WelcomeTour'
@@ -216,6 +217,9 @@ function Layout() {
 
   // ── Estado de suscripción ────────────────────────────
   const [subStatus, setSubStatus] = useState(null)
+
+  // Logo de la empresa disponible para reportes y documentos impresos
+  useEffect(() => { setLogoGlobal(perfil?.tenants?.logo_url) }, [perfil?.tenants?.logo_url])
 
   const checkSub = async () => {
     if (!perfil?.tenant_id) return
@@ -558,7 +562,14 @@ function Layout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {perfil?.tenants?.logo_url && (
+            <div className="hidden md:flex absolute inset-0 items-center justify-center pointer-events-none">
+              <img src={perfil.tenants.logo_url} alt={perfil?.tenants?.nombre_empresa || 'Logo'}
+                style={{ maxHeight: 44, maxWidth: 220, objectFit: 'contain' }} />
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 relative z-10">
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl"
               style={{ background: 'var(--surface-2)', border: '1px solid var(--bd)' }}>
               <span className="w-3.5 h-3.5" style={{ color: 'var(--brand)' }}>{Icons.calendar}</span>
