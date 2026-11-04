@@ -2,6 +2,7 @@ import { useState, useRef, useContext } from 'react'
 import * as XLSX from 'xlsx'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
+import { normalizarUnidad } from '../utils'
 
 const CATEGORIAS = [
   { es: 'Concreto',     en: 'Concrete',   key: 'concreto'     },
@@ -133,7 +134,7 @@ export default function ImportarCatalogo({ onDone }) {
           }
 
           const cat    = normalizarCategoria(iCat  !== -1 ? row[iCat]  : '')
-          const unit   = String(iUnit !== -1 ? (row[iUnit] || 'und') : 'und').trim() || 'und'
+          const unit   = (iUnit !== -1 && normalizarUnidad(row[iUnit])) || 'und'
           const stock  = parseFloat(iStock !== -1 ? (row[iStock] || 0) : 0) || 0
           const minSt  = parseFloat(iMin   !== -1 ? (row[iMin]   || 0) : 0) || 0
           const pu     = parseFloat(iPU    !== -1 ? (row[iPU]    || 0) : 0) || 0

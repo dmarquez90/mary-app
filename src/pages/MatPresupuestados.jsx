@@ -2,7 +2,7 @@ import { useState, useContext, useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { fmtNum, fmt, UNIDADES_CONFIG } from '../utils'
+import { fmtNum, fmt, UNIDADES_CONFIG, unidadCorta } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 import ImportarMatPresupuestados from './ImportarMatPresupuestados'
 
@@ -191,7 +191,7 @@ export default function MatPresupuestados() {
   const openAdd = () => { setForm({ ...emptyForm(), proyecto_id: proyId }); setEditing(null); setDrawer(true) }
 
   const getNombre  = (mp) => mp.nombre_libre || materiales.find(m => m.id === mp.material_id)?.descripcion || '...'
-  const getUnidad  = (mp) => mp.unidad_libre || materiales.find(m => m.id === mp.material_id)?.unidad || '...'
+  const getUnidad  = (mp) => unidadCorta(mp.unidad_libre || materiales.find(m => m.id === mp.material_id)?.unidad, lang) || '...'
   const getActividad = (mp) => {
     const act = presupuesto.find(b => b.id === mp.actividad_id)
     return act ? `${act.code} ${act.descripcion}` : '...'
@@ -482,7 +482,7 @@ export default function MatPresupuestados() {
             {form.material_id && (
               <p className="text-xs text-gray-400 mt-1.5">
                 {t('mp_form_current_stock')} <span className="font-mono font-medium text-gray-600">
-                  {fmtNum(materiales.find(m => m.id === form.material_id)?.stock_actual || 0)} {materiales.find(m => m.id === form.material_id)?.unidad}
+                  {fmtNum(materiales.find(m => m.id === form.material_id)?.stock_actual || 0)} {unidadCorta(materiales.find(m => m.id === form.material_id)?.unidad, lang)}
                 </span>
               </p>
             )}

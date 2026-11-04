@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react'
 import { useStore } from '../store'
 import { useT } from '../i18n'
-import { today, fmtNum, fmt } from '../utils'
+import { today, fmtNum, fmt, unidadCorta } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader, Toolbar, SearchInput, Chip, IconBtn } from '../components'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
@@ -158,8 +158,8 @@ export default function Inventario() {
       const totalOtras       = otrasEntradas.reduce((s,x) => s + parseFloat(x.cantidad||0), 0)
       const totalSalidas     = salidasAfectadas.reduce((s,x) => s + parseFloat(x.cantidad||0), 0)
       let mensaje = isEs
-        ? `Eliminar esta entrada?\nSe descontaran ${fmtNum(e.cantidad)} ${mat?.unidad || ''} del stock de "${mat?.descripcion || ''}".`
-        : `Delete this entry?\n${fmtNum(e.cantidad)} ${mat?.unidad || ''} will be deducted from "${mat?.descripcion || ''}" stock.`
+        ? `Eliminar esta entrada?\nSe descontaran ${fmtNum(e.cantidad)} ${unidadCorta(mat?.unidad, lang) || ''} del stock de "${mat?.descripcion || ''}".`
+        : `Delete this entry?\n${fmtNum(e.cantidad)} ${unidadCorta(mat?.unidad, lang) || ''} will be deducted from "${mat?.descripcion || ''}" stock.`
       if (totalSalidas > totalOtras) {
         mensaje += isEs
           ? `\n\nADVERTENCIA: Hay ${salidasAfectadas.length} salida(s) registradas que quedaran sin respaldo. Se eliminaran automaticamente.`
@@ -185,8 +185,8 @@ export default function Inventario() {
       setModalElim({ tipo: 'salida', registro: s, mat })
     } else {
       if (!window.confirm(isEs
-        ? `Eliminar esta salida?\nSe devolvaran ${fmtNum(s.cantidad)} ${mat?.unidad || ''} al stock de "${mat?.descripcion || ''}".`
-        : `Delete this exit?\n${fmtNum(s.cantidad)} ${mat?.unidad || ''} will be returned to "${mat?.descripcion || ''}" stock.`)) return
+        ? `Eliminar esta salida?\nSe devolvaran ${fmtNum(s.cantidad)} ${unidadCorta(mat?.unidad, lang) || ''} al stock de "${mat?.descripcion || ''}".`
+        : `Delete this exit?\n${fmtNum(s.cantidad)} ${unidadCorta(mat?.unidad, lang) || ''} will be returned to "${mat?.descripcion || ''}" stock.`)) return
       dispatch({ type:'DEL_SALIDA', payload:{ id: s.id, materialId: s.material_id, cantidad: parseFloat(s.cantidad||0) } })
     }
   }
@@ -402,7 +402,7 @@ export default function Inventario() {
                                 ? <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: cat.color }}>{isEs ? cat.es : cat.en}</span>
                                 : <span className="text-xs text-gray-300">---</span>}
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-500">{m.unidad}</td>
+                            <td className="px-4 py-3 text-xs text-gray-500">{unidadCorta(m.unidad, lang)}</td>
                             <td className="px-4 py-3 text-sm font-mono font-semibold" style={{ color: crit ? 'var(--danger)' : 'var(--ok)' }}>
                               {fmtNum(m.stock_actual)} {crit && <span className="text-xs">!</span>}
                             </td>
@@ -473,7 +473,7 @@ export default function Inventario() {
                               <td className="px-4 py-2 text-xs text-gray-400">
                                 {cat ? (isEs ? cat.es : cat.en) : '---'}
                               </td>
-                              <td className="px-4 py-2 text-xs text-gray-400">{m.unidad}</td>
+                              <td className="px-4 py-2 text-xs text-gray-400">{unidadCorta(m.unidad, lang)}</td>
                               <td className="px-4 py-2 text-xs font-mono text-gray-400">{fmtNum(m.stock_actual)}</td>
                               <td className="px-4 py-2">
                                 <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">
@@ -536,7 +536,7 @@ export default function Inventario() {
                     <tr key={e.id} className="m-tr">
                       <td className="px-4 py-3 text-xs text-gray-500">{e.fecha_recepcion}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '---'}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-[#1D9E75]">+{fmtNum(e.cantidad)} {mat?.unidad}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-[#1D9E75]">+{fmtNum(e.cantidad)} {unidadCorta(mat?.unidad, lang)}</td>
                       <td className="px-4 py-3 text-sm font-mono text-gray-600">{fmt(e.precio_unitario, proy?.moneda)}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {parseFloat(e.impuesto_monto||0) > 0
@@ -623,7 +623,7 @@ export default function Inventario() {
                     <tr key={s.id} className="m-tr">
                       <td className="px-4 py-3 text-xs text-gray-500">{s.fecha_salida}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '---'}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-red-500">-{fmtNum(s.cantidad)} {mat?.unidad}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-red-500">-{fmtNum(s.cantidad)} {unidadCorta(mat?.unidad, lang)}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{proy?.project_code || '---'}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{act ? `${act.code} --- ${act.descripcion}` : '---'}</td>
                       <td className="px-4 py-3">
@@ -693,7 +693,7 @@ export default function Inventario() {
                       <td className="px-4 py-3 text-xs text-gray-500">{m.fecha}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{mat?.descripcion || '---'}</td>
                       <td className="px-4 py-3 text-sm font-mono font-medium" style={{ color: m.mov==='entrada' ? '#1D9E75' : '#ef4444' }}>
-                        {m.mov==='entrada' ? '+' : '-'}{fmtNum(m.cantidad)} {mat?.unidad}
+                        {m.mov==='entrada' ? '+' : '-'}{fmtNum(m.cantidad)} {unidadCorta(mat?.unidad, lang)}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {m.mov==='entrada' ? (m.proveedor || m.numero_factura || '---') : proyectos.find(p=>p.id===m.proyecto_id)?.project_code || '---'}
@@ -719,7 +719,7 @@ export default function Inventario() {
             </select>
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('inv_form_unit')}><input className={inputCls} value={form.unidad||''} onChange={set('unidad')} placeholder="und" /></Field>
+            <Field label={t('inv_form_unit')}><input className={inputCls} list="unidades-sugeridas" value={form.unidad||''} onChange={set('unidad')} placeholder="und" /></Field>
             <Field label={t('inv_form_location')}><input className={inputCls} value={form.ubicacion_bodega||''} onChange={set('ubicacion_bodega')} placeholder={isEs ? 'Estante A-1' : 'Shelf A-1'} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -791,7 +791,7 @@ export default function Inventario() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{nombre}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">{recibido > 0 ? `${recibido} / ` : ''}{it.cantidad} {it.unidad}</span>
+                            <span className="text-xs text-gray-400">{recibido > 0 ? `${recibido} / ` : ''}{it.cantidad} {unidadCorta(it.unidad, lang)}</span>
                             {recibido >= (parseFloat(it.cantidad) || 0) && recibido > 0 &&
                               <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{isEs ? 'Recibido' : 'Received'}</span>}
                             {!matExistente && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{isEs ? 'Crear en catalogo' : 'Create in catalog'}</span>}
@@ -820,7 +820,7 @@ export default function Inventario() {
                 </Field>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label={isEs ? 'Unidad' : 'Unit'}>
-                    <input className={inputCls} value={form._mat_unidad||'und'} onChange={e => setForm(f => ({...f, _mat_unidad: e.target.value}))} />
+                    <input className={inputCls} list="unidades-sugeridas" value={form._mat_unidad||'und'} onChange={e => setForm(f => ({...f, _mat_unidad: e.target.value}))} />
                   </Field>
                   <Field label={isEs ? 'Stock minimo' : 'Min. stock'}>
                     <input type="number" className={inputCls} value={form._mat_stock_min||'0'} onChange={e => setForm(f => ({...f, _mat_stock_min: e.target.value}))} placeholder="0" />
@@ -932,7 +932,7 @@ export default function Inventario() {
             <select className={selectCls} value={form.material_id||''} onChange={set('material_id')}>
               <option value="">{t('lbl_select')}</option>
               {activosFiltradosSalida.map(m => (
-                <option key={m.id} value={m.id}>{m.codigo} --- {m.descripcion} (stock: {fmtNum(m.stock_actual)} {m.unidad})</option>
+                <option key={m.id} value={m.id}>{m.codigo} --- {m.descripcion} (stock: {fmtNum(m.stock_actual)} {unidadCorta(m.unidad, lang)})</option>
               ))}
             </select>
             {searchOut && activosFiltradosSalida.length === 0 && (

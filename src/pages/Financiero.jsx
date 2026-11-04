@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, r2, calcGrandTotal, calcIndirectos, costosSalidasFIFO } from '../utils'
+import { today, fmt, fmtNum, r2, calcGrandTotal, calcIndirectos, costosSalidasFIFO, unidadCorta } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { useAuth } from '../auth'
 import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
@@ -1444,7 +1444,7 @@ function SubcontratosModule({ can, rol,
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_unit')}</label>
-                      <input className="m-input"
+                      <input className="m-input" list="unidades-sugeridas"
                         value={it.unidad||'und'} onChange={e => setScItem(idx,'unidad',e.target.value)} />
                     </div>
                     <div>
@@ -1804,7 +1804,7 @@ Total: `)
                 return (
                   <tr key={it.id} className="m-tr">
                     <td className={tdCls}>{it.descripcion}</td>
-                    <td className={tdCls + ' text-xs text-gray-400'}>{it.unidad}</td>
+                    <td className={tdCls + ' text-xs text-gray-400'}>{unidadCorta(it.unidad, isEs ? 'ES' : 'EN')}</td>
                     <td className={tdCls + ' font-mono'}>{it.cantidad_contrato}</td>
                     <td className={tdCls + ' font-mono'}>{fmt2(it.costo_unitario)}</td>
                     <td className={tdCls + ' font-mono font-medium'}>{fmt2(it.costo_total)}</td>
@@ -1982,7 +1982,7 @@ Total: `)
                   return (
                     <tr key={it.id} className={`border-b border-gray-50 ${excede ? 'bg-red-50/30' : ''}`}>
                       <td className="px-3 py-2 text-sm text-gray-700">{it.descripcion}</td>
-                      <td className="px-3 py-2 text-xs text-gray-400">{it.unidad}</td>
+                      <td className="px-3 py-2 text-xs text-gray-400">{unidadCorta(it.unidad, isEs ? 'ES' : 'EN')}</td>
                       <td className="px-3 py-2 text-sm font-mono">{it.cantidad_contrato}</td>
                       <td className="px-3 py-2 text-sm font-mono text-gray-500">{fmt2(it.costo_unitario)}</td>
                       <td className="px-3 py-2 text-sm font-mono text-gray-400">{cantAnt > 0 ? cantAnt : '—'}</td>

@@ -226,6 +226,30 @@ h1, h2, .m-display { font-family: var(--font-d); letter-spacing: -0.02em; }
 .m-cell-input.num { text-align: right; font-variant-numeric: tabular-nums; }
 select.m-cell-input { cursor: pointer; }
 
+/* Encabezados de tabla fijos en todos los módulos.
+   Un `position: sticky` se ancla al contenedor con scroll más cercano, y las tablas viven dentro
+   de un div con overflow (scroll horizontal o esquinas redondeadas) que crecía con la tabla, así
+   que el encabezado se iba con la página. Con un alto máximo, ese div hace el scroll vertical:
+   el encabezado queda quieto y solo se desplazan las filas. */
+.overflow-x-auto:has(> table),
+.overflow-auto:has(> table),
+.overflow-hidden:has(> table) {
+  max-height: calc(100dvh - 9rem);
+  overflow-y: auto;
+}
+/* El fondo se hereda (thead → tr → th) para respetar el color de cada encabezado; sin él,
+   las filas se verían a través del encabezado al desplazarse. :where() deja que cualquier
+   clase o estilo del propio encabezado tenga prioridad. */
+:where(thead) { background-color: var(--surface); }
+:where(thead tr) { background-color: inherit; }
+/* Con border-collapse el borde de la fila no acompaña a la celda fija: se dibuja con una sombra */
+:where(thead th) { position: sticky; top: 0; z-index: 5; background-color: inherit; box-shadow: inset 0 -1px 0 var(--bd); }
+#print-area thead th { position: static; }
+@media print {
+  .overflow-x-auto:has(> table), .overflow-auto:has(> table), .overflow-hidden:has(> table) { max-height: none; overflow: visible; }
+  thead th { position: static; }
+}
+
 /* Encabezado de tabla pegajoso */
 .m-thead th {
   position: sticky; top: 0; z-index: 5;

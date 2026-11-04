@@ -2,6 +2,7 @@ import { useState, useRef, useContext } from 'react'
 import * as XLSX from 'xlsx'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
+import { normalizarUnidad } from '../utils'
 
 export default function ImportarMatPresupuestados({ proyId, onDone }) {
   const { state, dispatch } = useStore()
@@ -103,7 +104,7 @@ export default function ImportarMatPresupuestados({ proyId, onDone }) {
         for (let r = firstRealRow; r <= maxRow; r++) {
           const cod  = String(getCellValue('A', r) ?? '').trim()
           const nom  = String(getCellValue('B', r) ?? '').trim()
-          const unit = String(getCellValue('C', r) ?? 'und').trim() || 'und'
+          const unit = normalizarUnidad(getCellValue('C', r)) || 'und'
           const rawCant = getCellValue(cantColLetter, r)
           const cant = typeof rawCant === 'number' ? rawCant : parseFloat(String(rawCant ?? '').replace(',', '.')) || 0
 

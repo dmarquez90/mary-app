@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect, useRef, useCallback, createContext, useMemo } from 'react'
-import { ESTADO_COLORS, getEstadoLabel } from '../utils'
+import { ESTADO_COLORS, getEstadoLabel, UNIDADES_CONFIG } from '../utils'
 import { LangContext } from '../i18n'
 
 // ═══════════════════════════════════════════════════════════
@@ -7,6 +7,17 @@ import { LangContext } from '../i18n'
 //  Todos los colores salen de las variables CSS de index.css,
 //  así que cada componente funciona en claro y en oscuro.
 // ═══════════════════════════════════════════════════════════
+
+// ── UNIDADES ──────────────────────────────────────────────
+// Sugerencias para los campos de unidad de texto libre: <input list="unidades-sugeridas">.
+// Se renderiza una sola vez en App, para todas las páginas.
+export function UnidadesDatalist({ lang }) {
+  return (
+    <datalist id="unidades-sugeridas">
+      {UNIDADES_CONFIG.map(u => <option key={u.value} value={u.value} label={lang === 'ES' ? u.es : u.en} />)}
+    </datalist>
+  )
+}
 
 // ── ICONOS ────────────────────────────────────────────────
 const ico = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   r2, calcSubtotal, calcGrandTotal, calcIndirectos, montoDesdePct, pctDesdeMonto,
   flatBudgetItems, genBudgetCode, genProjectCode, genOCCode, costosSalidasFIFO,
+  unidadCorta, normalizarUnidad, getUnitLabel,
 } from './utils'
 
 // ── Fictitious budget ────────────────────────────────────────────────────────
@@ -221,5 +222,34 @@ describe('costosSalidasFIFO', () => {
   it('falls back to catalog price when there are no entries', () => {
     const c = costosSalidasFIFO([], [{ id: 'x', material_id: 'M', cantidad: 3 }], [{ id: 'M', precio_unitario: 10 }])
     expect(c.x).toBe(30)
+  })
+})
+
+// ── Unidades de medida ──────────────────────────────────────────────────────
+describe('unidades', () => {
+  it('LS se muestra como Global en español y LS en inglés', () => {
+    expect(unidadCorta('LS', 'ES')).toBe('Global')
+    expect(unidadCorta('LS', 'EN')).toBe('LS')
+    expect(getUnitLabel('LS', 'ES')).toBe('Global')
+    expect(getUnitLabel('LS', 'EN')).toBe('LS — lump sum')
+  })
+  it('ft guardado antes se muestra como LF', () => {
+    expect(unidadCorta('ft', 'EN')).toBe('LF')
+    expect(getUnitLabel('ft', 'EN')).toBe('LF — linear foot')
+  })
+  it('las demás unidades y las desconocidas se muestran tal cual', () => {
+    expect(unidadCorta('ft²', 'ES')).toBe('ft²')
+    expect(unidadCorta('bolsa', 'ES')).toBe('bolsa')
+    expect(unidadCorta('', 'ES')).toBe('')
+  })
+  it('normaliza alias de Excel sin confundir gl (galón) con global', () => {
+    expect(normalizarUnidad(' ft ')).toBe('LF')
+    expect(normalizarUnidad('Global')).toBe('LS')
+    expect(normalizarUnidad('glb')).toBe('LS')
+    expect(normalizarUnidad('Lump Sum')).toBe('LS')
+    expect(normalizarUnidad('gl')).toBe('gal')
+    expect(normalizarUnidad('m2')).toBe('m²')
+    expect(normalizarUnidad('und')).toBe('und')
+    expect(normalizarUnidad(undefined)).toBe('')
   })
 })

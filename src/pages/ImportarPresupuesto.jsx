@@ -2,6 +2,7 @@ import { useState, useRef, useContext } from 'react'
 import * as XLSX from 'xlsx'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
+import { normalizarUnidad } from '../utils'
 
 const CATEGORIAS_ES = ['Etapa', 'Sub-etapa', 'Actividad']
 const CATEGORIAS_EN = ['Stage', 'Sub-stage', 'Activity']
@@ -86,7 +87,7 @@ export default function ImportarPresupuesto({ proyId, moneda, onDone }) {
           const mo   = parseFloat(row[iMO]  || 0) || 0
           const mat  = parseFloat(row[iMat] || 0) || 0
           const eq   = parseFloat(row[iEq]  || 0) || 0
-          const unit = String(row[iUnit] || 'und').trim() || 'und'
+          const unit = normalizarUnidad(row[iUnit]) || 'und'
 
           if (!desc) { errs.push(`Row ${r + 1}: empty description`); continue }
           if (cat && !VALID_CATS.includes(cat)) {

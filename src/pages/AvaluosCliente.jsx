@@ -6,7 +6,7 @@ import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, calcGrandTotal, calcIndirectos, r2, flatBudgetItems } from '../utils'
+import { today, fmt, fmtNum, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, unidadCorta } from '../utils'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
 const BRAND = 'var(--brand)'
@@ -116,7 +116,7 @@ async function exportAvaluoExcel({ avaluo, items, proy, moneda, empresa, lang = 
     const vals = [
       idx + 1,
       it.descripcion + (it.es_oc ? ' [OC]' : ''),
-      it.unidad || 'und',
+      unidadCorta(it.unidad || 'und', lang),
       parseFloat(it.cantidad_total || 0),
       parseFloat(it.precio_unitario || 0),
       parseFloat(it.cantidad_anterior || 0) || null,
@@ -470,7 +470,7 @@ export default function AvaluosCliente() {
                   return (
                     <tr key={idx} className={`border-b border-gray-50 ${sobrepa ? 'bg-red-50/30' : ''}`}>
                       <td className="px-2 py-2 text-gray-700">{it.descripcion}{it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}</td>
-                      <td className="px-2 py-2 text-center text-gray-400">{it.unidad}</td>
+                      <td className="px-2 py-2 text-center text-gray-400">{unidadCorta(it.unidad, lang)}</td>
                       <td className="px-2 py-2 text-center font-mono">{fmtNum(it.cantidad_total)}</td>
                       <td className="px-2 py-2 text-center font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
                       <td className="px-2 py-2 text-center font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>
@@ -697,7 +697,7 @@ export default function AvaluosCliente() {
                   {itemsDetalle.filter(it => parseFloat(it.cantidad_periodo||0) > 0).map(it => (
                     <tr key={it.id} className="m-tr">
                       <td className="px-3 py-2 text-gray-700 min-w-[280px] max-w-[440px] whitespace-normal align-top">{it.descripcion}{it.es_oc && <span className="ml-1 text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-700">OC</span>}</td>
-                      <td className="px-3 py-2 text-center text-gray-400">{it.unidad}</td>
+                      <td className="px-3 py-2 text-center text-gray-400">{unidadCorta(it.unidad, lang)}</td>
                       <td className="px-3 py-2 text-center font-mono">{fmtNum(it.cantidad_total)}</td>
                       <td className="px-3 py-2 text-center font-mono text-gray-500">{fmt(it.precio_unitario, moneda)}</td>
                       <td className="px-3 py-2 text-center font-mono font-medium" style={{color:BRAND}}>{fmt(it.monto_contrato, moneda)}</td>

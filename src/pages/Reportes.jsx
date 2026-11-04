@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO, fmtFecha, today } from '../utils'
+import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO, fmtFecha, today, unidadCorta } from '../utils'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
@@ -365,7 +365,7 @@ async function buildFinanciero({ data, budget, moneda, proy, desde, hasta, presu
         const vals = [
           av.numero_avaluo || av.folio || '—',
           it.descripcion || '—',
-          it.unidad || '—',
+          unidadCorta(it.unidad, lang) || '—',
           parseFloat(it.precio_unitario||0),
           contrato,
           parseFloat(it.monto_anterior||0),
@@ -1504,7 +1504,7 @@ export async function buildSubcontratoDoc({ contrato, itemsContrato, avaluos, av
     const bg   = even ? 'FFF8FAFC' : 'FFFFFFFF'
     ws.getRow(row).height = 17
     const c1 = cell(row, 1); c1.value = it.descripcion
-    const c2 = cell(row, 2); c2.value = it.unidad || ''
+    const c2 = cell(row, 2); c2.value = unidadCorta(it.unidad, lang) || ''
     const c3 = cell(row, 3); c3.value = cantContrato
     const c4 = cell(row, 4); c4.value = costoUnit
     const c5 = cell(row, 5); c5.value = costoTotal
@@ -1866,7 +1866,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
     ws1.getRow(r1).height = 16
     const even = i%2===1
     const crit = parseFloat(m.stock_actual||0) <= parseFloat(m.stock_minimo||0)
-    const vals = [m.codigo, m.descripcion, m.unidad, m.ubicacion_bodega||'—',
+    const vals = [m.codigo, m.descripcion, unidadCorta(m.unidad, lang), m.ubicacion_bodega||'—',
       parseFloat(m.stock_actual)||0, parseFloat(m.stock_minimo)||0, crit?(isEs?'CRÍTICO':'CRITICAL'):'OK']
     vals.forEach((v,ci) => {
       const c = ws1.getCell(r1,ci+1)
@@ -1896,7 +1896,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
     const total = round2((parseFloat(e.cantidad)||0)*(parseFloat(e.precio_unitario)||0))
     totalEntradas += total
     const vals = [e.fecha_recepcion, m?.codigo||'—', m?.descripcion||'—',
-      parseFloat(e.cantidad)||0, m?.unidad||'', parseFloat(e.precio_unitario)||0,
+      parseFloat(e.cantidad)||0, unidadCorta(m?.unidad, lang)||'', parseFloat(e.precio_unitario)||0,
       total, e.numero_factura||'—', e.proveedor||'—', p?.project_code||'—']
     vals.forEach((v,ci) => {
       const c = ws2.getCell(r2,ci+1)
@@ -1926,7 +1926,7 @@ async function buildInventario({ data, materiales, proyectos, presupuesto, desde
     const p   = proyectos.find(x=>x.id===s.proyecto_id)
     const act = presupuesto.find(x=>x.id===s.actividad_id)
     const vals = [s.fecha_salida, m?.codigo||'—', m?.descripcion||'—',
-      parseFloat(s.cantidad)||0, m?.unidad||'', p?.project_code||'—',
+      parseFloat(s.cantidad)||0, unidadCorta(m?.unidad, lang)||'', p?.project_code||'—',
       act?`${act.code} — ${act.descripcion}`:'—']
     vals.forEach((v,ci) => {
       const c = ws3.getCell(r3,ci+1)
@@ -2683,7 +2683,7 @@ function VistaInventario({ data, materiales, proyectos, presupuesto, fmtDate, fm
       </div>
       {subTab===0&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{(isEs ? ['Código','Descripción','Unidad','Ubicación','Stock actual','Stock mín.','Estado'] : ['Code','Description','Unit','Location','Current stock','Min. stock','Status']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>
-        <tbody>{data.mats.map((m,i)=>{const crit=parseFloat(m.stock_actual||0)<=parseFloat(m.stock_minimo||0);return(<tr key={m.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC+' font-mono text-xs'}>{m.codigo}</td><td className={tdC}>{m.descripcion}</td><td className={tdC}>{m.unidad}</td><td className={tdC}>{m.ubicacion_bodega||'—'}</td><td className={tdC+' font-mono font-medium'} style={{color:crit?'#ef4444':'#1D9E75'}}>{fmtNum(m.stock_actual)}</td><td className={tdC+' font-mono'}>{fmtNum(m.stock_minimo)}</td><td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit?'bg-red-100 text-red-600':'bg-green-100 text-green-700'}`}>{crit?(isEs?'Crítico':'Critical'):'OK'}</span></td></tr>)})}</tbody>
+        <tbody>{data.mats.map((m,i)=>{const crit=parseFloat(m.stock_actual||0)<=parseFloat(m.stock_minimo||0);return(<tr key={m.id} className={i%2===0?'bg-white':'bg-gray-50/50'}><td className={tdC+' font-mono text-xs'}>{m.codigo}</td><td className={tdC}>{m.descripcion}</td><td className={tdC}>{unidadCorta(m.unidad, lang)}</td><td className={tdC}>{m.ubicacion_bodega||'—'}</td><td className={tdC+' font-mono font-medium'} style={{color:crit?'#ef4444':'#1D9E75'}}>{fmtNum(m.stock_actual)}</td><td className={tdC+' font-mono'}>{fmtNum(m.stock_minimo)}</td><td className={tdC}><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${crit?'bg-red-100 text-red-600':'bg-green-100 text-green-700'}`}>{crit?(isEs?'Crítico':'Critical'):'OK'}</span></td></tr>)})}</tbody>
       </table></div>}
       {subTab===1&&<div className="m-card overflow-x-auto"><table className="w-full">
         <thead><tr style={thS}>{(isEs ? ['Fecha','Código','Material','Cantidad','Precio unit.','Total','Factura','Proveedor','Proyecto'] : ['Date','Code','Material','Quantity','Unit price','Total','Invoice','Supplier','Project']).map((h,i)=><th key={i} className={thC}>{h}</th>)}</tr></thead>

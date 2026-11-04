@@ -5,7 +5,7 @@ import { LangProvider, useLanguage, detectInitialLang } from './i18n'
 import { AuthProvider, useAuth } from './auth'
 import { usePermissions, NAV_PERMISOS } from './usePermissions'
 import { MODULOS_PRO_PLUS, MODULOS_ENTERPRISE, PLAN_INFO } from './plans'
-import { Icons, Avatar, Spinner } from './components'
+import { Icons, Avatar, Spinner, UnidadesDatalist } from './components'
 import { useTheme } from './theme'
 import { supabase } from './supabase'
 import { setLogoGlobal } from './logoUtils'
@@ -691,6 +691,7 @@ function Layout() {
       </div>
 
       <WelcomeTour />
+      <UnidadesDatalist lang={lang} />
     </div>
   )
 }

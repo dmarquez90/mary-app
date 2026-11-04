@@ -383,9 +383,10 @@ export const UNIDADES_CONFIG = [
   { value: 'ft²',  es: 'ft² — pie cuadrado',      en: 'ft² — square foot'    },
   { value: 'ft³',  es: 'ft³ — pie cúbico',        en: 'ft³ — cubic foot'     },
   { value: 'yd³',  es: 'yd³ — yarda cúbica',      en: 'yd³ — cubic yard'     },
-  { value: 'ft',   es: 'ft — pie',                en: 'ft — foot'            },
   { value: 'in',   es: 'in — pulgada',            en: 'in — inch'            },
   { value: 'LF',   es: 'LF — pie lineal',         en: 'LF — linear foot'     },
+  // `corto`: lo que se muestra en tablas e impresiones cuando difiere del valor guardado
+  { value: 'LS',   es: 'Global',                  en: 'LS — lump sum',  corto: { es: 'Global', en: 'LS' } },
 ]
 
 // Mapa rápido: valor antiguo → nuevo valor (para mostrar unidades guardadas antes del cambio)
@@ -393,6 +394,7 @@ export const UNIDADES_LEGADO = {
   'pie²': 'ft²', 'gl': 'gal', 'hr': 'h',
   'día': 'day', 'semana': 'wk', 'mes': 'mo',
   'lote': 'lot', 'viaje': 'load',
+  'ft': 'LF',
 }
 
 // Valores del array (para compatibilidad con código existente)
@@ -405,6 +407,32 @@ export const getUnitLabel = (value, lang = 'ES') => {
   const cfg = UNIDADES_CONFIG.find(u => u.value === normalized)
   if (!cfg) return value
   return lang === 'ES' ? cfg.es : cfg.en
+}
+
+// Símbolo corto para tablas, impresiones y exportaciones: el valor guardado, salvo las unidades
+// que cambian con el idioma (LS → "Global" en español) y las legadas (ft → LF)
+export const unidadCorta = (value, lang = 'ES') => {
+  if (!value) return value
+  const normalized = UNIDADES_LEGADO[value] || value
+  const cfg = UNIDADES_CONFIG.find(u => u.value === normalized)
+  if (!cfg) return value
+  return cfg.corto ? cfg.corto[lang === 'ES' ? 'es' : 'en'] : cfg.value
+}
+
+// Alias que llegan en las plantillas de Excel o escritos a mano → valor estándar.
+// 'gl' no se toca: en datos antiguos significa galón (ver UNIDADES_LEGADO).
+const UNIDADES_ALIAS = {
+  'ft': 'LF', 'lf': 'LF', 'foot': 'LF', 'feet': 'LF', 'linear foot': 'LF', 'linear feet': 'LF', 'pie lineal': 'LF', 'pies lineales': 'LF',
+  'ls': 'LS', 'l.s.': 'LS', 'lump sum': 'LS', 'global': 'LS', 'glb': 'LS', 'sg': 'LS', 'suma global': 'LS',
+  'm2': 'm²', 'm3': 'm³', 'ft2': 'ft²', 'ft3': 'ft³', 'yd3': 'yd³', 'yrd3': 'yd³',
+  'lbs': 'lb', 'kgs': 'kg', 'galon': 'gal', 'galón': 'gal', 'dia': 'day', 'día': 'day',
+}
+export const normalizarUnidad = (raw) => {
+  const s = String(raw ?? '').trim()
+  if (!s) return s
+  const alias = UNIDADES_ALIAS[s.toLowerCase()]
+  if (alias) return alias
+  return UNIDADES_LEGADO[s] || s
 }
 
 // ── Costo de materiales consumidos (FIFO) ────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useContext, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
-import { today } from '../utils'
+import { today, unidadCorta } from '../utils'
 import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { supabase } from '../supabase'
 import { usePermissions } from '../usePermissions'
@@ -36,10 +36,10 @@ function ItemFlujoBadge({ item, materiales }) {
     <div className="mt-1 flex flex-wrap gap-1 items-center">
       <FlujoBadge flujo={item.flujo_item} />
       {item.flujo_item === 'stock_total' && (
-        <span className="text-xs text-green-600">✓ {item.cantidad_bodega} {item.unidad} {isEs ? 'disponibles en bodega' : 'available in warehouse'}</span>
+        <span className="text-xs text-green-600">✓ {item.cantidad_bodega} {unidadCorta(item.unidad, lang)} {isEs ? 'disponibles en bodega' : 'available in warehouse'}</span>
       )}
       {item.flujo_item === 'sin_stock' && (
-        <span className="text-xs text-amber-600">⚠ {item.cantidad_oc} {item.unidad} {isEs ? 'requieren OC' : 'require a PO'}</span>
+        <span className="text-xs text-amber-600">⚠ {item.cantidad_oc} {unidadCorta(item.unidad, lang)} {isEs ? 'requieren OC' : 'require a PO'}</span>
       )}
       {item.flujo_item === 'stock_parcial' && (
         <div className="flex gap-2 text-xs">
@@ -91,7 +91,7 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
         <div className="flex items-center gap-2 w-full border border-gray-200 rounded-lg px-3 py-2 bg-white">
           <span className="font-mono text-xs text-gray-400 flex-shrink-0">{selected.codigo}</span>
           <span className="text-sm text-gray-800 flex-1 truncate">{selected.descripcion}</span>
-          <span className="text-xs text-gray-400 flex-shrink-0">{selected.unidad}</span>
+          <span className="text-xs text-gray-400 flex-shrink-0">{unidadCorta(selected.unidad, lang)}</span>
           <button onClick={clear} className="text-gray-300 hover:text-red-400 flex-shrink-0 text-sm">✕</button>
         </div>
       ) : (
@@ -108,7 +108,7 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
               className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0">
               <span className="font-mono text-xs text-gray-400 w-24 flex-shrink-0">{m.codigo}</span>
               <span className="text-sm text-gray-800 flex-1">{m.descripcion}</span>
-              <span className="text-xs text-gray-400 flex-shrink-0">{m.unidad}</span>
+              <span className="text-xs text-gray-400 flex-shrink-0">{unidadCorta(m.unidad, lang)}</span>
               <span className={`text-xs font-mono font-medium flex-shrink-0 ${
                 m.stock_actual <= 0 ? 'text-red-500' :
                 m.stock_actual <= (m.stock_minimo || 0) ? 'text-amber-500' :
@@ -207,7 +207,7 @@ function SolicitudSearchInput({ solicitudes, solicitud_items, materiales, proyec
                 <div className="flex flex-wrap gap-1">
                   {items.slice(0,3).map(it => {
                     const m = materiales.find(x => x.id === it.material_id)
-                    return <span key={it.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-mono">{m?.codigo} × {it.cantidad} {it.unidad}</span>
+                    return <span key={it.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-mono">{m?.codigo} × {it.cantidad} {unidadCorta(it.unidad, lang)}</span>
                   })}
                   {items.length > 3 && <span className="text-xs text-gray-400">+{items.length-3}</span>}
                 </div>
@@ -985,7 +985,7 @@ export default function Compras() {
                     value={it.cantidad} onChange={e=>setSolItem(idx,'cantidad',e.target.value)} min="0" step="0.01"/>
                   <input
                     className="m-input" style={{ width: 80 }}
-                    placeholder={t('lbl_unit')}
+                    placeholder={t('lbl_unit')} list="unidades-sugeridas"
                     value={it.unidad} onChange={e=>setSolItem(idx,'unidad',e.target.value)}/>
                 </div>
 
@@ -1123,7 +1123,7 @@ export default function Compras() {
                       <span className="text-sm font-medium text-gray-800 flex-1">{it.descripcion}</span>
                       <div className="flex items-center gap-1.5">
                         {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-medium">🚜 {t('comp_eq_badge')}</span>}
-                        <span className="text-xs text-gray-400">{it.cantidad} {it.unidad}</span>
+                        <span className="text-xs text-gray-400">{it.cantidad} {unidadCorta(it.unidad, lang)}</span>
                       </div>
                     </div>
                     {/* Fechas de equipo si aplica */}
@@ -1247,7 +1247,7 @@ export default function Compras() {
                       {it.es_adicional && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{!isEs?'Additional':'Adicional'}</span>}
                       {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{t('comp_eq_badge')}</span>}
                     </span>
-                    <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
+                    <span className="font-mono text-gray-500">{it.cantidad} {unidadCorta(it.unidad, lang)}</span>
                   </div>
                   {act && <p className="text-xs text-gray-400 mt-0.5">{act.code} — {act.descripcion}</p>}
                   {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin) && (
@@ -1319,7 +1319,7 @@ export default function Compras() {
                       {m ? `${m.codigo} — ${m.descripcion}` : (it.descripcion || '—')}
                       {isEquipo && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{t('comp_eq_badge')}</span>}
                     </span>
-                    <span className="font-mono text-gray-500">{it.cantidad} {it.unidad}</span>
+                    <span className="font-mono text-gray-500">{it.cantidad} {unidadCorta(it.unidad, lang)}</span>
                   </div>
                   {isEquipo && (it.eq_fecha_inicio || it.eq_fecha_fin) && (
                     <p className="text-xs text-orange-600 mt-0.5">
@@ -1462,7 +1462,7 @@ function PrintSolicitud({ doc, materiales, presupuesto, t, nombreEmpresa = 'Marq
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
                 <td style={{ ...cell, fontFamily:'monospace' }}>{m?.codigo || '—'}</td>
                 <td style={cell}>{m?.descripcion || it.descripcion || '—'}{it.es_adicional ? ' *' : ''}</td>
-                <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
+                <td style={{ ...cell, textAlign:'center' }}>{unidadCorta(it.unidad, isEn ? 'EN' : 'ES')}</td>
                 <td style={{ ...cell, textAlign:'center', fontWeight:'bold' }}>{it.cantidad}</td>
                 <td style={{ ...cell, fontSize:'10px' }}>{act ? `${act.code} — ${act.descripcion}` : '—'}</td>
                 <td style={{ ...cell, fontSize:'10px' }}>{it.observaciones || '—'}</td>
@@ -1648,7 +1648,7 @@ function PrintOC({ doc, materiales, presupuesto, t, nombreEmpresa = 'Marquez Pro
                 <td style={{ ...cell, textAlign:'center' }}>{idx+1}</td>
                 <td style={{ ...cell, fontFamily:'monospace', fontSize:'10px' }}>{codigo}</td>
                 <td style={cell}>{descripcion}</td>
-                <td style={{ ...cell, textAlign:'center' }}>{it.unidad}</td>
+                <td style={{ ...cell, textAlign:'center' }}>{unidadCorta(it.unidad, isEn ? 'EN' : 'ES')}</td>
                 <td style={{ ...numCell }}>{fmt2(it.cantidad)}</td>
                 <td style={{ ...numCell }}>{it.precio > 0 ? fmt2(it.precio) : '___________'}</td>
                 <td style={{ ...numCell }}>{it.precio > 0 ? fmt2(it.subtotal) : '___________'}</td>

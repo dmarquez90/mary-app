@@ -6,7 +6,7 @@ import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, r2 } from '../utils'
+import { today, fmt, fmtNum, r2, unidadCorta } from '../utils'
 import { labelCategoriaInd } from './categoriasIndirectos'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
@@ -165,7 +165,7 @@ async function exportOCExcel({ oc, items, inds, proy, moneda, empresa, lang = 'E
       ? (isEs ? 'Nueva' : 'New')
       : (isEs ? 'Modificada' : 'Modified')
     ws.getRow(row).height = 17
-    const vals = [tipoLabel, it.descripcion, it.unidad || 'und', parseFloat(it.cantidad_original || 0), parseFloat(it.cantidad_nueva || 0), parseFloat(it.precio_unitario || 0), monto]
+    const vals = [tipoLabel, it.descripcion, unidadCorta(it.unidad || 'und', lang), parseFloat(it.cantidad_original || 0), parseFloat(it.cantidad_nueva || 0), parseFloat(it.precio_unitario || 0), monto]
     const numFmts = [null, null, null, '#,##0.00', '#,##0.00', '"$"#,##0.00', '"$"#,##0.00']
     vals.forEach((v, ci) => {
       const c = ws.getCell(row, ci + 1)
@@ -608,7 +608,7 @@ export default function OrdenesCambio() {
                             </div>
                           </td>
                           <td className="px-2 py-2 align-top">
-                            <input className={`${inputCls} w-20 text-center`} value={it.unidad||'und'}
+                            <input className={`${inputCls} w-20 text-center`} list="unidades-sugeridas" value={it.unidad||'und'}
                               onChange={e => setItem(idx, 'unidad', e.target.value)} />
                           </td>
                           <td className="px-2 py-2 align-top">
@@ -937,7 +937,7 @@ export default function OrdenesCambio() {
                         <div key={it.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-green-100">
                           <div>
                             <span className="text-sm font-medium text-gray-700">{it.descripcion}</span>
-                            <span className="ml-2 text-xs text-gray-400">{fmtNum(it.cantidad_nueva)} {it.unidad}</span>
+                            <span className="ml-2 text-xs text-gray-400">{fmtNum(it.cantidad_nueva)} {unidadCorta(it.unidad, lang)}</span>
                           </div>
                           <div className="text-right">
                             <p className="text-xs font-mono font-bold text-green-600">+{fmt(it.monto_cambio, moneda)}</p>
@@ -967,7 +967,7 @@ export default function OrdenesCambio() {
                             <div>
                               <span className="text-sm font-medium text-gray-700">{it.descripcion}</span>
                               <span className="ml-2 text-xs text-gray-400">
-                                {fmtNum(it.cantidad_original)} → {fmtNum(it.cantidad_nueva)} {it.unidad}
+                                {fmtNum(it.cantidad_original)} → {fmtNum(it.cantidad_nueva)} {unidadCorta(it.unidad, lang)}
                                 {' '}({diff >= 0 ? '+' : ''}{fmtNum(diff)})
                               </span>
                             </div>
@@ -1045,7 +1045,7 @@ export default function OrdenesCambio() {
                             </p>
                           )}
                         </td>
-                        <td className={tdCls + ' text-xs text-gray-400'}>{it.unidad}</td>
+                        <td className={tdCls + ' text-xs text-gray-400'}>{unidadCorta(it.unidad, lang)}</td>
                         <td className={tdCls + ' font-mono text-xs'}>{fmtNum(it.cantidad_original)}</td>
                         <td className={tdCls + ' font-mono text-xs'}>{fmtNum(it.cantidad_nueva)}</td>
                         <td className={tdCls + ' font-mono text-xs'}>{fmt(it.precio_unitario, moneda)}</td>
