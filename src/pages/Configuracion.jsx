@@ -260,7 +260,9 @@ export default function Configuracion({ onNavigate }) {
         throw new Error(isEs ? 'La contraseña debe tener mínimo 8 caracteres.' : 'Password must be at least 8 characters.')
       }
       if (form.id) {
-        await supabase.from('usuarios').update({ nombre:form.nombre, rol:form.rol, activo:form.activo }).eq('id', form.id)
+        // Antes se ignoraba el error: si la base de datos rechazaba el cambio, igual decía "actualizado"
+        const { error: updErr } = await supabase.from('usuarios').update({ nombre:form.nombre, rol:form.rol, activo:form.activo }).eq('id', form.id)
+        if (updErr) throw new Error(updErr.message)
         showSuccess(t('cfg_users_success_updated'))
       } else {
         const res = await fetch(
