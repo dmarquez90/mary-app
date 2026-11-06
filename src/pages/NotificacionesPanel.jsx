@@ -14,6 +14,15 @@ const TIPO_CONFIG = {
   avaluo_sub_nuevo:     { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '🧾' },
   avaluo_cliente_nuevo: { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '💵' },
   oc_cambio_nueva:      { bg: 'bg-blue-100',  text: 'text-blue-700',  icon: '📝' },
+  // Visto bueno pendiente del Project Manager
+  oc_cambio_revisar:      { bg: 'bg-blue-100',   text: 'text-blue-700',   icon: '📝' },
+  avaluo_cliente_revisar: { bg: 'bg-blue-100',   text: 'text-blue-700',   icon: '💵' },
+  avaluo_sub_revisar:     { bg: 'bg-blue-100',   text: 'text-blue-700',   icon: '🧾' },
+  // Aprobación pendiente del Gerente General
+  oc_compra_nueva:        { bg: 'bg-indigo-100', text: 'text-indigo-700', icon: '🛒' },
+  oc_cambio_aprobar:      { bg: 'bg-indigo-100', text: 'text-indigo-700', icon: '📝' },
+  avaluo_cliente_aprobar: { bg: 'bg-indigo-100', text: 'text-indigo-700', icon: '💵' },
+  avaluo_sub_aprobar:     { bg: 'bg-indigo-100', text: 'text-indigo-700', icon: '🧾' },
 }
 
 const MODULO_LABELS = {

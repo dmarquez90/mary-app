@@ -96,8 +96,9 @@ export function AuthProvider({ children }) {
 
     const perfilFinal = {
       ...data,
-      permisos_custom:      permData?.permisos || null,
-      proyectos_permitidos: permData?.todos_proyectos !== false ? null : (permData?.proyectos || null),
+      // Gerente General: todos los módulos y proyectos, sin restricciones personalizadas
+      permisos_custom:      data?.rol === 'gerente_general' ? null : (permData?.permisos || null),
+      proyectos_permitidos: data?.rol === 'gerente_general' || permData?.todos_proyectos !== false ? null : (permData?.proyectos || null),
       // Datos de plan expuestos directamente en perfil
       plan,
       plan_limites: limites,

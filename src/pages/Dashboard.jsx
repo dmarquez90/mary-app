@@ -229,7 +229,7 @@ export default function Dashboard({ onNavigate }) {
 
   const ocCambioStats = useMemo(() => {
     const aprobadas  = ordenes_cambio.filter(o => o.estado === 'aprobada')
-    const pendientes = ordenes_cambio.filter(o => o.estado === 'presentada')
+    const pendientes = ordenes_cambio.filter(o => ['presentada','revisada_pm'].includes(o.estado))
     return {
       aprobadas: aprobadas.length,
       pendientes: pendientes.length,

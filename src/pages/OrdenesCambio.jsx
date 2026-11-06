@@ -15,6 +15,7 @@ const BRAND = 'var(--brand)'
 const ESTADO_OC = {
   borrador:   { label: 'Borrador',   labelEn: 'Draft',      cls: 'bg-gray-100 text-gray-600'   },
   presentada: { label: 'Presentada', labelEn: 'Submitted',  cls: 'bg-blue-100 text-blue-700'   },
+  revisada_pm:{ label: 'Visto bueno PM', labelEn: 'PM reviewed', cls: 'bg-indigo-100 text-indigo-700' },
   aprobada:   { label: 'Aprobada',   labelEn: 'Approved',   cls: 'bg-green-100 text-green-700' },
   rechazada:  { label: 'Rechazada',  labelEn: 'Rejected',   cls: 'bg-red-100 text-red-600'     },
 }
@@ -131,8 +132,8 @@ async function exportOCExcel({ oc, items, inds, proy, moneda, empresa, lang = 'E
   }
 
   const estadoLabels = isEs
-    ? { borrador: 'Borrador', presentada: 'Presentada', aprobada: 'Aprobada', rechazada: 'Rechazada' }
-    : { borrador: 'Draft', presentada: 'Submitted', aprobada: 'Approved', rechazada: 'Rejected' }
+    ? { borrador: 'Borrador', presentada: 'Presentada', revisada_pm: 'Visto bueno PM', aprobada: 'Aprobada', rechazada: 'Rechazada' }
+    : { borrador: 'Draft', presentada: 'Submitted', revisada_pm: 'PM reviewed', aprobada: 'Approved', rechazada: 'Rejected' }
 
   addInfoRow(isEs ? 'Proyecto:' : 'Project:', `${proy?.project_code || ''} — ${proy?.nombre || ''}`)
   addInfoRow(isEs ? 'Cliente:' : 'Client:', proy?.cliente_externo || '—')
@@ -236,7 +237,7 @@ async function exportOCExcel({ oc, items, inds, proy, moneda, empresa, lang = 'E
 export default function OrdenesCambio() {
   const { state, dispatch } = useStore()
   const { t, lang } = useContext(LangContext)
-  const { can } = usePermissions()
+  const { can, rol } = usePermissions()
   const isEs = lang === 'ES'
 
   const {
@@ -246,7 +247,9 @@ export default function OrdenesCambio() {
   } = state
 
   const puedeEditar  = can('ordenes_cambio_editar')
-  const puedeAprobar = can('oc_aprobar')
+  // Flujo: presentada → visto bueno del PM (obligatorio) → aprobación del Gerente General
+  const puedeRevisarPM = can('pm_revisar') || rol === 'super_admin'
+  const puedeAprobar   = can('oc_aprobar')
 
   const [exportando, setExportando] = useState(false)
 
@@ -293,7 +296,7 @@ export default function OrdenesCambio() {
   )
 
   const totalAprobadas   = ocs.filter(o=>o.estado==='aprobada').reduce((s,o)=>s+(parseFloat(o.total_oc)||0),0)
-  const totalPresentadas = ocs.filter(o=>o.estado==='presentada').length
+  const totalPresentadas = ocs.filter(o=>['presentada','revisada_pm'].includes(o.estado)).length
   const totalBorradores  = ocs.filter(o=>o.estado==='borrador').length
 
   // Prefijo distinto al de las Órdenes de Compra ("OC-"): CO (Change Order) / ODC
@@ -824,7 +827,16 @@ export default function OrdenesCambio() {
                                 {isEs ? 'Presentar' : 'Submit'}
                               </TBtn>
                             )}
-                            {(puedeEditar || puedeAprobar) && oc.estado === 'presentada' && <>
+                            {puedeRevisarPM && oc.estado === 'presentada' && <>
+                              <TBtn onClick={() => cambiarEstado(oc.id, 'revisada_pm')}
+                                className="text-indigo-600 hover:bg-indigo-50">
+                                {isEs ? 'Dar visto bueno' : 'PM sign-off'}
+                              </TBtn>
+                              <TBtn danger onClick={() => cambiarEstado(oc.id, 'rechazada')}>
+                                {isEs ? 'Rechazar' : 'Reject'}
+                              </TBtn>
+                            </>}
+                            {puedeAprobar && oc.estado === 'revisada_pm' && <>
                               <TBtn onClick={() => cambiarEstado(oc.id, 'aprobada')}
                                 className="text-green-600 hover:bg-green-50">
                                 {isEs ? 'Aprobar' : 'Approve'}
@@ -881,10 +893,27 @@ export default function OrdenesCambio() {
                     {isEs ? 'Presentar al cliente' : 'Submit to client'}
                   </button>
                 )}
-                {(puedeEditar || puedeAprobar) && ocDetalle.estado === 'presentada' && <>
+                {puedeRevisarPM && ocDetalle.estado === 'presentada' && <>
+                  <button onClick={() => { cambiarEstado(ocDetalle.id, 'revisada_pm'); setDrawer(null) }}
+                    className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-indigo-600"
+                    title={isEs ? 'Enviar al Gerente General para aprobación' : 'Send to the General Manager for approval'}>
+                    {isEs ? 'Dar visto bueno' : 'PM sign-off'}
+                  </button>
+                  <button onClick={() => { cambiarEstado(ocDetalle.id, 'rechazada'); setDrawer(null) }}
+                    className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-red-500">
+                    {isEs ? 'Rechazar' : 'Reject'}
+                  </button>
+                </>}
+                {ocDetalle.estado === 'presentada' && !puedeRevisarPM && (
+                  <span className="text-xs text-gray-400 self-center">{isEs ? 'Pendiente visto bueno del PM' : 'Awaiting PM sign-off'}</span>
+                )}
+                {ocDetalle.estado === 'revisada_pm' && !puedeAprobar && (
+                  <span className="text-xs text-indigo-600 self-center">{isEs ? 'Pendiente del Gerente General' : 'Awaiting General Manager'}</span>
+                )}
+                {puedeAprobar && ocDetalle.estado === 'revisada_pm' && <>
                   <button onClick={() => { cambiarEstado(ocDetalle.id, 'aprobada'); setDrawer(null) }}
                     className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-green-600">
-                    {isEs ? 'Marcar aprobada' : 'Mark approved'}
+                    {isEs ? 'Aprobar' : 'Approve'}
                   </button>
                   <button onClick={() => { cambiarEstado(ocDetalle.id, 'rechazada'); setDrawer(null) }}
                     className="text-xs px-3 py-1.5 rounded-lg text-white font-medium bg-red-500">

@@ -2625,7 +2625,7 @@ function VistaFinanciero({ data, budget, moneda, proy, desde, hasta, fmt }) {
                 const total   = parseFloat(oc.total_oc || 0)
                 const varPct  = budget > 0 ? ((total / budget) * 100).toFixed(2) : '—'
                 const isAprobada = oc.estado === 'aprobada'
-                const ESTADOS = { borrador: isEs?'Borrador':'Draft', presentada: isEs?'Presentada':'Submitted', aprobada: isEs?'Aprobada':'Approved', rechazada: isEs?'Rechazada':'Rejected' }
+                const ESTADOS = { borrador: isEs?'Borrador':'Draft', presentada: isEs?'Presentada':'Submitted', revisada_pm: isEs?'Visto bueno PM':'PM reviewed', aprobada: isEs?'Aprobada':'Approved', rechazada: isEs?'Rechazada':'Rejected' }
                 return (
                   <tr key={oc.id} className={i%2===0?'bg-white':'bg-gray-50/50'}>
                     <td className={tdC+' font-mono text-xs font-semibold'} style={{color:BRAND}}>{oc.numero||'—'}</td>

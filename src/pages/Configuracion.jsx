@@ -9,8 +9,9 @@ import { fmtFecha } from '../utils'
 import { resizeLogo } from '../logoUtils'
 
 const BRAND = 'var(--brand)'
-const ROLES  = ['coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
+const ROLES  = ['gerente_general','coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
 const ROL_COLORS = {
+  gerente_general: 'bg-indigo-100 text-indigo-700',
   gerente:      'bg-blue-100 text-blue-700',
   coordinador:  'bg-cyan-100 text-cyan-700',
   residente:    'bg-green-100 text-green-700',
@@ -293,6 +294,31 @@ export default function Configuracion({ onNavigate }) {
     await loadData()
   }
 
+  // Elimina la cuenta de forma permanente (perfil + acceso). La función del servidor
+  // valida que quien elimina sea admin de la misma empresa.
+  const [deleteError, setDeleteError] = useState('')
+  const eliminarUsuario = async (u) => {
+    setDeleteError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-auth-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ userId: u.id }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok || result.error) throw new Error(result.error || `HTTP ${res.status}`)
+      showSuccess(isEs ? `Cuenta de ${u.nombre} eliminada.` : `${u.nombre}'s account deleted.`)
+      await loadData()
+    } catch (e) {
+      setDeleteError((isEs ? 'No se pudo eliminar la cuenta: ' : 'Could not delete the account: ') + e.message)
+    }
+  }
+
   const aprobarSolicitud = () => {
     if (!modalSol) return
     dispatch({
@@ -399,6 +425,13 @@ export default function Configuracion({ onNavigate }) {
         </div>
       )}
 
+      {deleteError && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 flex items-start justify-between gap-2">
+          <span>{deleteError}</span>
+          <button onClick={() => setDeleteError('')} className="opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       {/* MODAL APROBAR/RECHAZAR SOLICITUD */}
       {modalSol && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -467,7 +500,7 @@ export default function Configuracion({ onNavigate }) {
               <button onClick={() => setConfirmAct(null)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg">{t('btn_cancel')}</button>
               <button onClick={async () => { await confirmAct.action(); setConfirmAct(null) }}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
-                {t('btn_save')}
+                {confirmAct.confirmLabel || t('btn_save')}
               </button>
             </div>
           </div>
@@ -669,6 +702,18 @@ export default function Configuracion({ onNavigate }) {
                             })} className={`text-xs px-2 py-1 rounded-lg border ${u.activo ? 'border-red-200 text-red-500 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                               {u.activo ? t('cfg_users_deactivate') : t('cfg_users_activate')}
                             </button>
+                            {u.rol !== 'super_admin' && (
+                              <button onClick={() => setConfirmAct({
+                                title: isEs ? 'Eliminar cuenta permanentemente' : 'Permanently delete account',
+                                msg: isEs
+                                  ? `Se eliminará la cuenta de "${u.nombre}" (${u.email}). Ya no podrá iniciar sesión y esta acción no se puede deshacer. Sus registros (auditoría, bitácora, etc.) se conservan.`
+                                  : `"${u.nombre}" (${u.email}) will be deleted. They will no longer be able to sign in and this cannot be undone. Their records (audit log, daily log, etc.) are kept.`,
+                                confirmLabel: isEs ? 'Eliminar' : 'Delete',
+                                action: () => eliminarUsuario(u)
+                              })} className="text-xs px-2 py-1 rounded-lg border border-red-300 text-white bg-red-500 hover:bg-red-600">
+                                {isEs ? 'Eliminar' : 'Delete'}
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-gray-400 px-2">{t('cfg_users_your_account')}</span>

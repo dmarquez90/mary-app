@@ -178,6 +178,11 @@ function reducer(state, action) {
       subcontratos_avaluos:      [...(state.subcontratos_avaluos||[]), action.payload.avaluo],
       subcontratos_avaluo_items: [...(state.subcontratos_avaluo_items||[]), ...action.payload.items],
     }
+    case 'UPD_SC_AVALUO_ESTADO': return {
+      ...state,
+      subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
+        a.id === action.payload.avaluo.id ? { ...a, estado: action.payload.estado } : a),
+    }
     case 'APROBAR_SC_AVALUO': return {
       ...state,
       subcontratos_avaluos: (state.subcontratos_avaluos||[]).map(a =>
@@ -798,7 +803,7 @@ useEffect(() => {
       case 'ADD_CAJA_CHICA': {
         // Solo client_admin/super_admin pueden abrir el fondo directamente (queda 'activa').
         // El gerente puede solicitarlo, pero queda 'pendiente_aprobacion' hasta que el admin lo apruebe.
-        const directo = ['client_admin','super_admin'].includes(rol)
+        const directo = ['client_admin','gerente_general','super_admin'].includes(rol)
         const monto = parseFloat(action.payload.monto_asignado)||0
         const item = {
           ...action.payload, id: uuid(), created_at: today(), tenant_id: tenantId,
@@ -914,7 +919,7 @@ useEffect(() => {
       case 'CERRAR_CAJA_CHICA': {
         // Solo client_admin/super_admin. Si hay gastos pendientes de liquidar, se liquidan
         // y aprueban automáticamente antes de cerrar la caja.
-        if (!['client_admin','super_admin'].includes(rol)) break
+        if (!['client_admin','gerente_general','super_admin'].includes(rol)) break
         const caja = state.cajas_chicas.find(c => c.id === action.payload.cajaId)
         if (!caja) break
         const pendientes = state.gastos_caja_chica.filter(g => g.caja_id === caja.id && !g.liquidacion_id)
@@ -1442,7 +1447,7 @@ useEffect(() => {
           await sbThrow(supabase.from('solicitud_items').insert(items))
         }
         dispatch({ type: 'ADD_SOLICITUD', payload: { solicitud: sol, items } })
-        // Notificar a quienes aprueban (admin y gerente, también por correo) y al coordinador
+        // Notificar al Gerente General (único que aprueba, también por correo); PM y coordinador informados
         const proySol   = state.proyectos.find(p => p.id === sol.proyecto_id)
         const nombreSol = action.payload.proyecto_nombre || proySol?.project_code || proySol?.nombre || ''
         const avisoSol  = {
@@ -1451,8 +1456,8 @@ useEffect(() => {
           modulo: 'compras',
           referencia_id: sol.id,
         }
-        await notify({ ...avisoSol, tipo: 'solicitud_nueva', roles: ['client_admin', 'gerente'] })
-        await notify({ ...avisoSol, tipo: 'solicitud', roles: ['coordinador'] })
+        await notify({ ...avisoSol, tipo: 'solicitud_nueva', roles: ['gerente_general'] })
+        await notify({ ...avisoSol, tipo: 'solicitud', roles: ['gerente', 'coordinador'] })
         break
       }
       case 'UPD_SOLICITUD_ESTADO': {
@@ -1491,8 +1496,8 @@ useEffect(() => {
       }
 
       case 'ADD_OC': {
-        // Solo client_admin, gerente y super_admin pueden crear OC
-        const rolesOC = ['super_admin', 'client_admin', 'gerente']
+        // Solo client_admin, gerente general, gerente y super_admin pueden crear OC
+        const rolesOC = ['super_admin', 'client_admin', 'gerente_general', 'gerente']
         if (!rolesOC.includes(rol)) {
           console.warn('[MARY] ADD_OC bloqueado — rol sin permiso:', rol)
           break
@@ -1560,13 +1565,27 @@ useEffect(() => {
           dispatch({ type: 'UPD_SOLICITUD_ESTADO', payload: { id: oc.solicitud_id, estado: 'oc_generada' } })
         }
         dispatch({ type: 'ADD_OC', payload: { oc, items: ocItems } })
+        // La OC queda pendiente: avisar al Gerente General (único que aprueba), también por correo
+        const proyOCc = state.proyectos.find(p => p.id === oc.proyecto_id)
+        const nombreOCc = proyOCc?.project_code || proyOCc?.nombre || ''
+        await notify({
+          tipo: 'oc_compra_nueva',
+          titulo: `🛒 Purchase Order ${oc_number} pending approval | 🛒 Orden de Compra ${oc_number} pendiente de aprobación`,
+          mensaje: `PO ${oc_number} for ${r2(monto_total)} (${oc.proveedor || ''}) needs your approval. Project: ${nombreOCc}`
+                   + ` | La OC ${oc_number} por ${r2(monto_total)} (${oc.proveedor || ''}) requiere tu aprobación. Proyecto: ${nombreOCc}`,
+          modulo: 'compras',
+          referencia_id: oc.id,
+          roles: ['gerente_general'],
+        })
         break
       }
       case 'UPD_OC_ESTADO': {
-        // Solo client_admin y super_admin pueden aprobar/rechazar OC
-        // gerente solo si tiene permiso condicional (oc_aprobar: 'cond')
-        // Solo client_admin, gerente y super_admin pueden aprobar/rechazar OC
-        const rolesAprobar = ['super_admin', 'client_admin', 'gerente']
+        // Aprobar o cancelar una OC pendiente: SOLO el Gerente General (y super_admin).
+        // Los demás cambios de estado (p. ej. cierre parcial por equipos) siguen como antes.
+        const esDecision = ['aprobada', 'cancelada'].includes(action.payload.estado)
+        const rolesAprobar = esDecision
+          ? ['super_admin', 'gerente_general']
+          : ['super_admin', 'client_admin', 'gerente_general', 'gerente']
         if (!rolesAprobar.includes(rol)) {
           console.warn('[MARY] UPD_OC_ESTADO bloqueado — rol sin permiso:', rol)
           break
@@ -1736,14 +1755,43 @@ useEffect(() => {
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
         const subc = action.payload.contrato?.subcontratista || ''
         await notify({
-          tipo: 'avaluo_sub_nuevo',
+          tipo: 'avaluo_sub_revisar',
           titulo: `🧾 Subcontract valuation #${av.numero ?? ''} pending approval | 🧾 Avalúo de subcontrato #${av.numero ?? ''} pendiente de autorización`,
           mensaje: `Valuation #${av.numero ?? ''} from ${subc} for ${r2(av.monto_a_pagar ?? av.monto_total ?? 0)} needs your approval.`
                    + ` | El avalúo #${av.numero ?? ''} de ${subc} por ${r2(av.monto_a_pagar ?? av.monto_total ?? 0)} requiere tu autorización.`,
           modulo: 'financiero',
           referencia_id: av.id,
-          roles: ['client_admin', 'gerente'],
+          roles: ['gerente'],
         })
+        break
+      }
+      // Visto bueno del PM (revisado_pm) o rechazo de un avalúo de subcontrato
+      case 'UPD_SC_AVALUO_ESTADO': {
+        const { avaluo: av, contrato, estado } = action.payload
+        await sbThrow(supabase.from('subcontratos_avaluos').update({ estado }).eq('id', av.id))
+        dispatch(action)
+        const subc = contrato?.subcontratista || ''
+        const montoAv = r2(av.monto_a_pagar ?? av.monto_total ?? 0)
+        if (estado === 'revisado_pm') {
+          await notify({
+            tipo: 'avaluo_sub_aprobar',
+            titulo: `🧾 Subcontract valuation #${av.numero ?? ''} reviewed by PM — awaiting your approval | 🧾 Avalúo de subcontrato #${av.numero ?? ''} revisado por el PM — pendiente de tu aprobación`,
+            mensaje: `Valuation #${av.numero ?? ''} from ${subc} for ${montoAv} has the Project Manager's sign-off and needs your approval.`
+                     + ` | El avalúo #${av.numero ?? ''} de ${subc} por ${montoAv} tiene el visto bueno del Project Manager y requiere tu aprobación.`,
+            modulo: 'financiero',
+            referencia_id: av.id,
+            roles: ['gerente_general'],
+          })
+        } else if (estado === 'rechazado') {
+          await notify({
+            tipo: 'rechazo',
+            titulo: '❌ Subcontract valuation rejected | ❌ Avalúo de subcontrato rechazado',
+            mensaje: `Valuation #${av.numero ?? ''} from ${subc} was rejected. | El avalúo #${av.numero ?? ''} de ${subc} fue rechazado.`,
+            modulo: 'financiero',
+            referencia_id: av.id,
+            roles: ['gerente', 'contador'],
+          })
+        }
         break
       }
       case 'APROBAR_SC_AVALUO': {
@@ -2081,7 +2129,7 @@ useEffect(() => {
                    + ` | Se creó una orden de cambio por ${r2(orden.total_oc || 0)}. Proyecto: ${nombreOC}. ${orden.motivo || ''}`,
           modulo: 'ordenes_cambio',
           referencia_id: orden.id,
-          roles: ['client_admin', 'gerente'],
+          roles: ['gerente'],
         })
         break
       }
@@ -2195,7 +2243,7 @@ useEffect(() => {
             mensaje: 'The change order was approved and applied to the budget. | La orden de cambio fue aprobada y aplicada al presupuesto.',
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
-            roles: ['residente', 'coordinador', 'contador'],
+            roles: ['residente', 'coordinador', 'contador', 'gerente'],
           })
 
         } else if (action.payload.estado === 'rechazada') {
@@ -2205,16 +2253,27 @@ useEffect(() => {
             mensaje: 'The change order was rejected. | La orden de cambio fue rechazada.',
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
-            roles: ['residente', 'coordinador'],
+            roles: ['residente', 'coordinador', 'gerente'],
           })
         } else if (action.payload.estado === 'presentada') {
           await notify({
-            tipo: 'info',
-            titulo: '📤 Change Order submitted to client | 📤 Orden de Cambio presentada al cliente',
-            mensaje: 'A change order was submitted to the client for approval. | Una orden de cambio fue presentada al cliente para aprobación.',
+            tipo: 'oc_cambio_revisar',
+            titulo: '📤 Change Order submitted — pending PM review | 📤 Orden de Cambio presentada — pendiente de visto bueno del PM',
+            mensaje: "A change order was submitted and needs the Project Manager's review. | Una orden de cambio fue presentada y requiere el visto bueno del Project Manager.",
             modulo: 'ordenes_cambio',
             referencia_id: action.payload.id,
-            roles: ['client_admin', 'gerente'],
+            roles: ['gerente'],
+          })
+        } else if (action.payload.estado === 'revisada_pm') {
+          const ocRev = state.ordenes_cambio.find(o => o.id === action.payload.id)
+          await notify({
+            tipo: 'oc_cambio_aprobar',
+            titulo: `📝 Change Order ${ocRev?.numero || ''} reviewed by PM — awaiting your approval | 📝 Orden de Cambio ${ocRev?.numero || ''} revisada por el PM — pendiente de tu aprobación`,
+            mensaje: `The change order for ${r2(ocRev?.total_oc || 0)} has the Project Manager's sign-off and needs your approval.`
+                     + ` | La orden de cambio por ${r2(ocRev?.total_oc || 0)} tiene el visto bueno del Project Manager y requiere tu aprobación.`,
+            modulo: 'ordenes_cambio',
+            referencia_id: action.payload.id,
+            roles: ['gerente_general'],
           })
         }
         break
@@ -2246,12 +2305,22 @@ useEffect(() => {
         if (action.payload.estado === 'presentado') {
           const num = action.payload.numero ?? ''
           await notify({
-            tipo: 'avaluo_cliente_nuevo',
-            titulo: `💵 Payment application #${num} pending approval | 💵 Avalúo de cobro #${num} pendiente de aprobación`,
-            mensaje: `Client valuation #${num} was submitted and needs your approval. | El avalúo de cliente #${num} fue presentado y requiere tu aprobación.`,
+            tipo: 'avaluo_cliente_revisar',
+            titulo: `💵 Payment application #${num} pending PM review | 💵 Avalúo de cobro #${num} pendiente de visto bueno`,
+            mensaje: `Client valuation #${num} was submitted and needs your review before the General Manager approves it. | El avalúo de cliente #${num} fue presentado y requiere tu visto bueno antes de la aprobación del Gerente General.`,
             modulo: 'financiero',
             referencia_id: action.payload.id,
-            roles: ['client_admin', 'gerente'],
+            roles: ['gerente'],
+          })
+        } else if (action.payload.estado === 'revisado_pm') {
+          const num = action.payload.numero ?? ''
+          await notify({
+            tipo: 'avaluo_cliente_aprobar',
+            titulo: `💵 Payment application #${num} reviewed by PM — awaiting your approval | 💵 Avalúo de cobro #${num} revisado por el PM — pendiente de tu aprobación`,
+            mensaje: `Client valuation #${num} has the Project Manager's sign-off and needs your approval. | El avalúo de cliente #${num} tiene el visto bueno del Project Manager y requiere tu aprobación.`,
+            modulo: 'financiero',
+            referencia_id: action.payload.id,
+            roles: ['gerente_general'],
           })
         } else if (action.payload.estado === 'aprobado') {
           await notify({
@@ -2260,7 +2329,7 @@ useEffect(() => {
             mensaje: 'The client valuation was approved. | El avalúo de cliente fue aprobado.',
             modulo: 'financiero',
             referencia_id: action.payload.id,
-            roles: ['residente', 'coordinador', 'contador'],
+            roles: ['residente', 'coordinador', 'contador', 'gerente'],
           })
         } else if (action.payload.estado === 'rechazado') {
           await notify({
@@ -2269,7 +2338,7 @@ useEffect(() => {
             mensaje: 'The valuation was rejected. Corrections required. | El avalúo fue rechazado. Requiere correcciones.',
             modulo: 'financiero',
             referencia_id: action.payload.id,
-            roles: ['residente', 'coordinador'],
+            roles: ['residente', 'coordinador', 'gerente'],
           })
         }
         break

@@ -9,7 +9,7 @@ const BRAND       = 'var(--brand)'
 const BRAND_LIGHT = '#2E5FA3'
 const BRAND_DARK  = '#122848'
 
-const ROLES  = ['client_admin','coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
+const ROLES  = ['client_admin','gerente_general','coordinador','gerente','residente','bodeguero','contador','supervisor','lectura']
 const PLANES = ['starter','pro','enterprise']
 
 // Misma fuente que el resto de la app y register-trial (antes: 5/15/999 usuarios aquí)
@@ -24,6 +24,7 @@ const PLAN_COLORS = {
 const ROL_COLORS = {
   super_admin:  'bg-red-100 text-red-700',
   client_admin: 'bg-amber-100 text-amber-700',
+  gerente_general: 'bg-indigo-100 text-indigo-700',
   gerente:      'bg-blue-100 text-blue-700',
   coordinador:  'bg-cyan-100 text-cyan-700',
   residente:    'bg-green-100 text-green-700',
@@ -115,7 +116,8 @@ export default function Admin() {
     emailLocked:      isEs ? 'El email no se puede modificar.' : 'Email cannot be modified.',
     role_client_admin: isEs ? 'Administrador' : 'Administrator',
     role_coordinador:  isEs ? 'Coordinador' : 'Coordinator',
-    role_gerente:      isEs ? 'Gerente' : 'Manager',
+    role_gerente_general: isEs ? 'Gerente General' : 'General Manager',
+    role_gerente:      isEs ? 'Gerente de Proyecto' : 'Project Manager',
     role_residente:    isEs ? 'Residente' : 'Site Superintendent',
     role_bodeguero:    isEs ? 'Bodeguero' : 'Warehouse',
     role_contador:     isEs ? 'Contador' : 'Accountant',

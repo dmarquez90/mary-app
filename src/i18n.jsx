@@ -828,6 +828,7 @@ const ES = {
   cfg_users_success_updated: 'Usuario actualizado correctamente.',
 
   // ROLES
+  role_gerente_general: 'Gerente General',
   role_coordinador: 'Coordinador',
   role_gerente: 'Gerente de Proyecto',
   role_residente: 'Residente de Obra',
@@ -1732,6 +1733,7 @@ const EN = {
   cfg_users_success_updated: 'User updated successfully.',
 
   // ROLES
+  role_gerente_general: 'General Manager',
   role_coordinador: 'Project Coordinator',
   role_gerente: 'Project Manager',
   role_residente: 'Site Superintendent',

@@ -14,6 +14,7 @@ const BRAND = 'var(--brand)'
 const ESTADO_AV = {
   borrador:   { label: 'Borrador',   labelEn: 'Draft',      cls: 'bg-gray-100 text-gray-600'   },
   presentado: { label: 'Presentado', labelEn: 'Submitted',  cls: 'bg-blue-100 text-blue-700'   },
+  revisado_pm:{ label: 'Visto bueno PM', labelEn: 'PM reviewed', cls: 'bg-indigo-100 text-indigo-700' },
   aprobado:   { label: 'Aprobado',   labelEn: 'Approved',   cls: 'bg-green-100 text-green-700' },
   rechazado:  { label: 'Rechazado',  labelEn: 'Rejected',   cls: 'bg-red-100 text-red-600'     },
 }
@@ -222,7 +223,11 @@ export default function AvaluosCliente() {
   } = state
 
   const puedeEditar = can('financiero_editar')
-  const puedeAprobar = ['super_admin','client_admin','gerente','supervisor'].includes(rol)
+  // Flujo: presentado → visto bueno del PM (obligatorio) → aprobación SOLO del Gerente General
+  const puedeRevisarPM    = can('pm_revisar') || rol === 'super_admin'
+  const puedeAprobarFinal = can('oc_aprobar')
+  // Reabrir / eliminar (no es aprobación)
+  const puedeAprobar = ['super_admin','client_admin','gerente_general','gerente','supervisor'].includes(rol)
 
   const [exportando, setExportando] = useState(false)
 
@@ -287,7 +292,7 @@ export default function AvaluosCliente() {
   )
 
   const numAvaluo             = avs.length + 1
-  const pendientesAprobacion  = avs.filter(a => a.estado === 'presentado')
+  const pendientesAprobacion  = avs.filter(a => ['presentado','revisado_pm'].includes(a.estado))
 
   const acumuladoPrevio = (actividadId) => {
     const avAprobados = avaluos_cliente.filter(a => a.proyecto_id === proyId && a.estado === 'aprobado')
@@ -662,20 +667,24 @@ export default function AvaluosCliente() {
         {avDetalle.estado !== 'aprobado' && (
           <div className={`rounded-xl border px-5 py-4 mb-5 flex items-center justify-between gap-4 flex-wrap
             ${avDetalle.estado === 'presentado' ? 'bg-blue-50 border-blue-200' :
+              avDetalle.estado === 'revisado_pm' ? 'bg-indigo-50 border-indigo-200' :
               avDetalle.estado === 'rechazado'  ? 'bg-red-50 border-red-200'  :
               'bg-amber-50 border-amber-200'}`}>
             <div>
               <p className="text-sm font-semibold text-gray-800">
                 {avDetalle.estado === 'borrador'   ? (isEs ? 'Este avaluo esta en borrador' : 'This valuation is a draft') :
                  avDetalle.estado === 'rechazado'  ? (isEs ? 'Avaluo rechazado' : 'Valuation rejected') :
-                 (isEs ? 'Pendiente de aprobacion' : 'Pending approval')}
+                 avDetalle.estado === 'revisado_pm' ? (isEs ? 'Con visto bueno del PM — pendiente del Gerente General' : 'PM reviewed — awaiting General Manager') :
+                 (isEs ? 'Pendiente de visto bueno del PM' : 'Pending PM review')}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
                 {avDetalle.estado === 'borrador'
                   ? (isEs ? 'Presentalo al cliente cuando estes listo. Solo los aprobados cuentan como cobrado.' : 'Submit to client when ready. Only approved ones count as billed.')
                   : avDetalle.estado === 'rechazado'
                   ? (isEs ? 'Este avaluo fue rechazado. Corrige y vuelve a presentar.' : 'This valuation was rejected. Correct and resubmit.')
-                  : (isEs ? 'Marcalo como aprobado cuando el cliente haya firmado o aceptado.' : 'Mark as approved when the client has signed or accepted.')}
+                  : avDetalle.estado === 'revisado_pm'
+                  ? (isEs ? 'Solo el Gerente General puede aprobarlo. Solo los aprobados cuentan como cobrado.' : 'Only the General Manager can approve it. Only approved ones count as billed.')
+                  : (isEs ? 'El Project Manager debe dar su visto bueno antes de que el Gerente General lo apruebe.' : 'The Project Manager must sign off before the General Manager approves it.')}
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0 flex-wrap">
@@ -691,7 +700,7 @@ export default function AvaluosCliente() {
                   {isEs ? 'Reabrir borrador' : 'Reopen draft'}
                 </button>
               )}
-              {puedeAprobar && avDetalle.estado === 'presentado' && (
+              {((puedeRevisarPM && avDetalle.estado === 'presentado') || (puedeAprobarFinal && avDetalle.estado === 'revisado_pm')) && (
                 <>
                   <button onClick={() => cambiarEstado(avDetalle.id, 'borrador', avDetalle.numero)}
                     className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-gray-50">
@@ -706,6 +715,22 @@ export default function AvaluosCliente() {
                     className="text-sm px-4 py-2 rounded-lg border border-red-300 text-red-600 font-medium hover:bg-red-50">
                     {isEs ? 'Rechazar' : 'Reject'}
                   </button>
+                </>
+              )}
+              {puedeRevisarPM && avDetalle.estado === 'presentado' && (
+                <button onClick={() => cambiarEstado(avDetalle.id, 'revisado_pm', avDetalle.numero)}
+                  className="text-sm px-4 py-2 rounded-lg text-white font-medium bg-indigo-600 hover:bg-indigo-700">
+                  {isEs ? 'Dar visto bueno (enviar al Gerente General)' : 'PM sign-off (send to General Manager)'}
+                </button>
+              )}
+              {avDetalle.estado === 'presentado' && !puedeRevisarPM && (
+                <span className="text-xs text-gray-500 self-center">{isEs ? 'Pendiente visto bueno del PM' : 'Awaiting PM sign-off'}</span>
+              )}
+              {avDetalle.estado === 'revisado_pm' && !puedeAprobarFinal && (
+                <span className="text-xs text-indigo-600 self-center">{isEs ? 'Pendiente de aprobación del Gerente General' : 'Awaiting General Manager approval'}</span>
+              )}
+              {puedeAprobarFinal && avDetalle.estado === 'revisado_pm' && (
+                <>
                   <button onClick={() => {
                     if (window.confirm(isEs
                       ? `Aprobar avaluo #${avDetalle.numero} por ${fmt(avTotal2, moneda)}? Esta accion sumara este monto al total cobrado.`
@@ -1030,29 +1055,37 @@ export default function AvaluosCliente() {
                               {isEs ? 'Presentar' : 'Submit'}
                             </button>
                           )}
-                          {puedeAprobar && av.estado === 'presentado' && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm(isEs
-                                    ? `Rechazar avaluo #${av.numero}?`
-                                    : `Reject valuation #${av.numero}?`))
-                                    cambiarEstado(av.id, 'rechazado', av.numero)
-                                }}
-                                className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 whitespace-nowrap hover:bg-red-50">
-                                {isEs ? 'Rechazar' : 'Reject'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm(isEs
-                                    ? `Aprobar avaluo #${av.numero} por ${fmt(av.total, moneda)}?`
-                                    : `Approve valuation #${av.numero} for ${fmt(av.total, moneda)}?`))
-                                    cambiarEstado(av.id, 'aprobado', av.numero)
-                                }}
-                                className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap bg-green-600 hover:bg-green-700">
-                                {isEs ? 'Aprobar' : 'Approve'}
-                              </button>
-                            </>
+                          {((puedeRevisarPM && av.estado === 'presentado') || (puedeAprobarFinal && av.estado === 'revisado_pm')) && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(isEs
+                                  ? `Rechazar avaluo #${av.numero}?`
+                                  : `Reject valuation #${av.numero}?`))
+                                  cambiarEstado(av.id, 'rechazado', av.numero)
+                              }}
+                              className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 whitespace-nowrap hover:bg-red-50">
+                              {isEs ? 'Rechazar' : 'Reject'}
+                            </button>
+                          )}
+                          {puedeRevisarPM && av.estado === 'presentado' && (
+                            <button
+                              onClick={() => cambiarEstado(av.id, 'revisado_pm', av.numero)}
+                              title={isEs ? 'Enviar al Gerente General para aprobación' : 'Send to the General Manager for approval'}
+                              className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap bg-indigo-600 hover:bg-indigo-700">
+                              {isEs ? 'Dar visto bueno' : 'PM sign-off'}
+                            </button>
+                          )}
+                          {puedeAprobarFinal && av.estado === 'revisado_pm' && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(isEs
+                                  ? `Aprobar avaluo #${av.numero} por ${fmt(av.total, moneda)}?`
+                                  : `Approve valuation #${av.numero} for ${fmt(av.total, moneda)}?`))
+                                  cambiarEstado(av.id, 'aprobado', av.numero)
+                              }}
+                              className="text-xs px-2 py-1 rounded-lg text-white font-medium whitespace-nowrap bg-green-600 hover:bg-green-700">
+                              {isEs ? 'Aprobar' : 'Approve'}
+                            </button>
                           )}
                           {puedeAprobar && av.estado === 'rechazado' && (
                             <button

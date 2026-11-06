@@ -415,7 +415,7 @@ export default function Financiero() {
 
           {/* ── TAB 3: EQUIPOS ────────────────────────────────────────── */}
           {tab === 3 && (() => {
-            const puedeAprobar = ['super_admin','client_admin','gerente'].includes(rol)
+            const puedeAprobar = ['super_admin','client_admin','gerente_general','gerente'].includes(rol)
             const ajustesProy  = equipos_ajustes.filter(a => eqs.some(e => e.id === a.equipo_id))
             const pendientesCount = ajustesProy.filter(a => a.estado === 'pendiente').length
             const estadoCfg = {
@@ -1065,7 +1065,11 @@ function SubcontratosModule({ can, rol,
   currentUserId, nombreEmpresa,
 }) {
   const BRAND = 'var(--brand)'
-  const puedeRechazar = ['super_admin','client_admin','gerente'].includes(rol)
+  // Avalúos de subcontrato: el PM da el visto bueno (obligatorio) y SOLO el Gerente General aprueba.
+  const puedeRevisarPM   = can('pm_revisar') || rol === 'super_admin'
+  const puedeAprobarSC   = can('oc_aprobar')
+  const puedeRechazar    = puedeRevisarPM || puedeAprobarSC
+  const puedeEliminarAprobado = ['super_admin','client_admin','gerente_general','gerente'].includes(rol)
   const acts  = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
   const contratosProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
 
@@ -1197,7 +1201,11 @@ function SubcontratosModule({ can, rol,
 
   const rechazarAvaluo = (av) => {
     if (!window.confirm(isEs ? '¿Rechazar este avalúo? El subcontratista será notificado.' : 'Reject this valuation? The subcontractor will be notified.')) return
-    dispatch({ type: 'RECHAZAR_SC_AVALUO', payload: { avaluo: av, contrato: scSelected, creador_id: av.created_by || currentUserId } })
+    dispatch({ type: 'UPD_SC_AVALUO_ESTADO', payload: { avaluo: av, contrato: scSelected, estado: 'rechazado' } })
+  }
+
+  const vistoBuenoAvaluo = (av) => {
+    dispatch({ type: 'UPD_SC_AVALUO_ESTADO', payload: { avaluo: av, contrato: scSelected, estado: 'revisado_pm' } })
   }
 
   const eliminarAvaluoAprobado = (av) => {
@@ -1858,10 +1866,12 @@ Total: `)
                         av.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
                         av.estado === 'borrador' ? 'bg-gray-100 text-gray-500' :
                         av.estado === 'rechazado' ? 'bg-red-100 text-red-600' :
+                        av.estado === 'revisado_pm' ? 'bg-indigo-100 text-indigo-700' :
                         'bg-amber-100 text-amber-700'}`}>
                         {av.estado === 'aprobado' ? t('fin_sc_status_approved') :
                          av.estado === 'borrador' ? t('fin_sc_status_draft') :
                          av.estado === 'rechazado' ? (isEs?'Rechazado':'Rejected') :
+                         av.estado === 'revisado_pm' ? (isEs?'Visto bueno PM':'PM reviewed') :
                          av.estado}
                       </span>
                     </td>
@@ -1879,14 +1889,33 @@ Total: `)
                                 {isEs ? 'Rechazar' : 'Reject'}
                               </button>
                             )}
-                            {puedeRechazar && (
-                              <button onClick={() => aprobarAvaluo(av)}
-                                className="text-xs px-3 py-1 rounded-lg text-white font-medium"
-                                style={{ background: '#1D9E75' }}>
-                                {t('fin_sc_approve_btn')}
+                            {puedeRevisarPM && (
+                              <button onClick={() => vistoBuenoAvaluo(av)}
+                                className="text-xs px-3 py-1 rounded-lg text-white font-medium bg-indigo-600 hover:bg-indigo-700"
+                                title={isEs ? 'Enviar al Gerente General para aprobación' : 'Send to the General Manager for approval'}>
+                                {isEs ? 'Dar visto bueno' : 'PM sign-off'}
                               </button>
                             )}
                           </>
+                        )}
+                        {av.estado === 'borrador' && !puedeRevisarPM && puedeAprobarSC && (
+                          <span className="text-xs text-gray-400 px-1">{isEs ? 'Pendiente visto bueno del PM' : 'Awaiting PM sign-off'}</span>
+                        )}
+                        {av.estado === 'revisado_pm' && puedeAprobarSC && (
+                          <>
+                            <button onClick={() => rechazarAvaluo(av)}
+                              className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
+                              {isEs ? 'Rechazar' : 'Reject'}
+                            </button>
+                            <button onClick={() => aprobarAvaluo(av)}
+                              className="text-xs px-3 py-1 rounded-lg text-white font-medium"
+                              style={{ background: '#1D9E75' }}>
+                              {t('fin_sc_approve_btn')}
+                            </button>
+                          </>
+                        )}
+                        {av.estado === 'revisado_pm' && !puedeAprobarSC && (
+                          <span className="text-xs text-indigo-600 px-1">{isEs ? 'Pendiente del Gerente General' : 'Awaiting General Manager'}</span>
                         )}
                         {av.estado === 'aprobado' && (
                           <button onClick={() => buildAvaluoComprobante({
@@ -1905,7 +1934,7 @@ Total: `)
                             📥 {isEs ? 'Comprobante' : 'Voucher'}
                           </button>
                         )}
-                        {av.estado === 'aprobado' && puedeRechazar && (
+                        {av.estado === 'aprobado' && puedeEliminarAprobado && (
                           <button onClick={() => eliminarAvaluoAprobado(av)}
                             className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
                             {isEs ? 'Eliminar' : 'Delete'}
@@ -2083,8 +2112,8 @@ function CajaChicaModule({
 }) {
   const thCls = 'px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap'
   const tdCls = 'px-4 py-3 text-sm text-gray-700'
-  const puedeAprobar     = ['gerente','client_admin','super_admin'].includes(rol)
-  const puedeAbrirDirecto = ['client_admin','super_admin'].includes(rol)
+  const puedeAprobar     = ['gerente','client_admin','gerente_general','super_admin'].includes(rol)
+  const puedeAbrirDirecto = ['client_admin','gerente_general','super_admin'].includes(rol)
   const puedeSolicitar    = rol === 'gerente'
   const puedeGestionarFondo = puedeAbrirDirecto || puedeSolicitar
 
@@ -2177,7 +2206,7 @@ function CajaChicaModule({
     dispatch({ type:'ADD_LIQUIDACION_CC', payload: { caja_id: caja.id, proyecto_id: proyId, gastoIds: pendientes.map(g=>g.id), usuarioId: currentUserId } })
   }
 
-  const puedeCerrar = ['client_admin','super_admin'].includes(rol)
+  const puedeCerrar = ['client_admin','gerente_general','super_admin'].includes(rol)
   const cerrarCaja = () => {
     if (!caja) return
     const msg = pendientes.length > 0

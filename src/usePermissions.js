@@ -3,40 +3,44 @@ import { planTieneModulo } from './plans'
 import { useSubscription } from './subscriptionContext'
 
 const MATRIX = {
-  dashboard:          { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true  },
-  proyectos_ver:      { client_admin: true,  coordinador: true,  gerente: true,  residente: 'own', bodeguero: 'own', contador: true,  lectura: true,  supervisor: 'own' },
-  proyectos_crear:    { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  proyectos_editar:   { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  proyectos_eliminar: { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  presupuesto_ver:    { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true,  supervisor: true  },
-  presupuesto_editar: { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
-  inventario_ver:     { client_admin: true,  coordinador: false, gerente: true,  residente: false, bodeguero: true,  contador: true,  lectura: true  },
-  inventario_editar:  { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: true,  contador: false, lectura: false },
-  mat_pres_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
-  mat_pres_editar:    { client_admin: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  compras_ver:        { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true },
-  solicitud_crear:    { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
-  oc_crear:           { client_admin: true,  coordinador: false, gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
-  oc_aprobar:         { client_admin: true,  coordinador: false, gerente: 'cond',residente: false, bodeguero: false, contador: false, lectura: false, supervisor: true },
-  financiero_ver:     { client_admin: true,  coordinador: false, gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
-  financiero_editar:  { client_admin: true,  coordinador: false, gerente: true, residente: true,  bodeguero: false, contador: true,  lectura: false },
-  curvas_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
-  configuracion:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
-  reportes_ver:       { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: false },
-  auditoria_ver:      { client_admin: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
+  dashboard:          { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true  },
+  proyectos_ver:      { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: 'own', bodeguero: 'own', contador: true,  lectura: true,  supervisor: 'own' },
+  proyectos_crear:    { client_admin: true, gerente_general: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
+  proyectos_editar:   { client_admin: true, gerente_general: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
+  proyectos_eliminar: { client_admin: true, gerente_general: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
+  presupuesto_ver:    { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true,  supervisor: true  },
+  presupuesto_editar: { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
+  inventario_ver:     { client_admin: true, gerente_general: true,  coordinador: false, gerente: true,  residente: false, bodeguero: true,  contador: true,  lectura: true  },
+  inventario_editar:  { client_admin: true, gerente_general: true,  coordinador: false, gerente: false, residente: false, bodeguero: true,  contador: false, lectura: false },
+  mat_pres_ver:       { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
+  mat_pres_editar:    { client_admin: true, gerente_general: true,  coordinador: true,  gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
+  compras_ver:        { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true },
+  solicitud_crear:    { client_admin: true, gerente_general: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
+  oc_crear:           { client_admin: true, gerente_general: true,  coordinador: false, gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
+  // Aprobación final de solicitudes, OCs, órdenes de cambio y avalúos: SOLO el Gerente General
+  oc_aprobar:         { client_admin: false, gerente_general: true, coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false, supervisor: false },
+  // Visto bueno previo (obligatorio) del Project Manager en órdenes de cambio y avalúos
+  pm_revisar:         { gerente: true },
+  financiero_ver:     { client_admin: true, gerente_general: true,  coordinador: false, gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
+  financiero_editar:  { client_admin: true, gerente_general: true,  coordinador: false, gerente: true, residente: true,  bodeguero: false, contador: true,  lectura: false },
+  curvas_ver:         { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true  },
+  configuracion:      { client_admin: true, gerente_general: false,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
+  reportes_ver:       { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: false },
+  auditoria_ver:      { client_admin: true, gerente_general: true,  coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false },
   // Módulos Pro+
-  ordenes_cambio_ver:  { client_admin: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true,  supervisor: true },
-  ordenes_cambio_editar:{ client_admin: true, coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: false },
-  avaluos_ver:         { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true,  supervisor: true },
-  avaluos_editar:      { client_admin: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: false },
+  ordenes_cambio_ver:  { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: false, bodeguero: false, contador: true,  lectura: true,  supervisor: true },
+  ordenes_cambio_editar:{ client_admin: true, gerente_general: true, coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: false },
+  avaluos_ver:         { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true,  supervisor: true },
+  avaluos_editar:      { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: false },
   // Bitácora de Supervisión
-  supervision_ver:     { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: true },
-  supervision_editar:  { client_admin: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: true },
+  supervision_ver:     { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: true },
+  supervision_editar:  { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: false, contador: false, lectura: false, supervisor: true },
 }
 
 export const NAV_PERMISOS = {
   // Alineado con los permisos *_ver de MATRIX: cada rol ve en el menú lo que puede ver
   super_admin:  ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','auditoria','chat'],
+  gerente_general: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','auditoria','chat'],
   client_admin: ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','auditoria','chat'],
   coordinador:  ['dashboard','proyectos','presupuesto','mat_pres','compras','ordenes_cambio','avaluos','curvas','reportes','supervision','chat'],
   gerente:      ['dashboard','proyectos','presupuesto','inventario','mat_pres','compras','ordenes_cambio','avaluos','financiero','curvas','reportes','supervision','chat'],
@@ -81,15 +85,18 @@ const PERMISO_A_MODULO = {
 export function usePermissions() {
   const { perfil, plan, isSuperAdmin } = useAuth()
   const rol = perfil?.rol || 'lectura'
-  const permisosCuston       = perfil?.permisos_custom || null
-  const proyectosPermitidos  = perfil?.proyectos_permitidos || null
+  // El Gerente General tiene acceso a todos los módulos y proyectos:
+  // los permisos personalizados no lo restringen.
+  const esGG = rol === 'gerente_general'
+  const permisosCuston       = esGG ? null : (perfil?.permisos_custom || null)
+  const proyectosPermitidos  = esGG ? null : (perfil?.proyectos_permitidos || null)
   const { isReadOnly }       = useSubscription()
 
   // ── Control por ROL ───────────────────────────────────────────────
   // Permisos de edición bloqueados en modo lectura (suscripción vencida)
   const EDIT_PERMISOS = ['proyectos_crear','proyectos_editar','proyectos_eliminar',
     'presupuesto_editar','inventario_editar','mat_pres_editar','solicitud_crear',
-    'oc_crear','oc_aprobar','financiero_editar','ordenes_cambio_editar','avaluos_editar',
+    'oc_crear','oc_aprobar','pm_revisar','financiero_editar','ordenes_cambio_editar','avaluos_editar',
     'supervision_editar']
 
   const can = (permiso) => {
@@ -144,7 +151,7 @@ export function usePermissions() {
   }
 
   const canViewProject = (proyectoId) => {
-    if (rol === 'super_admin' || rol === 'client_admin') return true
+    if (rol === 'super_admin' || rol === 'client_admin' || esGG) return true
     if (!proyectosPermitidos || proyectosPermitidos.length === 0) return true
     return proyectosPermitidos.includes(proyectoId)
   }

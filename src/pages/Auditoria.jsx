@@ -53,6 +53,7 @@ const OVERRIDE_LABELS = {
   APROBAR_SOL_ELIM:           { es: 'Aprobó solicitud de eliminación',      en: 'Approved deletion request',        modulo: 'Inventario' },
   RECHAZAR_SOL_ELIM:          { es: 'Rechazó solicitud de eliminación',     en: 'Rejected deletion request',        modulo: 'Inventario' },
   APROBAR_SC_AVALUO:          { es: 'Aprobó avalúo de subcontrato',         en: 'Approved subcontract valuation',   modulo: 'Financiero' },
+  UPD_SC_AVALUO_ESTADO:       { es: 'Cambió estado de avalúo de subcontrato', en: 'Changed subcontract valuation status', modulo: 'Financiero' },
   APROBAR_CAJA_CHICA:         { es: 'Aprobó apertura de caja chica',        en: 'Approved petty cash fund opening', modulo: 'Financiero' },
   RECHAZAR_CAJA_CHICA:        { es: 'Rechazó apertura de caja chica',       en: 'Rejected petty cash fund opening', modulo: 'Financiero' },
   APROBAR_LIQUIDACION_CC:     { es: 'Aprobó liquidación de caja chica',     en: 'Approved petty cash settlement',   modulo: 'Financiero' },

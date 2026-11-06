@@ -66,6 +66,7 @@ const NAV = [
 // Nombre del rol en el encabezado [ES, EN] (antes mostraba la clave interna: "residente")
 const ROL_LABEL = {
   super_admin: ['Super Admin', 'Super Admin'], client_admin: ['Administrador', 'Administrator'],
+  gerente_general: ['Gerente General', 'General Manager'],
   coordinador: ['Coordinador', 'Project Coordinator'], gerente: ['Gerente de Proyecto', 'Project Manager'],
   residente: ['Residente de Obra', 'Site Superintendent'], bodeguero: ['Bodeguero', 'Warehouse Manager'],
   contador: ['Contador', 'Accountant'], supervisor: ['Supervisor', 'Supervisor'], lectura: ['Solo Lectura', 'Read Only'],
