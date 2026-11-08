@@ -6,7 +6,7 @@ import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { useAuth } from '../auth'
 import { PageHeader, Card, Icons } from '../components'
-import { headerConLogo } from '../logoUtils'
+import { headerConLogo, getLogoGlobal } from '../logoUtils'
 
 const BRAND    = 'var(--brand)'
 const BRAND_HX = '1B3A6B'
@@ -1049,6 +1049,152 @@ export async function buildPettyCashReceipt({ caja, proy, responsable, lang='ES'
   saveAs(new Blob([buf]), `${isEs ? 'Comprobante_Caja_Chica' : 'Petty_Cash_Receipt'}_${proy?.project_code || ''}_${respSlug}_${fechaHoy.replace(/\//g,'-')}.xlsx`)
 }
 
+// ── AVALÚO DE SUBCONTRATO: título y estado según su etapa ───────────────────
+// Solo un avalúo aprobado es "comprobante de pago"; los demás son documentos
+// de revisión (borrador, visto bueno del PM, rechazado).
+function estadoAvaluoSC(estado, isEs) {
+  return ({
+    borrador:    isEs ? 'Borrador'        : 'Draft',
+    revisado_pm: isEs ? 'Visto bueno PM'  : 'PM reviewed',
+    aprobado:    isEs ? 'Aprobado'        : 'Approved',
+    rechazado:   isEs ? 'Rechazado'       : 'Rejected',
+  })[estado] || estado || '—'
+}
+function tituloAvaluoSC(estado, isEs) {
+  if (estado === 'aprobado') return isEs ? 'COMPROBANTE DE PAGO — AVALÚO' : 'PAYMENT VOUCHER — VALUATION'
+  return `${isEs ? 'AVALÚO DE SUBCONTRATO' : 'SUBCONTRACT VALUATION'} — ${estadoAvaluoSC(estado, isEs).toUpperCase()}`
+}
+
+// ── VER AVALÚO DE SUBCONTRATO EN PDF ────────────────────────────────────────
+// Abre el avalúo como documento imprimible en una pestaña nueva; desde ahí se
+// ve, se imprime o se guarda como PDF ("Guardar como PDF" del navegador).
+export function abrirAvaluoPDF({ avaluo, contrato, itemsContrato, avaluoItems, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
+  const isEs   = lang === 'ES'
+  const moneda = contrato?.moneda || proy?.moneda || 'USD'
+  const money  = (v) => new Intl.NumberFormat(isEs ? 'es' : 'en-US', { style: 'currency', currency: moneda }).format(parseFloat(v)||0)
+  const num    = (v) => new Intl.NumberFormat(isEs ? 'es' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(v)||0)
+  const esc    = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch])
+  const fechaHoy  = new Date().toLocaleDateString(isEs ? 'es' : 'en-US')
+  const proyLabel = proy ? `${proy.project_code} — ${proy.nombre}` : ''
+  const periodo   = avaluo.periodo_inicio && avaluo.periodo_fin ? `${avaluo.periodo_inicio} → ${avaluo.periodo_fin}` : '—'
+  const logo      = getLogoGlobal()
+  const aprobado  = avaluo.estado === 'aprobado'
+
+  const filas = itemsContrato.map(it => {
+    const ai = avaluoItems.find(x => x.avaluo_id === avaluo.id && x.subcontrato_item_id === it.id)
+    if (!ai) return ''
+    const cantContrato = parseFloat(it.cantidad_contrato)||0
+    const cantAcum     = parseFloat(ai.cantidad_acumulada)||0
+    const pct          = cantContrato > 0 ? (cantAcum / cantContrato) * 100 : 0
+    return `<tr>
+      <td class="l">${esc(it.descripcion)}</td>
+      <td>${esc(it.unidad || '')}</td>
+      <td>${num(cantContrato)}</td>
+      <td>${num(ai.cantidad_anterior)}</td>
+      <td>${num(ai.cantidad_actual)}</td>
+      <td>${num(cantAcum)}</td>
+      <td>${money(ai.costo_unitario)}</td>
+      <td>${pct.toFixed(1)}%</td>
+      <td class="b">${money(ai.monto_actual)}</td>
+    </tr>`
+  }).join('')
+
+  const totales = [
+    [isEs ? 'Subtotal' : 'Subtotal', money(avaluo.subtotal)],
+    [`${isEs ? 'Impuesto' : 'Tax'} (${contrato?.impuesto_pct || 0}%)`, money(avaluo.impuesto_monto)],
+    [isEs ? 'Total Avalúo' : 'Valuation Total', money(avaluo.monto_total)],
+  ]
+  if (parseFloat(avaluo.retencion_monto || 0) > 0)
+    totales.push([`${isEs ? 'Retención' : 'Retention'} (${avaluo.retencion_pct || 0}%)`, `-${money(avaluo.retencion_monto)}`])
+
+  const titulo = tituloAvaluoSC(avaluo.estado, isEs)
+  const nombreDoc = `${isEs ? 'Avaluo' : 'Valuation'}_${avaluo.numero}_${(contrato?.subcontratista || '').replace(/\s+/g, '_')}_${proy?.project_code || ''}`
+
+  const html = `<!doctype html>
+<html lang="${isEs ? 'es' : 'en'}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(nombreDoc)}</title>
+<style>
+  @page { size: letter landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1f2937; margin: 0; background: #e5e7eb; }
+  .bar { position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; background: #1B3A6B; }
+  .bar button { font: 600 13px Arial; padding: 8px 14px; border-radius: 8px; border: 0; cursor: pointer; }
+  .bar .p { background: #fff; color: #1B3A6B; } .bar .c { background: transparent; color: #fff; border: 1px solid #ffffff66; }
+  .page { max-width: 1050px; margin: 16px auto; background: #fff; padding: 28px 32px; box-shadow: 0 2px 10px #0002; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 3px solid #1B3A6B; padding-bottom: 12px; }
+  .head img { max-height: 48px; max-width: 180px; }
+  .emp { font-size: 16px; font-weight: 700; color: #1B3A6B; }
+  .tit { text-align: right; } .tit h1 { margin: 0; font-size: 16px; color: #1B3A6B; } .tit p { margin: 2px 0 0; font-size: 11px; color: #64748b; }
+  .badge { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 700;
+           background: ${aprobado ? '#d1fae5' : '#fef3c7'}; color: ${aprobado ? '#047857' : '#b45309'}; }
+  .info { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin: 16px 0; font-size: 12px; }
+  .info b { color: #1B3A6B; display: inline-block; min-width: 150px; }
+  h2 { font-size: 12px; color: #fff; background: #2E5FA3; padding: 6px 10px; margin: 18px 0 0; letter-spacing: .04em; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #1B3A6B; color: #fff; padding: 6px; text-align: right; font-weight: 600; }
+  th:first-child { text-align: left; }
+  td { border: 1px solid #d0d7de; padding: 5px 6px; text-align: right; white-space: nowrap; }
+  td.l { text-align: left; white-space: normal; } td.b { font-weight: 700; }
+  tbody tr:nth-child(even) td { background: #f8fafc; }
+  .tot { margin-left: auto; width: 360px; margin-top: 10px; font-size: 12px; }
+  .tot div { display: flex; justify-content: space-between; padding: 5px 10px; border: 1px solid #d0d7de; border-top: 0; }
+  .tot div:first-child { border-top: 1px solid #d0d7de; }
+  .tot .fin { background: #1D9E75; color: #fff; font-weight: 700; font-size: 14px; border-color: #1D9E75; }
+  .notas { font-size: 11px; color: #64748b; font-style: italic; margin-top: 12px; }
+  .firmas { display: flex; justify-content: space-between; gap: 48px; margin-top: 56px; font-size: 11px; text-align: center; }
+  .firmas > div { flex: 1; } .linea { border-top: 2px solid #1B3A6B; padding-top: 4px; font-weight: 700; color: #1B3A6B; }
+  .foot { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 28px; }
+  @media print { body { background: #fff; } .bar { display: none; } .page { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+                 th, h2, .tot .fin, .badge, tbody tr:nth-child(even) td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head>
+<body>
+  <div class="bar">
+    <button class="c" onclick="window.close()">${isEs ? 'Cerrar' : 'Close'}</button>
+    <button class="p" onclick="window.print()">${isEs ? '🖨 Imprimir / Guardar PDF' : '🖨 Print / Save PDF'}</button>
+  </div>
+  <div class="page">
+    <div class="head">
+      <div>${logo ? `<img src="${logo}" alt="">` : ''}<div class="emp">${esc(nombreEmpresa)}</div></div>
+      <div class="tit"><h1>${esc(titulo)}</h1>
+        <p>${isEs ? 'Avalúo N°' : 'Valuation No.'} ${esc(avaluo.numero)} · ${isEs ? 'Fecha' : 'Date'}: ${esc(avaluo.fecha_elaboracion || fechaHoy)}</p>
+        <span class="badge">${esc(estadoAvaluoSC(avaluo.estado, isEs))}</span></div>
+    </div>
+    <div class="info">
+      <div><b>${isEs ? 'Proyecto:' : 'Project:'}</b> ${esc(proyLabel)}</div>
+      <div><b>${isEs ? 'Subcontratista:' : 'Subcontractor:'}</b> ${esc(contrato?.subcontratista || '—')}</div>
+      <div><b>${isEs ? 'Descripción del contrato:' : 'Contract description:'}</b> ${esc(contrato?.descripcion || '—')}</div>
+      <div><b>${isEs ? 'Período del avalúo:' : 'Valuation period:'}</b> ${esc(periodo)}</div>
+      <div><b>${isEs ? 'Monto total del contrato:' : 'Total contract amount:'}</b> ${money(contrato?.monto_total)}</div>
+    </div>
+    <h2>${isEs ? 'DETALLE DEL AVALÚO' : 'VALUATION DETAIL'}</h2>
+    <table>
+      <thead><tr>${(isEs
+        ? ['Descripción','Unidad','Cant. Contrato','Cant. Anterior','Cant. Actual','Cant. Acumulada','Costo Unitario','% Avance','Monto Avalúo']
+        : ['Description','Unit','Contract Qty','Previous Qty','Current Qty','Accumulated Qty','Unit Cost','% Progress','Valuation Amount']
+      ).map(h => `<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div class="tot">
+      ${totales.map(([l, v]) => `<div><span>${esc(l)}</span><span>${esc(v)}</span></div>`).join('')}
+      <div class="fin"><span>${isEs ? 'MONTO A PAGAR' : 'AMOUNT DUE'}</span><span>${money(avaluo.monto_a_pagar ?? avaluo.monto_total)}</span></div>
+    </div>
+    ${avaluo.notas ? `<p class="notas">${isEs ? 'Notas:' : 'Notes:'} ${esc(avaluo.notas)}</p>` : ''}
+    <div class="firmas">
+      <div><div class="linea">${isEs ? 'Aprobado por' : 'Approved by'}</div>${isEs ? 'Administrador / Gerente' : 'Administrator / Manager'}</div>
+      <div><div class="linea">${isEs ? 'Recibido por' : 'Received by'}</div>${esc(contrato?.subcontratista || (isEs ? 'Subcontratista' : 'Subcontractor'))}</div>
+    </div>
+    <div class="foot">${esc(nombreEmpresa)} · appmary.com · ${isEs ? 'Generado por MARY ERP' : 'Generated by MARY ERP'} · ${fechaHoy}</div>
+  </div>
+</body></html>`
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const win  = window.open(url, '_blank')
+  if (!win) alert(isEs ? 'Permite las ventanas emergentes para ver el PDF.' : 'Allow pop-ups to view the PDF.')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
 // ── COMPROBANTE DE PAGO DE AVALÚO DE SUBCONTRATO ────────────────────────────
 export async function buildAvaluoComprobante({ avaluo, contrato, itemsContrato, avaluoItems, presupuesto, proy, lang='ES', nombreEmpresa='Marquez Project Solutions LLC' }) {
   const isEs  = lang === 'ES'
@@ -1098,7 +1244,7 @@ export async function buildAvaluoComprobante({ avaluo, contrato, itemsContrato, 
 
   merge(1, 4, 1, 5)
   const h2 = cell(1, 4)
-  h2.value     = isEs ? 'COMPROBANTE DE PAGO — AVALÚO' : 'PAYMENT VOUCHER — VALUATION'
+  h2.value     = tituloAvaluoSC(avaluo.estado, isEs)
   h2.font      = { bold: true, size: 12, name: 'Arial', color: { argb: 'FFFFFFFF' } }
   h2.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } }
   h2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }

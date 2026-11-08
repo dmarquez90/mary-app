@@ -240,6 +240,19 @@ function reducer(state, action) {
       ordenes_cambio_items:       [...(state.ordenes_cambio_items||[]),       ...action.payload.items],
       ordenes_cambio_indirectos:  [...(state.ordenes_cambio_indirectos||[]),  ...action.payload.indirectos],
     }
+    case 'UPD_ORDEN_CAMBIO': return {
+      ...state,
+      ordenes_cambio: (state.ordenes_cambio||[]).map(o =>
+        o.id === action.payload.id ? { ...o, ...action.payload.orden } : o),
+      ordenes_cambio_items: [
+        ...(state.ordenes_cambio_items||[]).filter(i => i.oc_id !== action.payload.id),
+        ...action.payload.items,
+      ],
+      ordenes_cambio_indirectos: [
+        ...(state.ordenes_cambio_indirectos||[]).filter(i => i.oc_id !== action.payload.id),
+        ...action.payload.indirectos,
+      ],
+    }
     case 'UPD_ORDEN_CAMBIO_ESTADO': return {
       ...state,
       ordenes_cambio: (state.ordenes_cambio||[]).map(o =>
@@ -2120,17 +2133,47 @@ useEffect(() => {
         }
 
         dispatch({ type: 'ADD_ORDEN_CAMBIO', payload: { orden, items, indirectos } })
-        const proyOC = state.proyectos.find(p => p.id === orden.proyecto_id)
-        const nombreOC = proyOC?.project_code || proyOC?.nombre || ''
-        await notify({
-          tipo: 'oc_cambio_nueva',
-          titulo: `📝 New Change Order ${orden.numero || ''} | 📝 Nueva Orden de Cambio ${orden.numero || ''}`,
-          mensaje: `A change order for ${r2(orden.total_oc || 0)} was created. Project: ${nombreOC}. ${orden.motivo || ''}`
-                   + ` | Se creó una orden de cambio por ${r2(orden.total_oc || 0)}. Proyecto: ${nombreOC}. ${orden.motivo || ''}`,
-          modulo: 'ordenes_cambio',
-          referencia_id: orden.id,
-          roles: ['gerente'],
-        })
+        // Sin notificación al crear: la OC nace como borrador y es privada hasta
+        // que se presenta (estado 'presentada'), momento en que se avisa al PM.
+        break
+      }
+      // Editar una OC en borrador: actualiza la cabecera y reemplaza items e indirectos.
+      case 'UPD_ORDEN_CAMBIO': {
+        const { id, orden: cambios, items: itemsIn = [], indirectos: indsIn = [] } = action.payload
+        const { data: actual } = await supabase.from('ordenes_cambio').select('estado').eq('id', id).single()
+        if (actual?.estado !== 'borrador') throw new Error('Solo se pueden editar órdenes de cambio en borrador / Only draft change orders can be edited')
+
+        const cabecera = {
+          numero:       cambios.numero,
+          fecha:        cambios.fecha || null,
+          presentado_a: cambios.presentado_a || '',
+          motivo:       cambios.motivo || '',
+          notas:        cambios.notas || '',
+          total_oc:     cambios.total_oc,
+        }
+        const items = itemsIn.map(({ id: _old, ...it }) => ({ ...it, id: uuid(), oc_id: id, created_at: today(), tenant_id: tenantId }))
+        const indirectos = indsIn
+          .filter(i => parseFloat(i.ajuste||0) !== 0)
+          .map(({ id: _old, ...i }) => ({ ...i, id: uuid(), oc_id: id, created_at: today(), tenant_id: tenantId }))
+
+        await sbThrow(supabase.from('ordenes_cambio').update(cabecera).eq('id', id))
+        await sbThrow(supabase.from('ordenes_cambio_items').delete().eq('oc_id', id))
+        await sbThrow(supabase.from('ordenes_cambio_indirectos').delete().eq('oc_id', id))
+        if (items.length) {
+          const dbItems = items.map(it => ({
+            ...it,
+            actividad_id:  it.actividad_id || null,
+            parent_id:     it.parent_id || null,
+            diferencia:    parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0),
+            monto_cambio:  r2((parseFloat(it.cantidad_nueva||0) - parseFloat(it.cantidad_original||0)) * parseFloat(it.precio_unitario||0)),
+          }))
+          await sbThrow(supabase.from('ordenes_cambio_items').insert(dbItems))
+        }
+        if (indirectos.length) {
+          await sbThrow(supabase.from('ordenes_cambio_indirectos').insert(indirectos))
+        }
+
+        dispatch({ type: 'UPD_ORDEN_CAMBIO', payload: { id, orden: cabecera, items, indirectos } })
         break
       }
       case 'FETCH_OC_ITEMS': {

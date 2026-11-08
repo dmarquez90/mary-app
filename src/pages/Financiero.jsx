@@ -7,7 +7,7 @@ import { today, fmt, fmtNum, r2, calcGrandTotal, calcIndirectos, costosSalidasFI
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, StatCard, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { useAuth } from '../auth'
 import { CATEGORIAS_IND, CAT_KEYS } from './categoriasIndirectos'
-import { buildOPR, buildAvaluoComprobante, buildSubcontratoDoc, buildPettyCashReceipt } from '../pages/Reportes'
+import { buildOPR, buildAvaluoComprobante, abrirAvaluoPDF, buildSubcontratoDoc, buildPettyCashReceipt } from '../pages/Reportes'
 
 // ── CATEGORÍAS DE COSTOS INDIRECTOS ──────────────────────────────────────
 export default function Financiero() {
@@ -1116,8 +1116,9 @@ function SubcontratosModule({ can, rol,
     : 1
 
   // ── Guardar contrato ──
+  const scItemsValidos = scItems.length > 0 && scItems.every(it => (it.descripcion || '').trim())
   const saveContrato = () => {
-    if (!scForm.subcontratista || scItems.length === 0) return
+    if (!scForm.subcontratista || !scItemsValidos) return
     dispatch({
       type: 'ADD_SC_CONTRATO',
       payload: {
@@ -1141,8 +1142,8 @@ function SubcontratosModule({ can, rol,
           plazo_garantia_meses: parseInt(scForm.plazo_garantia_meses ?? 6),
         },
         items: scItems.map(it => ({
-          actividad_id:      it.actividad_id || null,
-          descripcion:       it.descripcion,
+          actividad_id:      it.origen === 'manual' ? null : (it.actividad_id || null),
+          descripcion:       it.descripcion.trim(),
           unidad:            it.unidad || 'und',
           cantidad_contrato: parseFloat(it.cantidad_contrato||0),
           costo_unitario:    parseFloat(it.costo_unitario||0),
@@ -1408,11 +1409,19 @@ function SubcontratosModule({ can, rol,
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               {t('fin_sc_form_activities')}
             </p>
-            <button onClick={() => setScItems(i => [...i, { actividad_id:'', descripcion:'', unidad:'und', cantidad_contrato:'', costo_unitario:'' }])}
-              className="text-xs font-medium px-3 py-1 rounded-lg"
-              style={{ color: 'var(--brand)', background: 'var(--brand-soft)' }}>
-              {t('fin_sc_form_add')}
-            </button>
+            <div className="flex gap-2">
+              {acts.length > 0 && (
+                <button onClick={() => setScItems(i => [...i, { origen:'presupuesto', actividad_id:'', descripcion:'', unidad:'und', cantidad_contrato:'', costo_unitario:'' }])}
+                  className="text-xs font-medium px-3 py-1 rounded-lg"
+                  style={{ color: 'var(--brand)', background: 'var(--brand-soft)' }}>
+                  {t('fin_sc_form_add_budget')}
+                </button>
+              )}
+              <button onClick={() => setScItems(i => [...i, { origen:'manual', actividad_id:'', descripcion:'', unidad:'und', cantidad_contrato:'', costo_unitario:'' }])}
+                className="text-xs font-medium px-3 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+                {t('fin_sc_form_add_manual')}
+              </button>
+            </div>
           </div>
 
           {scItems.length === 0 && (
@@ -1424,25 +1433,42 @@ function SubcontratosModule({ can, rol,
           <div className="flex flex-col gap-2">
             {scItems.map((it, idx) => {
               const subtotalIt = r2(parseFloat(it.cantidad_contrato||0) * parseFloat(it.costo_unitario||0))
+              const esManual = it.origen === 'manual' || (!it.origen && !it.actividad_id && acts.length === 0)
               return (
                 <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-gray-400">#{idx+1}</span>
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold text-gray-400">#{idx+1}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${esManual ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {esManual ? t('fin_sc_form_origin_manual') : t('fin_sc_form_origin_budget')}
+                      </span>
+                      {acts.length > 0 && (
+                        <button type="button"
+                          onClick={() => setScItems(items => items.map((x,i) => i===idx
+                            ? (esManual ? { ...x, origen:'presupuesto' } : { ...x, origen:'manual', actividad_id:'' })
+                            : x))}
+                          className="text-xs underline text-gray-400 hover:text-gray-600 truncate">
+                          {esManual ? t('fin_sc_form_switch_budget') : t('fin_sc_form_switch_manual')}
+                        </button>
+                      )}
+                    </div>
                     <button onClick={() => setScItems(i => i.filter((_,j) => j!==idx))}
                       className="text-xs text-red-400 hover:text-red-600">✕</button>
                   </div>
-                  <div className="mb-2">
-                    <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_budget_activity')}</label>
-                    <select className="m-input"
-                      value={it.actividad_id||''} onChange={e => {
-                        const act = acts.find(a => a.id === e.target.value)
-                        setScItem(idx, 'actividad_id', e.target.value)
-                        if (act) { setScItem(idx, 'descripcion', act.descripcion); setScItem(idx, 'unidad', act.unidad || 'und'); setScItem(idx, 'cantidad_contrato', act.cantidad ? String(act.cantidad) : '') }
-                      }}>
-                      <option value="">— {t('fin_sc_form_select_optional').replace(' —', '')} —</option>
-                      {acts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
-                    </select>
-                  </div>
+                  {!esManual && (
+                    <div className="mb-2">
+                      <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_budget_activity')}</label>
+                      <select className="m-input"
+                        value={it.actividad_id||''} onChange={e => {
+                          const act = acts.find(a => a.id === e.target.value)
+                          setScItem(idx, 'actividad_id', e.target.value)
+                          if (act) { setScItem(idx, 'descripcion', act.descripcion); setScItem(idx, 'unidad', act.unidad || 'und'); setScItem(idx, 'cantidad_contrato', act.cantidad ? String(act.cantidad) : '') }
+                        }}>
+                        <option value="">— {t('fin_sc_form_select_optional').replace(' —', '').replace('— ', '')} —</option>
+                        {acts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.descripcion}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div className="mb-2">
                     <label className="text-xs text-gray-400 block mb-1">{t('fin_sc_form_act_desc')}</label>
                     <input className="m-input"
@@ -1502,7 +1528,7 @@ function SubcontratosModule({ can, rol,
             {t('btn_cancel')}
           </button>
           <button onClick={saveContrato}
-            disabled={!scForm.subcontratista || scItems.length === 0}
+            disabled={!scForm.subcontratista || !scItemsValidos}
             className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40"
             style={{ background: BRAND }}>
             {t('fin_sc_form_save')}
@@ -1917,23 +1943,34 @@ Total: `)
                         {av.estado === 'revisado_pm' && !puedeAprobarSC && (
                           <span className="text-xs text-indigo-600 px-1">{isEs ? 'Pendiente del Gerente General' : 'Awaiting General Manager'}</span>
                         )}
-                        {av.estado === 'aprobado' && (
-                          <button onClick={() => buildAvaluoComprobante({
-                              avaluo:       av,
-                              contrato:     scSelected,
-                              itemsContrato,
-                              avaluoItems:  subcontratos_avaluo_items,
-                              presupuesto,
-                              proy:         proyectos?.find(p => p.id === proyId),
-                              lang:         isEs ? 'ES' : 'EN',
-                              nombreEmpresa,
-                            })}
-                            className="text-xs px-2 py-1 rounded-lg text-white font-medium flex items-center gap-1"
-                            style={{ background: '#1D9E75' }}
-                            title={isEs ? 'Descargar comprobante (Excel)' : 'Download voucher (Excel)'}>
-                            📥 {isEs ? 'Comprobante' : 'Voucher'}
-                          </button>
-                        )}
+                        {(() => {
+                          const docArgs = {
+                            avaluo:       av,
+                            contrato:     scSelected,
+                            itemsContrato,
+                            avaluoItems:  subcontratos_avaluo_items,
+                            presupuesto,
+                            proy:         proyectos?.find(p => p.id === proyId),
+                            lang:         isEs ? 'ES' : 'EN',
+                            nombreEmpresa,
+                          }
+                          return (
+                            <>
+                              <button onClick={() => buildAvaluoComprobante(docArgs)}
+                                className="text-xs px-2 py-1 rounded-lg text-white font-medium flex items-center gap-1"
+                                style={{ background: '#1D9E75' }}
+                                title={isEs ? 'Descargar en Excel' : 'Download as Excel'}>
+                                📥 Excel
+                              </button>
+                              <button onClick={() => abrirAvaluoPDF(docArgs)}
+                                className="text-xs px-2 py-1 rounded-lg text-white font-medium flex items-center gap-1"
+                                style={{ background: '#DC2626' }}
+                                title={isEs ? 'Ver / imprimir en PDF' : 'View / print as PDF'}>
+                                📄 PDF
+                              </button>
+                            </>
+                          )
+                        })()}
                         {av.estado === 'aprobado' && puedeEliminarAprobado && (
                           <button onClick={() => eliminarAvaluoAprobado(av)}
                             className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">

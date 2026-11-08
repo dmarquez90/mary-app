@@ -6,7 +6,7 @@ import { supabase } from '../supabase'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
-import { today, fmt, fmtNum, r2, unidadCorta } from '../utils'
+import { today, fmt, fmtNum, r2, unidadCorta, normalizarUnidad, UNIDADES_CONFIG } from '../utils'
 import { labelCategoriaInd } from './categoriasIndirectos'
 import { Drawer, EmptyState, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 
@@ -270,6 +270,7 @@ export default function OrdenesCambio() {
   const [form, setForm]         = useState({})
   const [items, setItems]       = useState([emptyItem()])
   const [ajustesInd, setAjustesInd] = useState({}) // { [ind_id]: monto_ajuste }
+  const [editId, setEditId]     = useState(null)   // id de la OC en borrador que se está editando
 
   const proy   = proyectos.find(p => p.id === proyId)
   const moneda = proy?.moneda || 'USD'
@@ -343,8 +344,47 @@ export default function OrdenesCambio() {
     })
     setItems([emptyItem()])
     setAjustesInd({})
+    setEditId(null)
     setVista('nueva')
   }
+
+  // Abre el formulario con los datos de una OC en borrador para editarla
+  const openEditar = async (oc) => {
+    if (oc.estado !== 'borrador') return
+    // Leer items e indirectos desde Supabase (el estado local puede no tenerlos cargados)
+    const [{ data: dbItems }, { data: dbInds }] = await Promise.all([
+      supabase.from('ordenes_cambio_items').select('*').eq('oc_id', oc.id),
+      supabase.from('ordenes_cambio_indirectos').select('*').eq('oc_id', oc.id),
+    ])
+    const str = v => (v === null || v === undefined) ? '' : String(v)
+    setForm({
+      numero:       oc.numero || '',
+      fecha:        oc.fecha || '',
+      presentado_a: oc.presentado_a || '',
+      motivo:       oc.motivo || '',
+      notas:        oc.notas || '',
+    })
+    const loaded = (dbItems || []).map(it => ({
+      tipo:              it.tipo || 'existente',
+      actividad_id:      it.actividad_id || '',
+      descripcion:       it.descripcion || '',
+      parent_id:         it.parent_id || '',
+      unidad:            it.unidad || 'und',
+      cantidad_original: it.tipo === 'nueva' ? '' : str(it.cantidad_original),
+      cantidad_nueva:    str(it.cantidad_nueva),
+      precio_unitario:   str(it.precio_unitario),
+      costo_mo:          str(it.costo_mo),
+      costo_materiales:  str(it.costo_materiales),
+      costo_equipos:     str(it.costo_equipos),
+    }))
+    setItems(loaded.length ? loaded : [emptyItem()])
+    setAjustesInd(Object.fromEntries((dbInds || []).map(i => [i.ind_id, str(i.ajuste)])))
+    setEditId(oc.id)
+    setDrawer(null)
+    setVista('nueva')
+  }
+
+  const cerrarFormulario = () => { setEditId(null); setVista('lista') }
 
   const saveOC = () => {
     const validItems = items.filter(it => it.descripcion && it.cantidad_nueva !== '')
@@ -368,8 +408,9 @@ export default function OrdenesCambio() {
       }))
 
     dispatch({
-      type: 'ADD_ORDEN_CAMBIO',
+      type: editId ? 'UPD_ORDEN_CAMBIO' : 'ADD_ORDEN_CAMBIO',
       payload: {
+        ...(editId ? { id: editId } : {}),
         orden: { ...form, proyecto_id: proyId, total_oc: totalOC },
         items: validItems.map(it => {
           const act = actividades.find(a => a.id === it.actividad_id)
@@ -389,7 +430,7 @@ export default function OrdenesCambio() {
         indirectos: indirectosPayload,
       }
     })
-    setVista('lista')
+    cerrarFormulario()
   }
 
   const cambiarEstado = (id, estado) => dispatch({ type: 'UPD_ORDEN_CAMBIO_ESTADO', payload: { id, estado } })
@@ -422,10 +463,12 @@ export default function OrdenesCambio() {
     return (
       <div className="p-3 sm:p-5 md:p-6 max-w-[1500px] mx-auto">
         <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => setVista('lista')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+          <button onClick={cerrarFormulario} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-gray-900">
-              {isEs ? `Nueva Orden de Cambio` : `New Change Order`} — {proy?.project_code}
+              {editId
+                ? (isEs ? `Editar Orden de Cambio ${form.numero || ''}` : `Edit Change Order ${form.numero || ''}`)
+                : (isEs ? `Nueva Orden de Cambio` : `New Change Order`)} — {proy?.project_code}
             </h1>
             <p className="text-sm text-gray-400">{proy?.nombre}</p>
           </div>
@@ -611,8 +654,19 @@ export default function OrdenesCambio() {
                             </div>
                           </td>
                           <td className="px-2 py-2 align-top">
-                            <input className={`${inputCls} w-20 text-center`} list="unidades-sugeridas" value={it.unidad||'und'}
-                              onChange={e => setItem(idx, 'unidad', e.target.value)} />
+                            {(() => {
+                              // Selector con todas las unidades (antes era un datalist que el navegador
+                              // filtraba por el texto escrito: con "und" solo mostraba und y lb).
+                              const uVal = normalizarUnidad(it.unidad || 'und')
+                              const enLista = UNIDADES_CONFIG.some(u => u.value === uVal)
+                              return (
+                                <select className={`${selectCls} min-w-[9rem]`} value={uVal}
+                                  onChange={e => setItem(idx, 'unidad', e.target.value)}>
+                                  {!enLista && <option value={uVal}>{uVal}</option>}
+                                  {UNIDADES_CONFIG.map(u => <option key={u.value} value={u.value}>{isEs ? u.es : u.en}</option>)}
+                                </select>
+                              )
+                            })()}
                           </td>
                           <td className="px-2 py-2 align-top">
                             {it.tipo === 'nueva' ? (
@@ -719,10 +773,10 @@ export default function OrdenesCambio() {
           </div>
 
           <div className="flex gap-2 justify-end pb-6">
-            <SecondaryBtn onClick={() => setVista('lista')}>{t('btn_cancel')}</SecondaryBtn>
+            <SecondaryBtn onClick={cerrarFormulario}>{t('btn_cancel')}</SecondaryBtn>
             <PrimaryBtn onClick={saveOC}
               disabled={!proyId || !form.numero || items.every(it => !it.descripcion || it.cantidad_nueva === '')}>
-              {isEs ? 'Guardar OC' : 'Save CO'}
+              {editId ? (isEs ? 'Guardar cambios' : 'Save changes') : (isEs ? 'Guardar OC' : 'Save CO')}
             </PrimaryBtn>
           </div>
         </div>
@@ -822,11 +876,14 @@ export default function OrdenesCambio() {
                             <TBtn onClick={() => { setDetailId(oc.id); setDrawer('detalle') }}>
                               {t('btn_view')}
                             </TBtn>
-                            {puedeEditar && oc.estado === 'borrador' && (
+                            {puedeEditar && oc.estado === 'borrador' && <>
+                              <TBtn onClick={() => openEditar(oc)}>
+                                {isEs ? 'Editar' : 'Edit'}
+                              </TBtn>
                               <TBtn onClick={() => cambiarEstado(oc.id, 'presentada')}>
                                 {isEs ? 'Presentar' : 'Submit'}
                               </TBtn>
-                            )}
+                            </>}
                             {puedeRevisarPM && oc.estado === 'presentada' && <>
                               <TBtn onClick={() => cambiarEstado(oc.id, 'revisada_pm')}
                                 className="text-indigo-600 hover:bg-indigo-50">
@@ -886,6 +943,12 @@ export default function OrdenesCambio() {
                 </button>
               </div>
               <div className="flex gap-2">
+                {puedeEditar && ocDetalle.estado === 'borrador' && (
+                  <button onClick={() => openEditar(ocDetalle)}
+                    className="text-xs px-3 py-1.5 rounded-lg font-medium border border-gray-200 text-gray-700 hover:bg-gray-50">
+                    {isEs ? 'Editar' : 'Edit'}
+                  </button>
+                )}
                 {puedeEditar && ocDetalle.estado === 'borrador' && (
                   <button onClick={() => { cambiarEstado(ocDetalle.id, 'presentada'); setDrawer(null) }}
                     className="text-xs px-3 py-1.5 rounded-lg text-white font-medium"
