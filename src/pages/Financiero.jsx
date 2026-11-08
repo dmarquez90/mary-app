@@ -80,6 +80,10 @@ export default function Financiero() {
   const inds    = costos_indirectos.filter(c => c.proyecto_id === proyId)
 
   const totalDir = directs.reduce((s,c) => s+(parseFloat(c.monto)||0), 0)
+  // Las compras directas de materiales (tipo 'compra_material') se registran en la pestaña de
+  // Imprevistos pero cuentan como MATERIALES; el resto sí son imprevistos.
+  const totalMatCompras = r2(directs.filter(c => c.tipo === 'compra_material').reduce((s,c) => s+(parseFloat(c.monto)||0), 0))
+  const totalImprev     = r2(totalDir - totalMatCompras)
   // Costo de mano de obra = salario bruto: las deducciones se retienen al trabajador
   // pero siguen siendo costo de la empresa. El neto solo se muestra en la tabla.
   const totalNom     = noms.reduce((s,n) => s+(parseFloat(n.salario_base)||0), 0)
@@ -127,8 +131,9 @@ export default function Financiero() {
   const bolsaDiferencia = r2(totalIndPres - totalInd)
   const bolsaPctUsado   = totalIndPres > 0 ? (totalInd / totalIndPres) * 100 : 0
   const costosFIFO = useMemo(() => costosSalidasFIFO(entradas, salidas, materiales), [entradas, salidas, materiales])
-  const totalMat = r2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => s + (costosFIFO[sa.id] || 0), 0))
-  const totalReal = totalMat + totalDir + totalNom + totalSub + totalEq + totalInd
+  // Materiales = salidas de inventario (FIFO) + compras directas de materiales
+  const totalMat = r2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa) => s + (costosFIFO[sa.id] || 0), 0) + totalMatCompras)
+  const totalReal = totalMat + totalImprev + totalNom + totalSub + totalEq + totalInd
 
   // ── Días trabajados para nómina ───────────────────────────────────────
   const diasTrabajados = useMemo(() => {
@@ -162,7 +167,7 @@ export default function Financiero() {
     if (tab===0) setForm({...base, tipo:'factura_obra', descripcion:'', monto:'', numero_documento:'', actividad_id:'', fecha:today(), impuesto_monto:'', impuesto_descripcion:''})
     if (tab===1) setForm({...base, trabajador:'', cargo:'', periodo_inicio:today(), periodo_fin:today(), tipo_pago:'dia', tarifa:'', salario_base:'', deducciones:'0'})
     if (tab===2) setForm({...base, subcontratista:'', descripcion_trabajo:'', monto_contrato:'', avance_porcentaje:'0', monto_pagado:'0', actividad_id:''})
-    if (tab===3) setForm({...base, descripcion:'', tipo:'alquiler', tarifa_diaria:'', dias_uso:'', costo_total:'', impuesto_monto:'', impuesto_descripcion:''})
+    if (tab===3) setForm({...base, descripcion:'', tipo:'alquiler', eq_fecha_inicio:today(), eq_fecha_fin:'', tarifa_diaria:'', dias_uso:'1', costo_total:'', impuesto_monto:'', impuesto_descripcion:''})
     if (tab===4) setForm({...base, categoria:'', subcategoria:'', descripcion:'', monto:'', fecha:today(), impuesto_monto:'', impuesto_descripcion:''})
     setDrawer(true)
   }
@@ -185,24 +190,42 @@ export default function Financiero() {
   const save = () => {
     // Campos opcionales vacíos ('') van como null: Postgres rechaza '' en numeric/uuid/date
     const datos = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v === '' ? null : v]))
+    // Equipos: la fecha del gasto es la de entrada (la usan la Curva S y los reportes)
+    if (tab===3 && datos.eq_fecha_inicio) datos.fecha = datos.eq_fecha_inicio
     if (editId) {
       dispatch({ type: UPD_TYPES[tab], payload: { ...datos, id: editId } })
     } else {
       if (tab===0) { if (!form.descripcion||!form.monto) return; dispatch({ type:'ADD_COSTO_DIRECTO', payload:datos }) }
       if (tab===1) { if (!form.trabajador||!form.salario_base) return; dispatch({ type:'ADD_NOMINA', payload:datos }) }
       if (tab===2) { if (!form.subcontratista||!form.monto_contrato) return; dispatch({ type:'ADD_SUBCONTRATO', payload:datos }) }
-      if (tab===3) { if (!form.descripcion||!form.costo_total) return; dispatch({ type:'ADD_EQUIPO', payload:datos }) }
+      if (tab===3) { if (!form.descripcion||!form.costo_total||!form.eq_fecha_inicio) return; dispatch({ type:'ADD_EQUIPO', payload:datos }) }
       if (tab===4) { if (!form.categoria||!form.monto) return; dispatch({ type:'ADD_COSTO_INDIRECTO', payload:datos }) }
     }
     setDrawer(false)
     setEditId(null)
   }
 
-  const calcCostoTotal = (tarifa, dias) => {
-    const t2 = parseFloat(tarifa)||0
-    const d  = parseFloat(dias)||0
-    return t2>0&&d>0 ? t2*d : ''
+  // Equipos: días de uso a partir de las fechas (mismo día = 1) y tarifa diaria = monto pagado ÷ días
+  const diasEntreFechas = (ini, fin) => {
+    if (!ini || !fin) return null
+    const d = Math.round((new Date(fin + 'T00:00:00') - new Date(ini + 'T00:00:00')) / 86400000)
+    return d < 0 ? null : Math.max(1, d)
   }
+  const calcTarifa = (total, dias) => {
+    const t2 = parseFloat(total)
+    const d  = parseFloat(dias)||0
+    return !isNaN(t2) && d > 0 ? String(r2(t2 / d)) : ''
+  }
+  // Recalcula días (si hay fechas) y tarifa al cambiar fechas, días o monto
+  const setEq = (campo, valor) => setForm(f => {
+    const nf = { ...f, [campo]: valor }
+    if (campo === 'eq_fecha_inicio' || campo === 'eq_fecha_fin') {
+      const d = diasEntreFechas(nf.eq_fecha_inicio, nf.eq_fecha_fin)
+      if (d !== null) nf.dias_uso = String(d)
+    }
+    nf.tarifa_diaria = calcTarifa(nf.costo_total, nf.dias_uso)
+    return nf
+  })
 
   // Enviar solicitud de ajuste (cualquier usuario con acceso)
   const submitAjuste = () => {
@@ -311,7 +334,9 @@ export default function Financiero() {
                       return (
                         <tr key={c.id} className="m-tr">
                           <td className={tdCls+' text-xs text-gray-400'}>{c.fecha||c.created_at?.slice(0,10)}</td>
-                          <td className={tdCls}><span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{c.tipo==='factura_obra'?(isEs?'Factura':'Invoice'):(isEs?'Caja chica':'Petty cash')}</span></td>
+                          <td className={tdCls}>{c.tipo==='compra_material'
+                            ? <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{isEs?'Compra de materiales':'Material purchase'}</span>
+                            : <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{c.tipo==='factura_obra'?(isEs?'Factura':'Invoice'):(isEs?'Caja chica':'Petty cash')}</span>}</td>
                           <td className={tdCls}>{c.descripcion||'—'}</td>
                           <td className={tdCls+' text-xs text-gray-400'}>{act?`${act.code} — ${act.descripcion}`:'—'}</td>
                           <td className={tdCls+' font-mono font-bold'} style={{color:'#1D9E75'}}>{fmt(c.monto,moneda)}</td>
@@ -323,6 +348,18 @@ export default function Financiero() {
                         </tr>
                       )
                     })}
+                    {totalMatCompras !== 0 && <>
+                      <tr className="bg-gray-50/60">
+                        <td colSpan={4} className="px-4 py-1.5 text-right text-xs text-gray-500">{isEs?'Compras de materiales (cuentan en Materiales)':'Material purchases (counted in Materials)'}</td>
+                        <td className="px-4 py-1.5 text-xs font-mono text-blue-700">{fmt(totalMatCompras,moneda)}</td>
+                        <td/>{puedeEditar&&<td/>}
+                      </tr>
+                      <tr className="bg-gray-50/60">
+                        <td colSpan={4} className="px-4 py-1.5 text-right text-xs text-gray-500">{isEs?'Imprevistos':'Contingencies'}</td>
+                        <td className="px-4 py-1.5 text-xs font-mono text-amber-700">{fmt(totalImprev,moneda)}</td>
+                        <td/>{puedeEditar&&<td/>}
+                      </tr>
+                    </>}
                     <tr className="bg-gray-50">
                       <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-gray-500">{t('lbl_total')}</td>
                       <td className="px-4 py-2 text-sm font-mono font-bold" style={{color:'#1D9E75'}}>{fmt(totalDir,moneda)}</td>
@@ -761,6 +798,7 @@ export default function Financiero() {
             <Field label={t('fin_form_type')}>
               <select className={selectCls} value={form.tipo||'factura_obra'} onChange={set('tipo')}>
                 <option value="factura_obra">{isEs?'Factura de obra':'Construction invoice'}</option>
+                <option value="compra_material">{isEs?'Compra de materiales':'Material purchase'}</option>
                 <option value="caja_chica">{isEs?'Caja chica':'Petty cash'}</option>
               </select>
             </Field>
@@ -885,20 +923,34 @@ export default function Financiero() {
               </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t('fin_form_eq_rate')}>
-                <input type="number" className={inputCls} value={form.tarifa_diaria||''}
-                  onChange={e => { const tarifa=e.target.value; setForm(f=>({...f, tarifa_diaria:tarifa, costo_total:calcCostoTotal(tarifa,f.dias_uso)})) }}
-                  placeholder="0.00" min="0" step="0.01"/>
+              <Field label={isEs ? 'Fecha de entrada' : 'Date in'} required>
+                <input type="date" className={inputCls} value={form.eq_fecha_inicio||''}
+                  onChange={e => setEq('eq_fecha_inicio', e.target.value)}/>
               </Field>
-              <Field label={t('fin_form_eq_days')}>
-                <input type="number" className={inputCls} value={form.dias_uso||''}
-                  onChange={e => { const dias=e.target.value; setForm(f=>({...f, dias_uso:dias, costo_total:calcCostoTotal(f.tarifa_diaria,dias)})) }}
-                  placeholder="0" min="0"/>
+              <Field label={isEs ? 'Fecha de salida' : 'Date out'}>
+                <input type="date" className={inputCls} value={form.eq_fecha_fin||''} min={form.eq_fecha_inicio||undefined}
+                  onChange={e => setEq('eq_fecha_fin', e.target.value)}/>
               </Field>
             </div>
             <Field label={t('fin_form_eq_total')} required>
-              <input type="number" className={inputCls} value={form.costo_total||''} onChange={set('costo_total')} placeholder="0.00" min="0" step="0.01"/>
+              <input type="number" className={inputCls} value={form.costo_total||''}
+                onChange={e => setEq('costo_total', e.target.value)} placeholder="0.00" step="0.01"/>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t('fin_form_eq_days')}>
+                <input type="number" className={inputCls} value={form.dias_uso||''}
+                  onChange={e => setEq('dias_uso', e.target.value)}
+                  placeholder="1" min="0" step="0.01"/>
+              </Field>
+              <Field label={t('fin_form_eq_rate')}>
+                <input className={inputCls + ' bg-gray-50 text-gray-500'} value={form.tarifa_diaria ? fmt(form.tarifa_diaria, moneda) : '—'} readOnly tabIndex={-1}/>
+              </Field>
+            </div>
+            <p className="text-xs text-gray-400 -mt-1">
+              {isEs
+                ? 'Los días se calculan con las fechas (puedes ajustarlos, p. ej. 0.5). La tarifa diaria = monto pagado ÷ días.'
+                : 'Days are calculated from the dates (you can adjust them, e.g. 0.5). Daily rate = amount paid ÷ days.'}
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <Field label={isEs ? 'Impuesto pagado ($)' : 'Tax paid ($)'}>
                 <input type="number" className={inputCls} value={form.impuesto_monto||''} onChange={set('impuesto_monto')} placeholder="0.00" min="0" step="0.01"/>
@@ -1067,9 +1119,8 @@ function SubcontratosModule({ can, rol,
 }) {
   const BRAND = 'var(--brand)'
   // Avalúos de subcontrato: el PM da el visto bueno (obligatorio) y SOLO el Gerente General aprueba.
-  const puedeRevisarPM   = can('pm_revisar') || rol === 'super_admin'
-  const puedeAprobarSC   = can('oc_aprobar')
-  const puedeRechazar    = puedeRevisarPM || puedeAprobarSC
+  // Avalúos de subcontrato: los aprueba el Project Manager, el Gerente General o el Administrador
+  const puedeAprobarSubAv = can('sc_avaluo_aprobar')
   const puedeEliminarAprobado = ['super_admin','client_admin','gerente_general','gerente'].includes(rol)
   const acts  = presupuesto.filter(b => b.proyecto_id === proyId && b.tipo === 'actividad')
   const contratosProy = subcontratos_contratos.filter(sc => sc.proyecto_id === proyId)
@@ -1206,8 +1257,8 @@ function SubcontratosModule({ can, rol,
     dispatch({ type: 'UPD_SC_AVALUO_ESTADO', payload: { avaluo: av, contrato: scSelected, estado: 'rechazado' } })
   }
 
-  const vistoBuenoAvaluo = (av) => {
-    dispatch({ type: 'UPD_SC_AVALUO_ESTADO', payload: { avaluo: av, contrato: scSelected, estado: 'revisado_pm' } })
+  const presentarAvaluo = (av) => {
+    dispatch({ type: 'UPD_SC_AVALUO_ESTADO', payload: { avaluo: av, contrato: scSelected, estado: 'presentado' } })
   }
 
   const eliminarAvaluoAprobado = (av) => {
@@ -1830,7 +1881,7 @@ Total: `)
             <tbody>
               {itemsContrato.map(it => {
                 const acum  = getCantAnterior(it.id) +
-                  avaluosSc.filter(a => a.estado === 'borrador')
+                  avaluosSc.filter(a => ['borrador','presentado','revisado_pm'].includes(a.estado))
                     .reduce((s,av) => {
                       const ai = subcontratos_avaluo_items.find(x => x.avaluo_id===av.id && x.subcontrato_item_id===it.id)
                       return s + parseFloat(ai?.cantidad_actual||0)
@@ -1894,41 +1945,35 @@ Total: `)
                         av.estado === 'borrador' ? 'bg-gray-100 text-gray-500' :
                         av.estado === 'rechazado' ? 'bg-red-100 text-red-600' :
                         av.estado === 'revisado_pm' ? 'bg-indigo-100 text-indigo-700' :
+                        av.estado === 'presentado' ? 'bg-blue-100 text-blue-700' :
                         'bg-amber-100 text-amber-700'}`}>
                         {av.estado === 'aprobado' ? t('fin_sc_status_approved') :
                          av.estado === 'borrador' ? t('fin_sc_status_draft') :
                          av.estado === 'rechazado' ? (isEs?'Rechazado':'Rejected') :
+                         av.estado === 'presentado' ? (isEs?'Presentado':'Submitted') :
                          av.estado === 'revisado_pm' ? (isEs?'Visto bueno PM':'PM reviewed') :
                          av.estado}
                       </span>
                     </td>
                     <td className={tdCls}>
                       <div className="flex gap-1 flex-wrap">
+                        {/* Flujo: borrador → Submit (presentado) → aprobación del PM. Sin Gerente General.
+                            'revisado_pm' es un estado del flujo anterior: se aprueba igual. */}
                         {av.estado === 'borrador' && puedeEditar && (
                           <>
                             <button onClick={() => editarAvaluo(av)}
                               className="text-xs px-2 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
                               {isEs ? 'Editar' : 'Edit'}
                             </button>
-                            {puedeRechazar && (
-                              <button onClick={() => rechazarAvaluo(av)}
-                                className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
-                                {isEs ? 'Rechazar' : 'Reject'}
-                              </button>
-                            )}
-                            {puedeRevisarPM && (
-                              <button onClick={() => vistoBuenoAvaluo(av)}
-                                className="text-xs px-3 py-1 rounded-lg text-white font-medium bg-indigo-600 hover:bg-indigo-700"
-                                title={isEs ? 'Enviar al Gerente General para aprobación' : 'Send to the General Manager for approval'}>
-                                {isEs ? 'Dar visto bueno' : 'PM sign-off'}
-                              </button>
-                            )}
+                            <button onClick={() => presentarAvaluo(av)}
+                              className="text-xs px-3 py-1 rounded-lg text-white font-medium"
+                              style={{ background: '#185FA5' }}
+                              title={isEs ? 'Enviar al Project Manager para aprobación' : 'Send to the Project Manager for approval'}>
+                              {isEs ? 'Presentar' : 'Submit'}
+                            </button>
                           </>
                         )}
-                        {av.estado === 'borrador' && !puedeRevisarPM && puedeAprobarSC && (
-                          <span className="text-xs text-gray-400 px-1">{isEs ? 'Pendiente visto bueno del PM' : 'Awaiting PM sign-off'}</span>
-                        )}
-                        {av.estado === 'revisado_pm' && puedeAprobarSC && (
+                        {['presentado','revisado_pm'].includes(av.estado) && puedeAprobarSubAv && (
                           <>
                             <button onClick={() => rechazarAvaluo(av)}
                               className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
@@ -1941,8 +1986,8 @@ Total: `)
                             </button>
                           </>
                         )}
-                        {av.estado === 'revisado_pm' && !puedeAprobarSC && (
-                          <span className="text-xs text-indigo-600 px-1">{isEs ? 'Pendiente del Gerente General' : 'Awaiting General Manager'}</span>
+                        {['presentado','revisado_pm'].includes(av.estado) && !puedeAprobarSubAv && (
+                          <span className="text-xs text-blue-600 px-1">{isEs ? 'Pendiente de aprobación del PM' : 'Awaiting PM approval'}</span>
                         )}
                         {(() => {
                           const docArgs = {

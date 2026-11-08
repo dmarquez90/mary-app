@@ -95,7 +95,8 @@ export default function CurvaS() {
       const costoEq = (e.costo_real && (e.estado_equipo === 'ajustado' || e.estado_equipo === 'cerrado_parcial'))
         ? parseFloat(e.costo_real)
         : parseFloat(e.costo_total) || 0
-      costs.push({ fecha: e.created_at?.slice(0,10), monto: costoEq })
+      // Fecha real del gasto; created_at solo para registros antiguos sin fecha
+      costs.push({ fecha: (e.fecha || e.eq_fecha_inicio || e.created_at)?.slice(0,10), monto: costoEq })
     })
     costos_indirectos.filter(c => c.proyecto_id === proyId).forEach(c =>
       costs.push({ fecha: c.fecha || c.created_at?.slice(0,10), monto: parseFloat(c.monto)||0 })

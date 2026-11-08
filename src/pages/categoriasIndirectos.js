@@ -18,8 +18,8 @@ export const CATEGORIAS_IND = {
     es: 'Instalaciones y servicios generales',
     en: 'Facilities & General Services',
     subs: {
-      es: ['Oficina, bodegas, casetas','Baños portátiles','Energía eléctrica temporal','Agua, internet, vigilancia','Señalización y control de accesos'],
-      en: ['Office, warehouses, booths','Portable restrooms','Temporary electrical power','Water, internet, security','Signage and access control'],
+      es: ['Oficina, bodegas, casetas','Baños portátiles','Energía eléctrica temporal','Agua, internet, vigilancia','Señalización y control de accesos','Contenedores y retiro de escombros (Dumpster)'],
+      en: ['Office, warehouses, booths','Portable restrooms','Temporary electrical power','Water, internet, security','Signage and access control','Dumpsters & debris removal'],
     }
   },
   'Seguros, fianzas y garantías': {

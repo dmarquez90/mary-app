@@ -17,8 +17,12 @@ const MATRIX = {
   compras_ver:        { client_admin: true, gerente_general: true,  coordinador: true,  gerente: true,  residente: true,  bodeguero: true,  contador: true,  lectura: true,  supervisor: true },
   solicitud_crear:    { client_admin: true, gerente_general: true,  coordinador: true,  gerente: false, residente: true,  bodeguero: false, contador: false, lectura: false },
   oc_crear:           { client_admin: true, gerente_general: true,  coordinador: false, gerente: true,  residente: false, bodeguero: false, contador: false, lectura: false },
-  // Aprobación final de solicitudes, OCs, órdenes de cambio y avalúos: SOLO el Gerente General
+  // Aprobación final de órdenes de cambio y avalúos de cliente: SOLO el Gerente General
   oc_aprobar:         { client_admin: false, gerente_general: true, coordinador: false, gerente: false, residente: false, bodeguero: false, contador: false, lectura: false, supervisor: false },
+  // Aprobar solicitudes de materiales y órdenes de compra: Gerente General y Administrador
+  compras_aprobar:    { client_admin: true,  gerente_general: true },
+  // Aprobar avalúos de subcontrato (después del Submit): PM, Gerente General y Administrador
+  sc_avaluo_aprobar:  { client_admin: true,  gerente_general: true, gerente: true },
   // Visto bueno previo (obligatorio) del Project Manager en órdenes de cambio y avalúos
   pm_revisar:         { gerente: true },
   financiero_ver:     { client_admin: true, gerente_general: true,  coordinador: false, gerente: true,  residente: true,  bodeguero: false, contador: true,  lectura: true  },
@@ -96,7 +100,7 @@ export function usePermissions() {
   // Permisos de edición bloqueados en modo lectura (suscripción vencida)
   const EDIT_PERMISOS = ['proyectos_crear','proyectos_editar','proyectos_eliminar',
     'presupuesto_editar','inventario_editar','mat_pres_editar','solicitud_crear',
-    'oc_crear','oc_aprobar','pm_revisar','financiero_editar','ordenes_cambio_editar','avaluos_editar',
+    'oc_crear','oc_aprobar','compras_aprobar','sc_avaluo_aprobar','pm_revisar','financiero_editar','ordenes_cambio_editar','avaluos_editar',
     'supervision_editar']
 
   const can = (permiso) => {

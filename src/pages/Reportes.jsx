@@ -2102,14 +2102,16 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
   const COLS      = 7
 
   const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
-  const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0))
   // tipo 'subcontrato' = costo generado al aprobar un avalúo; ya se cuenta en subcontratos
   const dirs     = costos_directos.filter(c=>c.proyecto_id===proyId && c.tipo!=='subcontrato')
+  // Compras directas de materiales (tipo 'compra_material') cuentan como materiales, no como imprevistos
+  const comprasMat = dirs.filter(c=>c.tipo==='compra_material').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+  const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0) + comprasMat)
   const noms     = nominas.filter(n=>n.proyecto_id===proyId)
   const subs     = subcontratos.filter(s=>s.proyecto_id===proyId)
   const eqs      = equipos.filter(e=>e.proyecto_id===proyId)
   const inds     = costos_indirectos.filter(c=>c.proyecto_id===proyId)
-  const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+  const totalDir = dirs.filter(c=>c.tipo!=='compra_material').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0),0) // bruto = costo de la empresa
   // totalSub: avalúos aprobados del nuevo sistema + fallback al sistema anterior
   const scIdsRes = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
@@ -2320,7 +2322,8 @@ async function buildResumenGeneral({ proy, proyectos, presupuesto, costos_direct
       row++
     })
     ws.mergeCells(row,1,row,COLS-1); const dt=ws.getCell(row,1); dt.value=isEs?'SUBTOTAL COSTOS DIRECTOS':'DIRECT COSTS SUBTOTAL'; styleTotal(dt)
-    const dv=ws.getCell(row,COLS); dv.value=totalDir; dv.numFmt='"$"#,##0.00'; styleTotal(dv)
+    // Subtotal de la lista completa (incluye compras de materiales, que en el resumen van en Materiales)
+    const dv=ws.getCell(row,COLS); dv.value=dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0); dv.numFmt='"$"#,##0.00'; styleTotal(dv)
     row+=2
   }
 
@@ -2387,12 +2390,14 @@ export default function Reportes() {
     const dirs  = costos_directos.filter(c => c.proyecto_id===proyId && c.tipo!=='subcontrato' && filtro(c.fecha||c.created_at?.slice(0,10)))
     const noms  = nominas.filter(n => n.proyecto_id===proyId && filtro(n.periodo_fin))
     const subs  = subcontratos.filter(s => s.proyecto_id===proyId && filtro(s.created_at?.slice(0,10)))
-    const eqs   = equipos.filter(e => e.proyecto_id===proyId && filtro(e.created_at?.slice(0,10)))
+    const eqs   = equipos.filter(e => e.proyecto_id===proyId && filtro((e.fecha || e.eq_fecha_inicio || e.created_at)?.slice(0,10)))
     const inds  = costos_indirectos.filter(c => c.proyecto_id===proyId && filtro(c.fecha||c.created_at?.slice(0,10)))
 
     const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
-    const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId&&filtro(s.fecha_salida)).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0))
-    const totalDir = dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+    // Compras directas de materiales (tipo 'compra_material') cuentan como materiales, no como imprevistos
+    const comprasMat = dirs.filter(c=>c.tipo==='compra_material').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+    const totalMat = round2(salidas.filter(s=>s.proyecto_id===proyId&&filtro(s.fecha_salida)).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0) + comprasMat)
+    const totalDir = dirs.filter(c=>c.tipo!=='compra_material').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
     const totalNom = noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0),0) // bruto = costo de la empresa
     // totalSub: avalúos aprobados del nuevo sistema + monto_pagado del sistema anterior
     const scIds = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)
@@ -2854,13 +2859,15 @@ function VistaGeneral({ proy, presupuesto, costos_directos, nominas, subcontrato
   const thC='px-4 py-2.5 text-left text-xs font-semibold text-white'
   const tdC='px-4 py-2.5 text-sm text-gray-700'
   const costosFIFO = costosSalidasFIFO(entradas, salidas, materiales)
-  const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0)
   const dirs=costos_directos.filter(c=>c.proyecto_id===proyId && c.tipo!=='subcontrato')
+  // Compras directas de materiales (tipo 'compra_material') cuentan como materiales, no como imprevistos
+  const comprasMat=dirs.filter(c=>c.tipo==='compra_material').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+  const totalMat=salidas.filter(s=>s.proyecto_id===proyId).reduce((s,sa)=>s+(costosFIFO[sa.id]||0),0)+comprasMat
   const noms=nominas.filter(n=>n.proyecto_id===proyId)
   const subs=subcontratos.filter(s=>s.proyecto_id===proyId)
   const eqs=equipos.filter(e=>e.proyecto_id===proyId)
   const inds=costos_indirectos.filter(c=>c.proyecto_id===proyId)
-  const totalDir=dirs.reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
+  const totalDir=dirs.filter(c=>c.tipo!=='compra_material').reduce((s,c)=>s+(parseFloat(c.monto)||0),0)
   const totalNom=noms.reduce((s,n)=>s+(parseFloat(n.salario_base)||0),0) // bruto = costo de la empresa
   // totalSub: avalúos aprobados del nuevo sistema + fallback sistema anterior
   const scIdsVG = subcontratos_contratos.filter(sc=>sc.proyecto_id===proyId).map(sc=>sc.id)

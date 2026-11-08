@@ -1593,11 +1593,11 @@ useEffect(() => {
         break
       }
       case 'UPD_OC_ESTADO': {
-        // Aprobar o cancelar una OC pendiente: SOLO el Gerente General (y super_admin).
+        // Aprobar o cancelar una OC pendiente: Gerente General, Administrador (y super_admin).
         // Los demás cambios de estado (p. ej. cierre parcial por equipos) siguen como antes.
         const esDecision = ['aprobada', 'cancelada'].includes(action.payload.estado)
         const rolesAprobar = esDecision
-          ? ['super_admin', 'gerente_general']
+          ? ['super_admin', 'gerente_general', 'client_admin']
           : ['super_admin', 'client_admin', 'gerente_general', 'gerente']
         if (!rolesAprobar.includes(rol)) {
           console.warn('[MARY] UPD_OC_ESTADO bloqueado — rol sin permiso:', rol)
@@ -1662,6 +1662,7 @@ useEffect(() => {
                 estado_equipo:        'activo',
                 eq_fecha_inicio:      it.eq_fecha_inicio || null,
                 eq_fecha_fin:         it.eq_fecha_fin    || null,
+                fecha:                it.eq_fecha_inicio || today(),
                 created_at:           today(),
               }
 
@@ -1766,26 +1767,29 @@ useEffect(() => {
         await sbThrow(supabase.from('subcontratos_avaluos').insert(av))
         if (avi.length) await sbThrow(supabase.from('subcontratos_avaluo_items').insert(avi))
         dispatch({ type: 'ADD_SC_AVALUO', payload: { avaluo: av, items: avi } })
-        const subc = action.payload.contrato?.subcontratista || ''
-        await notify({
-          tipo: 'avaluo_sub_revisar',
-          titulo: `🧾 Subcontract valuation #${av.numero ?? ''} pending approval | 🧾 Avalúo de subcontrato #${av.numero ?? ''} pendiente de autorización`,
-          mensaje: `Valuation #${av.numero ?? ''} from ${subc} for ${r2(av.monto_a_pagar ?? av.monto_total ?? 0)} needs your approval.`
-                   + ` | El avalúo #${av.numero ?? ''} de ${subc} por ${r2(av.monto_a_pagar ?? av.monto_total ?? 0)} requiere tu autorización.`,
-          modulo: 'financiero',
-          referencia_id: av.id,
-          roles: ['gerente'],
-        })
+        // Sin notificación al crear: el avalúo nace como borrador y se avisa al PM
+        // cuando se presenta (Submit → estado 'presentado').
         break
       }
-      // Visto bueno del PM (revisado_pm) o rechazo de un avalúo de subcontrato
+      // Presentar (presentado), visto bueno legado (revisado_pm) o rechazo de un avalúo de subcontrato
       case 'UPD_SC_AVALUO_ESTADO': {
         const { avaluo: av, contrato, estado } = action.payload
         await sbThrow(supabase.from('subcontratos_avaluos').update({ estado }).eq('id', av.id))
         dispatch(action)
         const subc = contrato?.subcontratista || ''
         const montoAv = r2(av.monto_a_pagar ?? av.monto_total ?? 0)
-        if (estado === 'revisado_pm') {
+        if (estado === 'presentado') {
+          // Flujo: borrador → presentado → aprobado por el Project Manager (sin Gerente General)
+          await notify({
+            tipo: 'avaluo_sub_revisar',
+            titulo: `🧾 Subcontract valuation #${av.numero ?? ''} submitted — pending your approval | 🧾 Avalúo de subcontrato #${av.numero ?? ''} presentado — pendiente de tu aprobación`,
+            mensaje: `Valuation #${av.numero ?? ''} from ${subc} for ${montoAv} was submitted and needs your approval.`
+                     + ` | El avalúo #${av.numero ?? ''} de ${subc} por ${montoAv} fue presentado y requiere tu aprobación.`,
+            modulo: 'financiero',
+            referencia_id: av.id,
+            roles: ['gerente'],
+          })
+        } else if (estado === 'revisado_pm') {
           await notify({
             tipo: 'avaluo_sub_aprobar',
             titulo: `🧾 Subcontract valuation #${av.numero ?? ''} reviewed by PM — awaiting your approval | 🧾 Avalúo de subcontrato #${av.numero ?? ''} revisado por el PM — pendiente de tu aprobación`,
@@ -1955,8 +1959,9 @@ useEffect(() => {
       }
 
       case 'ADD_EQUIPO': {
-        const { fecha, monto, ...rest } = action.payload
-        const item = { ...rest, id: uuid(), created_at: today(), tenant_id: tenantId }
+        // `fecha` = fecha del gasto (entrada del equipo); la usan la Curva S y los reportes.
+        const { monto, ...rest } = action.payload
+        const item = { ...rest, fecha: rest.fecha || rest.eq_fecha_inicio || today(), id: uuid(), created_at: today(), tenant_id: tenantId }
         await sbThrow(supabase.from('equipos').insert(item))
         dispatch({ type: 'ADD_EQUIPO', payload: item })
         break

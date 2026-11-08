@@ -653,7 +653,7 @@ export default function Compras() {
                           <TBtn onClick={() => openPrintSol(sol)}>🖨</TBtn>
 
                           {/* FLUJO: Pendiente — Aprobar activa detección automática */}
-                          {sol.estado === 'pendiente' && can('oc_aprobar') && <>
+                          {sol.estado === 'pendiente' && can('compras_aprobar') && <>
                             <TBtn onClick={async () => {
                               await dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'pendiente_bodega' } })
                               await procesarFlujo(sol.id)
@@ -733,7 +733,7 @@ export default function Compras() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetail(oc.id); setDrawer('detoc') }}>{t('btn_view')}</TBtn>
                           <TBtn onClick={() => openPrintOC(oc)}>🖨</TBtn>
-                          {oc.estado === 'pendiente_aprobacion' && can('oc_aprobar') && <>
+                          {oc.estado === 'pendiente_aprobacion' && can('compras_aprobar') && <>
                             <TBtn onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'aprobada' } })}>{t('btn_approve')}</TBtn>
                             <TBtn danger onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'cancelada' } })}>{t('comp_cancel_oc')}</TBtn>
                           </>}
