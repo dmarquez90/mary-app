@@ -1,4 +1,5 @@
 import { useState, useContext, useMemo, useEffect, useRef } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
@@ -21,7 +22,7 @@ export default function MatPresupuestados() {
   const { can } = usePermissions()
   const { proyectos, presupuesto, materiales, materiales_presupuestados = [], entradas, salidas, solicitud_items = [], solicitudes = [], equipos = [] } = state
 
-  const [proyId, setProyId]   = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId]   = useProyectoActivo(proyectos)
   const [drawer, setDrawer]   = useState(false)
   const [form, setForm]       = useState(emptyForm())
   const [editing, setEditing] = useState(null)

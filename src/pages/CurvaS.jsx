@@ -1,4 +1,5 @@
 import { useState, useMemo, useContext } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { fmt, calcGrandTotal, calcIndirectos, r2, flatBudgetItems, costosSalidasFIFO, localeDe, today } from '../utils'
@@ -40,7 +41,7 @@ export default function CurvaS() {
     subcontratos_contratos = [], subcontratos_avaluos = [], subcontratos_items = [], subcontratos_avaluo_items = [],
     ordenes_cambio = [] } = state
 
-  const [proyId, setProyId]           = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId]           = useProyectoActivo(proyectos)
   const [granularity, setGranularity] = useState('mes')
 
   const proy   = proyectos.find(p => p.id === proyId)

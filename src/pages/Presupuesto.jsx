@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useContext, useRef, Fragment } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { usePermissions } from '../usePermissions'
@@ -25,7 +26,7 @@ export default function Presupuesto() {
   const { can } = usePermissions()
   const { proyectos, presupuesto, presupuesto_indirectos = [], cajas_chicas = [], indirectos_historial = [] } = state
 
-  const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId]         = useProyectoActivo(proyectos)
   const [edit, setEdit]             = useState(null)  // { id, campo } de la celda abierta
   const [editVal, setEditVal]       = useState('')
   const [draft, setDraft]           = useState(null)  // partida nueva sin guardar

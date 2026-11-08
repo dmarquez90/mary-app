@@ -1,4 +1,5 @@
 import { useState, useContext, useMemo, useEffect } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import { useStore } from '../store'
 import { supabase } from '../supabase'
 import { LangContext } from '../i18n'
@@ -25,7 +26,7 @@ export default function Financiero() {
     presupuesto_indirectos = [] } = state
 
   const [tab, setTab]       = useState(0)
-  const [proyId, setProyId] = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId] = useProyectoActivo(proyectos)
   const [drawer, setDrawer] = useState(false)
   const [form, setForm]     = useState({})
   const [editId, setEditId] = useState(null)

@@ -1,4 +1,5 @@
 import { useState, useContext, useMemo } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import ExcelJS from 'exceljs'
 import { filaLogoExcel } from '../logoUtils'
 import { saveAs } from 'file-saver'
@@ -241,7 +242,7 @@ export default function AvaluosCliente() {
     setExportando(false)
   }
 
-  const [proyId, setProyId]             = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId]             = useProyectoActivo(proyectos)
   const [vista, setVista]               = useState('lista')
   const [detailId, setDetailId]         = useState(null)
   const [avForm, setAvForm]             = useState({})

@@ -1,4 +1,5 @@
 import { useState, useMemo, useContext } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { fmt, fmtNum, calcGrandTotal, calcIndirectos, r2 as round2, flatBudgetItems, getPaisLabel, costosSalidasFIFO, fmtFecha, today, unidadCorta } from '../utils'
@@ -2354,7 +2355,7 @@ export default function Reportes() {
   } = state
 
   const [reportType, setReportType] = useState('financiero')
-  const [proyId, setProyId]         = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId]         = useProyectoActivo(proyectos)
   const [desde, setDesde]           = useState('')
   const [hasta, setHasta]           = useState('')
   const [loading, setLoading]       = useState(false)

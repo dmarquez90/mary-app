@@ -1,4 +1,5 @@
 import { useState, useContext, useMemo, useEffect, Fragment } from 'react'
+import { useProyectoActivo } from '../useProyectoActivo'
 import ExcelJS from 'exceljs'
 import { filaLogoExcel } from '../logoUtils'
 import { saveAs } from 'file-saver'
@@ -263,7 +264,7 @@ export default function OrdenesCambio() {
     setExportando(false)
   }
 
-  const [proyId, setProyId]     = useState(proyectos[0]?.id || '')
+  const [proyId, setProyId]     = useProyectoActivo(proyectos)
   const [vista, setVista]       = useState('lista')
   const [drawer, setDrawer]     = useState(null)
   const [detailId, setDetailId] = useState(null)
