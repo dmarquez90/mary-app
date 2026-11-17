@@ -205,6 +205,35 @@ export default function Configuracion({ onNavigate }) {
 
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3500) }
 
+  // ── Datos del solicitante (se precargan en Compras) ─────────────
+  const [datosForm, setDatosForm] = useState({ cargo: '', departamento: '', email_solicitud: '' })
+  const [datosSaving, setDatosSaving] = useState(false)
+  const [datosMsg, setDatosMsg] = useState(null) // { ok: bool, text }
+
+  useEffect(() => {
+    setDatosForm({
+      cargo:           perfil?.cargo || '',
+      departamento:    perfil?.departamento || '',
+      email_solicitud: perfil?.email_solicitud || '',
+    })
+  }, [perfil?.id, perfil?.cargo, perfil?.departamento, perfil?.email_solicitud])
+
+  const guardarDatos = async () => {
+    setDatosSaving(true); setDatosMsg(null)
+    const { error } = await supabase.from('usuarios').update({
+      cargo:           datosForm.cargo.trim() || null,
+      departamento:    datosForm.departamento.trim() || null,
+      email_solicitud: datosForm.email_solicitud.trim() || null,
+    }).eq('id', perfil.id)
+    if (error) {
+      setDatosMsg({ ok: false, text: (isEs ? 'No se pudo guardar: ' : 'Could not save: ') + error.message })
+    } else {
+      await refreshPerfil?.()
+      setDatosMsg({ ok: true, text: isEs ? 'Datos guardados. Se usarán en tus próximas solicitudes.' : 'Saved. They will be used in your next requests.' })
+    }
+    setDatosSaving(false)
+  }
+
   // ── Logo de la empresa ───────────────────────────────
   const [logoSaving, setLogoSaving] = useState(false)
   const [logoError, setLogoError]   = useState('')
@@ -856,6 +885,49 @@ export default function Configuracion({ onNavigate }) {
 
       {activeTab === 'micuenta' && (
         <div className="max-w-md mx-auto">
+          {/* DATOS DEL SOLICITANTE */}
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">
+            {isEs ? 'Mis datos de solicitante' : 'My requester details'}
+          </h2>
+          <p className="text-xs text-gray-400 mb-3">
+            {isEs
+              ? 'Se completan automáticamente cuando creas una solicitud de compra, para no escribirlos cada vez.'
+              : 'Filled in automatically when you create a purchase request, so you do not retype them each time.'}
+          </p>
+          <div className="m-card p-5 flex flex-col gap-4 mb-8">
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Cargo' : 'Position'}</label>
+              <input className={inputCls} value={datosForm.cargo}
+                onChange={e => setDatosForm(f => ({ ...f, cargo: e.target.value }))}
+                placeholder={isEs ? 'Ej: Residente de obra' : 'e.g. Site engineer'} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Departamento' : 'Department'}</label>
+              <input className={inputCls} value={datosForm.departamento}
+                onChange={e => setDatosForm(f => ({ ...f, departamento: e.target.value }))}
+                placeholder={isEs ? 'Ej: Operaciones' : 'e.g. Operations'} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">{isEs ? 'Correo para solicitudes' : 'Email for requests'}</label>
+              <input type="email" className={inputCls} value={datosForm.email_solicitud}
+                onChange={e => setDatosForm(f => ({ ...f, email_solicitud: e.target.value }))}
+                placeholder={perfil?.email || 'email@company.com'} />
+              <p className="text-xs text-gray-400 mt-1">
+                {isEs ? 'Si lo dejas vacío se usa tu correo de acceso.' : 'If left empty, your login email is used.'}
+              </p>
+            </div>
+            {datosMsg && (
+              <div className={`rounded-lg px-3 py-2 text-xs border ${datosMsg.ok ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                {datosMsg.text}
+              </div>
+            )}
+            <button onClick={guardarDatos} disabled={datosSaving}
+              className="w-full px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-60"
+              style={{ background: BRAND }}>
+              {datosSaving ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar datos' : 'Save details')}
+            </button>
+          </div>
+
           <h2 className="text-sm font-semibold text-gray-700 mb-4">
             {isEs ? 'Cambiar contraseña' : 'Change password'}
           </h2>

@@ -2,7 +2,7 @@ import { useState, useContext, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../store'
 import { LangContext } from '../i18n'
 import { today, unidadCorta } from '../utils'
-import { Drawer, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
+import { Drawer, Modal, EmptyState, Badge, Field, PrimaryBtn, SecondaryBtn, TBtn, Icons, inputCls, selectCls, PageHeader } from '../components'
 import { supabase } from '../supabase'
 import { usePermissions } from '../usePermissions'
 import { useAuth } from '../auth'
@@ -60,11 +60,24 @@ const printStyles = `
   }
 `
 
+// Ítem vacío de solicitud. _k es una clave estable para React: como los ítems nuevos
+// se agregan arriba, usar el índice como key mezclaría el estado entre filas.
+const newSolItem = () => ({
+  _k: crypto.randomUUID(),
+  material_id: '', cantidad: '', unidad: 'und', actividad_id: '', descripcion_libre: '',
+  es_adicional: false, observaciones: '', tipo_item: 'material', eq_tipo_propiedad: 'alquilado',
+  eq_fecha_inicio: '', eq_fecha_fin: '', eq_dias_uso: '',
+})
+
 // ── BUSCADOR DE MATERIAL ──────────────────────────────────
-function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
+// Si se pasa onFreeText, el texto escrito se guarda como descripción libre
+// (antes se perdía si no se hacía clic en un resultado del catálogo).
+function MaterialSearchInput({ materiales, value, onChange, placeholder, freeText, onFreeText }) {
   const { lang } = useContext(LangContext)
   const isEs = lang === 'ES'
-  const [query, setQuery] = useState('')
+  const [localQuery, setLocalQuery] = useState('')
+  const query    = onFreeText ? (freeText || '') : localQuery
+  const setQuery = onFreeText ? onFreeText : setLocalQuery
   const [open, setOpen]   = useState(false)
   const ref               = useRef(null)
   const selected          = materiales.find(m => m.id === value)
@@ -82,7 +95,7 @@ function MaterialSearchInput({ materiales, value, onChange, placeholder }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const select = (m) => { onChange(m.id); setQuery(''); setOpen(false) }
+  const select = (m) => { onChange(m.id); if (!onFreeText) setQuery(''); setOpen(false) }
   const clear  = () => { onChange(''); setQuery('') }
 
   return (
@@ -235,7 +248,7 @@ export default function Compras() {
   const [tab, setTab]       = useState(0)
   const [drawer, setDrawer] = useState(null)
   const [form, setForm]     = useState({})
-  const [solItems, setSolItems] = useState([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
+  const [solItems, setSolItems] = useState(() => [newSolItem()])
   const [detail, setDetail] = useState(null)
   const [printDoc, setPrintDoc] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
@@ -255,7 +268,7 @@ export default function Compras() {
 
   const saveSol = async () => {
     if (!form.proyecto_id) return
-    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre || i.mat_pres_id) && i.cantidad)
+    const validItems = solItems.filter(i => (i.material_id || i.descripcion_libre?.trim() || i.mat_pres_id) && parseFloat(i.cantidad) > 0)
     if (!validItems.length) return
 
     const itemsResueltos = await Promise.all(validItems.map(async (it) => {
@@ -333,7 +346,32 @@ export default function Compras() {
     })
 
     setDrawer(null)
-    setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
+    setSolItems([newSolItem()])
+  }
+
+  // Abre el formulario de solicitud precargando los datos del solicitante desde su perfil
+  const openSolDrawer = () => {
+    setForm({
+      proyecto_id: '', folio: genFolio(), justificacion: '',
+      nombre_solicitante: perfil?.nombre || '',
+      cargo_solicitante:  perfil?.cargo || '',
+      departamento:       perfil?.departamento || '',
+      email_solicitante:  perfil?.email_solicitud || perfil?.email || '',
+      fecha_requerida: '', prioridad: 'normal', observaciones_generales: '',
+    })
+    setSolItems([newSolItem()])
+    setDrawer('sol')
+  }
+
+  // Abre el formulario de OC precargando "Elaboró" con el usuario actual
+  const openOCForm = () => {
+    setForm({
+      solicitud_id: '', proveedor: '',
+      elaboro_nombre: perfil?.nombre || '', elaboro_cargo: perfil?.cargo || '',
+      solicitante_nombre: '', solicitante_cargo: '', aprobador_nombre: '', aprobador_cargo: '', notas: '',
+    })
+    setOcItems([])
+    setDrawer('oc')
   }
 
   const [ocItems, setOcItems] = useState([])
@@ -384,7 +422,8 @@ export default function Compras() {
   const detOC      = ordenes_compra.find(oc => oc.id === detail)
   const detOCItems = detOC ? solicitud_items.filter(i => i.solicitud_id === detOC.solicitud_id) : []
 
-  const addSolItem    = () => setSolItems(items => [...items, { material_id:'', cantidad:'', unidad:'und', actividad_id:'', descripcion_libre:'', es_adicional:false, observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
+  // El ítem nuevo va arriba: así siempre queda visible sin bajar el scroll
+  const addSolItem    = () => setSolItems(items => [newSolItem(), ...items])
   const setSolItem    = (idx, k, v) => setSolItems(items => items.map((it,i) => i === idx ? { ...it, [k]:v } : it))
   const removeSolItem = (idx) => setSolItems(items => items.filter((_,i) => i !== idx))
 
@@ -402,7 +441,7 @@ export default function Compras() {
       proveedor:          '',
       impuesto_pct:       proySol?.impuesto_pct ? String(proySol.impuesto_pct) : '',
       elaboro_nombre:     perfil?.nombre || '',
-      elaboro_cargo:      '',
+      elaboro_cargo:      perfil?.cargo || '',
       solicitante_nombre: sol.nombre_solicitante || '',
       solicitante_cargo:  sol.cargo_solicitante  || '',
       aprobador_nombre:   '',
@@ -581,17 +620,10 @@ export default function Compras() {
             {syncing ? '⟳' : '↺'}
           </button>
         {tab === 0 && can('solicitud_crear') && (
-          <PrimaryBtn onClick={() => {
-            setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante: perfil?.nombre || '', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
-            setDrawer('sol')
-          }}>{t('comp_new_sol')}</PrimaryBtn>
+          <PrimaryBtn onClick={openSolDrawer}>{t('comp_new_sol')}</PrimaryBtn>
         )}
         {tab === 1 && can('oc_crear') && (
-          <PrimaryBtn onClick={() => {
-            setForm({ solicitud_id:'', proveedor:'', elaboro_nombre:'', elaboro_cargo:'', solicitante_nombre:'', solicitante_cargo:'', aprobador_nombre:'', aprobador_cargo:'', notas:'' })
-            setDrawer('oc')
-          }}>{t('comp_new_oc')}</PrimaryBtn>
+          <PrimaryBtn onClick={openOCForm}>{t('comp_new_oc')}</PrimaryBtn>
         )}
         </>}
       />
@@ -612,11 +644,7 @@ export default function Compras() {
       {/* SOLICITUDES */}
       {tab === 0 && (
         solicitudes.length === 0 ? (
-          <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={can('solicitud_crear') ? t('comp_new_sol') : null} onAction={can('solicitud_crear') ? () => {
-            setForm({ proyecto_id:'', folio: genFolio(), justificacion:'', nombre_solicitante: perfil?.nombre || '', cargo_solicitante:'', email_solicitante:'', departamento:'', fecha_requerida:'', prioridad:'normal', observaciones_generales:'' })
-            setSolItems([{ material_id:'', cantidad:'', unidad:'und', actividad_id:'', observaciones:'', tipo_item:'material', eq_tipo_propiedad:'alquilado', eq_fecha_inicio:'', eq_fecha_fin:'', eq_dias_uso:'' }])
-            setDrawer('sol')
-          } : null} />
+          <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={can('solicitud_crear') ? t('comp_new_sol') : null} onAction={can('solicitud_crear') ? openSolDrawer : null} />
         ) : (
           <div className="m-card overflow-x-auto">
             <table className="w-full">
@@ -751,8 +779,27 @@ export default function Compras() {
       )}
 
       {/* DRAWER SOLICITUD */}
-      <Drawer open={drawer==='sol'} onClose={() => setDrawer(null)} title={t('comp_form_sol_title')} width={560}>
-        <div className="grid grid-cols-2 gap-3">
+      <Modal open={drawer==='sol'} onClose={() => setDrawer(null)} title={t('comp_form_sol_title')} width={1040}
+        footer={<>
+          {(() => {
+            const faltantes = []
+            if (!form.proyecto_id) faltantes.push(isEs ? 'selecciona un proyecto' : 'select a project')
+            if (!solItems.some(i => (i.material_id || i.descripcion_libre?.trim() || i.mat_pres_id) && parseFloat(i.cantidad) > 0))
+              faltantes.push(isEs ? 'agrega al menos un ítem con material/descripción y cantidad mayor a 0' : 'add at least one item with a material/description and quantity above 0')
+            if (!faltantes.length) return null
+            return (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mr-auto">
+                {isEs ? 'Para enviar: ' : 'To submit: '}{faltantes.join(isEs ? ' y ' : ' and ')}.
+              </p>
+            )
+          })()}
+          <SecondaryBtn onClick={() => setDrawer(null)}>{t('btn_cancel')}</SecondaryBtn>
+          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || !solItems.some(i => (i.material_id || i.descripcion_libre?.trim() || i.mat_pres_id) && parseFloat(i.cantidad) > 0)}>
+            {t('comp_form_submit')}
+          </PrimaryBtn>
+        </>}>
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Field label={t('comp_sol_folio')}>
             <input className={inputCls} value={form.folio||''} onChange={set('folio')} placeholder="SOL-2026-001" />
           </Field>
@@ -764,8 +811,6 @@ export default function Compras() {
               ))}
             </select>
           </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <Field label={t('comp_sol_req_date')}>
             <input type="date" className={inputCls} value={form.fecha_requerida||''} onChange={set('fecha_requerida')} />
           </Field>
@@ -779,19 +824,20 @@ export default function Compras() {
         </div>
 
         <div className="border-t border-gray-100 pt-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('comp_requester_info')}</p>
-          <Field label={t('comp_requester_name')}>
-            <input className={inputCls} value={form.nombre_solicitante||''} onChange={set('nombre_solicitante')} placeholder={t('comp_requester_name')} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3 mt-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{t('comp_requester_info')}</p>
+          <p className="text-xs text-gray-400 mb-3">
+            {isEs ? 'Se completa con tus datos de Configuración → Mi cuenta.' : 'Filled from your Settings → My account data.'}
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Field label={t('comp_requester_name')}>
+              <input className={inputCls} value={form.nombre_solicitante||''} onChange={set('nombre_solicitante')} placeholder={t('comp_requester_name')} />
+            </Field>
             <Field label={t('comp_requester_position')}>
               <input className={inputCls} value={form.cargo_solicitante||''} onChange={set('cargo_solicitante')} placeholder={t('comp_requester_position')} />
             </Field>
             <Field label={t('comp_requester_dept')}>
               <input className={inputCls} value={form.departamento||''} onChange={set('departamento')} placeholder={t('comp_requester_dept')} />
             </Field>
-          </div>
-          <div className="mt-2">
             <Field label={t('comp_sol_email')}>
               <input type="email" className={inputCls} value={form.email_solicitante||''} onChange={set('email_solicitante')} placeholder="email@company.com" />
             </Field>
@@ -812,9 +858,10 @@ export default function Compras() {
           </div>
           <div className="flex flex-col gap-3">
             {solItems.map((it, idx) => (
-              <div key={idx} className="rounded-xl p-3 flex flex-col gap-2 border border-gray-200 bg-gray-50">
+              <div key={it._k || idx} className="rounded-xl p-3 flex flex-col gap-2 border border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-500">#{idx + 1}</span>
+                  {/* Numeración descendente: el ítem nuevo (arriba) tiene el número más alto, los anteriores conservan el suyo */}
+                  <span className="text-xs font-semibold text-gray-500">#{solItems.length - idx}</span>
                   <div className="flex items-center gap-2">
                     {/* Badge tipo equipo */}
                     {it.tipo_item === 'equipo_alquilado' && (
@@ -919,7 +966,9 @@ export default function Compras() {
                       setSolItem(idx, 'descripcion_libre', '')
                     }
                   }}
-                  placeholder={t('inv_form_material') + '...'}
+                  freeText={it.material_id ? '' : (it.descripcion_libre || '')}
+                  onFreeText={v => setSolItem(idx, 'descripcion_libre', v)}
+                  placeholder={isEs ? 'Buscar en catálogo o escribir descripción...' : 'Search catalog or type a description...'}
                 />
 
              {/* Aviso: material no está en el presupuesto del proyecto */}
@@ -956,10 +1005,6 @@ export default function Compras() {
                 {/* Campo libre — siempre visible si no hay material del catálogo */}
                 {!it.material_id && (
                   <>
-                    <input className={inputCls}
-                      placeholder={t('btn_cancel') === 'Cancel' ? 'Or write description freely...' : 'O escribe libremente (ej: Lapiz...)'}
-                      value={it.descripcion_libre||''}
-                      onChange={e => setSolItem(idx, 'descripcion_libre', e.target.value)} />
                     {it.descripcion_libre && (
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" className="w-3.5 h-3.5 accent-[#1B3A6B]"
@@ -1018,16 +1063,16 @@ export default function Compras() {
           <textarea className={inputCls} rows={2} value={form.observaciones_generales||''} onChange={set('observaciones_generales')} placeholder={t('comp_sol_general_remarks_ph')} />
         </Field>
 
-        <div className="flex gap-2 mt-auto pt-2">
-          <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-          <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || solItems.every(i=>(!i.material_id&&!i.descripcion_libre&&!i.mat_pres_id)||!i.cantidad)} className="flex-1">
-            {t('comp_form_submit')}
-          </PrimaryBtn>
-        </div>
-      </Drawer>
+      </div>
+      </Modal>
 
-      {/* DRAWER OC */}
-      <Drawer open={drawer==='oc'} onClose={() => setDrawer(null)} title={t('comp_form_oc_title')} width={600}>
+      {/* MODAL OC */}
+      <Modal open={drawer==='oc'} onClose={() => setDrawer(null)} title={t('comp_form_oc_title')} width={1040}
+        footer={<>
+          <SecondaryBtn onClick={() => setDrawer(null)}>{t('btn_cancel')}</SecondaryBtn>
+          <PrimaryBtn onClick={saveOC} disabled={!form.solicitud_id||!form.proveedor}>{t('comp_form_create_oc')}</PrimaryBtn>
+        </>}>
+      <div className="flex flex-col gap-4">
         <div>
           <label className="text-xs font-medium text-gray-500 block mb-1">{t('comp_form_sol_ref')} *</label>
           <SolicitudSearchInput
@@ -1117,7 +1162,7 @@ export default function Compras() {
                 const impItem = subtotalItem * (parseFloat(it.impuesto_pct || form.impuesto_pct || 0)/100)
                 const totalItem = subtotalItem + impItem
                 return (
-                  <div key={idx} className={`border rounded-xl p-3 ${isEquipo ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
+                  <div key={it.solicitud_item_id || idx} className={`border rounded-xl p-3 ${isEquipo ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       {it.codigo && <span className="font-mono text-xs text-gray-400">{it.codigo}</span>}
                       <span className="text-sm font-medium text-gray-800 flex-1">{it.descripcion}</span>
@@ -1206,11 +1251,8 @@ export default function Compras() {
         <Field label={t('lbl_notes')}>
           <textarea className={inputCls} rows={2} value={form.notas||''} onChange={set('notas')} placeholder={t('comp_notes_ph')} />
         </Field>
-        <div className="flex gap-2 mt-auto pt-2">
-          <SecondaryBtn onClick={() => setDrawer(null)} className="flex-1">{t('btn_cancel')}</SecondaryBtn>
-          <PrimaryBtn onClick={saveOC} disabled={!form.solicitud_id||!form.proveedor} className="flex-1">{t('comp_form_create_oc')}</PrimaryBtn>
-        </div>
-      </Drawer>
+      </div>
+      </Modal>
 
       {/* DRAWER DETALLE SOLICITUD */}
       <Drawer open={drawer==='detalle'} onClose={() => setDrawer(null)} title={t('comp_detail_sol')} width={440}>
