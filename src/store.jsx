@@ -126,6 +126,15 @@ function reducer(state, action) {
       return { ...state, solicitudes: [...state.solicitudes, action.payload.solicitud], solicitud_items: [...state.solicitud_items, ...action.payload.items] }
     case 'UPD_SOLICITUD_ESTADO':
       return { ...state, solicitudes: state.solicitudes.map(s => s.id === action.payload.id ? { ...s, estado: action.payload.estado } : s) }
+    case 'UPD_SOLICITUD':
+      return {
+        ...state,
+        solicitudes: state.solicitudes.map(s => s.id === action.payload.solicitud.id ? { ...s, ...action.payload.solicitud } : s),
+        solicitud_items: [
+          ...state.solicitud_items.filter(i => i.solicitud_id !== action.payload.solicitud.id),
+          ...action.payload.items,
+        ],
+      }
     case 'REFRESH_SOLICITUDES':
       return { ...state, solicitudes: action.payload.solicitudes, solicitud_items: action.payload.items }
     case 'DEL_SOLICITUD':
@@ -1472,6 +1481,25 @@ useEffect(() => {
         // Aprobadores: GG (también por correo) y Administrador (solo aviso en la app)
         await notify({ ...avisoSol, tipo: 'solicitud_nueva', roles: ['gerente_general', 'client_admin'] })
         await notify({ ...avisoSol, tipo: 'solicitud', roles: ['gerente', 'coordinador'] })
+        break
+      }
+      case 'UPD_SOLICITUD': {
+        // Editar una solicitud: solo mientras está pendiente de aprobación (antes de
+        // procesar el flujo bodega/OC, cuando ningún otro registro depende de sus ítems).
+        const { id } = action.payload.solicitud
+        const { data: actual } = await supabase.from('solicitudes').select('estado').eq('id', id).single()
+        if (actual?.estado !== 'pendiente') {
+          throw new Error('Solo se puede editar una solicitud pendiente de aprobación. / Only requests pending approval can be edited.')
+        }
+        const { estado, created_at, tenant_id, ...campos } = action.payload.solicitud
+        await sbThrow(supabase.from('solicitudes').update(campos).eq('id', id))
+        // Ítems: primero insertar los nuevos y luego borrar los anteriores,
+        // así si la inserción falla la solicitud conserva sus ítems originales.
+        const viejos = state.solicitud_items.filter(i => i.solicitud_id === id).map(i => i.id)
+        const items  = (action.payload.items || []).map(it => ({ ...it, id: uuid(), solicitud_id: id, tenant_id: tenantId }))
+        if (items.length) await sbThrow(supabase.from('solicitud_items').insert(items))
+        if (viejos.length) await sbThrow(supabase.from('solicitud_items').delete().in('id', viejos))
+        dispatch({ type: 'UPD_SOLICITUD', payload: { solicitud: campos, items } })
         break
       }
       case 'UPD_SOLICITUD_ESTADO': {

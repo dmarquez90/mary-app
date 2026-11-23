@@ -254,6 +254,7 @@ export default function Compras() {
   const [confirmDel, setConfirmDel] = useState(null)
   const [confirmRej, setConfirmRej] = useState(null) // { type: 'sol'|'oc', item }
   const [filtroProy, setFiltroProy] = useState('')   // '' = todos los proyectos
+  const [editSolId, setEditSolId]   = useState(null) // id de la solicitud en edición (null = nueva)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   // Filtro por proyecto (aplica a Solicitudes y Órdenes de compra)
@@ -301,8 +302,9 @@ export default function Compras() {
       return it
     }))
 
-    dispatch({ type: 'ADD_SOLICITUD', payload: {
+    dispatch({ type: editSolId ? 'UPD_SOLICITUD' : 'ADD_SOLICITUD', payload: {
       solicitud: {
+        ...(editSolId ? { id: editSolId } : {}),
         proyecto_id:             form.proyecto_id,
         actividad_id:            null,
         folio:                   form.folio || genFolio(),
@@ -357,11 +359,50 @@ export default function Compras() {
     })
 
     setDrawer(null)
+    setEditSolId(null)
     setSolItems([newSolItem()])
+  }
+
+  // Editar: solo solicitudes pendientes de aprobación; quien crea o quien aprueba solicitudes
+  const puedeEditarSol = (sol) => sol.estado === 'pendiente' && (can('solicitud_crear') || can('compras_aprobar'))
+
+  // Abre el mismo formulario con los datos de una solicitud existente
+  const openEditSol = (sol) => {
+    setForm({
+      proyecto_id:             sol.proyecto_id || '',
+      folio:                   sol.folio || '',
+      justificacion:           sol.justificacion || '',
+      nombre_solicitante:      sol.nombre_solicitante || '',
+      cargo_solicitante:       sol.cargo_solicitante || '',
+      departamento:            sol.departamento || '',
+      email_solicitante:       sol.email_solicitante || '',
+      fecha_requerida:         sol.fecha_requerida || '',
+      prioridad:               sol.prioridad || 'normal',
+      observaciones_generales: sol.observaciones_generales || '',
+    })
+    const items = solicitud_items.filter(i => i.solicitud_id === sol.id)
+    setSolItems(items.length ? items.map(it => ({
+      ...newSolItem(),
+      material_id:       it.material_id || '',
+      descripcion_libre: it.descripcion || '',
+      cantidad:          it.cantidad ?? '',
+      unidad:            it.unidad || 'und',
+      actividad_id:      it.actividad_id || '',
+      es_adicional:      !!it.es_adicional,
+      observaciones:     it.observaciones || '',
+      tipo_item:         it.tipo_item || 'material',
+      eq_tipo_propiedad: it.eq_tipo_propiedad || 'alquilado',
+      eq_fecha_inicio:   it.eq_fecha_inicio || '',
+      eq_fecha_fin:      it.eq_fecha_fin || '',
+      eq_dias_uso:       it.eq_dias_uso ?? '',
+    })) : [newSolItem()])
+    setEditSolId(sol.id)
+    setDrawer('sol')
   }
 
   // Abre el formulario de solicitud precargando los datos del solicitante desde su perfil
   const openSolDrawer = () => {
+    setEditSolId(null)
     setForm({
       proyecto_id: '', folio: genFolio(), justificacion: '',
       nombre_solicitante: perfil?.nombre || '',
@@ -742,6 +783,7 @@ export default function Compras() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetail(sol.id); setDrawer('detalle') }}>{t('btn_view')}</TBtn>
                           <TBtn onClick={() => openPrintSol(sol)}>🖨</TBtn>
+                          {puedeEditarSol(sol) && <TBtn onClick={() => openEditSol(sol)}>{t('btn_edit')}</TBtn>}
 
                           {/* FLUJO: Pendiente — Aprobar activa detección automática */}
                           {sol.estado === 'pendiente' && puedeAprobar && <>
@@ -839,7 +881,8 @@ export default function Compras() {
       )}
 
       {/* DRAWER SOLICITUD */}
-      <Modal open={drawer==='sol'} onClose={() => setDrawer(null)} title={t('comp_form_sol_title')} width={1040}
+      <Modal open={drawer==='sol'} onClose={() => { setDrawer(null); setEditSolId(null) }}
+        title={editSolId ? (isEs ? `Editar solicitud ${form.folio || ''}` : `Edit request ${form.folio || ''}`) : t('comp_form_sol_title')} width={1040}
         footer={<>
           {(() => {
             const faltantes = []
@@ -853,9 +896,9 @@ export default function Compras() {
               </p>
             )
           })()}
-          <SecondaryBtn onClick={() => setDrawer(null)}>{t('btn_cancel')}</SecondaryBtn>
+          <SecondaryBtn onClick={() => { setDrawer(null); setEditSolId(null) }}>{t('btn_cancel')}</SecondaryBtn>
           <PrimaryBtn onClick={saveSol} disabled={!form.proyecto_id || !solItems.some(i => (i.material_id || i.descripcion_libre?.trim() || i.mat_pres_id) && parseFloat(i.cantidad) > 0)}>
-            {t('comp_form_submit')}
+            {editSolId ? (isEs ? 'Guardar cambios' : 'Save changes') : t('comp_form_submit')}
           </PrimaryBtn>
         </>}>
       <div className="flex flex-col gap-4">
@@ -866,7 +909,7 @@ export default function Compras() {
           <Field label={t('comp_form_project')} required>
             <select className={selectCls} value={form.proyecto_id||''} onChange={e => setForm(f=>({...f, proyecto_id:e.target.value}))}>
               <option value="">{t('lbl_select')}</option>
-              {proyectos.filter(p=>p.estado!=='completado'&&p.estado!=='cancelado').map(p=>(
+              {proyectos.filter(p=>(p.estado!=='completado'&&p.estado!=='cancelado') || p.id===form.proyecto_id).map(p=>(
                 <option key={p.id} value={p.id}>{p.project_code} — {p.nombre}</option>
               ))}
             </select>
@@ -1397,6 +1440,9 @@ export default function Compras() {
             </div>
           )}
           <div className="flex gap-2">
+            {puedeEditarSol(detSol) && (
+              <SecondaryBtn onClick={() => openEditSol(detSol)} className="flex-1">✎ {t('btn_edit')}</SecondaryBtn>
+            )}
             <PrimaryBtn onClick={() => openPrintSol(detSol)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
             {puedeBorrarSol && <button onClick={() => setConfirmDel({ type:'sol', id:detSol.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>}
           </div>
