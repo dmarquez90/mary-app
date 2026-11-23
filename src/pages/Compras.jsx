@@ -252,7 +252,18 @@ export default function Compras() {
   const [detail, setDetail] = useState(null)
   const [printDoc, setPrintDoc] = useState(null)
   const [confirmDel, setConfirmDel] = useState(null)
+  const [confirmRej, setConfirmRej] = useState(null) // { type: 'sol'|'oc', item }
+  const [filtroProy, setFiltroProy] = useState('')   // '' = todos los proyectos
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Filtro por proyecto (aplica a Solicitudes y Órdenes de compra)
+  const solsFiltradas = filtroProy ? solicitudes.filter(s => s.proyecto_id === filtroProy) : solicitudes
+  const ocsFiltradas  = filtroProy ? ordenes_compra.filter(oc => oc.proyecto_id === filtroProy) : ordenes_compra
+  // Solo se listan proyectos que tienen solicitudes u OC
+  const proyIdsConCompras = new Set([...solicitudes, ...ordenes_compra].map(x => x.proyecto_id).filter(Boolean))
+  const proyectosFiltro = proyectos
+    .filter(p => proyIdsConCompras.has(p.id))
+    .sort((a, b) => (a.project_code || a.nombre || '').localeCompare(b.project_code || b.nombre || ''))
 
   const TABS             = [t('comp_tab_sol'), t('comp_tab_oc')]
   const todasActsDelProy = presupuesto.filter(b => b.proyecto_id === form.proyecto_id && b.tipo === 'actividad')
@@ -475,10 +486,10 @@ export default function Compras() {
     setDrawer('oc')
   }
 
-  const pendSol = solicitudes.filter(s =>
+  const pendSol = solsFiltradas.filter(s =>
     ['pendiente', 'pendiente_bodega', 'pendiente_oc', 'dividida'].includes(s.estado)
   ).length
-  const pendOC  = ordenes_compra.filter(oc => oc.estado === 'pendiente_aprobacion').length
+  const pendOC  = ocsFiltradas.filter(oc => oc.estado === 'pendiente_aprobacion').length
 
   // Sync desde Supabase — por si el store tiene datos desincronizados
   const [syncing, setSyncing] = useState(false)
@@ -564,6 +575,20 @@ export default function Compras() {
     setPrintDoc({ type:'oc', oc, items, proy })
   }
 
+  // ── Aprobar / rechazar (Gerente General y Administrador: permiso compras_aprobar) ──
+  const puedeAprobar = can('compras_aprobar')
+  const aprobarSol = async (sol) => {
+    await dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'pendiente_bodega' } })
+    await procesarFlujo(sol.id)
+  }
+  const aprobarOC = (oc) => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'aprobada' } })
+  const confirmarRechazo = async () => {
+    const { type, item } = confirmRej
+    setConfirmRej(null)
+    if (type === 'sol') await dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:item.id, estado:'rechazada' } })
+    else                await dispatch({ type:'UPD_OC_ESTADO',        payload:{ id:item.id, estado:'rechazada' } })
+  }
+
   const PRIORIDAD_COLORS = {
     normal:  'bg-gray-100 text-gray-600',
     alta:    'bg-amber-100 text-amber-700',
@@ -585,6 +610,24 @@ export default function Compras() {
             <div className="flex justify-end gap-2">
               <SecondaryBtn onClick={() => setConfirmDel(null)}>{t('btn_cancel')}</SecondaryBtn>
               <button onClick={confirmDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">{t('btn_delete')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAR RECHAZO */}
+      {confirmRej && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-xl p-5 sm:p-6 max-w-sm w-full mx-4 max-h-[90dvh] overflow-y-auto">
+            <p className="text-sm font-semibold text-gray-800 mb-1">
+              {confirmRej.type === 'sol'
+                ? (isEs ? `¿Rechazar la solicitud ${confirmRej.item.folio || ''}?` : `Reject request ${confirmRej.item.folio || ''}?`)
+                : (isEs ? `¿Rechazar la orden de compra ${confirmRej.item.oc_number || ''}?` : `Reject purchase order ${confirmRej.item.oc_number || ''}?`)}
+            </p>
+            <p className="text-sm text-gray-500 mb-5">{isEs ? 'Esta acción no se puede deshacer.' : 'This action cannot be undone.'}</p>
+            <div className="flex justify-end gap-2">
+              <SecondaryBtn onClick={() => setConfirmRej(null)}>{t('btn_cancel')}</SecondaryBtn>
+              <button onClick={confirmarRechazo} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">{t('btn_reject')}</button>
             </div>
           </div>
         </div>
@@ -641,10 +684,30 @@ export default function Compras() {
         ))}
       </div>
 
+      {/* FILTRO POR PROYECTO */}
+      {(solicitudes.length > 0 || ordenes_compra.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <label className="text-xs font-medium text-gray-500">{isEs ? 'Proyecto' : 'Project'}</label>
+          <select className={selectCls} style={{ maxWidth: 320 }} value={filtroProy} onChange={e => setFiltroProy(e.target.value)}>
+            <option value="">{isEs ? 'Todos los proyectos' : 'All projects'}</option>
+            {proyectosFiltro.map(p => (
+              <option key={p.id} value={p.id}>{p.project_code ? `${p.project_code} — ${p.nombre || ''}` : p.nombre}</option>
+            ))}
+          </select>
+          {filtroProy && (
+            <button onClick={() => setFiltroProy('')} className="text-xs text-gray-500 hover:text-gray-700 underline">
+              {isEs ? 'Quitar filtro' : 'Clear filter'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* SOLICITUDES */}
       {tab === 0 && (
         solicitudes.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_sol')} action={can('solicitud_crear') ? t('comp_new_sol') : null} onAction={can('solicitud_crear') ? openSolDrawer : null} />
+        ) : solsFiltradas.length === 0 ? (
+          <EmptyState icon={Icons.purchases} title={isEs ? 'No hay solicitudes para este proyecto' : 'No requests for this project'} />
         ) : (
           <div className="m-card overflow-x-auto">
             <table className="w-full">
@@ -654,7 +717,7 @@ export default function Compras() {
                 ))}
               </tr></thead>
               <tbody>
-                {[...solicitudes].reverse().map(sol => {
+                {[...solsFiltradas].reverse().map(sol => {
                   const proy  = proyectos.find(p => p.id === sol.proyecto_id)
                   const items = solicitud_items.filter(i => i.solicitud_id === sol.id)
                   return (
@@ -681,14 +744,9 @@ export default function Compras() {
                           <TBtn onClick={() => openPrintSol(sol)}>🖨</TBtn>
 
                           {/* FLUJO: Pendiente — Aprobar activa detección automática */}
-                          {sol.estado === 'pendiente' && can('compras_aprobar') && <>
-                            <TBtn onClick={async () => {
-                              await dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'pendiente_bodega' } })
-                              await procesarFlujo(sol.id)
-                            }}>
-                              {t('btn_approve')}
-                            </TBtn>
-                            <TBtn danger onClick={() => dispatch({ type:'UPD_SOLICITUD_ESTADO', payload:{ id:sol.id, estado:'rechazada' } })}>{t('btn_reject')}</TBtn>
+                          {sol.estado === 'pendiente' && puedeAprobar && <>
+                            <TBtn onClick={() => aprobarSol(sol)}>{t('btn_approve')}</TBtn>
+                            <TBtn danger onClick={() => setConfirmRej({ type:'sol', item:sol })}>{t('btn_reject')}</TBtn>
                           </>}
 
                           {/* FLUJO A: Todo en bodega — solo despacho */}
@@ -732,6 +790,8 @@ export default function Compras() {
       {tab === 1 && (
         ordenes_compra.length === 0 ? (
           <EmptyState icon={Icons.purchases} title={t('comp_empty_oc')} subtitle={t('comp_empty_oc_sub')} />
+        ) : ocsFiltradas.length === 0 ? (
+          <EmptyState icon={Icons.purchases} title={isEs ? 'No hay órdenes de compra para este proyecto' : 'No purchase orders for this project'} />
         ) : (
           <div className="m-card overflow-x-auto">
             <table className="w-full">
@@ -741,7 +801,7 @@ export default function Compras() {
                 ))}
               </tr></thead>
               <tbody>
-                {[...ordenes_compra].reverse().map(oc => {
+                {[...ocsFiltradas].reverse().map(oc => {
                   const proy       = proyectos.find(p => p.id === oc.proyecto_id)
                   const ocItemsRow = ordenes_compra_items.filter(i => i.oc_id === oc.id)
                   const tieneEquipo = ocItemsRow.some(i => i.tipo_item === 'equipo_alquilado')
@@ -761,9 +821,9 @@ export default function Compras() {
                         <div className="flex gap-1 flex-wrap">
                           <TBtn onClick={() => { setDetail(oc.id); setDrawer('detoc') }}>{t('btn_view')}</TBtn>
                           <TBtn onClick={() => openPrintOC(oc)}>🖨</TBtn>
-                          {oc.estado === 'pendiente_aprobacion' && can('compras_aprobar') && <>
-                            <TBtn onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'aprobada' } })}>{t('btn_approve')}</TBtn>
-                            <TBtn danger onClick={() => dispatch({ type:'UPD_OC_ESTADO', payload:{ id:oc.id, estado:'cancelada' } })}>{t('comp_cancel_oc')}</TBtn>
+                          {oc.estado === 'pendiente_aprobacion' && puedeAprobar && <>
+                            <TBtn onClick={() => aprobarOC(oc)}>{t('btn_approve')}</TBtn>
+                            <TBtn danger onClick={() => setConfirmRej({ type:'oc', item:oc })}>{t('btn_reject')}</TBtn>
                           </>}
                           {oc.estado === 'aprobada' && <span className="text-xs text-green-600 font-medium px-2">{t('comp_ready_receive')}</span>}
                           {puedeBorrarOC && <TBtn danger onClick={() => setConfirmDel({ type:'oc', id:oc.id })}>{t('btn_delete')}</TBtn>}
@@ -1330,6 +1390,12 @@ export default function Compras() {
             })}
           </div>
           {detSol.observaciones_generales && <div><p className="text-xs text-gray-400">{t('comp_sol_general_remarks')}</p><p className="text-sm text-gray-700">{detSol.observaciones_generales}</p></div>}
+          {detSol.estado === 'pendiente' && puedeAprobar && (
+            <div className="flex gap-2">
+              <PrimaryBtn onClick={async () => { await aprobarSol(detSol); setDrawer(null) }} className="flex-1">✓ {t('btn_approve')}</PrimaryBtn>
+              <button onClick={() => setConfirmRej({ type:'sol', item:detSol })} className="flex-1 px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">✕ {t('btn_reject')}</button>
+            </div>
+          )}
           <div className="flex gap-2">
             <PrimaryBtn onClick={() => openPrintSol(detSol)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
             {puedeBorrarSol && <button onClick={() => setConfirmDel({ type:'sol', id:detSol.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>}
@@ -1375,6 +1441,12 @@ export default function Compras() {
           </div>
           {detOC.notas && <div><p className="text-xs text-gray-400">{t('lbl_notes')}</p><p className="text-sm text-gray-700">{detOC.notas}</p></div>}
           {detOC.estado === 'aprobada' && <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">{t('comp_oc_approved_msg')}</div>}
+          {detOC.estado === 'pendiente_aprobacion' && puedeAprobar && (
+            <div className="flex gap-2">
+              <PrimaryBtn onClick={async () => { await aprobarOC(detOC); setDrawer(null) }} className="flex-1">✓ {t('btn_approve')}</PrimaryBtn>
+              <button onClick={() => setConfirmRej({ type:'oc', item:detOC })} className="flex-1 px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">✕ {t('btn_reject')}</button>
+            </div>
+          )}
           <div className="flex gap-2">
             <PrimaryBtn onClick={() => openPrintOC(detOC)} className="flex-1">🖨 {t('comp_print_btn')}</PrimaryBtn>
             {puedeBorrarOC && <button onClick={() => setConfirmDel({ type:'oc', id:detOC.id })} className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50">{t('btn_delete')}</button>}

@@ -1469,7 +1469,8 @@ useEffect(() => {
           modulo: 'compras',
           referencia_id: sol.id,
         }
-        await notify({ ...avisoSol, tipo: 'solicitud_nueva', roles: ['gerente_general'] })
+        // Aprobadores: GG (también por correo) y Administrador (solo aviso en la app)
+        await notify({ ...avisoSol, tipo: 'solicitud_nueva', roles: ['gerente_general', 'client_admin'] })
         await notify({ ...avisoSol, tipo: 'solicitud', roles: ['gerente', 'coordinador'] })
         break
       }
@@ -1588,14 +1589,14 @@ useEffect(() => {
                    + ` | La OC ${oc_number} por ${r2(monto_total)} (${oc.proveedor || ''}) requiere tu aprobación. Proyecto: ${nombreOCc}`,
           modulo: 'compras',
           referencia_id: oc.id,
-          roles: ['gerente_general'],
+          roles: ['gerente_general', 'client_admin'],
         })
         break
       }
       case 'UPD_OC_ESTADO': {
         // Aprobar o cancelar una OC pendiente: Gerente General, Administrador (y super_admin).
         // Los demás cambios de estado (p. ej. cierre parcial por equipos) siguen como antes.
-        const esDecision = ['aprobada', 'cancelada'].includes(action.payload.estado)
+        const esDecision = ['aprobada', 'cancelada', 'rechazada'].includes(action.payload.estado)
         const rolesAprobar = esDecision
           ? ['super_admin', 'gerente_general', 'client_admin']
           : ['super_admin', 'client_admin', 'gerente_general', 'gerente']
