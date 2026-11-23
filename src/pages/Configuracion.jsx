@@ -277,7 +277,11 @@ export default function Configuracion({ onNavigate }) {
   }
 
   const saveUsuario = async () => {
-    if (!form.nombre || !form.email || !form.rol) return
+    // Antes regresaba sin avisar: el botón Guardar parecía no hacer nada
+    if (!form.nombre || !form.email || !form.rol) {
+      setError(isEs ? 'Completa nombre, correo y rol.' : 'Please fill in name, email and role.')
+      return
+    }
     setSaving(true); setError('')
     try {
       const activos = usuarios.filter(u => u.activo).length
