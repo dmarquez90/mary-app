@@ -86,6 +86,13 @@ const PERMISO_A_MODULO = {
   supervision_ver:      ['supervision','ver'],    supervision_editar:    ['supervision','editar'],
 }
 
+// Usuarios que pueden aprobar TODO sin importar su rol: visto bueno del PM, aprobación
+// del GG y aprobaciones de compras/subcontratos. Espejo del trigger fn_validar_aprobacion
+// (supabase/sql/2026-11-27_aprobador_total.sql).
+const APROBADORES_TOTALES = [
+  '4bbb1929-e3af-4f70-81f4-32a2125f4b0c', // Deybi Marquez
+]
+
 export function usePermissions() {
   const { perfil, plan, isSuperAdmin } = useAuth()
   const rol = perfil?.rol || 'lectura'
@@ -103,9 +110,12 @@ export function usePermissions() {
     'oc_crear','oc_aprobar','compras_aprobar','sc_avaluo_aprobar','pm_revisar','financiero_editar','ordenes_cambio_editar','avaluos_editar',
     'supervision_editar']
 
+  const APROBAR_PERMISOS = ['pm_revisar','oc_aprobar','compras_aprobar','sc_avaluo_aprobar']
+
   const can = (permiso) => {
     if (isReadOnly && EDIT_PERMISOS.includes(permiso)) return false
     if (rol === 'super_admin') return true
+    if (APROBADORES_TOTALES.includes(perfil?.id) && APROBAR_PERMISOS.includes(permiso)) return true
     if (permisosCuston) {
       const mapped = PERMISO_A_MODULO[permiso]
       if (mapped) {
